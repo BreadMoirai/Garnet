@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "redstonespecs:item/auto_spec_marker"
+  }
+}

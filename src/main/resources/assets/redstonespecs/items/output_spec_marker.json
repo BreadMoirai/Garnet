@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "redstonespecs:item/output_spec_marker"
+  }
+}
