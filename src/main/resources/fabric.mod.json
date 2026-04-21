@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "redstonespecs",
+  "version": "${version}",
+  "name": "RedstoneSpecs",
+  "description": "Redstone Specs",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/redstonespecs/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.breadmoirai.redstonespecs.Redstonespecs"
+    ],
+    "client": [
+      "com.breadmoirai.redstonespecs.client.RedstonespecsClient"
+    ]
+  },
+  "mixins": [
+    "redstonespecs.mixins.json",
+    {
+      "config": "redstonespecs.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-language-kotlin": ">=${kotlin_loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
