@@ -1,10 +1,13 @@
 package com.breadmoirai.redstonespecs
 
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.item.SpecMarkerTool
 import com.breadmoirai.redstonespecs.item.UndoStack
 import com.breadmoirai.redstonespecs.network.registerNetworking
+import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.api.ModInitializer
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback
 import net.minecraft.world.InteractionResult
 
@@ -14,6 +17,16 @@ class Redstonespecs : ModInitializer {
         ModRegistries.register()
         registerNetworking()
         registerAttackCallback()
+        registerPhaseHooks()
+    }
+
+    private fun registerPhaseHooks() {
+        ServerTickEvents.START_LEVEL_TICK.register { level ->
+            SpecRunnerCoordinator.onPhase(level, level.server.tickCount, Phase.START_OF_TICK)
+        }
+        ServerTickEvents.END_LEVEL_TICK.register { level ->
+            SpecRunnerCoordinator.onPhase(level, level.server.tickCount, Phase.END_OF_TICK)
+        }
     }
 
     private fun registerAttackCallback() {
