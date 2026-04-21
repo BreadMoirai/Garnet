@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "redstonespecs:block/spec_origin" }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "item.redstonespecs.spec_origin": "Spec Origin",
+  "item.redstonespecs.input_spec_marker": "Input Spec Marker",
+  "item.redstonespecs.output_spec_marker": "Output Spec Marker",
+  "item.redstonespecs.breakpoint_spec_marker": "Breakpoint Spec Marker",
+  "item.redstonespecs.auto_spec_marker": "Auto Spec Marker"
+}
