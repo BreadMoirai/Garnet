@@ -8,7 +8,9 @@ import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
 
 enum class Phase {
-    START_OF_TICK, BLOCK_EVENTS, TILE_ENTITY_TICK, SCHEDULED_TICKS, RANDOM_TICKS, END_OF_TICK;
+    START_OF_TICK, BLOCK_EVENTS, TILE_ENTITY_TICK, SCHEDULED_TICKS, RANDOM_TICKS, END_OF_TICK,
+    /** Inputs fire at START_OF_TICK; outputs are checked at END_OF_TICK. Hidden in Advanced UI. */
+    USER_INTERACTION;
 
     companion object {
         val CODEC: Codec<Phase> = Codec.STRING.comapFlatMap(

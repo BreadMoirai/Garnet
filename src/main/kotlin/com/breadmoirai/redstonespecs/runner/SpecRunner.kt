@@ -70,8 +70,13 @@ class SpecRunner(
     }
 
     private fun applyInputsAt(simTime: SimTime) {
+        // USER_INTERACTION entries fire at START_OF_TICK
+        val userInteractionTime = if (simTime.phase == Phase.START_OF_TICK)
+            simTime.copy(phase = Phase.USER_INTERACTION) else null
         for (input in specCase.inputs) {
-            val (_, condition) = input.entries.find { it.first == simTime } ?: continue
+            val (_, condition) = input.entries.find {
+                it.first == simTime || (userInteractionTime != null && it.first == userInteractionTime)
+            } ?: continue
             val pos = worldPos(input.pos)
             LOGGER.debug("[SpecRunner#applyInputsAt] {} applying condition to {}", simTime, pos)
             applyCondition(condition, pos)
@@ -109,8 +114,13 @@ class SpecRunner(
     }
 
     private fun checkOutputsAt(simTime: SimTime) {
+        // USER_INTERACTION entries are checked at END_OF_TICK
+        val userInteractionTime = if (simTime.phase == Phase.END_OF_TICK)
+            simTime.copy(phase = Phase.USER_INTERACTION) else null
         for (output in specCase.outputs) {
-            val (_, condition) = output.entries.find { it.first == simTime } ?: continue
+            val (_, condition) = output.entries.find {
+                it.first == simTime || (userInteractionTime != null && it.first == userInteractionTime)
+            } ?: continue
             val pos = worldPos(output.pos)
             val state = level.getBlockState(pos)
             val label = output.label.ifEmpty { output.pos.toString() }

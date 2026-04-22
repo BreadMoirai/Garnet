@@ -1,5 +1,7 @@
 package com.breadmoirai.redstonespecs.runner
 
+import com.breadmoirai.redstonespecs.config.DevLevel
+import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
@@ -58,7 +60,9 @@ class AutoSpecRecorder(
     }
 
     fun commit(): SpecCase {
-        fun buildEntries(worldPos: BlockPos): List<Pair<SimTime, StateCondition>> {
+        val standardMode = SharedSettings.devLevel == DevLevel.STANDARD
+
+        fun buildEntries(worldPos: BlockPos, isInput: Boolean): List<Pair<SimTime, StateCondition>> {
             val initBlockState = initBlockStates[worldPos] ?: level.getBlockState(worldPos)
             val initProps = initStates[worldPos] ?: emptyMap()
             val result = mutableListOf<Pair<SimTime, StateCondition>>(
@@ -66,7 +70,9 @@ class AutoSpecRecorder(
             )
             for ((simTime, changes) in recordedChanges) {
                 changes[worldPos]?.let { (stateAtChange, diff) ->
-                    result += simTime to propsToCondition(diff, stateAtChange)
+                    val effectiveTime = if (standardMode && !isInput)
+                        simTime.copy(phase = Phase.END_OF_TICK) else simTime
+                    result += effectiveTime to propsToCondition(diff, stateAtChange)
                 }
             }
             return result
@@ -77,8 +83,8 @@ class AutoSpecRecorder(
         return SpecCase(
             name = caseName,
             lifespan = (ticksElapsed + 1).coerceAtLeast(1),
-            inputs = specCase.inputs.map { it.copy(entries = buildEntries(worldPos(it.pos))) },
-            outputs = specCase.outputs.map { it.copy(entries = buildEntries(worldPos(it.pos))) },
+            inputs = specCase.inputs.map { it.copy(entries = buildEntries(worldPos(it.pos), isInput = true)) },
+            outputs = specCase.outputs.map { it.copy(entries = buildEntries(worldPos(it.pos), isInput = false)) },
             breakpoints = specCase.breakpoints,
             autoSpecs = specCase.autoSpecs,
         )
