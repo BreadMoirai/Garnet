@@ -43,10 +43,14 @@ sealed class PropertyRow {
      */
     abstract fun addWidgetsTo(font: Font, rowX: Int, rowY: Int, addWidget: (AbstractWidget) -> Unit)
 
-    protected fun buildCheckbox(rowX: Int, rowY: Int): Button =
-        Button.builder(Component.literal(if (included) "✓" else " ")) {
+    protected fun buildCheckbox(rowX: Int, rowY: Int): Button {
+        var btn: Button? = null
+        btn = Button.builder(Component.literal(if (included) "✓" else " ")) {
             included = !included
+            btn?.setMessage(Component.literal(if (included) "✓" else " "))
         }.bounds(rowX, rowY, CHECK_W, ROW_H).build()
+        return btn
+    }
 
     // ------------------------------------------------------------------
     // BlockTypeRow — read-only block identity row
@@ -192,9 +196,8 @@ object BlockStateFormBuilder {
                 }
                 is IntegerProperty -> {
                     val currentValue = state.getValue(prop)
-                    val possibleValues = prop.possibleValues
-                    val minVal = possibleValues.first()
-                    val maxVal = possibleValues.last()
+                    val minVal = prop.possibleValues.minOrNull() ?: 0
+                    val maxVal = prop.possibleValues.maxOrNull() ?: 15
                     PropertyRow.IntRow(name = prop.name, value = currentValue, min = minVal, max = maxVal)
                 }
                 else -> {
