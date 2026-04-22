@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.client
 
+import com.breadmoirai.redstonespecs.client.config.ModConfig
 import com.breadmoirai.redstonespecs.client.network.registerClientNetworking
 import com.breadmoirai.redstonespecs.client.render.registerBoundsRenderer
 import com.breadmoirai.redstonespecs.client.render.registerHudOverlay
@@ -12,6 +13,7 @@ class RedstonespecsClient : ClientModInitializer {
 
     override fun onInitializeClient() {
         LOGGER.debug("[RedstonespecsClient#onInitializeClient] initializing client")
+        ModConfig.load()
         registerBoundsRenderer()
         registerClientNetworking()
         registerHudOverlay()

@@ -15,6 +15,9 @@
     ],
     "client": [
       "com.breadmoirai.redstonespecs.client.RedstonespecsClient"
+    ],
+    "modmenu": [
+      "com.breadmoirai.redstonespecs.client.config.ModMenuIntegration"
     ]
   },
   "mixins": [
