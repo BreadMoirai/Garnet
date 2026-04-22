@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "redstonespecs-test",
+  "version": "1.0.0",
+  "name": "RedstoneSpecs Testmod",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "com.breadmoirai.redstonespecs.test.LeverLampSpecTest"
+    ],
+    "fabric-client-gametest": [
+      "com.breadmoirai.redstonespecs.test.RedstonespecsClientTests"
+    ]
+  },
+  "depends": {
+    "redstonespecs": "*"
+  }
+}
