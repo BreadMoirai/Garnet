@@ -87,8 +87,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitForScreen(YACLScreen::class.java)
         ctx.setYaclOption("Tick", 0)
         ctx.setYaclOption("Phase", "START_OF_TICK")
-        ctx.setYaclOption("Include", true, groupName = "powered")
-        ctx.setYaclOption("Value", true, groupName = "powered")
+        ctx.setYaclOption("powered", "true")
         ctx.clickButton("Save Changes")
         ctx.waitForScreen(YACLScreen::class.java)
 
@@ -108,8 +107,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitForScreen(YACLScreen::class.java)
         ctx.setYaclOption("Tick", 0)
         // Phase stays END_OF_TICK (default)
-        ctx.setYaclOption("Include", true, groupName = "lit")
-        ctx.setYaclOption("Value", true, groupName = "lit")
+        ctx.setYaclOption("lit", "true")
         ctx.clickButton("Save Changes")
         ctx.waitForScreen(YACLScreen::class.java)
 

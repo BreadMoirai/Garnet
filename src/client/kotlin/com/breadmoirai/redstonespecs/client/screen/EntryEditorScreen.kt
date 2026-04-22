@@ -5,13 +5,12 @@ import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
 import dev.isxander.yacl3.api.ConfigCategory
 import dev.isxander.yacl3.api.Option
-import dev.isxander.yacl3.api.OptionGroup
+import dev.isxander.yacl3.api.OptionDescription
 import dev.isxander.yacl3.api.YetAnotherConfigLib
-import dev.isxander.yacl3.api.controller.BooleanControllerBuilder
+import dev.isxander.yacl3.api.controller.CyclingListControllerBuilder
 import dev.isxander.yacl3.api.controller.DropdownStringControllerBuilder
-import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder
 import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder
-import dev.isxander.yacl3.api.controller.TickBoxControllerBuilder
+import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.core.BlockPos
@@ -75,7 +74,7 @@ fun buildEntryEditorYacl(
     val mc = Minecraft.getInstance()
     val worldPos = originPos.offset(entryRelPos)
     val blockState = mc.level?.getBlockState(worldPos)
-        ?: return parent  // level not loaded; fall back to parent
+        ?: return parent
 
     var currentTick: Int = initial?.first?.tick ?: -1
     var currentPhaseStr: String = (initial?.first?.phase ?: Phase.END_OF_TICK).name
@@ -90,7 +89,7 @@ fun buildEntryEditorYacl(
                 .option(
                     Option.createBuilder<Int>()
                         .name(Component.literal("Tick"))
-                        .description(dev.isxander.yacl3.api.OptionDescription.of(Component.literal("-1 = INIT (before tick 0)")))
+                        .description(OptionDescription.of(Component.literal("-1 = INIT (before tick 0)")))
                         .binding(-1, { currentTick }, { currentTick = it })
                         .controller { opt -> IntegerFieldControllerBuilder.create(opt) }
                         .build()
@@ -110,7 +109,7 @@ fun buildEntryEditorYacl(
             ConfigCategory.createBuilder()
                 .name(Component.literal("Conditions"))
                 .apply {
-                    propStates.forEach { ps -> group(buildPropGroup(ps)) }
+                    propStates.forEach { ps -> option(buildPropOption(ps)) }
                 }
                 .build()
         )
@@ -126,49 +125,98 @@ fun buildEntryEditorYacl(
         .generateScreen(parent)
 }
 
-private fun buildPropGroup(ps: PropState): OptionGroup {
-    val includeOption = Option.createBuilder<Boolean>()
-        .name(Component.literal("Include"))
-        .binding(ps.included, { ps.included }, { ps.included = it })
-        .controller(TickBoxControllerBuilder::create)
+// ── Per-property option builders — each option row combines include + value ──
+
+private const val SKIP = "—"
+
+private fun buildPropOption(ps: PropState): Option<*> = when (ps) {
+    is PropState.Block -> buildBlockOption(ps)
+    is PropState.Bool -> buildBoolOption(ps)
+    is PropState.Int -> buildIntOption(ps)
+    is PropState.Enum -> buildEnumOption(ps)
+}
+
+private fun buildBlockOption(ps: PropState.Block): Option<String> =
+    Option.createBuilder<String>()
+        .name(Component.literal(ps.name))
+        .binding(
+            SKIP,
+            { if (ps.included) "✓" else SKIP },
+            { v -> ps.included = v != SKIP }
+        )
+        .controller { opt ->
+            CyclingListControllerBuilder.create(opt)
+                .values(SKIP, "✓")
+                .formatValue { v ->
+                    if (v == SKIP) Component.literal(SKIP).withStyle(ChatFormatting.DARK_GRAY)
+                    else Component.literal(ps.blockId.path)
+                }
+        }
         .build()
 
-    return OptionGroup.createBuilder()
+private fun buildBoolOption(ps: PropState.Bool): Option<String> =
+    Option.createBuilder<String>()
         .name(Component.literal(ps.name))
-        .collapsed(!ps.included)
-        .option(includeOption)
-        .apply {
-            when (ps) {
-                is PropState.Block -> {} // block type fixed — no value option
-                is PropState.Bool -> option(
-                    Option.createBuilder<Boolean>()
-                        .name(Component.literal("Value"))
-                        .binding(ps.value, { ps.value }, { ps.value = it })
-                        .controller(BooleanControllerBuilder::create)
-                        .build()
-                )
-                is PropState.Int -> option(
-                    Option.createBuilder<Int>()
-                        .name(Component.literal("Value"))
-                        .binding(ps.value, { ps.value }, { ps.value = it })
-                        .controller { opt ->
-                            IntegerSliderControllerBuilder.create(opt).range(ps.min, ps.max).step(1)
-                        }
-                        .build()
-                )
-                is PropState.Enum -> option(
-                    Option.createBuilder<String>()
-                        .name(Component.literal("Value"))
-                        .binding(ps.value, { ps.value }, { ps.value = it })
-                        .controller { opt ->
-                            DropdownStringControllerBuilder.create(opt).values(ps.options)
-                        }
-                        .build()
-                )
+        .binding(
+            SKIP,
+            { if (ps.included) ps.value.toString() else SKIP },
+            { v ->
+                when (v) {
+                    SKIP -> ps.included = false
+                    else -> { ps.included = true; ps.value = v.toBooleanStrict() }
+                }
             }
+        )
+        .controller { opt ->
+            CyclingListControllerBuilder.create(opt)
+                .values(SKIP, "false", "true")
+                .formatValue { v ->
+                    if (v == SKIP) Component.literal(SKIP).withStyle(ChatFormatting.DARK_GRAY)
+                    else Component.literal(v)
+                }
+        }
+        .build()
+
+private fun buildIntOption(ps: PropState.Int): Option<Int> {
+    val sentinel = ps.min - 1
+    return Option.createBuilder<Int>()
+        .name(Component.literal(ps.name))
+        .binding(
+            sentinel,
+            { if (ps.included) ps.value else sentinel },
+            { v ->
+                if (v == sentinel) ps.included = false
+                else { ps.included = true; ps.value = v }
+            }
+        )
+        .controller { opt ->
+            CyclingListControllerBuilder.create(opt)
+                .values((sentinel..ps.max).toList())
+                .formatValue { v ->
+                    if (v == sentinel) Component.literal(SKIP).withStyle(ChatFormatting.DARK_GRAY)
+                    else Component.literal(v.toString())
+                }
         }
         .build()
 }
+
+private fun buildEnumOption(ps: PropState.Enum): Option<String> =
+    Option.createBuilder<String>()
+        .name(Component.literal(ps.name))
+        .binding(
+            SKIP,
+            { if (ps.included) ps.value else SKIP },
+            { v ->
+                if (v == SKIP) ps.included = false
+                else { ps.included = true; ps.value = v }
+            }
+        )
+        .controller { opt ->
+            DropdownStringControllerBuilder.create(opt).values(listOf(SKIP) + ps.options)
+        }
+        .build()
+
+// ── State construction helpers ────────────────────────────────────────────
 
 private fun buildPropStates(state: BlockState, condition: StateCondition?): List<PropState> {
     val blockId = BuiltInRegistries.BLOCK.getKey(state.block)
