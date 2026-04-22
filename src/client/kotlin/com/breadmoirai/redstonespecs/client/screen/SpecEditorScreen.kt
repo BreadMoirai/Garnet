@@ -8,7 +8,7 @@ import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.StateSpec
+import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.network.RemoveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
@@ -37,7 +37,7 @@ class SpecEditorScreen(
     private var colorEditBox: EditBox? = null
 
     // Persists across rebuildWidgets(); null until entry is available from server BE.
-    private var workingEntries: MutableList<Pair<SimTime, Map<String, String>>>? = null
+    private var workingEntries: MutableList<Pair<SimTime, StateCondition>>? = null
     private var showAddForm = false
 
     // Add-form field refs (populated in init() when showAddForm=true)
@@ -53,8 +53,8 @@ class SpecEditorScreen(
 
         if (workingEntries == null) {
             workingEntries = when (entry) {
-                is InputSpec -> entry.stateSpec.entries.toMutableList()
-                is OutputSpec -> entry.stateSpec.entries.toMutableList()
+                is InputSpec -> entry.entries.toMutableList()
+                is OutputSpec -> entry.entries.toMutableList()
                 else -> null
             }
         }
@@ -145,11 +145,11 @@ class SpecEditorScreen(
         if (workingEntries == null) {
             when (val entry = getEntry()) {
                 is InputSpec -> {
-                    workingEntries = entry.stateSpec.entries.toMutableList()
+                    workingEntries = entry.entries.toMutableList()
                     rebuildWidgets()
                 }
                 is OutputSpec -> {
-                    workingEntries = entry.stateSpec.entries.toMutableList()
+                    workingEntries = entry.entries.toMutableList()
                     rebuildWidgets()
                 }
                 else -> {}
@@ -169,13 +169,20 @@ class SpecEditorScreen(
             SimTime(tick, phase)
         }
 
-        val props = if (propsText.isEmpty()) emptyMap()
+        // Parse key=val pairs into EnumProperty conditions (string-based, works for editor input)
+        val conditions = if (propsText.isEmpty()) emptyList()
         else propsText.split(",").mapNotNull { token ->
             val kv = token.trim().split("=", limit = 2)
-            if (kv.size == 2) kv[0].trim() to kv[1].trim() else null
-        }.toMap()
+            if (kv.size == 2) StateCondition.EnumProperty(kv[0].trim(), kv[1].trim()) else null
+        }
 
-        entries.add(simTime to props)
+        val condition: StateCondition = when (conditions.size) {
+            0 -> StateCondition.All(emptyList())
+            1 -> conditions[0]
+            else -> StateCondition.All(conditions)
+        }
+
+        entries.add(simTime to condition)
         showAddForm = false
         rebuildWidgets()
     }
@@ -210,15 +217,15 @@ class SpecEditorScreen(
                 Component.literal("State entries: ${entries.size}"),
                 x + 8, y + 68, 0xFF888888.toInt(),
             )
-            entries.take(4).forEachIndexed { i, (simTime, props) ->
+            entries.take(4).forEachIndexed { i, (simTime, condition) ->
                 val rowY = y + 82 + i * 14
                 val timeLabel = if (simTime == SimTime.INIT) "INIT"
                     else "t${simTime.tick} ${simTime.phase.name.take(5)}"
-                val propStr = props.entries.joinToString(",") { "${it.key}=${it.value}" }.let {
+                val condStr = conditionToDisplayString(condition).let {
                     if (it.length > 28) it.take(27) + "…" else it
                 }
                 extractor.text(font, Component.literal(timeLabel), x + 10, rowY, 0xFFAAAAAA.toInt())
-                extractor.text(font, Component.literal(propStr), x + 68, rowY, 0xFF888888.toInt())
+                extractor.text(font, Component.literal(condStr), x + 68, rowY, 0xFF888888.toInt())
             }
             if (showAddForm) {
                 extractor.text(font, Component.literal("Tick:"), x + 8, y + 166, 0xFFAAAAAA.toInt())
@@ -246,6 +253,17 @@ class SpecEditorScreen(
         }
     }
 
+    private fun conditionToDisplayString(condition: StateCondition): String = when (condition) {
+        is StateCondition.All -> condition.conditions.joinToString(",") { conditionToDisplayString(it) }
+        is StateCondition.BoolProperty -> "${condition.name}=${condition.value}"
+        is StateCondition.IntProperty -> "${condition.name}=${condition.value}"
+        is StateCondition.EnumProperty -> "${condition.name}=${condition.value}"
+        is StateCondition.BlockType -> "block=${condition.blockId}"
+        is StateCondition.Any -> "any(${condition.conditions.size})"
+        is StateCondition.Not -> "not(${conditionToDisplayString(condition.condition)})"
+        is StateCondition.ContainerContents -> "container[${condition.slot}]"
+    }
+
     private fun captureInitState() {
         val mc = minecraft ?: return
         val level = mc.level ?: return
@@ -256,9 +274,16 @@ class SpecEditorScreen(
         )
         val props = captureBlockStateProps(level.getBlockState(worldPos))
         val entries = workingEntries ?: return
+        // Build an All condition from captured string props using EnumProperty (display-only approach)
+        val conditions = props.map { (k, v) -> StateCondition.EnumProperty(k, v) }
+        val condition: StateCondition = when (conditions.size) {
+            0 -> StateCondition.All(emptyList())
+            1 -> conditions[0]
+            else -> StateCondition.All(conditions)
+        }
         val idx = entries.indexOfFirst { it.first == SimTime.INIT }
-        if (idx >= 0) entries[idx] = SimTime.INIT to props
-        else entries.add(0, SimTime.INIT to props)
+        if (idx >= 0) entries[idx] = SimTime.INIT to condition
+        else entries.add(0, SimTime.INIT to condition)
         rebuildWidgets()
     }
 
@@ -268,16 +293,13 @@ class SpecEditorScreen(
         val label = labelEditBox?.value ?: ""
         val color = (colorEditBox?.value ?: "FFFFFF").toLongOrNull(16)?.toInt() ?: 0xFFFFFF
 
-        val stateSpec = workingEntries?.let { entries ->
-            if (entries.any { it.first == SimTime.INIT }) StateSpec(entries.toList())
-            else null
-        }
+        val newEntries = workingEntries?.toList()
 
         val updated: SpecEntry = when (entry) {
             is InputSpec -> entry.copy(label = label, color = color,
-                stateSpec = stateSpec ?: entry.stateSpec)
+                entries = newEntries ?: entry.entries)
             is OutputSpec -> entry.copy(label = label, color = color,
-                stateSpec = stateSpec ?: entry.stateSpec)
+                entries = newEntries ?: entry.entries)
             is BreakpointSpec -> entry.copy(label = label, color = color)
             is AutoSpec -> entry.copy(label = label, color = color)
         }

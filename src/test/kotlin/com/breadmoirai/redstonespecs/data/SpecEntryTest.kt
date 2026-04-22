@@ -18,7 +18,7 @@ class SpecEntryTest {
         Bootstrap.bootStrap()
     }
 
-    private val initStateSpec = StateSpec(listOf(SimTime.INIT to mapOf("powered" to "false")))
+    private val initEntries = listOf(SimTime.INIT to StateCondition.BoolProperty("powered", false))
     private val pos = BlockPos(1, 2, 3)
     private val color = 0xFF0000
 
@@ -29,13 +29,26 @@ class SpecEntryTest {
 
     @Test
     fun `InputSpec roundtrip via SpecEntry codec`() {
-        val entry: SpecEntry = InputSpec(pos, "A", color, initStateSpec)
+        val entry: SpecEntry = InputSpec(pos, "A", color, initEntries)
         assertEquals(entry, roundtrip(entry, SpecEntry.CODEC))
     }
 
     @Test
     fun `OutputSpec roundtrip via SpecEntry codec`() {
-        val entry: SpecEntry = OutputSpec(pos, "B", color, initStateSpec)
+        val entry: SpecEntry = OutputSpec(pos, "B", color, initEntries)
+        assertEquals(entry, roundtrip(entry, SpecEntry.CODEC))
+    }
+
+    @Test
+    fun `InputSpec with multiple entries roundtrip`() {
+        val entries = listOf(
+            SimTime.INIT to StateCondition.BoolProperty("powered", false),
+            SimTime(0, Phase.END_OF_TICK) to StateCondition.All(listOf(
+                StateCondition.BoolProperty("powered", true),
+                StateCondition.IntProperty("power", 15),
+            )),
+        )
+        val entry: SpecEntry = InputSpec(pos, "multi", color, entries)
         assertEquals(entry, roundtrip(entry, SpecEntry.CODEC))
     }
 
@@ -46,10 +59,10 @@ class SpecEntryTest {
     }
 
     @Test
-    fun `BreakpointSpec roundtrip with custom condition and disabled`() {
+    fun `BreakpointSpec roundtrip with typed condition and disabled`() {
         val entry: SpecEntry = BreakpointSpec(
             pos, "BP", color,
-            condition = StateCondition.BlockState(mapOf("lit" to "true")),
+            condition = StateCondition.BoolProperty("lit", true),
             enabled = false,
         )
         assertEquals(entry, roundtrip(entry, SpecEntry.CODEC))
@@ -72,13 +85,13 @@ class SpecEntryTest {
 
     @Test
     fun `negative relative positions roundtrip`() {
-        val entry: SpecEntry = InputSpec(BlockPos(-5, -1, 10), "neg", color, initStateSpec)
+        val entry: SpecEntry = InputSpec(BlockPos(-5, -1, 10), "neg", color, initEntries)
         assertEquals(entry, roundtrip(entry, SpecEntry.CODEC))
     }
 
     @Test
     fun `InputSpec MAP_CODEC roundtrip directly`() {
-        val entry = InputSpec(pos, "direct", color, initStateSpec)
+        val entry = InputSpec(pos, "direct", color, initEntries)
         val encoded = InputSpec.MAP_CODEC.codec().encodeStart(NbtOps.INSTANCE, entry).getOrThrow()
         val decoded = InputSpec.MAP_CODEC.codec().parse(NbtOps.INSTANCE, encoded).getOrThrow()
         assertEquals(entry, decoded)

@@ -5,6 +5,16 @@ import com.mojang.serialization.MapCodec
 import com.mojang.serialization.codecs.RecordCodecBuilder
 import net.minecraft.core.BlockPos
 
+private val ENTRY_CODEC: Codec<Pair<SimTime, StateCondition>> =
+    RecordCodecBuilder.create { instance ->
+        instance.group(
+            SimTime.CODEC.fieldOf("time").forGetter { it.first },
+            StateCondition.CODEC.fieldOf("condition").forGetter { it.second },
+        ).apply(instance) { time, cond -> time to cond }
+    }
+
+val ENTRIES_CODEC: Codec<List<Pair<SimTime, StateCondition>>> = ENTRY_CODEC.listOf()
+
 sealed class SpecEntry {
     abstract val pos: BlockPos
     abstract val label: String
@@ -38,7 +48,7 @@ data class InputSpec(
     override val pos: BlockPos,
     override val label: String,
     override val color: Int,
-    val stateSpec: StateSpec,
+    val entries: List<Pair<SimTime, StateCondition>>,
 ) : SpecEntry() {
     companion object {
         val MAP_CODEC: MapCodec<InputSpec> = RecordCodecBuilder.mapCodec { instance ->
@@ -46,7 +56,7 @@ data class InputSpec(
                 BlockPos.CODEC.fieldOf("pos").forGetter(InputSpec::pos),
                 Codec.STRING.fieldOf("label").forGetter(InputSpec::label),
                 Codec.INT.fieldOf("color").forGetter(InputSpec::color),
-                StateSpec.CODEC.fieldOf("state_spec").forGetter(InputSpec::stateSpec),
+                ENTRIES_CODEC.fieldOf("entries").forGetter(InputSpec::entries),
             ).apply(instance, ::InputSpec)
         }
     }
@@ -56,7 +66,7 @@ data class OutputSpec(
     override val pos: BlockPos,
     override val label: String,
     override val color: Int,
-    val stateSpec: StateSpec,
+    val entries: List<Pair<SimTime, StateCondition>>,
 ) : SpecEntry() {
     companion object {
         val MAP_CODEC: MapCodec<OutputSpec> = RecordCodecBuilder.mapCodec { instance ->
@@ -64,7 +74,7 @@ data class OutputSpec(
                 BlockPos.CODEC.fieldOf("pos").forGetter(OutputSpec::pos),
                 Codec.STRING.fieldOf("label").forGetter(OutputSpec::label),
                 Codec.INT.fieldOf("color").forGetter(OutputSpec::color),
-                StateSpec.CODEC.fieldOf("state_spec").forGetter(OutputSpec::stateSpec),
+                ENTRIES_CODEC.fieldOf("entries").forGetter(OutputSpec::entries),
             ).apply(instance, ::OutputSpec)
         }
     }

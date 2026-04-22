@@ -20,7 +20,7 @@ class RedstoneSpecTest {
         Bootstrap.bootStrap()
     }
 
-    private val initSpec = StateSpec(listOf(SimTime.INIT to mapOf("powered" to "false")))
+    private val initEntries = listOf(SimTime.INIT to StateCondition.BoolProperty("powered", false))
 
     private fun roundtrip(value: RedstoneSpec): RedstoneSpec {
         val encoded = RedstoneSpec.CODEC.encodeStart(NbtOps.INSTANCE, value).getOrThrow()
@@ -70,8 +70,8 @@ class RedstoneSpecTest {
     fun `RedstoneSpec with multiple SpecCases roundtrip`() {
         val cases = listOf(
             SpecCase("case-1", 20,
-                inputs = listOf(InputSpec(BlockPos(1, 0, 0), "A", 0xFF0000, initSpec)),
-                outputs = listOf(OutputSpec(BlockPos(5, 0, 0), "Q", 0x0000FF, initSpec)),
+                inputs = listOf(InputSpec(BlockPos(1, 0, 0), "A", 0xFF0000, initEntries)),
+                outputs = listOf(OutputSpec(BlockPos(5, 0, 0), "Q", 0x0000FF, initEntries)),
                 breakpoints = emptyList(), autoSpecs = emptyList()),
             SpecCase("case-2", 30, emptyList(), emptyList(), emptyList(), emptyList()),
         )

@@ -7,9 +7,9 @@ import com.breadmoirai.redstonespecs.data.InputSpec
 import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.StateSpec
 import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload
 import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
+import com.breadmoirai.redstonespecs.runner.propsToCondition
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerPlayer
@@ -23,7 +23,7 @@ private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(properties) {
 
-    abstract fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry
+    abstract fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: net.minecraft.world.level.block.state.BlockState): SpecEntry
 
     override fun useOn(context: UseOnContext): InteractionResult {
         val level: Level = context.level
@@ -38,11 +38,12 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 
             val relPos = hitPos.subtract(be.blockPos)
             val specCase = spec.specCases[be.activeSpecCaseIndex]
-            val initProps = captureBlockStateProps(level.getBlockState(hitPos))
+            val hitState = level.getBlockState(hitPos)
+            val initProps = captureBlockStateProps(hitState)
 
             if (specCase.entryAt(relPos) == null) {
                 LOGGER.debug("[SpecMarkerTool#useOn] placing {} entry at {} for case {}", javaClass.simpleName, relPos, be.activeSpecCaseIndex)
-                be.addOrUpdateEntry(be.activeSpecCaseIndex, createEntry(relPos, initProps))
+                be.addOrUpdateEntry(be.activeSpecCaseIndex, createEntry(relPos, initProps, hitState))
             } else {
                 LOGGER.debug("[SpecMarkerTool#useOn] opening editor for existing entry at {} case {}", relPos, be.activeSpecCaseIndex)
             }
@@ -55,21 +56,21 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 }
 
 class InputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
-        InputSpec(relPos, "", 0x4488FF, StateSpec(listOf(SimTime.INIT to initProps)))
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: net.minecraft.world.level.block.state.BlockState): SpecEntry =
+        InputSpec(relPos, "", 0x4488FF, listOf(SimTime.INIT to propsToCondition(initProps, initState)))
 }
 
 class OutputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
-        OutputSpec(relPos, "", 0x44FF88, StateSpec(listOf(SimTime.INIT to initProps)))
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: net.minecraft.world.level.block.state.BlockState): SpecEntry =
+        OutputSpec(relPos, "", 0x44FF88, listOf(SimTime.INIT to propsToCondition(initProps, initState)))
 }
 
 class BreakpointSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: net.minecraft.world.level.block.state.BlockState): SpecEntry =
         BreakpointSpec(relPos, "", 0xFF4444)
 }
 
 class AutoSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: net.minecraft.world.level.block.state.BlockState): SpecEntry =
         AutoSpec(relPos, "", 0xFFAA00)
 }

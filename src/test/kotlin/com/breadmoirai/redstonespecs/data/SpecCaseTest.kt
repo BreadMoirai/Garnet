@@ -18,7 +18,7 @@ class SpecCaseTest {
         Bootstrap.bootStrap()
     }
 
-    private val initSpec = StateSpec(listOf(SimTime.INIT to mapOf("powered" to "false")))
+    private val initEntries = listOf(SimTime.INIT to StateCondition.BoolProperty("powered", false))
 
     private fun roundtrip(value: SpecCase): SpecCase {
         val encoded = SpecCase.CODEC.encodeStart(NbtOps.INSTANCE, value).getOrThrow()
@@ -37,11 +37,11 @@ class SpecCaseTest {
             name = "full",
             lifespan = 40,
             inputs = listOf(
-                InputSpec(BlockPos(1, 0, 0), "A", 0xFF0000, initSpec),
-                InputSpec(BlockPos(2, 0, 0), "B", 0x00FF00, initSpec),
+                InputSpec(BlockPos(1, 0, 0), "A", 0xFF0000, initEntries),
+                InputSpec(BlockPos(2, 0, 0), "B", 0x00FF00, initEntries),
             ),
             outputs = listOf(
-                OutputSpec(BlockPos(5, 0, 0), "Q", 0x0000FF, initSpec),
+                OutputSpec(BlockPos(5, 0, 0), "Q", 0x0000FF, initEntries),
             ),
             breakpoints = listOf(
                 BreakpointSpec(BlockPos(3, 0, 0), "BP", 0xFF00FF),
