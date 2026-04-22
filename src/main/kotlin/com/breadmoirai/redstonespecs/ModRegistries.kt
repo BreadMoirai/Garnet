@@ -2,6 +2,10 @@ package com.breadmoirai.redstonespecs
 
 import com.breadmoirai.redstonespecs.block.SpecOriginBlock
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.item.AutoSpecMarkerItem
+import com.breadmoirai.redstonespecs.item.BreakpointSpecMarkerItem
+import com.breadmoirai.redstonespecs.item.InputSpecMarkerItem
+import com.breadmoirai.redstonespecs.item.OutputSpecMarkerItem
 import net.fabricmc.fabric.api.`object`.builder.v1.block.entity.FabricBlockEntityTypeBuilder
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Registry
@@ -31,6 +35,10 @@ object ModRegistries {
         SPEC_ORIGIN_BLOCK,
     )
     val SPEC_ORIGIN_ITEM: BlockItem = registerBlockItem("spec_origin", SPEC_ORIGIN_BLOCK)
+    val INPUT_SPEC_MARKER: InputSpecMarkerItem = registerItem("input_spec_marker", ::InputSpecMarkerItem)
+    val OUTPUT_SPEC_MARKER: OutputSpecMarkerItem = registerItem("output_spec_marker", ::OutputSpecMarkerItem)
+    val BREAKPOINT_SPEC_MARKER: BreakpointSpecMarkerItem = registerItem("breakpoint_spec_marker", ::BreakpointSpecMarkerItem)
+    val AUTO_SPEC_MARKER: AutoSpecMarkerItem = registerItem("auto_spec_marker", ::AutoSpecMarkerItem)
 
     fun register() {
         LOGGER.debug("[ModRegistries#register] registering blocks, block entities, and items")
@@ -73,5 +81,11 @@ object ModRegistries {
                 block, Item.Properties().setId(ResourceKey.create(Registries.ITEM, id(id)))
             )
         )
+    }
+
+    private fun <T : Item> registerItem(id: String, factory: (Item.Properties) -> T): T {
+        val identifier = id(id)
+        val props = Item.Properties().setId(ResourceKey.create(Registries.ITEM, identifier))
+        return Registry.register(BuiltInRegistries.ITEM, identifier, factory(props))
     }
 }
