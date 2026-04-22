@@ -95,8 +95,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitForScreen(StateEntryEditorScreen::class.java)
         ctx.waitForButton("Confirm")                  // wait for blockState to load and widgets to be built
         ctx.fillEditBoxByWidth(36, "0")               // Tick=0 (EditBox width=36)
-        // CycleButton label is the "name" field used for matching (e.g. "Phase"), not the full display text
-        ctx.clickButton("Phase")                      // Cycle END_OF_TICK → START_OF_TICK
+        ctx.clickNthCycleButtonByValue("END_OF_TICK", 0) // Cycle Phase END_OF_TICK → START_OF_TICK
         ctx.clickNthButton(" ", 1)                    // Check "powered" checkbox (row 1, 0-indexed)
         ctx.clickNthCycleButtonByValue("false", 0)    // Cycle powered BoolRow: false→true
         ctx.clickButton("Confirm")
@@ -143,11 +142,11 @@ class RedstonespecsClientTests : FabricClientGameTest {
             ?: throw AssertionError("SpecOriginBlockEntity not found at $originPos")
         val result = be.lastTestResult
             ?: throw AssertionError("lastTestResult is null after waitFor succeeded")
-        assert(result.results.isNotEmpty()) { "Expected at least one SpecCaseResult" }
+        check(result.results.isNotEmpty()) { "Expected at least one SpecCaseResult" }
         val checks = result.results.flatMap { it.checks }
-        assert(checks.isNotEmpty()) { "Expected at least one check in results" }
+        check(checks.isNotEmpty()) { "Expected at least one check in results" }
         val failed = checks.filter { !it.pass }
-        assert(failed.isEmpty()) {
+        check(failed.isEmpty()) {
             "Failed checks: ${failed.joinToString { "${it.label}: expected=${it.expected} actual=${it.actual}" }}"
         }
     }
