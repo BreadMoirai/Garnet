@@ -5,9 +5,6 @@
   "name": "RedstoneSpecs Testmod",
   "environment": "*",
   "entrypoints": {
-    "fabric-gametest": [
-      "com.breadmoirai.redstonespecs.test.LeverLampSpecTest"
-    ],
     "fabric-client-gametest": [
       "com.breadmoirai.redstonespecs.test.RedstonespecsClientTests"
     ]
