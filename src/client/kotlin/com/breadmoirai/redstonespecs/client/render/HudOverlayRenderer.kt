@@ -1,6 +1,11 @@
 package com.breadmoirai.redstonespecs.client.render
 
+import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.client.FaceHit
+import com.breadmoirai.redstonespecs.client.HoveredFace
+import com.breadmoirai.redstonespecs.client.currentHoveredFace
+import com.breadmoirai.redstonespecs.client.findHoveredFace
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.InputSpec
@@ -16,6 +21,7 @@ import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.Identifier
+import net.minecraft.world.item.BlockItem
 import net.minecraft.world.phys.BlockHitResult
 
 private val keyCycleForward = KeyMappingHelper.registerKeyMapping(
@@ -86,8 +92,49 @@ fun registerHudOverlay() {
     )
 
     ClientTickEvents.END_CLIENT_TICK.register { mc ->
-        if (mc.screen != null) return@register
-        val level = mc.level ?: return@register
+        if (mc.screen != null) {
+            currentHoveredFace = null
+            return@register
+        }
+        val level = mc.level ?: run { currentHoveredFace = null; return@register }
+
+        // Face detection when holding SpecOrigin block item
+        val player = mc.player
+        val holdingSpecOrigin = player != null && (
+            (player.mainHandItem.item as? BlockItem)?.block == ModRegistries.SPEC_ORIGIN_BLOCK ||
+            (player.offhandItem.item as? BlockItem)?.block == ModRegistries.SPEC_ORIGIN_BLOCK
+        )
+
+        if (holdingSpecOrigin && player != null) {
+            val eyePos = player.getEyePosition(1.0f)
+            val lookVec = player.getLookAngle()
+            val maxReach = 64.0
+
+            var bestT = Double.MAX_VALUE
+            var bestFace: HoveredFace? = null
+
+            for (be in SpecOriginBlockEntity.allFor(level)) {
+                val spec = be.spec ?: continue
+                val b = spec.bounds
+                val bpX = be.blockPos.x.toDouble()
+                val bpY = be.blockPos.y.toDouble()
+                val bpZ = be.blockPos.z.toDouble()
+                val hit: FaceHit = findHoveredFace(
+                    eyePos.x - bpX, eyePos.y - bpY, eyePos.z - bpZ,
+                    lookVec.x, lookVec.y, lookVec.z,
+                    b.minX().toDouble(), b.minY().toDouble(), b.minZ().toDouble(),
+                    b.maxX().toDouble() + 1.0, b.maxY().toDouble() + 1.0, b.maxZ().toDouble() + 1.0,
+                ) ?: continue
+                if (hit.t < bestT && hit.t < maxReach) {
+                    bestT = hit.t
+                    bestFace = HoveredFace(be.blockPos, hit.axis, hit.isMax)
+                }
+            }
+            currentHoveredFace = bestFace
+        } else {
+            currentHoveredFace = null
+        }
+
         val hitPos = (mc.hitResult as? BlockHitResult)?.blockPos ?: return@register
 
         val be = SpecOriginBlockEntity.findFor(level, hitPos)
