@@ -60,21 +60,25 @@ class ColorPickerWidget(
     }
 
     /**
-     * Opens the dropdown and creates the hex EditBox.
+     * Opens the dropdown and returns the hex EditBox.
      * The caller is responsible for registering the returned EditBox with their screen
      * (e.g. via `addRenderableWidget`).
      *
-     * @return the newly created [EditBox], or null if already open
+     * If already open, returns the existing [EditBox] so it can be re-registered after
+     * a `rebuildWidgets()` call without resetting dropdown state.
+     *
+     * @return the [EditBox] for the hex input field
      */
-    fun openDropdown(): EditBox? {
-        if (dropdownOpen) return null
-        dropdownOpen = true
-        val font = Minecraft.getInstance().font
-        return EditBox(font, x, y + height + dropH - HEX_ROW_H - PAD, dropW - SWATCH_SIZE - PAD, HEX_ROW_H, Component.empty()).also {
-            it.value = String.format("%06X", color)
-            it.setMaxLength(6)
-            hexBox = it
+    fun openDropdown(): EditBox {
+        if (!dropdownOpen) {
+            dropdownOpen = true
+            val font = Minecraft.getInstance().font
+            hexBox = EditBox(font, x, y + height + dropH - HEX_ROW_H - PAD, dropW - SWATCH_SIZE - PAD, HEX_ROW_H, Component.empty()).also {
+                it.value = String.format("%06X", color)
+                it.setMaxLength(6)
+            }
         }
+        return hexBox!!
     }
 
     /**

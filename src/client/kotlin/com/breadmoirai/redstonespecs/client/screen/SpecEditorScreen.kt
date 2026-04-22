@@ -38,10 +38,12 @@ class SpecEditorScreen(
     private val panelY get() = (height - panelH) / 2
 
     private var labelEditBox: EditBox? = null
-    // colorPicker persists across rebuildWidgets() like workingEntries
     private var colorPicker: ColorPickerWidget? = null
 
-    // Persists across rebuildWidgets(); null until entry available from server BE
+    // colorPicker and workingEntries persist across rebuildWidgets() (cleared only in doClose()).
+    // They are lazily initialized: workingEntries from init() when entry is already available,
+    // or from tick() after the server sends the block entity sync. colorPicker is initialized
+    // in init() on first open and reused across rebuilds to preserve dropdown state.
     private var workingEntries: MutableList<Pair<SimTime, StateCondition>>? = null
     private var scrollOffset = 0
 
@@ -81,7 +83,7 @@ class SpecEditorScreen(
         addRenderableWidget(colorPicker!!)
         // If dropdown is open (e.g. after rebuildWidgets()), re-register hexBox
         if (colorPicker!!.isDropdownOpen()) {
-            colorPicker!!.openDropdown()?.let { addRenderableWidget(it) }
+            addRenderableWidget(colorPicker!!.openDropdown())
         }
 
         val entries = workingEntries
@@ -196,7 +198,7 @@ class SpecEditorScreen(
         }
 
         // Find last entry by SimTime order
-        val lastEntry = entries.maxByOrNull { it.first }!!
+        val lastEntry = entries.maxByOrNull { it.first } ?: return
         val lastKnown = flattenConditionToMap(lastEntry.second)
 
         // Diff: only properties that changed
@@ -280,13 +282,21 @@ class SpecEditorScreen(
         val entry = getEntry() ?: run { doClose(); return }
         val specCaseIndex = getBe()?.activeSpecCaseIndex ?: 0
         val label = labelEditBox?.value ?: ""
+        val entries = workingEntries?.toList()
+        if ((entry is InputSpec || entry is OutputSpec) && entries != null) {
+            val initCount = entries.count { it.first == SimTime.INIT }
+            if (initCount != 1) {
+                // Don't save — invalid state (must have exactly one INIT entry)
+                return
+            }
+        }
         val color = colorPicker?.color ?: 0xFFFFFF
 
         val updated: SpecEntry = when (entry) {
             is InputSpec -> entry.copy(label = label, color = color,
-                entries = workingEntries?.toList() ?: entry.entries)
+                entries = entries ?: entry.entries)
             is OutputSpec -> entry.copy(label = label, color = color,
-                entries = workingEntries?.toList() ?: entry.entries)
+                entries = entries ?: entry.entries)
             is BreakpointSpec -> entry.copy(label = label, color = color)
             is AutoSpec -> entry.copy(label = label, color = color)
         }
