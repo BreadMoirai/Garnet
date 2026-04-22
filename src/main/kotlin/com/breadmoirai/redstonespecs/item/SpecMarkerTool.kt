@@ -5,11 +5,11 @@ import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.InputSpec
 import com.breadmoirai.redstonespecs.data.OutputSpec
-import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.StateSpec
 import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload
+import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerPlayer
@@ -20,7 +20,7 @@ import net.minecraft.world.level.Level
 
 abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(properties) {
 
-    abstract fun createEntry(relPos: BlockPos): SpecEntry
+    abstract fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry
 
     override fun useOn(context: UseOnContext): InteractionResult {
         val level: Level = context.level
@@ -35,9 +35,10 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 
             val relPos = hitPos.subtract(be.blockPos)
             val specCase = spec.specCases[be.activeSpecCaseIndex]
+            val initProps = captureBlockStateProps(level.getBlockState(hitPos))
 
             if (specCase.entryAt(relPos) == null) {
-                be.addOrUpdateEntry(be.activeSpecCaseIndex, createEntry(relPos))
+                be.addOrUpdateEntry(be.activeSpecCaseIndex, createEntry(relPos, initProps))
             }
 
             ServerPlayNetworking.send(player as ServerPlayer, OpenEditorS2CPayload(be.blockPos, relPos))
@@ -48,21 +49,21 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 }
 
 class InputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos): SpecEntry =
-        InputSpec(relPos, "", 0x4488FF, StateSpec(listOf(SimTime.INIT to emptyMap())))
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
+        InputSpec(relPos, "", 0x4488FF, StateSpec(listOf(SimTime.INIT to initProps)))
 }
 
 class OutputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos): SpecEntry =
-        OutputSpec(relPos, "", 0x44FF88, StateSpec(listOf(SimTime.INIT to emptyMap())))
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
+        OutputSpec(relPos, "", 0x44FF88, StateSpec(listOf(SimTime.INIT to initProps)))
 }
 
 class BreakpointSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos): SpecEntry =
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
         BreakpointSpec(relPos, "", 0xFF4444)
 }
 
 class AutoSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos): SpecEntry =
+    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>): SpecEntry =
         AutoSpec(relPos, "", 0xFFAA00)
 }
