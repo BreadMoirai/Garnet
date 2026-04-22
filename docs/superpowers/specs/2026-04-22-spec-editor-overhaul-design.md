@@ -28,6 +28,7 @@ Clean break: existing serialized data using `StateSpec`/`Map<String, String>` wi
 ```kotlin
 sealed class StateCondition {
     // Typed property leaves (new)
+    data class BlockType(val blockId: Identifier) : StateCondition()
     data class BoolProperty(val name: String, val value: Boolean) : StateCondition()
     data class IntProperty(val name: String, val value: Int) : StateCondition()
     data class EnumProperty(val name: String, val value: String) : StateCondition()
@@ -65,6 +66,7 @@ The `entries` list must contain exactly one `SimTime.INIT` entry (validated at c
 
 `evaluateCondition` gains cases for the three new leaf types, reading typed block state properties via MC's `Property<T>` API:
 
+- `BlockType` → compare `level.getBlockState(worldPos).block` registry key against `blockId`
 - `BoolProperty` → read `BooleanProperty` by name, compare boolean
 - `IntProperty` → read `IntegerProperty` by name, compare int
 - `EnumProperty` → read `EnumProperty` / `DirectionProperty` by name, compare `getName()` string
@@ -151,7 +153,7 @@ Replaces "Capture Init State". Label: **"Capture State"**.
 On click:
 1. Read current live block state at `originPos + entryRelPos` using `captureBlockStateProps()`
 2. If `workingEntries` is empty → create a full INIT entry (`SimTime.INIT`, `All(allProps)`)
-3. Otherwise → find the last entry by `SimTime` order; diff current state against it; build a `StateCondition` from only changed properties; insert a new entry at `SimTime(lastTick + 1, Phase.END_OF_TICK)`
+3. Otherwise → find the last entry by `SimTime` order; diff current state against it; build a `StateCondition` from the block type (if changed) plus only changed properties; insert a new entry at `SimTime(lastTick + 1, Phase.END_OF_TICK)`
 
 Diff is computed by comparing raw string values from `captureBlockStateProps` against the existing condition values. To extract the "last known values" from the last entry's `StateCondition`, flatten it: walk `All(conditions)` leaves and single leaves, collecting `name→value` from `BoolProperty`/`IntProperty`/`EnumProperty`; ignore `Any`/`Not`/`ContainerContents`. Properties not mentioned in the last condition are treated as unchanged. The typed `StateCondition` variant for each changed property is inferred from the block's `stateDefinition` property type (same logic as `BlockStateFormBuilder`).
 
@@ -247,6 +249,9 @@ sealed class PropertyRow {
     abstract fun currentCondition(): StateCondition
     abstract fun addWidgetsTo(screen: Screen)
 
+    class BlockTypeRow(val blockId: Identifier, ...) : PropertyRow()
+    // value widget: read-only label showing block registry ID (value fixed to the live block)
+
     class BoolRow(val name: String, val property: BooleanProperty, ...) : PropertyRow()
     // value widget: CycleButton<Boolean> or checkbox toggle
 
@@ -257,6 +262,8 @@ sealed class PropertyRow {
     // value widget: DropdownWidget of property.possibleValues mapped to getName()
 }
 ```
+
+`buildRows` always prepends a `BlockTypeRow` as the first row (name = `"block"`, value = the current block's registry ID). This lets users assert the block type itself in addition to its properties — useful when a piston or other mechanism moves a different block to the position.
 
 ### Property type inference
 
