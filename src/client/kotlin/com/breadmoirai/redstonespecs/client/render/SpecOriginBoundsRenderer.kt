@@ -2,6 +2,8 @@ package com.breadmoirai.redstonespecs.client.render
 
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.client.HoveredFace
+import com.breadmoirai.redstonespecs.client.currentHoveredFace
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.InputSpec
@@ -31,6 +33,7 @@ fun registerBoundsRenderer() {
 class SpecOriginRenderState : BlockEntityRenderState() {
     var bounds: BoundingBox? = null
     var activeEntries: List<SpecEntry> = emptyList()
+    var hoveredFace: HoveredFace? = null
 }
 
 class SpecOriginBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
@@ -47,6 +50,7 @@ class SpecOriginBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
     ) {
         super.extractRenderState(entity, state, partialTick, cameraPos, crumbling)
         state.bounds = entity.spec?.bounds
+        state.hoveredFace = if (entity.blockPos == currentHoveredFace?.originPos) currentHoveredFace else null
         val spec = entity.spec
         state.activeEntries = if (spec != null && entity.activeSpecCaseIndex < spec.specCases.size) {
             spec.specCases[entity.activeSpecCaseIndex].allEntries
@@ -79,6 +83,12 @@ class SpecOriginBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
             val z2 = z1 + 1f
             drawBox(buffer, matrix, x1, y1, z1, x2, y2, z2, r, g, b, 0.9f)
         }
+
+        state.hoveredFace?.let { face ->
+            val b = state.bounds ?: return@let
+            val bufferFace = bufferSource.getBuffer(RenderTypes.debugQuads())
+            drawFaceHighlight(bufferFace, matrix, b, face)
+        }
     }
 
     override fun shouldRenderOffScreen(): Boolean = true
@@ -110,6 +120,66 @@ class SpecOriginBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
         val y2 = bounds.maxY().toFloat() + 1f
         val z2 = bounds.maxZ().toFloat() + 1f
         drawBox(buffer, matrix, x1, y1, z1, x2, y2, z2, r, g, b, a)
+    }
+
+    private fun drawFaceHighlight(
+        buffer: VertexConsumer,
+        matrix: Matrix4f,
+        bounds: BoundingBox,
+        face: HoveredFace,
+    ) {
+        val x1 = bounds.minX().toFloat()
+        val y1 = bounds.minY().toFloat()
+        val z1 = bounds.minZ().toFloat()
+        val x2 = bounds.maxX().toFloat() + 1f
+        val y2 = bounds.maxY().toFloat() + 1f
+        val z2 = bounds.maxZ().toFloat() + 1f
+
+        val r: Float; val g: Float; val b: Float; val a = 0.3f
+        when (face.axis) {
+            0 -> { r = 1f; g = 0.27f; b = 0.27f }  // red — X axis
+            1 -> { r = 0.27f; g = 1f; b = 0.27f }   // green — Y axis
+            else -> { r = 0.27f; g = 0.27f; b = 1f } // blue — Z axis
+        }
+
+        when {
+            face.axis == 0 && face.isMax -> {  // +X face
+                buffer.addVertex(matrix, x2, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z1).setColor(r, g, b, a)
+            }
+            face.axis == 0 && !face.isMax -> {  // -X face
+                buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z2).setColor(r, g, b, a)
+            }
+            face.axis == 1 && face.isMax -> {  // +Y face
+                buffer.addVertex(matrix, x1, y2, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z1).setColor(r, g, b, a)
+            }
+            face.axis == 1 && !face.isMax -> {  // -Y face
+                buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a)
+            }
+            face.axis == 2 && face.isMax -> {  // +Z face
+                buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a)
+            }
+            else -> {  // -Z face
+                buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z1).setColor(r, g, b, a)
+            }
+        }
     }
 
     private fun drawBox(
