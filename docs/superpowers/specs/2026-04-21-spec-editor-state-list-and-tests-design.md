@@ -73,7 +73,7 @@ are added in `init()` for each existing entry.
 | Field  | Widget       | Validation |
 |--------|-------------|------------|
 | Tick   | `EditBox` (width 30) | int ≥ 0 or blank for INIT |
-| Phase  | `EditBox` (width 90, default `end_of_tick`) | must match a `Phase` name (case-insensitive) |
+| Phase  | `CycleButton<Phase>` (width 110) | cycles through `Phase` enum values; default `END_OF_TICK` |
 | Props  | `EditBox` (width 220) | `key=value` pairs separated by `,` |
 
 The screen holds a mutable `workingStateSpec: StateSpec` (initialised from the current
@@ -331,7 +331,7 @@ companion object {
      → waitForScreen(SpecEditorScreen::class.java)
 
 6.  INIT entry is already populated (lever.powered=false auto-captured by marker item)
-    Click "+ Add Entry", fill Tick=0, Phase=start_of_tick, Props=powered=true, Confirm
+    Click "+ Add Entry", fill Tick=0, cycle Phase to start_of_tick, Props=powered=true, Confirm
     Click "Save"
      → SaveSpecEntryC2SPayload sent with updated InputSpec
 
@@ -369,5 +369,5 @@ matches, then calling `screen.mouseClicked(cx, cy, 0)` at the button's center.
 ## 6. Out of Scope (This Plan)
 
 - Editing existing state entries (only add + remove in this design)
-- Phase selector as a dropdown widget (plain EditBox accepting phase name)
+- Editing existing state entries (click-to-edit inline)
 - Multi-property inline table (comma-separated `key=value` string in one EditBox)
