@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.data.SpecCase
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.TestResult
 import net.minecraft.core.BlockPos
@@ -52,6 +53,54 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
         val updatedCases = s.specCases.toMutableList()
         updatedCases[specCaseIndex] = updatedCases[specCaseIndex].withEntryAddedOrUpdated(entry)
         spec = s.copy(specCases = updatedCases)
+        setChangedAndSync()
+    }
+
+    fun addSpecCase(name: String) {
+        val s = spec ?: return
+        val newCase = SpecCase(name, 20, emptyList(), emptyList(), emptyList(), emptyList())
+        spec = s.copy(specCases = s.specCases + newCase)
+        setChangedAndSync()
+    }
+
+    fun addOrUpdateSpecCase(specCase: SpecCase) {
+        val s = spec ?: return
+        val existing = s.specCases.indexOfFirst { it.name == specCase.name }
+        val updated = if (existing >= 0) {
+            s.specCases.toMutableList().also { it[existing] = specCase }
+        } else {
+            s.specCases + specCase
+        }
+        spec = s.copy(specCases = updated)
+        if (activeSpecCaseIndex >= updated.size) activeSpecCaseIndex = updated.size - 1
+        setChangedAndSync()
+    }
+
+    fun removeSpecCase(index: Int) {
+        val s = spec ?: return
+        if (index !in s.specCases.indices) return
+        val updated = s.specCases.toMutableList().also { it.removeAt(index) }
+        spec = s.copy(specCases = updated)
+        if (activeSpecCaseIndex >= updated.size) activeSpecCaseIndex = (updated.size - 1).coerceAtLeast(0)
+        setChangedAndSync()
+    }
+
+    fun renameSpecCase(index: Int, name: String) {
+        val s = spec ?: return
+        if (index !in s.specCases.indices) return
+        val updated = s.specCases.toMutableList()
+        updated[index] = updated[index].copy(name = name)
+        spec = s.copy(specCases = updated)
+        setChangedAndSync()
+    }
+
+    fun setSpecName(name: String) {
+        spec = spec?.copy(name = name) ?: return
+        setChangedAndSync()
+    }
+
+    fun setOneShot(oneShot: Boolean) {
+        spec = spec?.copy(oneShot = oneShot) ?: return
         setChangedAndSync()
     }
 

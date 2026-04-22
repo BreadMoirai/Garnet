@@ -1,7 +1,12 @@
 package com.breadmoirai.redstonespecs.block
 
+import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.data.SpecCase
+import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
 import com.mojang.serialization.MapCodec
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
@@ -11,7 +16,9 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BlockEntityTicker
 import net.minecraft.world.level.block.entity.BlockEntityType
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.levelgen.structure.BoundingBox
 import net.minecraft.world.phys.BlockHitResult
+import java.util.UUID
 
 class SpecOriginBlock(properties: Properties) : BaseEntityBlock(properties) {
 
@@ -29,9 +36,20 @@ class SpecOriginBlock(properties: Properties) : BaseEntityBlock(properties) {
         player: Player,
         hit: BlockHitResult,
     ): InteractionResult {
-        if (level.isClientSide) {
+        if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecOriginBlockEntity ?: return InteractionResult.PASS
-            openOverviewScreen(be)
+            if (be.spec == null) {
+                be.setSpec(
+                    RedstoneSpec(
+                        id = UUID.randomUUID(),
+                        name = "New Spec",
+                        bounds = BoundingBox(-4, -1, -4, 4, 3, 4),
+                        oneShot = false,
+                        specCases = listOf(SpecCase("Case 1", 20, emptyList(), emptyList(), emptyList(), emptyList())),
+                    )
+                )
+            }
+            ServerPlayNetworking.send(player as ServerPlayer, OpenOverviewS2CPayload(pos))
         }
         return InteractionResult.SUCCESS
     }
@@ -44,9 +62,5 @@ class SpecOriginBlock(properties: Properties) : BaseEntityBlock(properties) {
 
     companion object {
         val CODEC: MapCodec<SpecOriginBlock> = simpleCodec(::SpecOriginBlock)
-
-        fun openOverviewScreen(be: SpecOriginBlockEntity) {
-            // TODO Phase 5: open SpecOverviewScreen(be)
-        }
     }
 }
