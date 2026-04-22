@@ -1,18 +1,23 @@
 package com.breadmoirai.redstonespecs.runner
 
 import com.breadmoirai.redstonespecs.data.InputSpec
-import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecCase
-import com.breadmoirai.redstonespecs.data.StateCondition
-import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.data.SpecCaseResult
+import com.breadmoirai.redstonespecs.data.TickCheck
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.block.state.properties.Property
+
+data class BreakpointHit(
+    val simTime: SimTime,
+    val specName: String,
+    val caseName: String,
+    val breakpointLabel: String,
+)
 
 class SpecRunner(
     val spec: RedstoneSpec,
@@ -24,8 +29,21 @@ class SpecRunner(
     private var ticksElapsed = -1
     private val checks = mutableListOf<TickCheck>()
 
+    var frozenAt: SimTime? = null
+        private set
+    var pendingBreakpointHit: BreakpointHit? = null
+        private set
+
     fun start() {
         applyInputsAt(SimTime.INIT)
+    }
+
+    fun resume() {
+        frozenAt = null
+    }
+
+    fun clearPendingBreakpointHit() {
+        pendingBreakpointHit = null
     }
 
     fun resetCircuit() {
@@ -33,10 +51,11 @@ class SpecRunner(
     }
 
     /**
-     * Called at each sub-tick phase boundary. Returns a completed [SpecCaseResult] once
-     * [SpecCase.lifespan] ticks have elapsed, null while still running.
+     * Called at each sub-tick phase boundary. Returns a [SpecCaseResult] once
+     * [SpecCase.lifespan] ticks have elapsed (or immediately if still frozen).
      */
     fun onPhase(phase: Phase): SpecCaseResult? {
+        if (frozenAt != null) return null
         if (phase == Phase.START_OF_TICK) ticksElapsed++
         if (ticksElapsed < 0) return null
         if (ticksElapsed >= specCase.lifespan) {
@@ -45,15 +64,17 @@ class SpecRunner(
         val simTime = SimTime(ticksElapsed, phase)
         applyInputsAt(simTime)
         checkOutputsAt(simTime)
+        checkBreakpointsAt(simTime)
         return null
     }
+
+    // --- inputs / outputs ---
 
     private fun applyInputsAt(simTime: SimTime) {
         for (input in specCase.inputs) {
             val (_, props) = input.stateSpec.entries.find { it.first == simTime } ?: continue
             if (props.isEmpty()) continue
-            val worldPos = worldPos(input.pos)
-            setBlockStateProperties(worldPos, props)
+            setBlockStateProperties(worldPos(input.pos), props)
         }
     }
 
@@ -61,17 +82,29 @@ class SpecRunner(
         for (output in specCase.outputs) {
             val (_, expected) = output.stateSpec.entries.find { it.first == simTime } ?: continue
             if (expected.isEmpty()) continue
-            val worldPos = worldPos(output.pos)
-            val actualState = level.getBlockState(worldPos)
+            val actualState = level.getBlockState(worldPos(output.pos))
             for ((propName, expectedValue) in expected) {
-                val actualValue = getPropertyStr(actualState, propName) ?: "missing"
+                val actualValue = blockStatePropertyStr(actualState, propName) ?: "missing"
                 val label = output.label.ifEmpty { propName }
                 checks += TickCheck(simTime, label, expectedValue, actualValue, actualValue == expectedValue)
             }
         }
     }
 
-    // --- Block-state helpers ---
+    // --- breakpoints ---
+
+    private fun checkBreakpointsAt(simTime: SimTime) {
+        for (bp in specCase.breakpoints) {
+            if (!bp.enabled) continue
+            if (evaluateCondition(bp.condition, level, worldPos(bp.pos))) {
+                frozenAt = simTime
+                pendingBreakpointHit = BreakpointHit(simTime, spec.name, specCase.name, bp.label.ifEmpty { bp.pos.toString() })
+                return
+            }
+        }
+    }
+
+    // --- block-state helpers ---
 
     private fun setBlockStateProperties(pos: BlockPos, properties: Map<String, String>) {
         var state = level.getBlockState(pos)
@@ -89,30 +122,10 @@ class SpecRunner(
         valueStr: String,
     ): BlockState = property.getValue(valueStr).map { state.setValue(property, it) }.orElse(state)
 
-    private fun getPropertyStr(state: BlockState, propName: String): String? {
-        val property = state.block.stateDefinition.getProperty(propName) ?: return null
-        if (!state.hasProperty(property)) return null
-        @Suppress("UNCHECKED_CAST")
-        return readProperty(state, property as Property<Comparable<Any>>)
-    }
+    // --- condition evaluation (also used by breakpoints) ---
 
-    private fun <T : Comparable<T>> readProperty(state: BlockState, property: Property<T>): String =
-        property.getName(state.getValue(property))
-
-    // --- Condition evaluation (used by BreakpointSpec / AutoSpec in later milestones) ---
-
-    fun evaluateCondition(condition: StateCondition, worldPos: BlockPos): Boolean = when (condition) {
-        is StateCondition.All -> condition.conditions.all { evaluateCondition(it, worldPos) }
-        is StateCondition.Any -> condition.conditions.any { evaluateCondition(it, worldPos) }
-        is StateCondition.Not -> !evaluateCondition(condition.condition, worldPos)
-        is StateCondition.BlockState -> {
-            val state = level.getBlockState(worldPos)
-            condition.properties.all { (name, expected) ->
-                getPropertyStr(state, name) == expected
-            }
-        }
-        is StateCondition.ContainerContents -> false // TODO milestone 8
-    }
+    fun evaluateCondition(condition: com.breadmoirai.redstonespecs.data.StateCondition, worldPos: BlockPos): Boolean =
+        com.breadmoirai.redstonespecs.runner.evaluateCondition(condition, level, worldPos)
 
     private fun worldPos(relPos: BlockPos) =
         BlockPos(originPos.x + relPos.x, originPos.y + relPos.y, originPos.z + relPos.z)
