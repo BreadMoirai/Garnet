@@ -77,6 +77,13 @@ class ColorPickerWidget(
         }
     }
 
+    /**
+     * Closes the dropdown and clears the [hexBox] reference.
+     *
+     * NOTE: [Screen.removeWidget] is protected and cannot be called from here.
+     * Callers that registered the [EditBox] from [openDropdown] must call
+     * `rebuildWidgets()` after this to remove the stale widget from the screen.
+     */
     fun closeDropdown() {
         dropdownOpen = false
         hexBox = null
@@ -110,7 +117,7 @@ class ColorPickerWidget(
             val sx = dx + PAD + col * SWATCH_SIZE
             val sy = dy + PAD + row * SWATCH_SIZE
             extractor.fill(sx, sy, sx + SWATCH_SIZE - 1, sy + SWATCH_SIZE - 1, c or 0xFF000000.toInt())
-            if (mouseX in sx until sx + SWATCH_SIZE - 1 && mouseY in sy until sy + SWATCH_SIZE - 1) {
+            if (mouseX in sx until sx + SWATCH_SIZE && mouseY in sy until sy + SWATCH_SIZE) {
                 extractor.fill(sx, sy, sx + SWATCH_SIZE - 1, sy + SWATCH_SIZE - 1, 0x44FFFFFF)
             }
         }
@@ -149,12 +156,14 @@ class ColorPickerWidget(
             }
         }
 
+        // Forward clicks to hexBox for keyboard focus
+        hexBox?.mouseClicked(event, unknownBoolean)
+
         // Outside dropdown: close
         val bounds = dropdownBounds()
         if (mouseX < bounds[0] || mouseX > bounds[2] || mouseY < bounds[1] || mouseY > bounds[3]) {
             applyHexInput()
-            dropdownOpen = false
-            hexBox = null
+            closeDropdown()
         }
         return super.mouseClicked(event, unknownBoolean)
     }
