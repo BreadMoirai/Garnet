@@ -8,6 +8,7 @@ import net.minecraft.client.gui.components.EditBox
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
 import org.apache.commons.lang3.function.FailableConsumer
@@ -38,13 +39,16 @@ class SpecTestContext(
                 val level = server.overworld()
                 val player = level.players().firstOrNull() ?: return
                 val hitResult = BlockHitResult(Vec3.atCenterOf(pos), direction, pos, false)
-                // Pass the first non-empty hotbar item directly; useItemOn skips item.useOn()
-                // entirely when the passed stack is empty, and the selected hotbar slot may not
-                // be the slot that /give placed the item into.
-                val inv = player.inventory
-                val stack = (0 until 9).map { inv.getItem(it) }.firstOrNull { !it.isEmpty }
+                val stack = (0 until 9).map { player.inventory.getItem(it) }.firstOrNull { !it.isEmpty }
                     ?: player.getItemInHand(InteractionHand.MAIN_HAND)
-                player.gameMode.useItemOn(player, level, stack, InteractionHand.MAIN_HAND, hitResult)
+                if (!stack.isEmpty) {
+                    // Item interaction: call useOn directly to bypass ServerPlayerGameMode block
+                    // interaction phase, which would toggle levers and similar blocks first.
+                    stack.useOn(UseOnContext(level, player, InteractionHand.MAIN_HAND, stack, hitResult))
+                } else {
+                    // No item: trigger the block's own use action (e.g. opening SpecOverviewScreen).
+                    level.getBlockState(pos).useWithoutItem(level, player, hitResult)
+                }
             }
         })
         context.waitTicks(2)

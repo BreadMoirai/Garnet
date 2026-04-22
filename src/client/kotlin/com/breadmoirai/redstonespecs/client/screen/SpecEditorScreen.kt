@@ -190,7 +190,6 @@ class SpecEditorScreen(
         val y = panelY
         val entry = getEntry()
 
-        extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
 
         val typeLabel = when (entry) {
@@ -200,16 +199,16 @@ class SpecEditorScreen(
             is AutoSpec -> "AutoSpec"
             null -> "Entry"
         }
-        extractor.centeredText(font, Component.literal("$typeLabel @ $entryRelPos"), x + panelW / 2, y + 6, 0xFFFFFF)
-        extractor.text(font, Component.literal("Label:"), x + 8, y + 29, 0xAAAAAA)
-        extractor.text(font, Component.literal("Color:"), x + 8, y + 49, 0xAAAAAA)
+        extractor.centeredText(font, Component.literal("$typeLabel @ $entryRelPos"), x + panelW / 2, y + 6, 0xFFFFFFFF.toInt())
+        extractor.text(font, Component.literal("Label:"), x + 8, y + 29, 0xFFAAAAAA.toInt())
+        extractor.text(font, Component.literal("Color:"), x + 8, y + 49, 0xFFAAAAAA.toInt())
 
         val entries = workingEntries
         if (entries != null) {
             extractor.text(
                 font,
                 Component.literal("State entries: ${entries.size}"),
-                x + 8, y + 68, 0x888888,
+                x + 8, y + 68, 0xFF888888.toInt(),
             )
             entries.take(4).forEachIndexed { i, (simTime, props) ->
                 val rowY = y + 82 + i * 14
@@ -218,16 +217,16 @@ class SpecEditorScreen(
                 val propStr = props.entries.joinToString(",") { "${it.key}=${it.value}" }.let {
                     if (it.length > 28) it.take(27) + "…" else it
                 }
-                extractor.text(font, Component.literal(timeLabel), x + 10, rowY, 0xAAAAAA)
-                extractor.text(font, Component.literal(propStr), x + 68, rowY, 0x888888)
+                extractor.text(font, Component.literal(timeLabel), x + 10, rowY, 0xFFAAAAAA.toInt())
+                extractor.text(font, Component.literal(propStr), x + 68, rowY, 0xFF888888.toInt())
             }
             if (showAddForm) {
-                extractor.text(font, Component.literal("Tick:"), x + 8, y + 166, 0xAAAAAA)
+                extractor.text(font, Component.literal("Tick:"), x + 8, y + 166, 0xFFAAAAAA.toInt())
             }
         } else {
             when (entry) {
                 is BreakpointSpec -> {
-                    val color = if (entry.enabled) 0x44FF88 else 0xFF4444
+                    val color = if (entry.enabled) 0xFF44FF88.toInt() else 0xFFFF4444.toInt()
                     extractor.text(
                         font,
                         Component.literal("Enabled: ${entry.enabled}  (${entry.condition::class.simpleName})"),
@@ -237,10 +236,10 @@ class SpecEditorScreen(
                 is AutoSpec -> extractor.text(
                     font,
                     Component.literal("Trigger: ${entry.condition::class.simpleName}"),
-                    x + 8, y + 70, 0xFFAA00,
+                    x + 8, y + 70, 0xFFFFAA00.toInt(),
                 )
                 null -> extractor.centeredText(
-                    font, Component.literal("Entry not found"), x + panelW / 2, y + 70, 0xFF4444,
+                    font, Component.literal("Entry not found"), x + panelW / 2, y + 70, 0xFFFF4444.toInt(),
                 )
                 else -> {}
             }

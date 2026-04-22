@@ -99,19 +99,18 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         val x = panelX
         val y = panelY
 
-        extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
-        extractor.centeredText(font, title, x + panelW / 2, y + 4, 0xFFFFFF)
-        extractor.text(font, Component.literal("Name:"), x + 10, y + 17, 0x888888)
+        extractor.centeredText(font, title, x + panelW / 2, y + 4, 0xFFFFFFFF.toInt())
+        extractor.text(font, Component.literal("Name:"), x + 10, y + 17, 0xFF888888.toInt())
 
         val be = getBe()
         val spec = be?.spec
         if (spec == null) {
-            extractor.centeredText(font, Component.literal("No spec loaded"), x + panelW / 2, y + 60, 0xFF4444)
+            extractor.centeredText(font, Component.literal("No spec loaded"), x + panelW / 2, y + 60, 0xFFFF4444.toInt())
             return
         }
 
-        extractor.text(font, Component.literal("Cases:"), x + 10, y + 36, 0x888888)
+        extractor.text(font, Component.literal("Cases:"), x + 10, y + 36, 0xFF888888.toInt())
 
         val activeIndex = be.activeSpecCaseIndex
         if (activeIndex < spec.specCases.size) {
@@ -124,9 +123,9 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             if (i >= 7) return@forEachIndexed
             val caseResult = testResult?.results?.find { it.specCaseName == case.name }
             val (statusText, statusColor) = when {
-                caseResult == null -> "○" to 0x888888
-                caseResult.checks.all { it.pass } -> "✓" to 0x44FF88
-                else -> "✗" to 0xFF4444
+                caseResult == null -> "○" to 0xFF888888.toInt()
+                caseResult.checks.all { it.pass } -> "✓" to 0xFF44FF88.toInt()
+                else -> "✗" to 0xFFFF4444.toInt()
             }
             extractor.text(font, Component.literal(statusText), x + 196, y + 47 + i * 22, statusColor)
         }
@@ -134,7 +133,7 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         if (testResult != null) {
             val pass = testResult.results.count { r -> r.checks.all { it.pass } }
             val total = testResult.results.size
-            val color = if (pass == total) 0x44FF88 else 0xFF6644
+            val color = if (pass == total) 0xFF44FF88.toInt() else 0xFFFF6644.toInt()
             extractor.text(
                 font,
                 Component.literal("Last: $pass/$total passed"),

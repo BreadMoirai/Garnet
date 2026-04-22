@@ -128,25 +128,24 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         val x = panelX
         val y = panelY
 
-        extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
 
         // Title
-        extractor.centeredText(font, title, x + panelW / 2, y + 6, 0xFFFFFF)
+        extractor.centeredText(font, title, x + panelW / 2, y + 6, 0xFFFFFFFF.toInt())
 
         val (label1, label2) = if (displayMode == DisplayMode.OFFSET_SIZE) "Offset" to "Size" else "Min" to "Max"
 
         // Row 1 labels
-        extractor.text(font, Component.literal(label1), x + 8, y + 41, 0x888888)
-        extractor.text(font, Component.literal("X"), x + 60, y + 41, 0xAAAAAA)
-        extractor.text(font, Component.literal("Y"), x + 122, y + 41, 0xAAAAAA)
-        extractor.text(font, Component.literal("Z"), x + 184, y + 41, 0xAAAAAA)
+        extractor.text(font, Component.literal(label1), x + 8, y + 41, 0xFF888888.toInt())
+        extractor.text(font, Component.literal("X"), x + 60, y + 41, 0xFFAAAAAA.toInt())
+        extractor.text(font, Component.literal("Y"), x + 122, y + 41, 0xFFAAAAAA.toInt())
+        extractor.text(font, Component.literal("Z"), x + 184, y + 41, 0xFFAAAAAA.toInt())
 
         // Row 2 labels
-        extractor.text(font, Component.literal(label2), x + 8, y + 63, 0x888888)
-        extractor.text(font, Component.literal("X"), x + 60, y + 63, 0xAAAAAA)
-        extractor.text(font, Component.literal("Y"), x + 122, y + 63, 0xAAAAAA)
-        extractor.text(font, Component.literal("Z"), x + 184, y + 63, 0xAAAAAA)
+        extractor.text(font, Component.literal(label2), x + 8, y + 63, 0xFF888888.toInt())
+        extractor.text(font, Component.literal("X"), x + 60, y + 63, 0xFFAAAAAA.toInt())
+        extractor.text(font, Component.literal("Y"), x + 122, y + 63, 0xFFAAAAAA.toInt())
+        extractor.text(font, Component.literal("Z"), x + 184, y + 63, 0xFFAAAAAA.toInt())
     }
 
     override fun isPauseScreen(): Boolean = false
