@@ -186,14 +186,12 @@ class SpecEditorScreen(
         mouseY: Int,
         partialTick: Float,
     ) {
-        super.extractBackground(extractor, mouseX, mouseY, partialTick)
-        super.extractRenderState(extractor, mouseX, mouseY, partialTick)
-
         val x = panelX
         val y = panelY
         val entry = getEntry()
 
         extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
+        super.extractRenderState(extractor, mouseX, mouseY, partialTick)
 
         val typeLabel = when (entry) {
             is InputSpec -> "Input"

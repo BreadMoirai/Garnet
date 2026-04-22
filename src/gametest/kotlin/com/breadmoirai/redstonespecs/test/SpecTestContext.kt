@@ -12,6 +12,7 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
 import org.apache.commons.lang3.function.FailableConsumer
 import org.lwjgl.glfw.GLFW
+import java.nio.file.Path
 
 @Suppress("UnstableApiUsage")
 class SpecTestContext(
@@ -63,6 +64,9 @@ class SpecTestContext(
         }
         context.waitTick()
     }
+
+    /** Takes a screenshot and saves it to the test screenshots directory. */
+    fun screenshot(name: String): Path = context.takeScreenshot(name)
 
     /** Reads the synced client-side BE (lastTestResult is synced via getUpdatePacket). */
     fun getClientBe(pos: BlockPos): SpecOriginBlockEntity? =

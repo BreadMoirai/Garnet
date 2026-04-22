@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.test
 
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.client.screen.SpecBoundsScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
@@ -16,8 +17,29 @@ class RedstonespecsClientTests : FabricClientGameTest {
 
     override fun runTest(context: ClientGameTestContext) {
         SpecTestContext.createWorld(context).use { world ->
-            leverLampFullFlow(SpecTestContext(context, world))
+            val ctx = SpecTestContext(context, world)
+            leverLampFullFlow(ctx)
+            boundsScreenFlow(ctx)
         }
+    }
+
+    private fun boundsScreenFlow(ctx: SpecTestContext) {
+        // Open overview and screenshot it
+        ctx.rightClickBlock(originPos)
+        ctx.waitForScreen(SpecOverviewScreen::class.java)
+        ctx.screenshot("spec-overview-screen")
+
+        // Open bounds sub-screen and screenshot it
+        ctx.clickButton("Bounds…")
+        ctx.waitForScreen(SpecBoundsScreen::class.java)
+        ctx.screenshot("spec-bounds-screen-offset-size")
+
+        // Toggle to Min+Max mode and screenshot
+        ctx.clickButton("Offset+Size")
+        ctx.waitTick()
+        ctx.screenshot("spec-bounds-screen-min-max")
+
+        ctx.closeScreen()
     }
 
     private fun leverLampFullFlow(ctx: SpecTestContext) {

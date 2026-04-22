@@ -18,16 +18,19 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
 
     private enum class DisplayMode { OFFSET_SIZE, MIN_MAX }
 
-    private val panelW = 252
-    private val panelH = 172
+    private val panelW = 260
+    private val panelH = 114
     private val panelX get() = (width - panelW) / 2
     private val panelY get() = (height - panelH) / 2
 
     private var displayMode = DisplayMode.OFFSET_SIZE
 
+    // Row 1: first triple (Offset X/Y/Z or Min X/Y/Z)
     private var box1x: EditBox? = null
     private var box1y: EditBox? = null
     private var box1z: EditBox? = null
+
+    // Row 2: second triple (Size X/Y/Z or Max X/Y/Z)
     private var box2x: EditBox? = null
     private var box2y: EditBox? = null
     private var box2z: EditBox? = null
@@ -40,12 +43,13 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         val y = panelY
         val bounds = getBounds() ?: BoundingBox(-4, -1, -4, 4, 3, 4)
 
+        // Mode toggle — top-right of header
         addRenderableWidget(
             CycleButton.builder<DisplayMode>(
                 { mode -> Component.literal(if (mode == DisplayMode.OFFSET_SIZE) "Offset+Size" else "Min+Max") },
                 displayMode,
             ).withValues(*DisplayMode.entries.toTypedArray())
-                .create(x + panelW - 92, y + 14, 88, 14, Component.empty()) { _, value ->
+                .create(x + panelW - 90, y + 8, 86, 18, Component.empty()) { _, value ->
                     displayMode = value
                     rebuildWidgets()
                 }
@@ -53,26 +57,28 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
 
         val (v1x, v1y, v1z, v2x, v2y, v2z) = toDisplayValues(bounds)
 
-        box1x = addBox(x + 8,   y + 56, v1x)
-        box1y = addBox(x + 88,  y + 56, v1y)
-        box1z = addBox(x + 168, y + 56, v1z)
+        // Row 1 at y+36: label + X, Y, Z boxes
+        box1x = addBox(x + 68, y + 36, v1x)
+        box1y = addBox(x + 130, y + 36, v1y)
+        box1z = addBox(x + 192, y + 36, v1z)
 
-        box2x = addBox(x + 8,   y + 110, v2x)
-        box2y = addBox(x + 88,  y + 110, v2y)
-        box2z = addBox(x + 168, y + 110, v2z)
+        // Row 2 at y+58: label + X, Y, Z boxes
+        box2x = addBox(x + 68, y + 58, v2x)
+        box2y = addBox(x + 130, y + 58, v2y)
+        box2z = addBox(x + 192, y + 58, v2z)
 
         addRenderableWidget(
             Button.builder(Component.literal("Save")) { save() }
-                .bounds(x + 8, y + panelH - 24, 60, 18).build()
+                .bounds(x + 8, y + panelH - 26, 60, 20).build()
         )
         addRenderableWidget(
             Button.builder(CommonComponents.GUI_CANCEL) { onClose() }
-                .bounds(x + panelW - 68, y + panelH - 24, 60, 18).build()
+                .bounds(x + panelW - 68, y + panelH - 26, 60, 20).build()
         )
     }
 
     private fun addBox(bx: Int, by: Int, value: Int): EditBox =
-        EditBox(font, bx, by, 72, 14, Component.empty()).also {
+        EditBox(font, bx, by, 48, 18, Component.empty()).also {
             it.value = value.toString()
             addRenderableWidget(it)
         }
@@ -119,25 +125,28 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         mouseY: Int,
         partialTick: Float,
     ) {
-        super.extractBackground(extractor, mouseX, mouseY, partialTick)
-        super.extractRenderState(extractor, mouseX, mouseY, partialTick)
-
         val x = panelX
         val y = panelY
+
         extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
+        super.extractRenderState(extractor, mouseX, mouseY, partialTick)
+
+        // Title
         extractor.centeredText(font, title, x + panelW / 2, y + 6, 0xFFFFFF)
 
         val (label1, label2) = if (displayMode == DisplayMode.OFFSET_SIZE) "Offset" to "Size" else "Min" to "Max"
 
-        extractor.text(font, Component.literal(label1), x + 8, y + 38, 0x888888)
-        extractor.text(font, Component.literal("X"), x + 8,   y + 44, 0x555555)
-        extractor.text(font, Component.literal("Y"), x + 88,  y + 44, 0x555555)
-        extractor.text(font, Component.literal("Z"), x + 168, y + 44, 0x555555)
+        // Row 1 labels
+        extractor.text(font, Component.literal(label1), x + 8, y + 41, 0x888888)
+        extractor.text(font, Component.literal("X"), x + 60, y + 41, 0xAAAAAA)
+        extractor.text(font, Component.literal("Y"), x + 122, y + 41, 0xAAAAAA)
+        extractor.text(font, Component.literal("Z"), x + 184, y + 41, 0xAAAAAA)
 
-        extractor.text(font, Component.literal(label2), x + 8, y + 92, 0x888888)
-        extractor.text(font, Component.literal("X"), x + 8,   y + 98, 0x555555)
-        extractor.text(font, Component.literal("Y"), x + 88,  y + 98, 0x555555)
-        extractor.text(font, Component.literal("Z"), x + 168, y + 98, 0x555555)
+        // Row 2 labels
+        extractor.text(font, Component.literal(label2), x + 8, y + 63, 0x888888)
+        extractor.text(font, Component.literal("X"), x + 60, y + 63, 0xAAAAAA)
+        extractor.text(font, Component.literal("Y"), x + 122, y + 63, 0xAAAAAA)
+        extractor.text(font, Component.literal("Z"), x + 184, y + 63, 0xAAAAAA)
     }
 
     override fun isPauseScreen(): Boolean = false

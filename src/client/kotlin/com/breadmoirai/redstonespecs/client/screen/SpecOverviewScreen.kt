@@ -96,13 +96,11 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         mouseY: Int,
         partialTick: Float,
     ) {
-        super.extractBackground(extractor, mouseX, mouseY, partialTick)
-        super.extractRenderState(extractor, mouseX, mouseY, partialTick)
-
         val x = panelX
         val y = panelY
 
         extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
+        super.extractRenderState(extractor, mouseX, mouseY, partialTick)
         extractor.centeredText(font, title, x + panelW / 2, y + 4, 0xFFFFFF)
         extractor.text(font, Component.literal("Name:"), x + 10, y + 17, 0x888888)
 
