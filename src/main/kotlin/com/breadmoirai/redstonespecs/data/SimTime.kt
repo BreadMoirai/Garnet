@@ -3,6 +3,9 @@ package com.breadmoirai.redstonespecs.data
 import com.mojang.serialization.Codec
 import com.mojang.serialization.DataResult
 import com.mojang.serialization.codecs.RecordCodecBuilder
+import io.netty.buffer.ByteBuf
+import net.minecraft.network.codec.ByteBufCodecs
+import net.minecraft.network.codec.StreamCodec
 
 enum class Phase {
     START_OF_TICK, BLOCK_EVENTS, TILE_ENTITY_TICK, SCHEDULED_TICKS, RANDOM_TICKS, END_OF_TICK;
@@ -16,6 +19,8 @@ enum class Phase {
             },
             Phase::name
         )
+        val STREAM_CODEC: StreamCodec<ByteBuf, Phase> =
+            ByteBufCodecs.VAR_INT.map({ entries[it] }, Phase::ordinal)
     }
 }
 
@@ -38,5 +43,12 @@ data class SimTime(
                 Codec.INT.optionalFieldOf("order", 0).forGetter(SimTime::order),
             ).apply(instance, ::SimTime)
         }
+
+        val STREAM_CODEC: StreamCodec<ByteBuf, SimTime> = StreamCodec.composite(
+            ByteBufCodecs.INT, SimTime::tick,
+            Phase.STREAM_CODEC, SimTime::phase,
+            ByteBufCodecs.INT, SimTime::order,
+            ::SimTime,
+        )
     }
 }
