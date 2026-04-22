@@ -4,7 +4,7 @@ import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.SpecBoundsScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
-import com.breadmoirai.redstonespecs.client.screen.StateEntryEditorScreen
+import dev.isxander.yacl3.gui.YACLScreen
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.minecraft.core.BlockPos
@@ -26,40 +26,34 @@ class RedstonespecsClientTests : FabricClientGameTest {
     }
 
     private fun specEditorScreenFlow(ctx: SpecTestContext) {
-        // Give input marker and right-click lever → SpecEditorScreen opens
+        // Give input marker and right-click lever → thin SpecEditorScreen → YACLScreen
         ctx.runCommand("clear @a")
         ctx.runCommand("give @a redstonespecs:input_spec_marker 1")
         ctx.waitTick()
         ctx.rightClickBlock(leverPos)
-        ctx.waitForScreen(SpecEditorScreen::class.java)
-        ctx.waitForButton("+ Add Entry")  // wait for workingEntries to be populated from server sync
+        // SpecEditorScreen (loader) transitions to YACLScreen once BE data arrives
+        ctx.waitForScreen(YACLScreen::class.java)
         ctx.screenshot("spec-editor-screen")
 
-        // Click + Add Entry → StateEntryEditorScreen opens
-        ctx.clickButton("+ Add Entry")
-        ctx.waitForScreen(StateEntryEditorScreen::class.java)
-        ctx.waitForButton("Confirm")                  // wait for blockState to load and widgets to be built
-        ctx.screenshot("state-entry-editor-screen")
+        // Click "+ Add Entry" ButtonOption → opens entry editor YACLScreen
+        ctx.clickYaclButton("+ Add Entry")
+        ctx.waitForScreen(YACLScreen::class.java)
+        ctx.screenshot("entry-editor-screen")
 
-        // Click Cancel → StateEntryEditorScreen closes, returns to game (no screen).
-        // The SpecEditorScreen is not preserved on cancel.
+        // Click Cancel (YACL's built-in cancel button, direct screen widget)
         ctx.clickButton("Cancel")
         ctx.context.waitFor({ mc -> mc.screen == null }, 100)
     }
 
     private fun boundsScreenFlow(ctx: SpecTestContext) {
-        // Open overview and screenshot it
         ctx.rightClickBlock(originPos)
         ctx.waitForScreen(SpecOverviewScreen::class.java)
         ctx.screenshot("spec-overview-screen")
 
-        // Open bounds sub-screen and screenshot it
         ctx.clickButton("Bounds")
         ctx.waitForScreen(SpecBoundsScreen::class.java)
         ctx.screenshot("spec-bounds-screen-offset-size")
 
-        // Toggle to Corners mode and screenshot.
-        // The CycleButton has Component.empty() as label, so match by current value.
         ctx.clickNthCycleButtonByValue("Offset / Size", 0)
         ctx.waitTick()
         ctx.screenshot("spec-bounds-screen-corners")
@@ -81,47 +75,46 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitForScreen(SpecOverviewScreen::class.java)
         ctx.closeScreen()
 
-        // ── Place InputSpec on lever via marker item ─────────────────────────
+        // ── Place InputSpec on lever ─────────────────────────────────────────
         ctx.runCommand("clear @a")
         ctx.runCommand("give @a redstonespecs:input_spec_marker 1")
         ctx.waitTick()
         ctx.rightClickBlock(leverPos)
-        ctx.waitForScreen(SpecEditorScreen::class.java)
-        ctx.waitForButton("+ Add Entry")  // wait for workingEntries to be populated from server sync
+        ctx.waitForScreen(YACLScreen::class.java)
 
-        // INIT entry is pre-populated (lever.powered=false captured by marker item).
-        // Add tick-0 entry: powered=true at START_OF_TICK.
-        ctx.clickButton("+ Add Entry")
-        ctx.waitForScreen(StateEntryEditorScreen::class.java)
-        ctx.waitForButton("Confirm")                  // wait for blockState to load and widgets to be built
-        ctx.fillEditBoxByWidth(36, "0")               // Tick=0 (EditBox width=36)
-        ctx.clickNthCycleButtonByValue("END_OF_TICK", 0) // Cycle Phase END_OF_TICK → START_OF_TICK
-        ctx.clickNthButton(" ", 1)                    // Check "powered" checkbox (row 1, 0-indexed)
-        ctx.clickNthCycleButtonByValue("false", 0)    // Cycle powered BoolRow: false→true
-        ctx.clickButton("Confirm")
-        ctx.waitForScreen(SpecEditorScreen::class.java)
-        ctx.clickButton("Save")
+        // Add tick-0 START_OF_TICK entry: powered=true
+        ctx.clickYaclButton("+ Add Entry")
+        ctx.waitForScreen(YACLScreen::class.java)
+        ctx.setYaclOption("Tick", 0)
+        ctx.setYaclOption("Phase", "START_OF_TICK")
+        ctx.setYaclOption("Include", true, groupName = "powered")
+        ctx.setYaclOption("Value", true, groupName = "powered")
+        ctx.clickButton("Save Changes")
+        ctx.waitForScreen(YACLScreen::class.java)
+
+        // Save the InputSpec
+        ctx.clickButton("Save Changes")
         ctx.waitTick()
 
-        // ── Place OutputSpec on lamp via marker item ─────────────────────────
+        // ── Place OutputSpec on lamp ─────────────────────────────────────────
         ctx.runCommand("clear @a")
         ctx.runCommand("give @a redstonespecs:output_spec_marker 1")
         ctx.waitTick()
         ctx.rightClickBlock(lampPos)
-        ctx.waitForScreen(SpecEditorScreen::class.java)
-        ctx.waitForButton("+ Add Entry")  // wait for workingEntries to be populated from server sync
+        ctx.waitForScreen(YACLScreen::class.java)
 
-        // INIT entry pre-populated (lamp.lit=false). Add tick-0 END_OF_TICK check.
-        ctx.clickButton("+ Add Entry")
-        ctx.waitForScreen(StateEntryEditorScreen::class.java)
-        ctx.waitForButton("Confirm")                  // wait for blockState to load and widgets to be built
-        ctx.fillEditBoxByWidth(36, "0")               // Tick=0
+        // Add tick-0 END_OF_TICK check: lit=true
+        ctx.clickYaclButton("+ Add Entry")
+        ctx.waitForScreen(YACLScreen::class.java)
+        ctx.setYaclOption("Tick", 0)
         // Phase stays END_OF_TICK (default)
-        ctx.clickNthButton(" ", 1)                    // Check "lit" checkbox (row 1)
-        ctx.clickNthCycleButtonByValue("false", 0)    // Cycle lit BoolRow: false→true
-        ctx.clickButton("Confirm")
-        ctx.waitForScreen(SpecEditorScreen::class.java)
-        ctx.clickButton("Save")
+        ctx.setYaclOption("Include", true, groupName = "lit")
+        ctx.setYaclOption("Value", true, groupName = "lit")
+        ctx.clickButton("Save Changes")
+        ctx.waitForScreen(YACLScreen::class.java)
+
+        // Save the OutputSpec
+        ctx.clickButton("Save Changes")
         ctx.waitTick()
 
         // ── Open overview and run spec ────────────────────────────────────────
@@ -131,7 +124,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitForScreen(SpecOverviewScreen::class.java)
         ctx.clickButton("Run")
 
-        // ── Wait for test result (synced to client BE via getUpdatePacket) ────
+        // ── Wait for test result ──────────────────────────────────────────────
         ctx.context.waitFor({ mc ->
             (mc.level?.getBlockEntity(originPos) as? SpecOriginBlockEntity)
                 ?.lastTestResult != null

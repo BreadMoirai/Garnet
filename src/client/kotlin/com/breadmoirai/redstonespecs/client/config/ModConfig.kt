@@ -52,7 +52,7 @@ object ModConfig {
                         .name(Component.literal("Auto-save on exit"))
                         .description(
                             OptionDescription.of(
-                                Component.literal("Automatically save changes when closing SpecEditorScreen without pressing Save")
+                                Component.literal("Automatically save changes when closing the spec editor without pressing Save")
                             )
                         )
                         .binding(false, { autoSaveOnExit }, { autoSaveOnExit = it })

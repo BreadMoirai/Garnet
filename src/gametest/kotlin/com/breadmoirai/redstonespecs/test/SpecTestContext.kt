@@ -1,6 +1,9 @@
 package com.breadmoirai.redstonespecs.test
 
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import dev.isxander.yacl3.api.ButtonOption
+import dev.isxander.yacl3.api.Option
+import dev.isxander.yacl3.gui.YACLScreen
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
 import net.minecraft.client.Minecraft
@@ -148,6 +151,62 @@ class SpecTestContext(
         fromClient { mc ->
             mc.level?.getBlockEntity(pos) as? SpecOriginBlockEntity
         }
+
+    /**
+     * Clicks a ButtonOption by name inside a YACLScreen's option list.
+     * Unlike clickButton(), this reaches into YACL's option tree (not the rendered widget tree).
+     */
+    fun clickYaclButton(labelText: String) {
+        onClient { mc ->
+            val screen = mc.screen as? YACLScreen
+                ?: throw AssertionError("clickYaclButton($labelText): current screen is not a YACLScreen (got ${mc.screen?.javaClass?.simpleName})")
+            for (category in screen.config.categories()) {
+                for (group in category.groups()) {
+                    for (option in group.options()) {
+                        if (option is ButtonOption && option.name().string == labelText) {
+                            option.action().accept(screen, option)
+                            return@onClient
+                        }
+                    }
+                }
+            }
+            val allButtons = screen.config.categories()
+                .flatMap { it.groups() }
+                .flatMap { it.options() }
+                .filterIsInstance<ButtonOption>()
+                .map { it.name().string }
+            throw AssertionError("clickYaclButton($labelText): not found. Available buttons: $allButtons")
+        }
+        context.waitTick()
+    }
+
+    /**
+     * Sets a YACL option value by searching all categories and groups.
+     * [groupName] can be null to search the root (ungrouped) options only,
+     * or set to a specific group name to search within that group.
+     * Uses [Option.requestSet] which triggers the binding setter immediately.
+     */
+    fun <T : Any> setYaclOption(optionName: String, value: T, groupName: String? = null) {
+        onClient { mc ->
+            val screen = mc.screen as? YACLScreen
+                ?: throw AssertionError("setYaclOption($optionName): not a YACLScreen")
+            for (category in screen.config.categories()) {
+                for (group in category.groups()) {
+                    val groupMatch = groupName == null || group.name().string == groupName
+                    if (!groupMatch) continue
+                    for (option in group.options()) {
+                        if (option.name().string == optionName) {
+                            @Suppress("UNCHECKED_CAST")
+                            (option as Option<T>).requestSet(value)
+                            return@onClient
+                        }
+                    }
+                }
+            }
+            throw AssertionError("setYaclOption($optionName, groupName=$groupName): option not found")
+        }
+        context.waitTick()
+    }
 
     // Wrappers to avoid Kotlin's inability to infer FailableConsumer's exception type parameter.
     fun onClient(block: (Minecraft) -> Unit) {
