@@ -38,11 +38,12 @@ class SpecTestContext(
                 val level = server.overworld()
                 val player = level.players().firstOrNull() ?: return
                 val hitResult = BlockHitResult(Vec3.atCenterOf(pos), direction, pos, false)
-                // Select the first non-empty hotbar slot so getItemInHand returns the actual item.
+                // Pass the first non-empty hotbar item directly; useItemOn skips item.useOn()
+                // entirely when the passed stack is empty, and the selected hotbar slot may not
+                // be the slot that /give placed the item into.
                 val inv = player.inventory
-                val nonEmpty = (0 until 9).firstOrNull { !inv.getItem(it).isEmpty }
-                if (nonEmpty != null) inv.selected = nonEmpty
-                val stack = player.getItemInHand(InteractionHand.MAIN_HAND)
+                val stack = (0 until 9).map { inv.getItem(it) }.firstOrNull { !it.isEmpty }
+                    ?: player.getItemInHand(InteractionHand.MAIN_HAND)
                 player.gameMode.useItemOn(player, level, stack, InteractionHand.MAIN_HAND, hitResult)
             }
         })
