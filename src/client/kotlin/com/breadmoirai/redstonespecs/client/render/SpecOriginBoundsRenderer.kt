@@ -118,12 +118,13 @@ class SpecOriginBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
         x1: Float, y1: Float, z1: Float,
         x2: Float, y2: Float, z2: Float,
         r: Float, g: Float, b: Float, a: Float,
+        lineWidth: Float = 2f,
     ) {
         val nx = 0f; val ny = 1f; val nz = 0f
 
         fun line(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float) {
-            buffer.addVertex(matrix, ax, ay, az).setColor(r, g, b, a).setNormal(nx, ny, nz)
-            buffer.addVertex(matrix, bx, by, bz).setColor(r, g, b, a).setNormal(nx, ny, nz)
+            buffer.addVertex(matrix, ax, ay, az).setColor(r, g, b, a).setNormal(nx, ny, nz).setLineWidth(lineWidth)
+            buffer.addVertex(matrix, bx, by, bz).setColor(r, g, b, a).setNormal(nx, ny, nz).setLineWidth(lineWidth)
         }
 
         // Bottom

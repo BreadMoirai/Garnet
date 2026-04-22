@@ -17,6 +17,9 @@ import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.level.Level
+import org.slf4j.LoggerFactory
+
+private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(properties) {
 
@@ -38,7 +41,10 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
             val initProps = captureBlockStateProps(level.getBlockState(hitPos))
 
             if (specCase.entryAt(relPos) == null) {
+                LOGGER.debug("[SpecMarkerTool#useOn] placing {} entry at {} for case {}", javaClass.simpleName, relPos, be.activeSpecCaseIndex)
                 be.addOrUpdateEntry(be.activeSpecCaseIndex, createEntry(relPos, initProps))
+            } else {
+                LOGGER.debug("[SpecMarkerTool#useOn] opening editor for existing entry at {} case {}", relPos, be.activeSpecCaseIndex)
             }
 
             ServerPlayNetworking.send(player as ServerPlayer, OpenEditorS2CPayload(be.blockPos, relPos))

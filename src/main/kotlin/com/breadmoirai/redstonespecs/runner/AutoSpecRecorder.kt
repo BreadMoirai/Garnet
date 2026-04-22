@@ -7,6 +7,9 @@ import com.breadmoirai.redstonespecs.data.SpecCase
 import com.breadmoirai.redstonespecs.data.StateSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
+import org.slf4j.LoggerFactory
+
+private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 /**
  * Watches InputSpec and OutputSpec positions for an ongoing circuit activation.
@@ -33,6 +36,7 @@ class AutoSpecRecorder(
     }
 
     fun start() {
+        LOGGER.debug("[AutoSpecRecorder#start] recording '{}' monitoring {} positions", autoSpec.label, monitoredPositions.size)
         ticksElapsed = -1
         val states = monitoredPositions.associateWith { pos -> captureBlockStateProps(level.getBlockState(pos)) }
         initStates.clear()
@@ -55,6 +59,7 @@ class AutoSpecRecorder(
         }.toMap()
 
         if (changes.isNotEmpty()) {
+            LOGGER.debug("[AutoSpecRecorder#onPhase] {} detected changes at {} positions", simTime, changes.size)
             recordedChanges += simTime to changes
         }
 
@@ -76,6 +81,7 @@ class AutoSpecRecorder(
         }
 
         val caseName = autoSpec.label.ifEmpty { "auto_${ticksElapsed + 1}t_${System.currentTimeMillis() % 10000}" }
+        LOGGER.debug("[AutoSpecRecorder#commit] committing '{}' duration={}t changes={}", caseName, ticksElapsed + 1, recordedChanges.size)
         return SpecCase(
             name = caseName,
             lifespan = (ticksElapsed + 1).coerceAtLeast(1),

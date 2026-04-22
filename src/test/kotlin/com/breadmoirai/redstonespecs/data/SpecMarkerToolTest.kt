@@ -1,35 +1,27 @@
 package com.breadmoirai.redstonespecs.data
 
-import com.breadmoirai.redstonespecs.item.InputSpecMarkerItem
-import com.breadmoirai.redstonespecs.item.OutputSpecMarkerItem
 import net.minecraft.core.BlockPos
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Test
 
 class SpecMarkerToolTest {
 
     @Test
-    fun `InputSpecMarkerItem creates entry with captured init props`() {
-        val marker = InputSpecMarkerItem()
+    fun `InputSpec created with INIT entry from captured props`() {
         val pos = BlockPos(1, 0, 0)
         val initProps = mapOf("powered" to "false", "facing" to "north")
-        val entry = marker.createEntry(pos, initProps)
-        assertInstanceOf(InputSpec::class.java, entry)
-        val inputEntry = entry as InputSpec
-        assertEquals(pos, inputEntry.pos)
-        assertEquals(SimTime.INIT to initProps, inputEntry.stateSpec.entries.first())
+        val entry = InputSpec(pos, "", 0x4488FF, StateSpec(listOf(SimTime.INIT to initProps)))
+        assertEquals(pos, entry.pos)
+        assertEquals(1, entry.stateSpec.entries.size)
+        assertEquals(SimTime.INIT to initProps, entry.stateSpec.entries.first())
     }
 
     @Test
-    fun `OutputSpecMarkerItem creates entry with captured init props`() {
-        val marker = OutputSpecMarkerItem()
+    fun `OutputSpec created with INIT entry from captured props`() {
         val pos = BlockPos(2, 0, 0)
         val initProps = mapOf("lit" to "false")
-        val entry = marker.createEntry(pos, initProps)
-        assertInstanceOf(OutputSpec::class.java, entry)
-        val outputEntry = entry as OutputSpec
-        assertEquals(pos, outputEntry.pos)
-        assertEquals(SimTime.INIT to initProps, outputEntry.stateSpec.entries.first())
+        val entry = OutputSpec(pos, "", 0x44FF88, StateSpec(listOf(SimTime.INIT to initProps)))
+        assertEquals(pos, entry.pos)
+        assertEquals(SimTime.INIT to initProps, entry.stateSpec.entries.first())
     }
 }

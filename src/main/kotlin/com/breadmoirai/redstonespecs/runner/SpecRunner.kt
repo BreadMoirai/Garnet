@@ -11,6 +11,9 @@ import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.block.state.properties.Property
+import org.slf4j.LoggerFactory
+
+private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 data class BreakpointHit(
     val simTime: SimTime,
@@ -35,10 +38,12 @@ class SpecRunner(
         private set
 
     fun start() {
+        LOGGER.debug("[SpecRunner#start] starting case '{}' of spec '{}'", specCase.name, spec.name)
         applyInputsAt(SimTime.INIT)
     }
 
     fun resume() {
+        LOGGER.debug("[SpecRunner#resume] resuming case '{}' frozen at {}", specCase.name, frozenAt)
         frozenAt = null
     }
 
@@ -59,6 +64,7 @@ class SpecRunner(
         if (phase == Phase.START_OF_TICK) ticksElapsed++
         if (ticksElapsed < 0) return null
         if (ticksElapsed >= specCase.lifespan) {
+            LOGGER.debug("[SpecRunner#onPhase] case '{}' finished after {} ticks", specCase.name, ticksElapsed)
             return SpecCaseResult(specCase.name, checks.toList())
         }
         val simTime = SimTime(ticksElapsed, phase)
@@ -74,6 +80,7 @@ class SpecRunner(
         for (input in specCase.inputs) {
             val (_, props) = input.stateSpec.entries.find { it.first == simTime } ?: continue
             if (props.isEmpty()) continue
+            LOGGER.debug("[SpecRunner#applyInputsAt] {} applying {} props to {}", simTime, props.size, input.pos)
             setBlockStateProperties(worldPos(input.pos), props)
         }
     }
@@ -86,7 +93,9 @@ class SpecRunner(
             for ((propName, expectedValue) in expected) {
                 val actualValue = blockStatePropertyStr(actualState, propName) ?: "missing"
                 val label = output.label.ifEmpty { propName }
-                checks += TickCheck(simTime, label, expectedValue, actualValue, actualValue == expectedValue)
+                val pass = actualValue == expectedValue
+                LOGGER.debug("[SpecRunner#checkOutputsAt] {} '{}' expected={} actual={} pass={}", simTime, label, expectedValue, actualValue, pass)
+                checks += TickCheck(simTime, label, expectedValue, actualValue, pass)
             }
         }
     }
@@ -97,6 +106,7 @@ class SpecRunner(
         for (bp in specCase.breakpoints) {
             if (!bp.enabled) continue
             if (evaluateCondition(bp.condition, level, worldPos(bp.pos))) {
+                LOGGER.debug("[SpecRunner#checkBreakpointsAt] breakpoint '{}' hit at {}", bp.label, simTime)
                 frozenAt = simTime
                 pendingBreakpointHit = BreakpointHit(simTime, spec.name, specCase.name, bp.label.ifEmpty { bp.pos.toString() })
                 return

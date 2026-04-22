@@ -16,8 +16,10 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BlockEntityType
 import net.minecraft.world.level.block.state.BlockBehaviour
 import net.minecraft.world.level.block.state.BlockState
+import org.slf4j.LoggerFactory
 
 object ModRegistries {
+    private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
     val SPEC_ORIGIN_BLOCK: SpecOriginBlock = registerBlock(
         "spec_origin",
         ::SpecOriginBlock,
@@ -31,7 +33,7 @@ object ModRegistries {
     val SPEC_ORIGIN_ITEM: BlockItem = registerBlockItem("spec_origin", SPEC_ORIGIN_BLOCK)
 
     fun register() {
-        // Accessing this object triggers the lazy initializers above.
+        LOGGER.debug("[ModRegistries#register] registering blocks, block entities, and items")
     }
 
     private fun id(path: String): Identifier = Identifier.fromNamespaceAndPath("redstonespecs", path)

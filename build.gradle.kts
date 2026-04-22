@@ -21,8 +21,6 @@ val requiredJava = when {
 }
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(requiredJava))
 
-val hasClientGameTestApi = property("minecraft_version").toString() >= "1.21.4"
-
 loom {
     splitEnvironmentSourceSets()
 
@@ -32,29 +30,15 @@ loom {
             sourceSet("client")
         }
     }
-
-    if (hasClientGameTestApi) {
-        runs {
-            register("TestClient") {
-                client()
-                name("Test Client")
-                source(sourceSets.test.get())
-                vmArgs(
-                    "-Dfabric.client.gametest",
-                    "-Dfabric.client.gametest.disableNetworkSynchronizer",
-                )
-            }
-        }
-    }
 }
 
-if (hasClientGameTestApi) {
-    sourceSets {
-        named("test") {
-            val clientSs = sourceSets.named("client").get()
-            compileClasspath += sourceSets.main.get().compileClasspath + clientSs.compileClasspath
-            runtimeClasspath += sourceSets.main.get().runtimeClasspath + clientSs.runtimeClasspath
-        }
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "redstonespecs-test"
+        enableGameTests = true
+        enableClientGameTests = true
+        eula = true
     }
 }
 
@@ -82,11 +66,6 @@ dependencies {
     implementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
 
     testImplementation("net.fabricmc:fabric-loader-junit:${project.property("loader_version")}")
-
-    if (hasClientGameTestApi) {
-        testImplementation(sourceSets.main.get().output)
-        testImplementation(sourceSets.named("client").get().output)
-    }
 }
 
 tasks {
@@ -130,5 +109,23 @@ tasks {
 
     test {
         useJUnitPlatform()
+        jvmArgs(
+            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
+            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+        )
+    }
+
+    named<JavaExec>("runGameTest") {
+        jvmArgs(
+            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
+            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+        )
+    }
+
+    named<JavaExec>("runClientGameTest") {
+        jvmArgs(
+            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
+            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+        )
     }
 }

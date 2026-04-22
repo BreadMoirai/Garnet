@@ -95,7 +95,6 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         mouseY: Int,
         partialTick: Float,
     ) {
-        extractBackground(extractor, mouseX, mouseY, partialTick)
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
 
         val x = panelX

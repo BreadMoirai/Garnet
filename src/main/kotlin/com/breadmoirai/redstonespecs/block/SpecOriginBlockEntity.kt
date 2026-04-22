@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.storage.ValueInput
 import net.minecraft.world.level.storage.ValueOutput
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
@@ -31,6 +32,7 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
         private set
 
     fun setSpec(newSpec: RedstoneSpec) {
+        LOGGER.debug("[SpecOriginBlockEntity#setSpec] setting spec '{}' at {}", newSpec.name, blockPos)
         spec = newSpec
         if (activeSpecCaseIndex >= newSpec.specCases.size) activeSpecCaseIndex = 0
         setChangedAndSync()
@@ -49,6 +51,7 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     fun addOrUpdateEntry(specCaseIndex: Int, entry: SpecEntry) {
+        LOGGER.debug("[SpecOriginBlockEntity#addOrUpdateEntry] case={} pos={} type={}", specCaseIndex, entry.pos, entry.javaClass.simpleName)
         val s = spec ?: return
         val updatedCases = s.specCases.toMutableList()
         updatedCases[specCaseIndex] = updatedCases[specCaseIndex].withEntryAddedOrUpdated(entry)
@@ -57,6 +60,7 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     fun addSpecCase(name: String) {
+        LOGGER.debug("[SpecOriginBlockEntity#addSpecCase] adding case '{}' at {}", name, blockPos)
         val s = spec ?: return
         val newCase = SpecCase(name, 20, emptyList(), emptyList(), emptyList(), emptyList())
         spec = s.copy(specCases = s.specCases + newCase)
@@ -105,6 +109,7 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     fun removeEntry(specCaseIndex: Int, pos: BlockPos): SpecEntry? {
+        LOGGER.debug("[SpecOriginBlockEntity#removeEntry] case={} pos={}", specCaseIndex, pos)
         val s = spec ?: return null
         val specCase = s.specCases.getOrNull(specCaseIndex) ?: return null
         val removed = specCase.entryAt(pos) ?: return null
@@ -131,6 +136,7 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     companion object {
+        private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
         private val registry = ConcurrentHashMap<Level, ConcurrentHashMap<BlockPos, SpecOriginBlockEntity>>()
 
         private fun register(be: SpecOriginBlockEntity) {
@@ -153,6 +159,7 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     override fun saveAdditional(output: ValueOutput) {
+        LOGGER.debug("[SpecOriginBlockEntity#saveAdditional] saving at {}", blockPos)
         super.saveAdditional(output)
         spec?.let { output.store("spec", RedstoneSpec.CODEC, it) }
         output.putInt("active_spec_case", activeSpecCaseIndex)
@@ -164,6 +171,7 @@ class SpecOriginBlockEntity(pos: BlockPos, state: BlockState) :
         spec = input.read("spec", RedstoneSpec.CODEC).orElse(null)
         activeSpecCaseIndex = input.getIntOr("active_spec_case", 0)
         lastTestResult = input.read("last_test_result", TestResult.CODEC).orElse(null)
+        LOGGER.debug("[SpecOriginBlockEntity#loadAdditional] loaded at {} spec='{}' activeCase={}", blockPos, spec?.name, activeSpecCaseIndex)
     }
 
     override fun getUpdateTag(registries: HolderLookup.Provider): CompoundTag =

@@ -11,8 +11,10 @@ import net.fabricmc.fabric.api.networking.v1.PlayerLookup
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
+import org.slf4j.LoggerFactory
 
 object SpecRunnerCoordinator {
+    private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
     private val runners = HashMap<SpecOriginBlockEntity, SpecRunner>()
     private val queues = HashMap<SpecOriginBlockEntity, ArrayDeque<Int>>()
@@ -34,6 +36,7 @@ object SpecRunnerCoordinator {
             listOf(be.activeSpecCaseIndex)
         }
 
+        LOGGER.debug("[SpecRunnerCoordinator#startRun] starting '{}' runAll={} cases={}", spec.name, runAll, caseIndices)
         snapshots[be] = SpecSnapshot.capture(level, be.blockPos, spec.bounds)
         results[be] = mutableListOf()
         queues[be] = ArrayDeque(caseIndices)
@@ -41,6 +44,7 @@ object SpecRunnerCoordinator {
     }
 
     fun resetSpec(be: SpecOriginBlockEntity) {
+        LOGGER.debug("[SpecRunnerCoordinator#resetSpec] resetting spec at {}", be.blockPos)
         runners.remove(be)
         queues.remove(be)
         val snapshot = snapshots.remove(be)
@@ -50,6 +54,7 @@ object SpecRunnerCoordinator {
     }
 
     fun resumeSpec(be: SpecOriginBlockEntity) {
+        LOGGER.debug("[SpecRunnerCoordinator#resumeSpec] resuming spec at {}", be.blockPos)
         runners[be]?.resume()
     }
 
@@ -104,6 +109,7 @@ object SpecRunnerCoordinator {
         val level = be.level as? ServerLevel ?: return
         val snapshot = snapshots[be] ?: return
 
+        LOGGER.debug("[SpecRunnerCoordinator#startNextCase] starting case '{}' (index={}) remaining={}", specCase.name, caseIndex, queue.size)
         snapshot.restore(level)
         val runner = SpecRunner(spec, specCase, be.blockPos, level, snapshot)
         runner.start()
@@ -118,6 +124,8 @@ object SpecRunnerCoordinator {
         val level = be.level as? ServerLevel ?: return
         snapshot?.restore(level)
 
+        val passCount = resultList.count { r -> r.checks.all { it.pass } }
+        LOGGER.debug("[SpecRunnerCoordinator#finishRun] spec '{}' done: {}/{} cases passed", spec.name, passCount, resultList.size)
         val testResult = TestResult(spec.id, System.currentTimeMillis(), resultList)
         be.setLastTestResult(testResult)
         PlayerLookup.level(level).forEach { player ->
@@ -139,6 +147,7 @@ object SpecRunnerCoordinator {
 
                     when {
                         existing == null && isActive -> {
+                            LOGGER.debug("[SpecRunnerCoordinator#monitorAutoSpecs] autoSpec '{}' activated at {}", autoSpec.label, autoSpec.pos)
                             val recorder = AutoSpecRecorder(autoSpec, be.blockPos, level, specCase)
                             recorder.start()
                             autoSpecRecorders[key] = recorder
@@ -147,6 +156,7 @@ object SpecRunnerCoordinator {
                         existing != null && !isActive -> {
                             autoSpecRecorders.remove(key)
                             val newCase = existing.commit()
+                            LOGGER.debug("[SpecRunnerCoordinator#monitorAutoSpecs] autoSpec '{}' committed as case '{}'", autoSpec.label, newCase.name)
                             be.addOrUpdateSpecCase(newCase)
                             PlayerLookup.level(level).forEach { player ->
                                 ServerPlayNetworking.send(

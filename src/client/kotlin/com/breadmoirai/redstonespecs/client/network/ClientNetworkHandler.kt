@@ -10,11 +10,15 @@ import com.breadmoirai.redstonespecs.network.TestResultS2CPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
+import org.slf4j.LoggerFactory
+
+private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 fun registerClientNetworking() {
     ClientPlayNetworking.registerGlobalReceiver(OpenOverviewS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#openOverview] originPos={}", payload.originPos)
             mc.setScreen(SpecOverviewScreen(payload.originPos))
         }
     }
@@ -22,6 +26,7 @@ fun registerClientNetworking() {
     ClientPlayNetworking.registerGlobalReceiver(OpenEditorS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#openEditor] originPos={} entryRelPos={}", payload.originPos, payload.entryRelPos)
             mc.setScreen(SpecEditorScreen(payload.originPos, payload.entryRelPos))
         }
     }
@@ -31,6 +36,7 @@ fun registerClientNetworking() {
         mc.execute {
             val passCount = payload.result.results.count { r -> r.checks.all { it.pass } }
             val total = payload.result.results.size
+            LOGGER.debug("[ClientNetworkHandler#testResult] originPos={} {}/{} passed", payload.originPos, passCount, total)
             val color = if (passCount == total) "§a" else "§c"
             mc.player?.sendSystemMessage(
                 Component.literal("${color}Spec run complete: $passCount/$total cases passed")
@@ -46,6 +52,7 @@ fun registerClientNetworking() {
     ClientPlayNetworking.registerGlobalReceiver(BreakpointHitS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#breakpointHit] '{}' in '{}' at {}t {}", payload.breakpointLabel, payload.caseName, payload.simTime.tick, payload.simTime.phase.name)
             mc.player?.sendSystemMessage(
                 Component.literal("§6Breakpoint hit: §f${payload.breakpointLabel} §7in §f${payload.caseName} §7at ${payload.simTime.tick}t ${payload.simTime.phase.name}")
             )
@@ -55,6 +62,7 @@ fun registerClientNetworking() {
     ClientPlayNetworking.registerGlobalReceiver(AutoSpecRecordedS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#autoSpecRecorded] originPos={} caseName='{}'", payload.originPos, payload.specCaseName)
             mc.player?.sendSystemMessage(
                 Component.literal("§bAutoSpec recorded: §f${payload.specCaseName}")
             )

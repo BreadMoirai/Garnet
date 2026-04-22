@@ -32,11 +32,16 @@ class SpecTestContext(
     }
 
     fun rightClickBlock(pos: BlockPos, direction: Direction = Direction.SOUTH) {
-        onClient { mc ->
-            val hitResult = BlockHitResult(Vec3.atCenterOf(pos), direction, pos, false)
-            mc.gameMode!!.useItemOn(mc.player!!, InteractionHand.MAIN_HAND, hitResult)
-        }
-        context.waitTick()
+        world.getServer().runOnServer(object : FailableConsumer<net.minecraft.server.MinecraftServer, RuntimeException> {
+            override fun accept(server: net.minecraft.server.MinecraftServer) {
+                val level = server.overworld()
+                val player = level.players().firstOrNull() ?: return
+                val hitResult = BlockHitResult(Vec3.atCenterOf(pos), direction, pos, false)
+                val stack = player.getItemInHand(InteractionHand.MAIN_HAND)
+                player.gameMode.useItemOn(player, level, stack, InteractionHand.MAIN_HAND, hitResult)
+            }
+        })
+        context.waitTicks(2)
     }
 
     /** Clicks a button by its displayed text (works with both literal and translatable components). */
@@ -84,6 +89,7 @@ class SpecTestContext(
             val world = context.worldBuilder().setUseConsistentSettings(true).create()
             world.getClientLevel().waitForChunksDownload()
             world.getServer().runCommand("time set day")
+            world.getServer().runCommand("gamemode creative @a")
             world.getServer().runCommand("effect give @a minecraft:saturation 1000000 255 true")
             context.waitTick()
             return world
