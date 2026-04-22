@@ -3,5 +3,22 @@
   "item.redstonespecs.input_spec_marker": "Input Spec Marker",
   "item.redstonespecs.output_spec_marker": "Output Spec Marker",
   "item.redstonespecs.breakpoint_spec_marker": "Breakpoint Spec Marker",
-  "item.redstonespecs.auto_spec_marker": "Auto Spec Marker"
+  "item.redstonespecs.auto_spec_marker": "Auto Spec Marker",
+
+  "screen.redstonespecs.spec_overview": "Spec Overview",
+  "screen.redstonespecs.spec_overview.spec_id": "Spec ID",
+  "screen.redstonespecs.spec_overview.active_case": "Active Case",
+  "screen.redstonespecs.spec_overview.no_spec": "No spec loaded",
+  "screen.redstonespecs.spec_overview.run": "Run",
+  "screen.redstonespecs.spec_overview.run_all": "Run All",
+  "screen.redstonespecs.spec_overview.cases": "Cases",
+  "screen.redstonespecs.spec_overview.bounds": "Bounds",
+  "screen.redstonespecs.spec_overview.reset_load": "Reset & Load",
+  "screen.redstonespecs.spec_overview.save": "Save",
+
+  "screen.redstonespecs.spec_cases": "Test Cases",
+  "screen.redstonespecs.spec_cases.name_hint": "Test case name…",
+
+  "screen.redstonespecs.spec_bounds": "Spec Bounds",
+  "screen.redstonespecs.spec_editor": "Spec Editor"
 }

@@ -30,14 +30,14 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.screenshot("spec-overview-screen")
 
         // Open bounds sub-screen and screenshot it
-        ctx.clickButton("Bounds…")
+        ctx.clickButton("Bounds")
         ctx.waitForScreen(SpecBoundsScreen::class.java)
         ctx.screenshot("spec-bounds-screen-offset-size")
 
-        // Toggle to Min+Max mode and screenshot
-        ctx.clickButton("Offset+Size")
+        // Toggle to Corners mode and screenshot
+        ctx.clickButton("Offset / Size")
         ctx.waitTick()
-        ctx.screenshot("spec-bounds-screen-min-max")
+        ctx.screenshot("spec-bounds-screen-corners")
 
         ctx.closeScreen()
     }
@@ -95,7 +95,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitTick()
         ctx.rightClickBlock(originPos)
         ctx.waitForScreen(SpecOverviewScreen::class.java)
-        ctx.clickButton("▶ Run")
+        ctx.clickButton("Run")
 
         // ── Wait for test result (synced to client BE via getUpdatePacket) ────
         ctx.context.waitFor({ mc ->

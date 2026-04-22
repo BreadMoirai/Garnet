@@ -262,6 +262,25 @@ data class RenameSpecC2SPayload(
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
+data class RenameSpecCaseC2SPayload(
+    val originPos: BlockPos,
+    val index: Int,
+    val newName: String,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<RenameSpecCaseC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "rename_spec_case")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, RenameSpecCaseC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, RenameSpecCaseC2SPayload::originPos,
+            ByteBufCodecs.VAR_INT, RenameSpecCaseC2SPayload::index,
+            ByteBufCodecs.STRING_UTF8, RenameSpecCaseC2SPayload::newName,
+            ::RenameSpecCaseC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 class UndoC2SPayload : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<UndoC2SPayload>(

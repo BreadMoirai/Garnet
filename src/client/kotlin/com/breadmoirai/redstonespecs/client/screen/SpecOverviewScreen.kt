@@ -1,12 +1,9 @@
 package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
-import com.breadmoirai.redstonespecs.network.AddSpecCaseC2SPayload
-import com.breadmoirai.redstonespecs.network.RemoveSpecCaseC2SPayload
 import com.breadmoirai.redstonespecs.network.RenameSpecC2SPayload
 import com.breadmoirai.redstonespecs.network.ResetSpecC2SPayload
 import com.breadmoirai.redstonespecs.network.RunSpecC2SPayload
-import com.breadmoirai.redstonespecs.network.SelectSpecCaseC2SPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.Button
@@ -21,72 +18,81 @@ class SpecOverviewScreen(val originPos: BlockPos) :
     Screen(Component.translatable("screen.redstonespecs.spec_overview")) {
 
     private val panelW = 320
-    private val panelH = 220
+    private val panelH = 190
     private val panelX get() = (width - panelW) / 2
     private val panelY get() = (height - panelH) / 2
 
+    private var nameEditMode = false
     private var nameEditBox: EditBox? = null
 
-    override fun isInGameUi(): Boolean = true
+    override fun isInGameUi() = true
 
     override fun init() {
         super.init()
-        val x = panelX
-        val y = panelY
-        val spec = getSpec()
+        val x = panelX; val y = panelY
 
-        nameEditBox = EditBox(font, x + 58, y + 14, 200, 16, Component.literal("Spec name")).also { box ->
-            box.value = spec?.name ?: ""
-            addRenderableWidget(box)
-        }
-
-        spec?.specCases?.forEachIndexed { i, case ->
-            if (i >= 7) return@forEachIndexed
+        // Spec ID row: display name text + pencil button, or edit box + confirm button
+        if (nameEditMode) {
+            nameEditBox = EditBox(font, x + 64, y + 12, panelW - 92, 16, Component.empty()).also {
+                it.value = getSpec()?.name ?: ""
+                addRenderableWidget(it)
+            }
             addRenderableWidget(
-                Button.builder(Component.literal(case.name)) {
-                    sendPacket(SelectSpecCaseC2SPayload(originPos, i))
-                }.bounds(x + 10, y + 42 + i * 22, 180, 18).build()
+                Button.builder(Component.literal("✔")) {
+                    val newName = nameEditBox?.value?.trim()?.takeIf { it.isNotEmpty() } ?: return@builder
+                    sendPacket(RenameSpecC2SPayload(originPos, newName))
+                    nameEditMode = false
+                    rebuildWidgets()
+                }.bounds(x + panelW - 26, y + 12, 18, 16).build()
+            )
+        } else {
+            addRenderableWidget(
+                Button.builder(Component.literal("✎")) {
+                    nameEditMode = true
+                    rebuildWidgets()
+                }.bounds(x + panelW - 26, y + 12, 18, 16).build()
             )
         }
 
+        // Row 1: Run, Run All, Cases
         addRenderableWidget(
-            Button.builder(Component.literal("▶ Run")) {
+            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.run")) {
                 sendPacket(RunSpecC2SPayload(originPos, false))
-            }.bounds(x + 10, y + panelH - 60, 58, 20).build()
+            }.bounds(x + 8, y + panelH - 48, 76, 20).build()
         )
         addRenderableWidget(
-            Button.builder(Component.literal("▶▶ All")) {
+            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.run_all")) {
                 sendPacket(RunSpecC2SPayload(originPos, true))
-            }.bounds(x + 74, y + panelH - 60, 58, 20).build()
+            }.bounds(x + 88, y + panelH - 48, 66, 20).build()
         )
         addRenderableWidget(
-            Button.builder(Component.literal("↺ Reset")) {
-                sendPacket(ResetSpecC2SPayload(originPos))
-            }.bounds(x + 138, y + panelH - 60, 58, 20).build()
-        )
-
-        addRenderableWidget(
-            Button.builder(Component.literal("+ Case")) {
-                val size = getSpec()?.specCases?.size ?: 0
-                sendPacket(AddSpecCaseC2SPayload(originPos, "Case ${size + 1}"))
-            }.bounds(x + 10, y + panelH - 35, 70, 20).build()
-        )
-        addRenderableWidget(
-            Button.builder(Component.literal("- Case")) {
-                val index = getBe()?.activeSpecCaseIndex ?: return@builder
-                sendPacket(RemoveSpecCaseC2SPayload(originPos, index))
-            }.bounds(x + 86, y + panelH - 35, 70, 20).build()
+            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.cases")) {
+                minecraft?.setScreen(SpecCasesScreen(originPos))
+            }.bounds(x + panelW - 78, y + panelH - 48, 70, 20).build()
         )
 
+        // Row 2: Bounds, Reset & Load, Save, Done
         addRenderableWidget(
-            Button.builder(Component.literal("Bounds…")) {
+            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.bounds")) {
                 minecraft?.setScreen(SpecBoundsScreen(originPos))
-            }.bounds(x + 162, y + panelH - 35, 62, 20).build()
+            }.bounds(x + 8, y + panelH - 24, 58, 20).build()
         )
-
+        addRenderableWidget(
+            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.reset_load")) {
+                sendPacket(ResetSpecC2SPayload(originPos))
+            }.bounds(x + 70, y + panelH - 24, 88, 20).build()
+        )
+        addRenderableWidget(
+            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.save")) {
+                val name = nameEditBox?.value?.trim()
+                if (name != null && name.isNotEmpty()) sendPacket(RenameSpecC2SPayload(originPos, name))
+                nameEditMode = false
+                onClose()
+            }.bounds(x + 162, y + panelH - 24, 50, 20).build()
+        )
         addRenderableWidget(
             Button.builder(CommonComponents.GUI_DONE) { onClose() }
-                .bounds(x + panelW - 72, y + panelH - 35, 62, 20).build()
+                .bounds(x + panelW - 66, y + panelH - 24, 58, 20).build()
         )
     }
 
@@ -96,62 +102,82 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         mouseY: Int,
         partialTick: Float,
     ) {
-        val x = panelX
-        val y = panelY
+        val x = panelX; val y = panelY
+        val be = getBe()
+        val spec = be?.spec
 
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
         extractor.centeredText(font, title, x + panelW / 2, y + 4, 0xFFFFFFFF.toInt())
-        extractor.text(font, Component.literal("Name:"), x + 10, y + 17, 0xFF888888.toInt())
 
-        val be = getBe()
-        val spec = be?.spec
+        // Spec ID label
+        extractor.text(
+            font,
+            Component.translatable("screen.redstonespecs.spec_overview.spec_id").append(":"),
+            x + 8, y + 16, 0xFF888888.toInt(),
+        )
+        if (!nameEditMode) {
+            extractor.text(font, Component.literal(spec?.name ?: ""), x + 64, y + 16, 0xFFFFFFFF.toInt())
+        }
+
         if (spec == null) {
-            extractor.centeredText(font, Component.literal("No spec loaded"), x + panelW / 2, y + 60, 0xFFFF4444.toInt())
+            extractor.centeredText(
+                font,
+                Component.translatable("screen.redstonespecs.spec_overview.no_spec"),
+                x + panelW / 2, y + 60, 0xFFFF4444.toInt(),
+            )
             return
         }
 
-        extractor.text(font, Component.literal("Cases:"), x + 10, y + 36, 0xFF888888.toInt())
-
         val activeIndex = be.activeSpecCaseIndex
-        if (activeIndex < spec.specCases.size) {
-            val highlightY = y + 42 + activeIndex * 22
-            extractor.fill(x + 9, highlightY - 1, x + 191, highlightY + 19, 0x44FFFFFF)
-        }
+        val activeCase = spec.specCases.getOrNull(activeIndex)
 
-        val testResult = be.lastTestResult
-        spec.specCases.forEachIndexed { i, case ->
-            if (i >= 7) return@forEachIndexed
-            val caseResult = testResult?.results?.find { it.specCaseName == case.name }
-            val (statusText, statusColor) = when {
-                caseResult == null -> "○" to 0xFF888888.toInt()
-                caseResult.checks.all { it.pass } -> "✓" to 0xFF44FF88.toInt()
-                else -> "✗" to 0xFFFF4444.toInt()
-            }
-            extractor.text(font, Component.literal(statusText), x + 196, y + 47 + i * 22, statusColor)
-        }
+        extractor.text(
+            font,
+            Component.translatable("screen.redstonespecs.spec_overview.active_case").append(":"),
+            x + 8, y + 36, 0xFF888888.toInt(),
+        )
 
-        if (testResult != null) {
-            val pass = testResult.results.count { r -> r.checks.all { it.pass } }
-            val total = testResult.results.size
-            val color = if (pass == total) 0xFF44FF88.toInt() else 0xFFFF6644.toInt()
+        if (activeCase != null) {
+            extractor.text(font, Component.literal(activeCase.name), x + 94, y + 36, 0xFFFFFFFF.toInt())
             extractor.text(
                 font,
-                Component.literal("Last: $pass/$total passed"),
-                x + 10, y + panelH - 78, color,
+                Component.literal("Lifespan: ${activeCase.lifespan}t"),
+                x + 8, y + 50, 0xFF888888.toInt(),
             )
+            extractor.text(
+                font,
+                Component.literal("In: ${activeCase.inputs.size}  Out: ${activeCase.outputs.size}  BP: ${activeCase.breakpoints.size}"),
+                x + 8, y + 62, 0xFF888888.toInt(),
+            )
+            val b = spec.bounds
+            extractor.text(
+                font,
+                Component.literal("(${b.minX()},${b.minY()},${b.minZ()})→(${b.maxX()},${b.maxY()},${b.maxZ()})"),
+                x + 8, y + 74, 0xFF888888.toInt(),
+            )
+
+            val testResult = be.lastTestResult
+            if (testResult != null) {
+                val caseResult = testResult.results.find { it.specCaseName == activeCase.name }
+                if (caseResult != null) {
+                    val passCount = caseResult.checks.count { it.pass }
+                    val total = caseResult.checks.size
+                    val (text, color) = if (passCount == total)
+                        "✓ $passCount/$total checks passed" to 0xFF44FF88.toInt()
+                    else
+                        "✗ ${total - passCount}/$total checks failed" to 0xFFFF4444.toInt()
+                    extractor.text(font, Component.literal(text), x + 8, y + 88, color)
+                }
+            }
         }
     }
 
     override fun onClose() {
-        val newName = nameEditBox?.value?.trim() ?: ""
-        val currentName = getSpec()?.name ?: ""
-        if (newName.isNotBlank() && newName != currentName) {
-            sendPacket(RenameSpecC2SPayload(originPos, newName))
-        }
+        nameEditMode = false
         super.onClose()
     }
 
-    override fun isPauseScreen(): Boolean = false
+    override fun isPauseScreen() = false
 
     private fun getBe() = minecraft?.level?.getBlockEntity(originPos) as? SpecOriginBlockEntity
     private fun getSpec() = getBe()?.spec

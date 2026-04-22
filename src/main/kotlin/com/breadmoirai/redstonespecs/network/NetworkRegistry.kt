@@ -30,6 +30,7 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(RemoveSpecCaseC2SPayload.TYPE, RemoveSpecCaseC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SelectSpecCaseC2SPayload.TYPE, SelectSpecCaseC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(RenameSpecC2SPayload.TYPE, RenameSpecC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(RenameSpecCaseC2SPayload.TYPE, RenameSpecCaseC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(ResizeBoundsC2SPayload.TYPE, ResizeBoundsC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(NudgeSpecBoundsC2SPayload.TYPE, NudgeSpecBoundsC2SPayload.STREAM_CODEC)
 
@@ -133,6 +134,14 @@ fun registerNetworking() {
             LOGGER.debug("[NetworkRegistry#renameSpec] originPos={} newName='{}'", payload.originPos, payload.newName)
             val be = context.player().level().getBlockEntity(payload.originPos) as? SpecOriginBlockEntity ?: return@execute
             be.setSpecName(payload.newName)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(RenameSpecCaseC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#renameSpecCase] originPos={} index={} newName='{}'", payload.originPos, payload.index, payload.newName)
+            val be = context.player().level().getBlockEntity(payload.originPos) as? SpecOriginBlockEntity ?: return@execute
+            be.renameSpecCase(payload.index, payload.newName)
         }
     }
 
