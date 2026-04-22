@@ -73,7 +73,7 @@ are added in `init()` for each existing entry.
 | Field  | Widget       | Validation |
 |--------|-------------|------------|
 | Tick   | `EditBox` (width 30) | int ≥ 0 or blank for INIT |
-| Phase  | `EditBox` (width 90) | must match a `Phase` name (case-insensitive) |
+| Phase  | `EditBox` (width 90, default `end_of_tick`) | must match a `Phase` name (case-insensitive) |
 | Props  | `EditBox` (width 220) | `key=value` pairs separated by `,` |
 
 The screen holds a mutable `workingStateSpec: StateSpec` (initialised from the current
@@ -102,18 +102,17 @@ reverts to the existing compact form.
 
 ---
 
-## 2. Missing Item Registrations
+## 2. Auto-Capture INIT State in Marker Items
 
-`InputSpecMarkerItem`, `OutputSpecMarkerItem`, `BreakpointSpecMarkerItem`, and
-`AutoSpecMarkerItem` have assets (models, textures) but are not registered in
-`ModRegistries`. These must be added before the ClientGameTest can give them to the
-player.
+Currently `SpecMarkerTool.useOn()` creates entries with an empty INIT state
+(`StateSpec(listOf(SimTime.INIT to emptyMap()))`). The marker item already runs
+server-side and has `context.level` + `context.clickedPos`, so it can capture the
+block's actual current state immediately.
 
-Item IDs (matching existing asset paths):
-- `redstonespecs:input_spec_marker`
-- `redstonespecs:output_spec_marker`
-- `redstonespecs:breakpoint_spec_marker`
-- `redstonespecs:auto_spec_marker`
+Change `createEntry(relPos: BlockPos)` to `createEntry(relPos: BlockPos, initProps: Map<String, String>)`.
+`SpecMarkerTool.useOn()` calls `captureBlockStateProps(level.getBlockState(hitPos))` and
+passes the result through. The INIT entry is pre-populated; "Capture Init State" in the
+editor becomes a re-capture button rather than a required first step.
 
 ---
 
@@ -331,7 +330,7 @@ companion object {
      → SpecMarkerTool.useOn adds InputSpec, sends OpenEditorS2CPayload
      → waitForScreen(SpecEditorScreen::class.java)
 
-6.  Click "Capture Init State"  (captures lever.powered=false as INIT entry)
+6.  INIT entry is already populated (lever.powered=false auto-captured by marker item)
     Click "+ Add Entry", fill Tick=0, Phase=start_of_tick, Props=powered=true, Confirm
     Click "Save"
      → SaveSpecEntryC2SPayload sent with updated InputSpec
@@ -340,8 +339,8 @@ companion object {
     Right-click lamp
      → waitForScreen(SpecEditorScreen::class.java)
 
-8.  Click "Capture Init State"  (captures lamp.lit=false as INIT entry)
-    Click "+ Add Entry", fill Tick=0, Phase=end_of_tick, Props=lit=true, Confirm
+8.  INIT entry already populated (lamp.lit=false auto-captured)
+    Click "+ Add Entry", fill Tick=0 (Phase defaults to end_of_tick), Props=lit=true, Confirm
     Click "Save"
 
 9.  Right-click SpecOrigin
