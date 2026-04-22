@@ -177,7 +177,8 @@ class SpecEditorScreen(
                         workingEntries?.add(simTime to condition)
                     }
                     minecraft?.setScreen(this)
-                    rebuildWidgets()
+                    // No rebuildWidgets() here — Minecraft calls init() on this screen
+                    // when the screen switch takes effect on the next frame.
                 },
             )
         )
