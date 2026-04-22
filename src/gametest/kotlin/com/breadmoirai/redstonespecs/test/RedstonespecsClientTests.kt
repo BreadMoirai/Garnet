@@ -4,6 +4,7 @@ import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.SpecBoundsScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
+import com.breadmoirai.redstonespecs.client.screen.StateEntryEditorScreen
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.minecraft.core.BlockPos
@@ -20,7 +21,30 @@ class RedstonespecsClientTests : FabricClientGameTest {
             val ctx = SpecTestContext(context, world)
             leverLampFullFlow(ctx)
             boundsScreenFlow(ctx)
+            specEditorScreenFlow(ctx)
         }
+    }
+
+    private fun specEditorScreenFlow(ctx: SpecTestContext) {
+        // Give input marker and right-click lever → SpecEditorScreen opens
+        ctx.runCommand("clear @a")
+        ctx.runCommand("give @a redstonespecs:input_spec_marker 1")
+        ctx.waitTick()
+        ctx.rightClickBlock(leverPos)
+        ctx.waitForScreen(SpecEditorScreen::class.java)
+        ctx.waitForButton("+ Add Entry")  // wait for workingEntries to be populated from server sync
+        ctx.screenshot("spec-editor-screen")
+
+        // Click + Add Entry → StateEntryEditorScreen opens
+        ctx.clickButton("+ Add Entry")
+        ctx.waitForScreen(StateEntryEditorScreen::class.java)
+        ctx.waitForButton("Confirm")                  // wait for blockState to load and widgets to be built
+        ctx.screenshot("state-entry-editor-screen")
+
+        // Click Cancel → StateEntryEditorScreen closes, returns to game (no screen).
+        // The SpecEditorScreen is not preserved on cancel.
+        ctx.clickButton("Cancel")
+        ctx.context.waitFor({ mc -> mc.screen == null }, 100)
     }
 
     private fun boundsScreenFlow(ctx: SpecTestContext) {
@@ -34,8 +58,9 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitForScreen(SpecBoundsScreen::class.java)
         ctx.screenshot("spec-bounds-screen-offset-size")
 
-        // Toggle to Corners mode and screenshot
-        ctx.clickButton("Offset / Size")
+        // Toggle to Corners mode and screenshot.
+        // The CycleButton has Component.empty() as label, so match by current value.
+        ctx.clickNthCycleButtonByValue("Offset / Size", 0)
         ctx.waitTick()
         ctx.screenshot("spec-bounds-screen-corners")
 
@@ -62,15 +87,20 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitTick()
         ctx.rightClickBlock(leverPos)
         ctx.waitForScreen(SpecEditorScreen::class.java)
+        ctx.waitForButton("+ Add Entry")  // wait for workingEntries to be populated from server sync
 
         // INIT entry is pre-populated (lever.powered=false captured by marker item).
         // Add tick-0 entry: powered=true at START_OF_TICK.
         ctx.clickButton("+ Add Entry")
-        ctx.fillEditBoxByWidth(30, "0")             // Tick EditBox (width=30)
-        // Phase CycleButton defaults to END_OF_TICK; one click cycles to START_OF_TICK.
-        ctx.clickButton("END_OF_TICK")
-        ctx.fillEditBoxByWidth(220, "powered=true")  // Props EditBox (width=220)
+        ctx.waitForScreen(StateEntryEditorScreen::class.java)
+        ctx.waitForButton("Confirm")                  // wait for blockState to load and widgets to be built
+        ctx.fillEditBoxByWidth(36, "0")               // Tick=0 (EditBox width=36)
+        // CycleButton label is the "name" field used for matching (e.g. "Phase"), not the full display text
+        ctx.clickButton("Phase")                      // Cycle END_OF_TICK → START_OF_TICK
+        ctx.clickNthButton(" ", 1)                    // Check "powered" checkbox (row 1, 0-indexed)
+        ctx.clickNthCycleButtonByValue("false", 0)    // Cycle powered BoolRow: false→true
         ctx.clickButton("Confirm")
+        ctx.waitForScreen(SpecEditorScreen::class.java)
         ctx.clickButton("Save")
         ctx.waitTick()
 
@@ -80,13 +110,18 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.waitTick()
         ctx.rightClickBlock(lampPos)
         ctx.waitForScreen(SpecEditorScreen::class.java)
+        ctx.waitForButton("+ Add Entry")  // wait for workingEntries to be populated from server sync
 
         // INIT entry pre-populated (lamp.lit=false). Add tick-0 END_OF_TICK check.
         ctx.clickButton("+ Add Entry")
-        ctx.fillEditBoxByWidth(30, "0")             // Tick=0
-        // Phase defaults to END_OF_TICK — no click needed
-        ctx.fillEditBoxByWidth(220, "lit=true")     // Props
+        ctx.waitForScreen(StateEntryEditorScreen::class.java)
+        ctx.waitForButton("Confirm")                  // wait for blockState to load and widgets to be built
+        ctx.fillEditBoxByWidth(36, "0")               // Tick=0
+        // Phase stays END_OF_TICK (default)
+        ctx.clickNthButton(" ", 1)                    // Check "lit" checkbox (row 1)
+        ctx.clickNthCycleButtonByValue("false", 0)    // Cycle lit BoolRow: false→true
         ctx.clickButton("Confirm")
+        ctx.waitForScreen(SpecEditorScreen::class.java)
         ctx.clickButton("Save")
         ctx.waitTick()
 

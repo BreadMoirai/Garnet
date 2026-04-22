@@ -57,6 +57,72 @@ class SpecTestContext(
     /** Clicks a button by its displayed text (works with both literal and translatable components). */
     fun clickButton(labelText: String) = context.clickScreenButton(labelText)
 
+    /**
+     * Waits until a button with [labelText] is present in the current screen.
+     * Useful when the screen rebuilds asynchronously after data arrives from the server.
+     */
+    fun waitForButton(labelText: String, timeoutTicks: Int = 100) {
+        context.waitFor({ mc ->
+            val screen = mc.screen ?: return@waitFor false
+            screen.children()
+                .filterIsInstance<net.minecraft.client.gui.components.AbstractButton>()
+                .any { it.message.string == labelText }
+        }, timeoutTicks)
+    }
+
+    /**
+     * Clicks the Nth button (0-indexed) that has the given label text in the current screen.
+     * Useful when multiple buttons share the same label (e.g. multiple " " checkboxes).
+     */
+    fun clickNthButton(labelText: String, index: Int) {
+        onClient { mc ->
+            val screen = mc.screen
+                ?: throw AssertionError("clickNthButton($labelText, $index): no screen open")
+            val matching = screen.children()
+                .filterIsInstance<net.minecraft.client.gui.components.AbstractButton>()
+                .filter { it.message.string == labelText }
+            if (index >= matching.size) throw AssertionError(
+                "clickNthButton($labelText, $index): only ${matching.size} button(s) with label '$labelText' found"
+            )
+            val input = net.minecraft.client.input.MouseButtonInfo(0, 0)
+            matching[index].onPress(input)
+        }
+        context.waitTick()
+    }
+
+    /**
+     * Clicks the Nth CycleButton (0-indexed) whose displayed value string equals [valueText].
+     * CycleButtons with Component.empty() label render as ": <value>"; this helper extracts
+     * just the value portion for matching.
+     *
+     * The displayed message of a CycleButton is either:
+     *   - Just the value (displayState=VALUE), e.g. "false"
+     *   - "Label: Value" (displayState=NAME_AND_VALUE), e.g. ": false" when label is empty
+     */
+    fun clickNthCycleButtonByValue(valueText: String, index: Int) {
+        onClient { mc ->
+            val screen = mc.screen
+                ?: throw AssertionError("clickNthCycleButtonByValue($valueText, $index): no screen open")
+            val matching = screen.children()
+                .filterIsInstance<net.minecraft.client.gui.components.CycleButton<*>>()
+                .filter { btn ->
+                    val msg = btn.message.string
+                    msg == valueText || msg.endsWith(": $valueText")
+                }
+            if (index >= matching.size) throw AssertionError(
+                "clickNthCycleButtonByValue($valueText, $index): only ${matching.size} CycleButton(s) " +
+                    "with value '$valueText' found. Messages: ${
+                        screen.children()
+                            .filterIsInstance<net.minecraft.client.gui.components.CycleButton<*>>()
+                            .map { it.message.string }
+                    }"
+            )
+            val input = net.minecraft.client.input.MouseButtonInfo(0, 0)
+            matching[index].onPress(input)
+        }
+        context.waitTick()
+    }
+
     /** Finds an EditBox in the current screen by its pixel width and sets its value directly. */
     fun fillEditBoxByWidth(widthPx: Int, value: String) {
         onClient { mc ->

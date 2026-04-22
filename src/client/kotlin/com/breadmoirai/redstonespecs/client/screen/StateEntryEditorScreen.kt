@@ -137,8 +137,10 @@ class StateEntryEditorScreen(
             StateCondition.All(included.map { it.currentCondition() })
         }
 
+        // onConfirm handles screen navigation (sets screen back to parent SpecEditorScreen).
+        // Do NOT call onClose() here — that would set screen to null after onConfirm already
+        // switched to the parent screen.
         onConfirm(simTime, condition)
-        onClose()
     }
 
     override fun extractRenderState(
