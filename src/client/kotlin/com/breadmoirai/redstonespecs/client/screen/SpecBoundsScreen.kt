@@ -46,7 +46,7 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         // Mode toggle — top-right of header
         addRenderableWidget(
             CycleButton.builder<DisplayMode>(
-                { mode -> Component.literal(if (mode == DisplayMode.OFFSET_SIZE) "Offset+Size" else "Min+Max") },
+                { mode -> Component.literal(if (mode == DisplayMode.OFFSET_SIZE) "Offset / Size" else "Corners") },
                 displayMode,
             ).withValues(*DisplayMode.entries.toTypedArray())
                 .create(x + panelW - 90, y + 8, 86, 18, Component.empty()) { _, value ->
