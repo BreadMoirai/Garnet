@@ -10,24 +10,36 @@ import dev.isxander.yacl3.api.controller.TickBoxControllerBuilder
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
+import org.slf4j.LoggerFactory
+
+private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 object ModConfig {
-    private val configFile get() = FabricLoader.getInstance().configDir.resolve("redstonespecs.json").toFile()
+    private val configFile = FabricLoader.getInstance().configDir.resolve("redstonespecs.json").toFile()
 
     var autoSaveOnExit: Boolean = false
 
     fun load() {
         if (!configFile.exists()) return
         runCatching {
-            val json = JsonParser.parseReader(configFile.reader()) as? JsonObject ?: return
-            autoSaveOnExit = json.get("autoSaveOnExit")?.asBoolean ?: false
+            configFile.reader().use { reader ->
+                val json = JsonParser.parseReader(reader) as? JsonObject ?: return@use
+                autoSaveOnExit = json.get("autoSaveOnExit")?.asBoolean ?: false
+            }
+        }.onFailure { e ->
+            LOGGER.warn("Failed to load ModConfig from {}", configFile.absolutePath, e)
         }
     }
 
     fun save() {
+        configFile.parentFile?.mkdirs()
         val json = JsonObject()
         json.addProperty("autoSaveOnExit", autoSaveOnExit)
-        configFile.writeText(json.toString())
+        runCatching {
+            configFile.writeText(json.toString())
+        }.onFailure { e ->
+            LOGGER.error("Failed to save ModConfig to {}", configFile.absolutePath, e)
+        }
     }
 
     fun createScreen(parent: Screen): Screen = YetAnotherConfigLib.createBuilder()
