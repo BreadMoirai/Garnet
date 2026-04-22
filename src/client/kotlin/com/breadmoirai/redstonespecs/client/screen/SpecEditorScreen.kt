@@ -186,13 +186,14 @@ class SpecEditorScreen(
         mouseY: Int,
         partialTick: Float,
     ) {
+        super.extractBackground(extractor, mouseX, mouseY, partialTick)
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
 
         val x = panelX
         val y = panelY
         val entry = getEntry()
 
-        extractor.fill(x, y, x + panelW, y + panelH, 0xCC000000.toInt())
+        extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
 
         val typeLabel = when (entry) {
             is InputSpec -> "Input"
@@ -300,6 +301,7 @@ class SpecEditorScreen(
     }
 
     override fun isPauseScreen(): Boolean = false
+    override fun isInGameUi(): Boolean = true
 
     private fun getBe() = minecraft?.level?.getBlockEntity(originPos) as? SpecOriginBlockEntity
     private fun getEntry(): SpecEntry? {
