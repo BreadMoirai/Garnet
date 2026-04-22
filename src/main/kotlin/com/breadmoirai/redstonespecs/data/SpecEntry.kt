@@ -13,7 +13,7 @@ private val ENTRY_CODEC: Codec<Pair<SimTime, StateCondition>> =
         ).apply(instance) { time, cond -> time to cond }
     }
 
-val ENTRIES_CODEC: Codec<List<Pair<SimTime, StateCondition>>> = ENTRY_CODEC.listOf()
+private val ENTRIES_CODEC: Codec<List<Pair<SimTime, StateCondition>>> = ENTRY_CODEC.listOf()
 
 sealed class SpecEntry {
     abstract val pos: BlockPos
@@ -50,6 +50,11 @@ data class InputSpec(
     override val color: Int,
     val entries: List<Pair<SimTime, StateCondition>>,
 ) : SpecEntry() {
+    init {
+        require(entries.count { it.first == SimTime.INIT } == 1) {
+            "InputSpec entries must contain exactly one INIT entry, got: ${entries.map { it.first }}"
+        }
+    }
     companion object {
         val MAP_CODEC: MapCodec<InputSpec> = RecordCodecBuilder.mapCodec { instance ->
             instance.group(
@@ -68,6 +73,11 @@ data class OutputSpec(
     override val color: Int,
     val entries: List<Pair<SimTime, StateCondition>>,
 ) : SpecEntry() {
+    init {
+        require(entries.count { it.first == SimTime.INIT } == 1) {
+            "OutputSpec entries must contain exactly one INIT entry, got: ${entries.map { it.first }}"
+        }
+    }
     companion object {
         val MAP_CODEC: MapCodec<OutputSpec> = RecordCodecBuilder.mapCodec { instance ->
             instance.group(

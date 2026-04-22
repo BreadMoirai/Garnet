@@ -97,7 +97,14 @@ class SpecRunner(
             is StateCondition.BoolProperty -> out += condition.name to condition.value.toString()
             is StateCondition.IntProperty -> out += condition.name to condition.value.toString()
             is StateCondition.EnumProperty -> out += condition.name to condition.value
-            else -> {}
+            is StateCondition.BlockType -> LOGGER.warn(
+                "[SpecRunner] BlockType condition '{}' cannot be applied as block property input, ignoring",
+                condition.blockId
+            )
+            else -> LOGGER.warn(
+                "[SpecRunner] Unsupported condition type '{}' in flattenToProperties, ignoring",
+                condition::class.simpleName
+            )
         }
     }
 
@@ -140,7 +147,15 @@ class SpecRunner(
                 val pass = actualId == expected
                 checks += TickCheck(simTime, "$label.block", expected, actualId, pass)
             }
-            else -> {}
+            is StateCondition.Any -> LOGGER.warn(
+                "[SpecRunner] Any condition not supported in output checks at {}, skipping", label
+            )
+            is StateCondition.Not -> LOGGER.warn(
+                "[SpecRunner] Not condition not supported in output checks at {}, skipping", label
+            )
+            is StateCondition.ContainerContents -> LOGGER.warn(
+                "[SpecRunner] ContainerContents condition not supported in output checks at {}, skipping", label
+            )
         }
     }
 

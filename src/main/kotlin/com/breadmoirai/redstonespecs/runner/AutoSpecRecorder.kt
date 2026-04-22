@@ -7,6 +7,7 @@ import com.breadmoirai.redstonespecs.data.SpecCase
 import com.breadmoirai.redstonespecs.data.StateCondition
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.block.state.BlockState
 import org.slf4j.LoggerFactory
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
@@ -19,7 +20,8 @@ class AutoSpecRecorder(
 ) {
     private var ticksElapsed = -1
     private val initStates = HashMap<BlockPos, Map<String, String>>()
-    private val recordedChanges = mutableListOf<Pair<SimTime, Map<BlockPos, Map<String, String>>>>()
+    private val initBlockStates = HashMap<BlockPos, BlockState>()
+    private val recordedChanges = mutableListOf<Pair<SimTime, Map<BlockPos, Pair<BlockState, Map<String, String>>>>>()
     private var lastStates: Map<BlockPos, Map<String, String>> = emptyMap()
 
     private val monitoredPositions: List<BlockPos> by lazy {
@@ -29,7 +31,10 @@ class AutoSpecRecorder(
     fun start() {
         LOGGER.debug("[AutoSpecRecorder#start] recording '{}' monitoring {} positions", autoSpec.label, monitoredPositions.size)
         ticksElapsed = -1
-        val states = monitoredPositions.associateWith { pos -> captureBlockStateProps(level.getBlockState(pos)) }
+        val blockStates = monitoredPositions.associateWith { pos -> level.getBlockState(pos) }
+        initBlockStates.clear()
+        initBlockStates.putAll(blockStates)
+        val states = blockStates.mapValues { (_, state) -> captureBlockStateProps(state) }
         initStates.clear()
         initStates.putAll(states)
         lastStates = states
@@ -38,11 +43,12 @@ class AutoSpecRecorder(
     fun onPhase(phase: Phase) {
         if (phase == Phase.START_OF_TICK) ticksElapsed++
         val simTime = SimTime(ticksElapsed.coerceAtLeast(0), phase)
-        val currentStates = monitoredPositions.associateWith { pos -> captureBlockStateProps(level.getBlockState(pos)) }
+        val currentBlockStates = monitoredPositions.associateWith { pos -> level.getBlockState(pos) }
+        val currentStates = currentBlockStates.mapValues { (_, state) -> captureBlockStateProps(state) }
         val changes = currentStates.mapNotNull { (pos, current) ->
             val last = lastStates[pos] ?: emptyMap()
             val diff = current.filter { (k, v) -> last[k] != v }
-            if (diff.isNotEmpty()) pos to diff else null
+            if (diff.isNotEmpty()) pos to (currentBlockStates.getValue(pos) to diff) else null
         }.toMap()
         if (changes.isNotEmpty()) {
             LOGGER.debug("[AutoSpecRecorder#onPhase] {} detected changes at {} positions", simTime, changes.size)
@@ -53,14 +59,14 @@ class AutoSpecRecorder(
 
     fun commit(): SpecCase {
         fun buildEntries(worldPos: BlockPos): List<Pair<SimTime, StateCondition>> {
-            val blockState = level.getBlockState(worldPos)
+            val initBlockState = initBlockStates[worldPos] ?: level.getBlockState(worldPos)
             val initProps = initStates[worldPos] ?: emptyMap()
             val result = mutableListOf<Pair<SimTime, StateCondition>>(
-                SimTime.INIT to propsToCondition(initProps, blockState)
+                SimTime.INIT to propsToCondition(initProps, initBlockState)
             )
             for ((simTime, changes) in recordedChanges) {
-                changes[worldPos]?.let { diff ->
-                    result += simTime to propsToCondition(diff, blockState)
+                changes[worldPos]?.let { (stateAtChange, diff) ->
+                    result += simTime to propsToCondition(diff, stateAtChange)
                 }
             }
             return result
