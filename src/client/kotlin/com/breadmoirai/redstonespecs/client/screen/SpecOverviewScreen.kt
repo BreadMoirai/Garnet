@@ -27,6 +27,8 @@ class SpecOverviewScreen(val originPos: BlockPos) :
 
     private var nameEditBox: EditBox? = null
 
+    override fun isInGameUi(): Boolean = true
+
     override fun init() {
         super.init()
         val x = panelX
@@ -38,7 +40,6 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             addRenderableWidget(box)
         }
 
-        // Spec case buttons (up to 7 cases shown)
         spec?.specCases?.forEachIndexed { i, case ->
             if (i >= 7) return@forEachIndexed
             addRenderableWidget(
@@ -48,33 +49,28 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             )
         }
 
-        // Run active
         addRenderableWidget(
             Button.builder(Component.literal("▶ Run")) {
                 sendPacket(RunSpecC2SPayload(originPos, false))
             }.bounds(x + 10, y + panelH - 60, 58, 20).build()
         )
-        // Run all
         addRenderableWidget(
             Button.builder(Component.literal("▶▶ All")) {
                 sendPacket(RunSpecC2SPayload(originPos, true))
             }.bounds(x + 74, y + panelH - 60, 58, 20).build()
         )
-        // Reset
         addRenderableWidget(
             Button.builder(Component.literal("↺ Reset")) {
                 sendPacket(ResetSpecC2SPayload(originPos))
             }.bounds(x + 138, y + panelH - 60, 58, 20).build()
         )
 
-        // Add case
         addRenderableWidget(
             Button.builder(Component.literal("+ Case")) {
                 val size = getSpec()?.specCases?.size ?: 0
                 sendPacket(AddSpecCaseC2SPayload(originPos, "Case ${size + 1}"))
             }.bounds(x + 10, y + panelH - 35, 70, 20).build()
         )
-        // Remove active case
         addRenderableWidget(
             Button.builder(Component.literal("- Case")) {
                 val index = getBe()?.activeSpecCaseIndex ?: return@builder
@@ -82,7 +78,12 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             }.bounds(x + 86, y + panelH - 35, 70, 20).build()
         )
 
-        // Close
+        addRenderableWidget(
+            Button.builder(Component.literal("Bounds…")) {
+                minecraft?.setScreen(SpecBoundsScreen(originPos))
+            }.bounds(x + 162, y + panelH - 35, 62, 20).build()
+        )
+
         addRenderableWidget(
             Button.builder(CommonComponents.GUI_DONE) { onClose() }
                 .bounds(x + panelW - 72, y + panelH - 35, 62, 20).build()
@@ -95,14 +96,15 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         mouseY: Int,
         partialTick: Float,
     ) {
+        super.extractBackground(extractor, mouseX, mouseY, partialTick)
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
 
         val x = panelX
         val y = panelY
 
-        extractor.fill(x, y, x + panelW, y + panelH, 0xCC000000.toInt())
+        extractor.fill(x, y, x + panelW, y + panelH, 0xB0101010.toInt())
         extractor.centeredText(font, title, x + panelW / 2, y + 4, 0xFFFFFF)
-        extractor.text(font, Component.literal("Name:"), x + 10, y + 17, 0xAAAAAA)
+        extractor.text(font, Component.literal("Name:"), x + 10, y + 17, 0x888888)
 
         val be = getBe()
         val spec = be?.spec
@@ -113,14 +115,12 @@ class SpecOverviewScreen(val originPos: BlockPos) :
 
         extractor.text(font, Component.literal("Cases:"), x + 10, y + 36, 0x888888)
 
-        // Highlight active case
         val activeIndex = be.activeSpecCaseIndex
         if (activeIndex < spec.specCases.size) {
             val highlightY = y + 42 + activeIndex * 22
             extractor.fill(x + 9, highlightY - 1, x + 191, highlightY + 19, 0x44FFFFFF)
         }
 
-        // Pass/fail indicators from last test result
         val testResult = be.lastTestResult
         spec.specCases.forEachIndexed { i, case ->
             if (i >= 7) return@forEachIndexed
@@ -133,7 +133,6 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             extractor.text(font, Component.literal(statusText), x + 196, y + 47 + i * 22, statusColor)
         }
 
-        // Test result summary
         if (testResult != null) {
             val pass = testResult.results.count { r -> r.checks.all { it.pass } }
             val total = testResult.results.size
