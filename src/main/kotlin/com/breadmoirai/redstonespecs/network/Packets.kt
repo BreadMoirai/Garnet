@@ -5,6 +5,7 @@ import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.TestResult
 import io.netty.buffer.ByteBuf
 import net.minecraft.core.BlockPos
+import net.minecraft.world.level.levelgen.structure.BoundingBox
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -268,6 +269,44 @@ class UndoC2SPayload : CustomPacketPayload {
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, UndoC2SPayload> =
             StreamCodec.unit(UndoC2SPayload())
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class ResizeBoundsC2SPayload(
+    val originPos: BlockPos,
+    val bounds: BoundingBox,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<ResizeBoundsC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "resize_bounds")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, ResizeBoundsC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, ResizeBoundsC2SPayload::originPos,
+            ByteBufCodecs.fromCodec(BoundingBox.CODEC), ResizeBoundsC2SPayload::bounds,
+            ::ResizeBoundsC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class NudgeSpecBoundsC2SPayload(
+    val originPos: BlockPos,
+    val axis: Int,
+    val isMax: Boolean,
+    val delta: Int,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<NudgeSpecBoundsC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "nudge_spec_bounds")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, NudgeSpecBoundsC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, NudgeSpecBoundsC2SPayload::originPos,
+            ByteBufCodecs.VAR_INT, NudgeSpecBoundsC2SPayload::axis,
+            ByteBufCodecs.BOOL, NudgeSpecBoundsC2SPayload::isMax,
+            ByteBufCodecs.VAR_INT, NudgeSpecBoundsC2SPayload::delta,
+            ::NudgeSpecBoundsC2SPayload,
+        )
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }

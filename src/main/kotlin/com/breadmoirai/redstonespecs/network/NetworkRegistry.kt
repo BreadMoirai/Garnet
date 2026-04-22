@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.network
 
 import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
 import com.breadmoirai.redstonespecs.item.UndoStack
+import com.breadmoirai.redstonespecs.network.nudgeBounds
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -29,6 +30,8 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(RemoveSpecCaseC2SPayload.TYPE, RemoveSpecCaseC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SelectSpecCaseC2SPayload.TYPE, SelectSpecCaseC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(RenameSpecC2SPayload.TYPE, RenameSpecC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(ResizeBoundsC2SPayload.TYPE, ResizeBoundsC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(NudgeSpecBoundsC2SPayload.TYPE, NudgeSpecBoundsC2SPayload.STREAM_CODEC)
 
     // C2S handlers
     ServerPlayNetworking.registerGlobalReceiver(UndoC2SPayload.TYPE) { _, context ->
@@ -130,6 +133,24 @@ fun registerNetworking() {
             LOGGER.debug("[NetworkRegistry#renameSpec] originPos={} newName='{}'", payload.originPos, payload.newName)
             val be = context.player().level().getBlockEntity(payload.originPos) as? SpecOriginBlockEntity ?: return@execute
             be.setSpecName(payload.newName)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(ResizeBoundsC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#resizeBounds] originPos={} bounds={}", payload.originPos, payload.bounds)
+            val be = context.player().level().getBlockEntity(payload.originPos) as? SpecOriginBlockEntity ?: return@execute
+            val spec = be.spec ?: return@execute
+            be.setSpec(spec.copy(bounds = payload.bounds))
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(NudgeSpecBoundsC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#nudgeSpecBounds] originPos={} axis={} isMax={} delta={}", payload.originPos, payload.axis, payload.isMax, payload.delta)
+            val be = context.player().level().getBlockEntity(payload.originPos) as? SpecOriginBlockEntity ?: return@execute
+            val spec = be.spec ?: return@execute
+            be.setSpec(spec.copy(bounds = nudgeBounds(spec.bounds, payload.axis, payload.isMax, payload.delta)))
         }
     }
 }
