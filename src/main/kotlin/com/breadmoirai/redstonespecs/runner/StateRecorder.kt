@@ -80,7 +80,7 @@ class StateRecorder(
 
     companion object {
         @JvmStatic
-        @Volatile
+        @field:Volatile
         var active: StateRecorder? = null
             private set
 
