@@ -73,11 +73,6 @@ data class OutputSpec(
     override val color: Int,
     val entries: List<Pair<SimTime, StateCondition>>,
 ) : SpecEntry() {
-    init {
-        require(entries.count { it.first == SimTime.INIT } == 1) {
-            "OutputSpec entries must contain exactly one INIT entry, got: ${entries.map { it.first }}"
-        }
-    }
     companion object {
         val MAP_CODEC: MapCodec<OutputSpec> = RecordCodecBuilder.mapCodec { instance ->
             instance.group(

@@ -1,7 +1,6 @@
 package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.SpecCase
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -16,7 +15,6 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BlockEntityTicker
 import net.minecraft.world.level.block.entity.BlockEntityType
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.level.levelgen.structure.BoundingBox
 import net.minecraft.world.phys.BlockHitResult
 import java.util.UUID
 
@@ -39,15 +37,7 @@ class RedstoneSpecBlock(properties: Properties) : BaseEntityBlock(properties) {
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? RedstoneSpecBlockEntity ?: return InteractionResult.PASS
             if (be.spec == null) {
-                be.setSpec(
-                    RedstoneSpec(
-                        id = UUID.randomUUID(),
-                        name = "New Spec",
-                        bounds = BoundingBox(1, 0, 1, 5, 4, 5),
-                        oneShot = false,
-                        specCases = listOf(SpecCase("Case 1", 20, emptyList(), emptyList(), emptyList(), emptyList())),
-                    )
-                )
+                be.setSpec(RedstoneSpec.new(UUID.randomUUID().toString()))
             }
             ServerPlayNetworking.send(player as ServerPlayer, OpenOverviewS2CPayload(pos))
         }

@@ -1,7 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
-import com.breadmoirai.redstonespecs.network.RenameSpecC2SPayload
 import com.breadmoirai.redstonespecs.network.ResetSpecC2SPayload
 import com.breadmoirai.redstonespecs.network.RunSpecC2SPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -34,13 +33,13 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         // Spec ID row: display name text + pencil button, or edit box + confirm button
         if (nameEditMode) {
             nameEditBox = EditBox(font, x + 64, y + 12, panelW - 92, 16, Component.empty()).also {
-                it.value = getSpec()?.name ?: ""
+                it.value = getSpec()?.id ?: ""
                 addRenderableWidget(it)
             }
             addRenderableWidget(
                 Button.builder(Component.literal("✔")) {
-                    val newName = nameEditBox?.value?.trim()?.takeIf { it.isNotEmpty() } ?: return@builder
-                    sendPacket(RenameSpecC2SPayload(originPos, newName))
+                    val newId = nameEditBox?.value?.trim()?.takeIf { it.isNotEmpty() } ?: return@builder
+                    // TODO Task 4: send RenameSpecC2SPayload or equivalent
                     nameEditMode = false
                     rebuildWidgets()
                 }.bounds(x + panelW - 26, y + 12, 18, 16).build()
@@ -54,24 +53,15 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             )
         }
 
-        // Row 1: Run, Run All, Cases
+        // Row 1: Run, Bounds, Reset & Load
         addRenderableWidget(
             Button.builder(Component.translatable("screen.redstonespecs.spec_overview.run")) {
                 sendPacket(RunSpecC2SPayload(originPos, false))
             }.bounds(x + 8, y + panelH - 48, 76, 20).build()
         )
-        addRenderableWidget(
-            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.run_all")) {
-                sendPacket(RunSpecC2SPayload(originPos, true))
-            }.bounds(x + 88, y + panelH - 48, 66, 20).build()
-        )
-        addRenderableWidget(
-            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.cases")) {
-                minecraft?.setScreen(SpecCasesScreen(originPos))
-            }.bounds(x + panelW - 78, y + panelH - 48, 70, 20).build()
-        )
+        // TODO Task 3/5: Run All button (removed runAll concept for now)
 
-        // Row 2: Bounds, Reset & Load, Save, Done
+        // Row 2: Bounds, Reset & Load, Done
         addRenderableWidget(
             Button.builder(Component.translatable("screen.redstonespecs.spec_overview.bounds")) {
                 minecraft?.setScreen(SpecBoundsScreen(originPos))
@@ -81,14 +71,6 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             Button.builder(Component.translatable("screen.redstonespecs.spec_overview.reset_load")) {
                 sendPacket(ResetSpecC2SPayload(originPos))
             }.bounds(x + 70, y + panelH - 24, 88, 20).build()
-        )
-        addRenderableWidget(
-            Button.builder(Component.translatable("screen.redstonespecs.spec_overview.save")) {
-                val name = nameEditBox?.value?.trim()
-                if (name != null && name.isNotEmpty()) sendPacket(RenameSpecC2SPayload(originPos, name))
-                nameEditMode = false
-                onClose()
-            }.bounds(x + 162, y + panelH - 24, 50, 20).build()
         )
         addRenderableWidget(
             Button.builder(CommonComponents.GUI_DONE) { onClose() }
@@ -116,7 +98,7 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             x + 8, y + 16, 0xFF888888.toInt(),
         )
         if (!nameEditMode) {
-            extractor.text(font, Component.literal(spec?.name ?: ""), x + 64, y + 16, 0xFFFFFFFF.toInt())
+            extractor.text(font, Component.literal(spec?.id ?: ""), x + 64, y + 16, 0xFFFFFFFF.toInt())
         }
 
         if (spec == null) {
@@ -128,48 +110,18 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             return
         }
 
-        val activeIndex = be.activeSpecCaseIndex
-        val activeCase = spec.specCases.getOrNull(activeIndex)
-
+        // TODO Task 3/5: display test result summary
         extractor.text(
             font,
-            Component.translatable("screen.redstonespecs.spec_overview.active_case").append(":"),
-            x + 8, y + 36, 0xFF888888.toInt(),
+            Component.literal("In: ${spec.inputs.size}  Out: ${spec.outputs.size}  BP: ${spec.breakpoints.size}"),
+            x + 8, y + 50, 0xFF888888.toInt(),
         )
-
-        if (activeCase != null) {
-            extractor.text(font, Component.literal(activeCase.name), x + 94, y + 36, 0xFFFFFFFF.toInt())
-            extractor.text(
-                font,
-                Component.literal("Lifespan: ${activeCase.lifespan}t"),
-                x + 8, y + 50, 0xFF888888.toInt(),
-            )
-            extractor.text(
-                font,
-                Component.literal("In: ${activeCase.inputs.size}  Out: ${activeCase.outputs.size}  BP: ${activeCase.breakpoints.size}"),
-                x + 8, y + 62, 0xFF888888.toInt(),
-            )
-            val b = spec.bounds
-            extractor.text(
-                font,
-                Component.literal("(${b.minX()},${b.minY()},${b.minZ()})→(${b.maxX()},${b.maxY()},${b.maxZ()})"),
-                x + 8, y + 74, 0xFF888888.toInt(),
-            )
-
-            val testResult = be.lastTestResult
-            if (testResult != null) {
-                val caseResult = testResult.results.find { it.specCaseName == activeCase.name }
-                if (caseResult != null) {
-                    val passCount = caseResult.checks.count { it.pass }
-                    val total = caseResult.checks.size
-                    val (text, color) = if (passCount == total)
-                        "✓ $passCount/$total checks passed" to 0xFF44FF88.toInt()
-                    else
-                        "✗ ${total - passCount}/$total checks failed" to 0xFFFF4444.toInt()
-                    extractor.text(font, Component.literal(text), x + 8, y + 88, color)
-                }
-            }
-        }
+        val b = spec.bounds
+        extractor.text(
+            font,
+            Component.literal("(${b.minX()},${b.minY()},${b.minZ()})→(${b.maxX()},${b.maxY()},${b.maxZ()})"),
+            x + 8, y + 62, 0xFF888888.toInt(),
+        )
     }
 
     override fun onClose() {

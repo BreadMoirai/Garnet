@@ -50,10 +50,10 @@ class Redstonespecs : ModInitializer {
 
             val be = RedstoneSpecBlockEntity.findFor(world, pos) ?: return@register InteractionResult.PASS
             val relPos = pos.subtract(be.blockPos)
-            val removed = be.removeEntry(be.activeSpecCaseIndex, relPos)
+            val removed = be.removeEntry(relPos)
             if (removed != null) {
-                LOGGER.debug("[Redstonespecs#attackCallback] removed entry at {} from case {}", relPos, be.activeSpecCaseIndex)
-                UndoStack.push(player.uuid, UndoStack.UndoRecord(be.blockPos, be.activeSpecCaseIndex, removed))
+                LOGGER.debug("[Redstonespecs#attackCallback] removed entry at {}", relPos)
+                UndoStack.push(player.uuid, UndoStack.UndoRecord(be.blockPos, removed))
             }
 
             InteractionResult.SUCCESS

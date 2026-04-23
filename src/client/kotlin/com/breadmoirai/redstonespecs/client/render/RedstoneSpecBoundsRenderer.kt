@@ -51,12 +51,7 @@ class RedstoneSpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) 
         super.extractRenderState(entity, state, partialTick, cameraPos, crumbling)
         state.bounds = entity.spec?.bounds
         state.hoveredFace = if (entity.blockPos == currentHoveredFace?.originPos) currentHoveredFace else null
-        val spec = entity.spec
-        state.activeEntries = if (spec != null && entity.activeSpecCaseIndex < spec.specCases.size) {
-            spec.specCases[entity.activeSpecCaseIndex].allEntries
-        } else {
-            emptyList()
-        }
+        state.activeEntries = entity.spec?.allEntries ?: emptyList()
     }
 
     override fun submit(

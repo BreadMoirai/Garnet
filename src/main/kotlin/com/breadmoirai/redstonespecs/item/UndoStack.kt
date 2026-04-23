@@ -7,7 +7,7 @@ import java.util.UUID
 object UndoStack {
     private const val MAX_DEPTH = 20
 
-    data class UndoRecord(val originPos: BlockPos, val specCaseIndex: Int, val entry: SpecEntry)
+    data class UndoRecord(val originPos: BlockPos, val entry: SpecEntry)
 
     private val stacks = HashMap<UUID, ArrayDeque<UndoRecord>>()
 

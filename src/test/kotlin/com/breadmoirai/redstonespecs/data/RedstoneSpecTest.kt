@@ -30,52 +30,83 @@ class RedstoneSpecTest {
     @Test
     fun `empty RedstoneSpec roundtrip`() {
         val spec = RedstoneSpec(
-            id = UUID.randomUUID(),
-            name = "test-spec",
+            id = "test-spec",
+            mode = SpecMode.SIMPLE,
             bounds = BoundingBox(0, 0, 0, 10, 5, 10),
-            oneShot = false,
-            specCases = emptyList(),
+            lifespan = 20,
+            structure = null,
+            inputs = emptyList(),
+            outputs = emptyList(),
+            breakpoints = emptyList(),
+            autoSpecs = emptyList(),
         )
         assertEquals(spec, roundtrip(spec))
     }
 
     @Test
-    fun `oneShot flag roundtrip`() {
+    fun `mode preserved across roundtrip`() {
         val spec = RedstoneSpec(
-            id = UUID.randomUUID(),
-            name = "one-shot",
+            id = "mode-test",
+            mode = SpecMode.TICK_AWARE,
             bounds = BoundingBox(0, 0, 0, 4, 4, 4),
-            oneShot = true,
-            specCases = emptyList(),
+            lifespan = 40,
+            structure = null,
+            inputs = emptyList(),
+            outputs = emptyList(),
+            breakpoints = emptyList(),
+            autoSpecs = emptyList(),
         )
         val decoded = roundtrip(spec)
-        assertEquals(true, decoded.oneShot)
+        assertEquals(SpecMode.TICK_AWARE, decoded.mode)
     }
 
     @Test
-    fun `UUID preserved across roundtrip`() {
-        val id = UUID.fromString("550e8400-e29b-41d4-a716-446655440000")
-        val spec = RedstoneSpec(id, "uuid-test", BoundingBox(0, 0, 0, 1, 1, 1), false, emptyList())
+    fun `id preserved across roundtrip`() {
+        val id = "my-spec-id"
+        val spec = RedstoneSpec(
+            id = id,
+            mode = SpecMode.SIMPLE,
+            bounds = BoundingBox(0, 0, 0, 1, 1, 1),
+            lifespan = 20,
+            structure = null,
+            inputs = emptyList(),
+            outputs = emptyList(),
+            breakpoints = emptyList(),
+            autoSpecs = emptyList(),
+        )
         assertEquals(id, roundtrip(spec).id)
     }
 
     @Test
     fun `bounds preserved across roundtrip`() {
         val bounds = BoundingBox(-3, 60, -3, 12, 65, 12)
-        val spec = RedstoneSpec(UUID.randomUUID(), "bounds-test", bounds, false, emptyList())
+        val spec = RedstoneSpec(
+            id = "bounds-test",
+            mode = SpecMode.SIMPLE,
+            bounds = bounds,
+            lifespan = 20,
+            structure = null,
+            inputs = emptyList(),
+            outputs = emptyList(),
+            breakpoints = emptyList(),
+            autoSpecs = emptyList(),
+        )
         assertEquals(bounds, roundtrip(spec).bounds)
     }
 
     @Test
-    fun `RedstoneSpec with multiple SpecCases roundtrip`() {
-        val cases = listOf(
-            SpecCase("case-1", 20,
-                inputs = listOf(InputSpec(BlockPos(1, 0, 0), "A", 0xFF0000, initEntries)),
-                outputs = listOf(OutputSpec(BlockPos(5, 0, 0), "Q", 0x0000FF, initEntries)),
-                breakpoints = emptyList(), autoSpecs = emptyList()),
-            SpecCase("case-2", 30, emptyList(), emptyList(), emptyList(), emptyList()),
+    fun `RedstoneSpec with entries roundtrip`() {
+        val spec = RedstoneSpec(
+            id = "with-entries",
+            mode = SpecMode.SIMPLE,
+            bounds = BoundingBox(0, 0, 0, 8, 4, 8),
+            lifespan = 20,
+            structure = null,
+            inputs = listOf(InputSpec(BlockPos(1, 0, 0), "A", 0xFF0000, initEntries)),
+            outputs = listOf(OutputSpec(BlockPos(5, 0, 0), "Q", 0x0000FF, initEntries)),
+            breakpoints = emptyList(),
+            autoSpecs = emptyList(),
         )
-        val spec = RedstoneSpec(UUID.randomUUID(), "multi-case", BoundingBox(0, 0, 0, 8, 4, 8), false, cases)
         assertEquals(spec, roundtrip(spec))
     }
 

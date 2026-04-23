@@ -23,14 +23,8 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(RunSpecC2SPayload.TYPE, RunSpecC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(ResetSpecC2SPayload.TYPE, ResetSpecC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(ResumeSpecC2SPayload.TYPE, ResumeSpecC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(CycleSpecCaseC2SPayload.TYPE, CycleSpecCaseC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SaveSpecEntryC2SPayload.TYPE, SaveSpecEntryC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(RemoveSpecEntryC2SPayload.TYPE, RemoveSpecEntryC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(AddSpecCaseC2SPayload.TYPE, AddSpecCaseC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(RemoveSpecCaseC2SPayload.TYPE, RemoveSpecCaseC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(SelectSpecCaseC2SPayload.TYPE, SelectSpecCaseC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(RenameSpecC2SPayload.TYPE, RenameSpecC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(RenameSpecCaseC2SPayload.TYPE, RenameSpecCaseC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(ResizeBoundsC2SPayload.TYPE, ResizeBoundsC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(NudgeSpecBoundsC2SPayload.TYPE, NudgeSpecBoundsC2SPayload.STREAM_CODEC)
 
@@ -39,17 +33,17 @@ fun registerNetworking() {
         val player = context.player()
         context.server().execute {
             val record = UndoStack.pop(player.uuid) ?: return@execute
-            LOGGER.debug("[NetworkRegistry#undo] player={} restoring entry at case={}", player.name.string, record.specCaseIndex)
+            LOGGER.debug("[NetworkRegistry#undo] player={} restoring entry at pos={}", player.name.string, record.entry.pos)
             val be = player.level().getBlockEntity(record.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            be.addOrUpdateEntry(record.specCaseIndex, record.entry)
+            be.addOrUpdateEntry(record.entry)
         }
     }
 
     ServerPlayNetworking.registerGlobalReceiver(RunSpecC2SPayload.TYPE) { payload, context ->
         context.server().execute {
-            LOGGER.debug("[NetworkRegistry#runSpec] originPos={} runAll={}", payload.originPos, payload.runAll)
+            LOGGER.debug("[NetworkRegistry#runSpec] originPos={}", payload.originPos)
             val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            SpecRunnerCoordinator.startRun(be, payload.runAll)
+            SpecRunnerCoordinator.startRun(be)
         }
     }
 
@@ -69,79 +63,21 @@ fun registerNetworking() {
         }
     }
 
-    ServerPlayNetworking.registerGlobalReceiver(CycleSpecCaseC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            val spec = be.spec ?: return@execute
-            if (spec.specCases.isEmpty()) return@execute
-            val size = spec.specCases.size
-            val newIndex = if (payload.forward) {
-                (be.activeSpecCaseIndex + 1) % size
-            } else {
-                (be.activeSpecCaseIndex - 1 + size) % size
-            }
-            LOGGER.debug("[NetworkRegistry#cycleSpecCase] originPos={} forward={} newIndex={}", payload.originPos, payload.forward, newIndex)
-            be.setActiveSpecCase(newIndex)
-        }
-    }
-
     ServerPlayNetworking.registerGlobalReceiver(SaveSpecEntryC2SPayload.TYPE) { payload, context ->
         context.server().execute {
-            LOGGER.debug("[NetworkRegistry#saveSpecEntry] originPos={} case={} pos={}", payload.originPos, payload.specCaseIndex, payload.entry.pos)
+            LOGGER.debug("[NetworkRegistry#saveSpecEntry] originPos={} pos={}", payload.originPos, payload.entry.pos)
             val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            be.addOrUpdateEntry(payload.specCaseIndex, payload.entry)
+            be.addOrUpdateEntry(payload.entry)
         }
     }
 
     ServerPlayNetworking.registerGlobalReceiver(RemoveSpecEntryC2SPayload.TYPE) { payload, context ->
         val player = context.player()
         context.server().execute {
-            LOGGER.debug("[NetworkRegistry#removeSpecEntry] originPos={} case={} entryPos={}", payload.originPos, payload.specCaseIndex, payload.entryRelPos)
+            LOGGER.debug("[NetworkRegistry#removeSpecEntry] originPos={} entryPos={}", payload.originPos, payload.entryRelPos)
             val be = player.level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            val removed = be.removeEntry(payload.specCaseIndex, payload.entryRelPos) ?: return@execute
-            UndoStack.push(player.uuid, UndoStack.UndoRecord(payload.originPos, payload.specCaseIndex, removed))
-        }
-    }
-
-    ServerPlayNetworking.registerGlobalReceiver(AddSpecCaseC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            LOGGER.debug("[NetworkRegistry#addSpecCase] originPos={} name='{}'", payload.originPos, payload.name)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            be.addSpecCase(payload.name)
-        }
-    }
-
-    ServerPlayNetworking.registerGlobalReceiver(RemoveSpecCaseC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            LOGGER.debug("[NetworkRegistry#removeSpecCase] originPos={} index={}", payload.originPos, payload.index)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            be.removeSpecCase(payload.index)
-        }
-    }
-
-    ServerPlayNetworking.registerGlobalReceiver(SelectSpecCaseC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            LOGGER.debug("[NetworkRegistry#selectSpecCase] originPos={} index={}", payload.originPos, payload.index)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            if (payload.index in (be.spec?.specCases?.indices ?: return@execute)) {
-                be.setActiveSpecCase(payload.index)
-            }
-        }
-    }
-
-    ServerPlayNetworking.registerGlobalReceiver(RenameSpecC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            LOGGER.debug("[NetworkRegistry#renameSpec] originPos={} newName='{}'", payload.originPos, payload.newName)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            be.setSpecName(payload.newName)
-        }
-    }
-
-    ServerPlayNetworking.registerGlobalReceiver(RenameSpecCaseC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            LOGGER.debug("[NetworkRegistry#renameSpecCase] originPos={} index={} newName='{}'", payload.originPos, payload.index, payload.newName)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            be.renameSpecCase(payload.index, payload.newName)
+            val removed = be.removeEntry(payload.entryRelPos) ?: return@execute
+            UndoStack.push(player.uuid, UndoStack.UndoRecord(payload.originPos, removed))
         }
     }
 
