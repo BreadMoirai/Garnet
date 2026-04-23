@@ -46,5 +46,8 @@ class StateRecordingView(
     companion object {
         fun of(recording: StateRecording) =
             StateRecordingView(recording.initialSnapshot, recording.changes)
+
+        fun of(recorder: StateRecorder) =
+            StateRecordingView(recorder.initialSnapshot, recorder.changes)
     }
 }
