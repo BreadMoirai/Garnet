@@ -55,6 +55,7 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
             { mode -> Component.literal(if (mode == DisplayMode.OFFSET_SIZE) "Offset / Size" else "Min / Max") },
             displayMode,
         ).withValues(*DisplayMode.entries.toTypedArray())
+            .displayOnlyValue()
             .create(0, 0, 120, 20, Component.empty()) { _, value ->
                 switchMode(value)
             }
@@ -91,8 +92,8 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         content.addChild(SpacerElement(0, 4))
         content.addChild(bottomRow)
 
-        FrameLayout.centerInRectangle(content, 0, 0, width, height)
         content.arrangeElements()
+        FrameLayout.centerInRectangle(content, 0, 0, width, height)
         content.visitWidgets { addRenderableWidget(it) }
     }
 

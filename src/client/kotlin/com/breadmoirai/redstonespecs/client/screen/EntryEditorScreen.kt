@@ -141,6 +141,7 @@ class EntryEditorScreen(
                 { phase -> Component.literal(phase.name) },
                 currentPhase,
             ).withValues(*advancedPhases.toTypedArray())
+                .displayOnlyValue()
                 .create(0, 0, 140, 20, Component.empty()) { _, _ -> }
             phaseButton = btn
             phaseRow.addChild(btn)
@@ -176,8 +177,8 @@ class EntryEditorScreen(
         )
         content.addChild(bottomRow)
 
-        FrameLayout.centerInRectangle(content, 0, 0, width, height)
         content.arrangeElements()
+        FrameLayout.centerInRectangle(content, 0, 0, width, height)
         content.visitWidgets { addRenderableWidget(it) }
     }
 
@@ -197,6 +198,7 @@ class EntryEditorScreen(
                     },
                     initial,
                 ).withValues(*values.toTypedArray())
+                    .displayOnlyValue()
                     .create(0, 0, 120, 20, Component.empty()) { _, v ->
                         ps.included = v != skipLabel
                     }
@@ -209,6 +211,7 @@ class EntryEditorScreen(
                     { v -> Component.literal(v) },
                     initial,
                 ).withValues(*values.toTypedArray())
+                    .displayOnlyValue()
                     .create(0, 0, 120, 20, Component.empty()) { _, v ->
                         when (v) {
                             skipLabel -> ps.included = false
@@ -228,6 +231,7 @@ class EntryEditorScreen(
                     { v -> Component.literal(v) },
                     initial,
                 ).withValues(*cycleValues.toTypedArray())
+                    .displayOnlyValue()
                     .create(0, 0, 120, 20, Component.empty()) { _, v ->
                         if (v == skipLabel) {
                             ps.included = false
@@ -245,6 +249,7 @@ class EntryEditorScreen(
                     { v -> Component.literal(v) },
                     initial,
                 ).withValues(*cycleValues.toTypedArray())
+                    .displayOnlyValue()
                     .create(0, 0, 120, 20, Component.empty()) { _, v ->
                         if (v == skipLabel) {
                             ps.included = false

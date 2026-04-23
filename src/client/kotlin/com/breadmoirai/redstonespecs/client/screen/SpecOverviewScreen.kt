@@ -74,6 +74,7 @@ class SpecOverviewScreen(
             },
             spec?.mode ?: SpecMode.SIMPLE,
         ).withValues(*SpecMode.entries.toTypedArray())
+            .displayOnlyValue()
             .create(0, 0, 180, 20, Component.empty()) { _, value ->
                 sendPacket(SetSpecModeC2SPayload(originPos, value))
             }
@@ -174,8 +175,8 @@ class SpecOverviewScreen(
         })
         content.addChild(actionRow)
 
-        FrameLayout.centerInRectangle(content, 0, 0, width, height)
         content.arrangeElements()
+        FrameLayout.centerInRectangle(content, 0, 0, width, height)
         content.visitWidgets { addRenderableWidget(it) }
     }
 
