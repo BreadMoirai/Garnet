@@ -43,6 +43,7 @@ private fun evaluateConditionOnState(condition: StateCondition, state: BlockStat
     }
     is StateCondition.EnumProperty -> blockStatePropertyStr(state, condition.name) == condition.value
     is StateCondition.ContainerContents -> false
+    is StateCondition.IntRange -> false
 }
 
 fun blockStatePropertyStr(state: BlockState, propName: String): String? {

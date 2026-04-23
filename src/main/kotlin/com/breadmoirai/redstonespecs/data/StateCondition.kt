@@ -21,6 +21,7 @@ sealed class StateCondition {
         val item: Identifier? = null,
         val minCount: Int = 1,
     ) : StateCondition()
+    data class IntRange(val name: String, val min: Int, val max: Int) : StateCondition()
 
     companion object {
         val CODEC: Codec<StateCondition> = Codec.lazyInitialized {
@@ -71,6 +72,13 @@ sealed class StateCondition {
                     ContainerContents(slot.orElse(null), item.orElse(null), minCount)
                 }
             }
+            val intRangeCodec: MapCodec<IntRange> = RecordCodecBuilder.mapCodec { instance ->
+                instance.group(
+                    Codec.STRING.fieldOf("name").forGetter(IntRange::name),
+                    Codec.INT.fieldOf("min").forGetter(IntRange::min),
+                    Codec.INT.fieldOf("max").forGetter(IntRange::max),
+                ).apply(instance, ::IntRange)
+            }
 
             val codecMap = mapOf<String, MapCodec<out StateCondition>>(
                 "block_type" to blockTypeCodec,
@@ -81,6 +89,7 @@ sealed class StateCondition {
                 "any" to anyCodec,
                 "not" to notCodec,
                 "container_contents" to containerContentsCodec,
+                "int_range" to intRangeCodec,
             )
 
             Codec.STRING.dispatch(
@@ -95,6 +104,7 @@ sealed class StateCondition {
                         is Any -> "any"
                         is Not -> "not"
                         is ContainerContents -> "container_contents"
+                        is IntRange -> "int_range"
                     }
                 },
                 { type: String ->

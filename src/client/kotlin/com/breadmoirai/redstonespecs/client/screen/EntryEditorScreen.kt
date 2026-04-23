@@ -346,6 +346,7 @@ internal fun previewCondition(condition: StateCondition): String = when (conditi
     is StateCondition.Any -> condition.conditions.joinToString("|") { previewCondition(it) }
     is StateCondition.Not -> "!${previewCondition(condition.condition)}"
     is StateCondition.ContainerContents -> "container(...)"
+    is StateCondition.IntRange -> "${condition.name}∈[${condition.min},${condition.max}]"
 }
 
 internal fun flattenConditionToMap(condition: StateCondition): Map<String, String> {

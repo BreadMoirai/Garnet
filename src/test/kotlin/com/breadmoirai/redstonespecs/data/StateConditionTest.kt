@@ -111,4 +111,10 @@ class StateConditionTest {
     fun `DEFAULT_CONDITION is BoolProperty powered=true`() {
         assertEquals(StateCondition.BoolProperty("powered", true), DEFAULT_CONDITION)
     }
+
+    @Test
+    fun `IntRange roundtrip`() {
+        val cond = StateCondition.IntRange("power", 1, 15)
+        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+    }
 }
