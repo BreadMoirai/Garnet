@@ -16,7 +16,7 @@ fun registerClientNetworking() {
         val mc = context.client()
         mc.execute {
             LOGGER.debug("[ClientNetworkHandler#openOverview] originPos={}", payload.originPos)
-            mc.setScreen(SpecOverviewScreen(payload.originPos, payload.availableStructures))
+            mc.setScreen(SpecOverviewScreen(payload.originPos))
         }
     }
 
@@ -39,7 +39,7 @@ fun registerClientNetworking() {
             )
             val current = mc.screen
             if (current is SpecOverviewScreen && current.originPos == payload.originPos) {
-                mc.setScreen(SpecOverviewScreen(payload.originPos, current.availableStructures))
+                mc.setScreen(SpecOverviewScreen(payload.originPos))
             }
         }
     }

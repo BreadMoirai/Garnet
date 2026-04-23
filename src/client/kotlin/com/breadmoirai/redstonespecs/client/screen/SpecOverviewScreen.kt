@@ -20,7 +20,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
 class SpecOverviewScreen(
     val originPos: BlockPos,
-    val availableStructures: List<String>,
 ) : Screen(Component.translatable("screen.redstonespecs.spec_overview")) {
 
     private var idEditMode = false
@@ -93,8 +92,8 @@ class SpecOverviewScreen(
         val incBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("+")) {
             lifespanBox.setIntValue(lifespanBox.getIntValue() + 1)
         }
-        lifespanRow.addChild(decBtn)
         lifespanRow.addChild(lifespanBox)
+        lifespanRow.addChild(decBtn)
         lifespanRow.addChild(incBtn)
         content.addChild(lifespanRow)
 
