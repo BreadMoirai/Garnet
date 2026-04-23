@@ -128,9 +128,3 @@ private fun blockStateFromString(str: String): BlockState {
     }
     return state
 }
-
-private fun <T : Comparable<T>> applyPropertyFromString(
-    state: BlockState,
-    property: Property<T>,
-    value: String,
-): BlockState = property.getValue(value).map { state.setValue(property, it) }.orElse(state)

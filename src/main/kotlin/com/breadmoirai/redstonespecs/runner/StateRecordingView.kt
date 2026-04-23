@@ -11,6 +11,12 @@ class StateRecordingView(
     val initialSnapshot: Map<BlockPos, BlockState>,
     private val changes: List<BlockStateChange>,
 ) {
+    /**
+     * Reconstructs [BlockState] at [pos] as of [simTime] by replaying diffs from [initialSnapshot].
+     *
+     * REQUIRES: [changes] must be globally sorted by [SimTime] ascending — as guaranteed
+     * by [StateRecorder]'s sequential append. Violations silently produce wrong results.
+     */
     fun stateAt(pos: BlockPos, simTime: SimTime): BlockState {
         var state = initialSnapshot[pos] ?: error("Position $pos not in recording bounds")
         for (change in changes) {
@@ -42,9 +48,3 @@ class StateRecordingView(
             StateRecordingView(recording.initialSnapshot, recording.changes)
     }
 }
-
-private fun <T : Comparable<T>> applyPropertyFromString(
-    state: BlockState,
-    property: Property<T>,
-    value: String,
-): BlockState = property.getValue(value).map { state.setValue(property, it) }.orElse(state)

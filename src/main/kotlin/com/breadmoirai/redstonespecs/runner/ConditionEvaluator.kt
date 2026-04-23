@@ -65,3 +65,9 @@ fun propsToCondition(props: Map<String, String>, state: BlockState): StateCondit
         else -> StateCondition.All(conditions)
     }
 }
+
+internal fun <T : Comparable<T>> applyPropertyFromString(
+    state: BlockState,
+    property: Property<T>,
+    value: String,
+): BlockState = property.getValue(value).map { state.setValue(property, it) }.orElse(state)

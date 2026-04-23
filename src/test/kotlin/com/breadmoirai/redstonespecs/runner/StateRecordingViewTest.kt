@@ -79,4 +79,17 @@ class StateRecordingViewTest {
         assertEquals(listOf(c1), view.changesInPhase(0, Phase.SCHEDULED_TICKS))
         assertEquals(listOf(c2), view.changesInPhase(0, Phase.END_OF_TICK))
     }
+
+    @Test
+    fun `stateAt applies toBlock block type change`() {
+        val pos = BlockPos(0, 0, 0)
+        val leverBlock = BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:lever"))
+        val stoneBlock = BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:stone"))
+        val initial = leverBlock.defaultBlockState()
+        val stoneId = BuiltInRegistries.BLOCK.getKey(stoneBlock)
+        val t = SimTime(0, Phase.SCHEDULED_TICKS, 0)
+        val change = BlockStateChange(pos, t, stoneId, emptyList())
+        val view = StateRecordingView(mapOf(pos to initial), listOf(change))
+        assertEquals(stoneBlock.defaultBlockState(), view.stateAt(pos, t))
+    }
 }
