@@ -20,7 +20,9 @@ abstract class ServerLevelSetBlockMixin {
     // We only process ServerLevel instances (guarded below), so this is always server-thread-only.
     // The stack is still needed for recursion safety: nested setBlock calls each need their own
     // stack entry to correctly pair HEAD captures with RETURN consumers.
-    private static final ThreadLocal<Deque<BlockState>> BEFORE_STATE_STACK =
+    // ArrayDeque does not allow null elements, so we use a sentinel object instead of null.
+    private static final Object SKIP_SENTINEL = new Object();
+    private static final ThreadLocal<Deque<Object>> BEFORE_STATE_STACK =
         ThreadLocal.withInitial(ArrayDeque::new);
 
     @Inject(
@@ -33,12 +35,12 @@ abstract class ServerLevelSetBlockMixin {
     ) {
         // Only record on the server level; ClientLevel calls are ignored.
         if (!(((Object) this) instanceof ServerLevel)) {
-            BEFORE_STATE_STACK.get().push(null); // null sentinel — skip at RETURN
+            BEFORE_STATE_STACK.get().push(SKIP_SENTINEL);
             return;
         }
         StateRecorder recorder = StateRecorder.getActive();
         if (recorder == null || !recorder.isInBounds(pos)) {
-            BEFORE_STATE_STACK.get().push(null); // null sentinel — skip at RETURN
+            BEFORE_STATE_STACK.get().push(SKIP_SENTINEL);
             return;
         }
         BEFORE_STATE_STACK.get().push(((Level) (Object) this).getBlockState(pos));
@@ -52,12 +54,12 @@ abstract class ServerLevelSetBlockMixin {
         BlockPos pos, BlockState newState, int flags,
         CallbackInfoReturnable<Boolean> cir
     ) {
-        Deque<BlockState> stack = BEFORE_STATE_STACK.get();
-        BlockState from = stack.isEmpty() ? null : stack.pop();
-        if (from == null) return; // client level, out of bounds, or no recorder — sentinel consumed
+        Deque<Object> stack = BEFORE_STATE_STACK.get();
+        Object fromObj = stack.isEmpty() ? SKIP_SENTINEL : stack.pop();
+        if (fromObj == SKIP_SENTINEL) return; // client level, out of bounds, or no recorder
         if (!cir.getReturnValue()) return; // block did not actually change
         StateRecorder recorder = StateRecorder.getActive();
         if (recorder == null) return; // recorder deactivated between HEAD and RETURN (edge case)
-        recorder.record(pos, from, newState);
+        recorder.record(pos, (BlockState) fromObj, newState);
     }
 }
