@@ -26,6 +26,7 @@ class IntEditBox(
 ) : EditBox(font, width, height, Component.empty()) {
 
     private var wasHovered = false
+    private var pendingHoverEnd = false
 
     init {
         setValue(formatIntValue(initial, min))
@@ -48,10 +49,23 @@ class IntEditBox(
         return true
     }
 
+    fun processDeferredCallback() {
+        if (pendingHoverEnd) {
+            pendingHoverEnd = false
+            onHoverEnd()
+        }
+    }
+
     override fun extractWidgetRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+        if (!active || !visible) {
+            wasHovered = false
+            super.extractWidgetRenderState(graphics, mouseX, mouseY, partialTick)
+            return
+        }
+
         super.extractWidgetRenderState(graphics, mouseX, mouseY, partialTick)
         val hovered = isMouseOver(mouseX.toDouble(), mouseY.toDouble())
-        if (wasHovered && !hovered) onHoverEnd()
+        if (wasHovered && !hovered) pendingHoverEnd = true
         wasHovered = hovered
     }
 }
