@@ -46,12 +46,18 @@ class StateRecordingStorageTest {
                 )
             ),
         )
-        val file = dir.resolve("$specId.dat").toFile()
+        val file = StateRecordingStorage.fileFor(dir, specId)
+        file.parentFile?.mkdirs()
         NbtIo.write(recording.toNbt(), file.toPath())
-        val loaded = stateRecordingFromNbt(NbtIo.read(file.toPath()) ?: error("NBT file was empty or missing"))
+        val loaded = stateRecordingFromNbt(NbtIo.read(file.toPath()) ?: error("NbtIo.read returned null"))
         assertEquals(recording.specId, loaded.specId)
         assertEquals(recording.timestamp, loaded.timestamp)
         assertEquals(recording.changes, loaded.changes)
         assertEquals(powered, StateRecordingView.of(loaded).stateAt(pos, SimTime(0, Phase.END_OF_TICK)))
+        assertEquals(recording.initialSnapshot.keys, loaded.initialSnapshot.keys)
+        recording.initialSnapshot.forEach { (pos, state) ->
+            assertEquals(state.toString(), loaded.initialSnapshot[pos]?.toString(),
+                "initialSnapshot mismatch at $pos")
+        }
     }
 }
