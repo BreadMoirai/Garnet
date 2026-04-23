@@ -23,7 +23,8 @@ class StateRecorder(
     lateinit var initialSnapshot: Map<BlockPos, BlockState>
         private set
 
-    val changes: MutableList<BlockStateChange> = mutableListOf()
+    private val _changes: MutableList<BlockStateChange> = mutableListOf()
+    val changes: List<BlockStateChange> get() = _changes
 
     fun start(level: ServerLevel, originPos: BlockPos, bounds: BoundingBox) {
         initialSnapshot = buildMap {
@@ -61,8 +62,9 @@ class StateRecorder(
 
     fun record(worldPos: BlockPos, from: BlockState, to: BlockState) {
         val localPos = worldToLocal(worldPos)
-        val toBlock: Identifier? = if (from.block != to.block)
-            BuiltInRegistries.BLOCK.getKey(to.block) else null
+        val toBlock: Identifier? = if (from.block != to.block) {
+            BuiltInRegistries.BLOCK.getKey(to.block) ?: return  // unregistered block — skip silently
+        } else null
         val fromProps = captureBlockStateProps(from)
         val toProps = captureBlockStateProps(to)
         val diffs = toProps.mapNotNull { (name, value) ->
@@ -70,11 +72,11 @@ class StateRecorder(
         }
         if (diffs.isEmpty() && toBlock == null) return
         val simTime = SimTime(currentTick.coerceAtLeast(0), currentPhase, tickOrder++)
-        changes += BlockStateChange(localPos, simTime, toBlock, diffs)
+        _changes += BlockStateChange(localPos, simTime, toBlock, diffs)
     }
 
     fun toRecording(): StateRecording =
-        StateRecording(specId, System.currentTimeMillis(), initialSnapshot, changes.toList())
+        StateRecording(specId, System.currentTimeMillis(), initialSnapshot, _changes.toList())
 
     companion object {
         @JvmStatic
@@ -91,6 +93,7 @@ class StateRecorder(
             active = null
         }
 
+        @JvmStatic
         fun forSpec(specId: UUID, originPos: BlockPos, bounds: BoundingBox): StateRecorder {
             val minX = originPos.x + bounds.minX()
             val minY = originPos.y + bounds.minY()
