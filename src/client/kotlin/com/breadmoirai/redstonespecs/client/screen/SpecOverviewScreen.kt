@@ -136,6 +136,7 @@ class SpecOverviewScreen(
                 is AutoSpec -> "AUTO"
             }
             val label = Component.literal("► $tag  ${entry.label.ifEmpty { "—" }}  (${entry.pos.x},${entry.pos.y},${entry.pos.z})")
+                .withStyle { it.withColor(entry.color) }
             entryListContent.addChild(LowProfileButtonWidget(0, 0, 240, 18, label) {
                 minecraft.setScreen(SpecEditorScreen(originPos, entry.pos))
             })
