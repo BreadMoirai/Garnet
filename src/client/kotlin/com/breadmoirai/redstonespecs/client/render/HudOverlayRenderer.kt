@@ -17,7 +17,6 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
-import net.minecraft.core.BlockPos
 import net.minecraft.resources.Identifier
 import net.minecraft.world.item.BlockItem
 import net.minecraft.world.phys.BlockHitResult
@@ -93,9 +92,9 @@ fun registerHudOverlay() {
             (player.offhandItem.item as? BlockItem)?.block == ModRegistries.REDSTONE_SPEC_BLOCK
         )
 
-        if (holdingRedstoneSpec && player != null) {
+        if (holdingRedstoneSpec) {
             val eyePos = player.getEyePosition(1.0f)
-            val lookVec = player.getLookAngle()
+            val lookVec = player.lookAngle
             val maxReach = 64.0
 
             var bestT = Double.MAX_VALUE

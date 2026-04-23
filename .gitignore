@@ -29,3 +29,4 @@ versions/**/logs/
 
 # Git worktrees
 .worktrees/
+/net/

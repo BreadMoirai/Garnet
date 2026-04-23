@@ -151,5 +151,5 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
     override fun isPauseScreen(): Boolean = false
 
     private fun getBounds() =
-        (minecraft?.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity)?.spec?.bounds
+        (minecraft.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity)?.spec?.bounds
 }

@@ -6,25 +6,23 @@ import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
-import com.breadmoirai.redstonespecs.data.InputSpec
-import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
-import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer
 import net.minecraft.client.renderer.rendertype.RenderTypes
 import net.minecraft.client.renderer.state.level.CameraRenderState
-import net.minecraft.core.BlockPos
 import net.minecraft.world.level.levelgen.structure.BoundingBox
+import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 
 fun registerBoundsRenderer() {
-    BlockEntityRendererRegistry.register(
+    BlockEntityRenderers.register(
         ModRegistries.REDSTONE_SPEC_BLOCK_ENTITY_TYPE,
         ::RedstoneSpecBlockEntityRenderer,
     )
@@ -45,8 +43,8 @@ class RedstoneSpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) 
         entity: RedstoneSpecBlockEntity,
         state: RedstoneSpecRenderState,
         partialTick: Float,
-        cameraPos: net.minecraft.world.phys.Vec3,
-        crumbling: net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay?,
+        cameraPos: Vec3,
+        crumbling: ModelFeatureRenderer.CrumblingOverlay?,
     ) {
         super.extractRenderState(entity, state, partialTick, cameraPos, crumbling)
         state.bounds = entity.spec?.bounds
