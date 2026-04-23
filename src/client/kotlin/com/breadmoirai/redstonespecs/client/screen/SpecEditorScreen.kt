@@ -134,7 +134,7 @@ class SpecEditorScreen(
 
             val tableContent = LinearLayout.vertical().spacing(1)
             rows.forEachIndexed { i, row ->
-                tableContent.addChild(buildTableRow(i, row, blockState, availableProps, advancedPhases))
+                tableContent.addChild(buildTableRow(i, row, rows, blockState, availableProps, advancedPhases))
             }
 
             tableContent.addChild(
@@ -186,6 +186,7 @@ class SpecEditorScreen(
     private fun buildTableRow(
         index: Int,
         row: FlatRow,
+        rows: MutableList<FlatRow>,
         blockState: BlockState?,
         availableProps: List<String>,
         advancedPhases: List<Phase>,
@@ -234,11 +235,11 @@ class SpecEditorScreen(
         }
         rowLayout.addChild(propDropdown)
 
-        rowLayout.addChild(buildValueWidget(index, row))
+        rowLayout.addChild(buildValueWidget(row))
 
         rowLayout.addChild(
             LowProfileButtonWidget(0, 0, 20, 16, Component.literal("×")) {
-                workingRows!!.removeAt(index)
+                rows.removeAt(index)
                 rebuildWidgets()
             }
         )
@@ -246,7 +247,7 @@ class SpecEditorScreen(
         return rowLayout
     }
 
-    private fun buildValueWidget(index: Int, row: FlatRow): LayoutElement = when (val prop = row.prop) {
+    private fun buildValueWidget(row: FlatRow): LayoutElement = when (val prop = row.prop) {
         is RowProp.Block -> StringWidget(110, 16, Component.literal(prop.blockId.path), font)
 
         is RowProp.Bool -> CycleButton.builder<Boolean>(
