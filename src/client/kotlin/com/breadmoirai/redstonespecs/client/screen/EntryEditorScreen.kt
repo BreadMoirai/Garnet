@@ -115,7 +115,7 @@ class EntryEditorScreen(
             val tickRow = LinearLayout.horizontal().spacing(4)
             tickRow.addChild(StringWidget(40, 20, Component.literal("Tick:"), font))
 
-            val box = IntEditBox(font, 70, 20, -1, Int.MAX_VALUE, currentTick) {}
+            val box = IntEditBox(font, 70, 20, -1, Int.MAX_VALUE, currentTick, onChange = {})
             tickBox = box
             tickRow.addChild(box)
 

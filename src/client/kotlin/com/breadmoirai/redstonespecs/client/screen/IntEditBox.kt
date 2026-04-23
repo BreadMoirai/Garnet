@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.client.screen
 
 import net.minecraft.client.gui.Font
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.network.chat.Component
 import kotlin.math.sign
@@ -21,7 +22,10 @@ class IntEditBox(
     private val max: Int,
     initial: Int,
     private val onChange: (Int) -> Unit,
+    private val onHoverEnd: () -> Unit = {},
 ) : EditBox(font, width, height, Component.empty()) {
+
+    private var wasHovered = false
 
     init {
         setValue(formatIntValue(initial, min))
@@ -42,5 +46,12 @@ class IntEditBox(
         if (!isMouseOver(mouseX, mouseY)) return false
         setIntValue(getIntValue() + verticalAmount.sign.toInt())
         return true
+    }
+
+    override fun extractWidgetRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+        super.extractWidgetRenderState(graphics, mouseX, mouseY, partialTick)
+        val hovered = isMouseOver(mouseX.toDouble(), mouseY.toDouble())
+        if (wasHovered && !hovered) onHoverEnd()
+        wasHovered = hovered
     }
 }

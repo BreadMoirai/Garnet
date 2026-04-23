@@ -84,7 +84,7 @@ class SpecOverviewScreen(
         // Lifespan row
         val lifespanRow = LinearLayout.horizontal().spacing(4)
         lifespanRow.addChild(StringWidget(40, 20, Component.literal("Life:"), font))
-        val lifespanBox = IntEditBox(font, 100, 20, 1, Int.MAX_VALUE, spec?.lifespan ?: 20) {}
+        val lifespanBox = IntEditBox(font, 100, 20, 1, Int.MAX_VALUE, spec?.lifespan ?: 20, onChange = {})
         val decBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("−")) {
             lifespanBox.setIntValue(lifespanBox.getIntValue() - 1)
             sendPacket(SetLifespanC2SPayload(originPos, lifespanBox.getIntValue()))
