@@ -74,7 +74,10 @@ class EntryEditorScreen(
 
     private var tickBox: IntEditBox? = null
     private var phaseButton: CycleButton<Phase>? = null
-    private var propStates: List<PropState> = emptyList()
+    private lateinit var propStates: List<PropState>
+    private var currentTick: Int = -1
+    private var currentPhase: Phase = Phase.END_OF_TICK
+    private var initialized = false
 
     override fun isPauseScreen(): Boolean = false
     override fun isInGameUi(): Boolean = true
@@ -82,17 +85,24 @@ class EntryEditorScreen(
     override fun init() {
         super.init()
 
-        // Build prop states from current world block state
-        val worldPos = originPos.offset(entryRelPos)
-        val blockState: BlockState? = minecraft.level?.getBlockState(worldPos)
-        propStates = if (blockState != null) {
-            buildPropStates(blockState, initial?.second)
+        if (!initialized) {
+            // Build prop states from current world block state (only once)
+            val worldPos = originPos.offset(entryRelPos)
+            val blockState: BlockState? = minecraft.level?.getBlockState(worldPos)
+            propStates = if (blockState != null) {
+                buildPropStates(blockState, initial?.second)
+            } else {
+                emptyList()
+            }
+            currentTick = initial?.first?.tick ?: -1
+            currentPhase = (initial?.first?.phase ?: Phase.END_OF_TICK)
+                .takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
+            initialized = true
         } else {
-            emptyList()
+            // Preserve current tick and phase from widgets before they are destroyed by resize
+            currentTick = tickBox?.getIntValue() ?: currentTick
+            currentPhase = phaseButton?.value ?: currentPhase
         }
-
-        val initialTick = initial?.first?.tick ?: -1
-        val initialPhase = initial?.first?.phase ?: Phase.END_OF_TICK
 
         val content = LinearLayout.vertical().spacing(6)
 
@@ -105,7 +115,7 @@ class EntryEditorScreen(
             val tickRow = LinearLayout.horizontal().spacing(4)
             tickRow.addChild(StringWidget(40, 20, Component.literal("Tick:"), font))
 
-            val box = IntEditBox(font, 70, 20, -1, Int.MAX_VALUE, initialTick) {}
+            val box = IntEditBox(font, 70, 20, -1, Int.MAX_VALUE, currentTick) {}
             tickBox = box
             tickRow.addChild(box)
 
@@ -129,7 +139,7 @@ class EntryEditorScreen(
 
             val btn = CycleButton.builder<Phase>(
                 { phase -> Component.literal(phase.name) },
-                initialPhase,
+                currentPhase,
             ).withValues(*advancedPhases.toTypedArray())
                 .create(0, 0, 140, 20, Component.empty()) { _, _ -> }
             phaseButton = btn
@@ -255,7 +265,10 @@ class EntryEditorScreen(
         val phase = phaseButton?.value ?: Phase.END_OF_TICK
         val simTime = if (rawTick < 0) SimTime.INIT else SimTime(rawTick, phase)
         val conditions = propStates.mapNotNull { it.toCondition() }
-        if (conditions.isEmpty()) return
+        if (conditions.isEmpty()) {
+            minecraft.player?.sendSystemMessage(Component.literal("Select at least one condition"))
+            return
+        }
         val condition = if (conditions.size == 1) conditions[0] else StateCondition.All(conditions)
         onConfirm(simTime, condition)
         onClose()
