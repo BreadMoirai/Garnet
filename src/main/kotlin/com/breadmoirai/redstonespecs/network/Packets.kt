@@ -63,8 +63,7 @@ data class TestResultS2CPayload(
 data class BreakpointHitS2CPayload(
     val originPos: BlockPos,
     val simTime: SimTime,
-    val specName: String,
-    val caseName: String,
+    val specId: String,
     val breakpointLabel: String,
 ) : CustomPacketPayload {
     companion object {
@@ -74,8 +73,7 @@ data class BreakpointHitS2CPayload(
         val STREAM_CODEC: StreamCodec<ByteBuf, BreakpointHitS2CPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, BreakpointHitS2CPayload::originPos,
             SimTime.STREAM_CODEC, BreakpointHitS2CPayload::simTime,
-            ByteBufCodecs.STRING_UTF8, BreakpointHitS2CPayload::specName,
-            ByteBufCodecs.STRING_UTF8, BreakpointHitS2CPayload::caseName,
+            ByteBufCodecs.STRING_UTF8, BreakpointHitS2CPayload::specId,
             ByteBufCodecs.STRING_UTF8, BreakpointHitS2CPayload::breakpointLabel,
             ::BreakpointHitS2CPayload,
         )
@@ -102,14 +100,13 @@ data class AutoSpecRecordedS2CPayload(
 
 // === C2S ===
 
-data class RunSpecC2SPayload(val originPos: BlockPos, val runAll: Boolean) : CustomPacketPayload {
+data class RunSpecC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<RunSpecC2SPayload>(
             Identifier.fromNamespaceAndPath("redstonespecs", "run_spec")
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, RunSpecC2SPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, RunSpecC2SPayload::originPos,
-            ByteBufCodecs.BOOL, RunSpecC2SPayload::runAll,
             ::RunSpecC2SPayload,
         )
     }

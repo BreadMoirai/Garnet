@@ -34,12 +34,12 @@ fun registerClientNetworking() {
     ClientPlayNetworking.registerGlobalReceiver(TestResultS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {
-            val passCount = payload.result.results.count { r -> r.checks.all { it.pass } }
-            val total = payload.result.results.size
+            val passCount = payload.result.passCount
+            val total = payload.result.checks.size
             LOGGER.debug("[ClientNetworkHandler#testResult] originPos={} {}/{} passed", payload.originPos, passCount, total)
-            val color = if (passCount == total) "§a" else "§c"
+            val color = if (payload.result.pass) "§a" else "§c"
             mc.player?.sendSystemMessage(
-                Component.literal("${color}Spec run complete: $passCount/$total cases passed")
+                Component.literal("${color}Spec run complete: $passCount/$total checks passed")
             )
             // If the overview screen is open for this origin, reopen to refresh
             val current = mc.screen
@@ -52,9 +52,9 @@ fun registerClientNetworking() {
     ClientPlayNetworking.registerGlobalReceiver(BreakpointHitS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#breakpointHit] '{}' in '{}' at {}t {}", payload.breakpointLabel, payload.caseName, payload.simTime.tick, payload.simTime.phase.name)
+            LOGGER.debug("[ClientNetworkHandler#breakpointHit] '{}' in spec '{}' at {}t {}", payload.breakpointLabel, payload.specId, payload.simTime.tick, payload.simTime.phase.name)
             mc.player?.sendSystemMessage(
-                Component.literal("§6Breakpoint hit: §f${payload.breakpointLabel} §7in §f${payload.caseName} §7at ${payload.simTime.tick}t ${payload.simTime.phase.name}")
+                Component.literal("§6Breakpoint hit: §f${payload.breakpointLabel} §7in spec §f${payload.specId} §7at ${payload.simTime.tick}t ${payload.simTime.phase.name}")
             )
         }
     }
