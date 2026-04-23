@@ -18,7 +18,7 @@ A foundational system that records all block state changes within a spec's bound
 data class PropertyDiff(val name: String, val to: String)
 
 data class BlockStateChange(
-    val pos: BlockPos,
+    val pos: BlockPos,               // relative to spec origin
     val simTime: SimTime,
     val toBlock: ResourceLocation?,  // null if block type unchanged
     val diffs: List<PropertyDiff>,   // only changed properties
@@ -27,7 +27,7 @@ data class BlockStateChange(
 data class StateRecording(
     val specId: UUID,
     val timestamp: Long,
-    val initialSnapshot: Map<BlockPos, BlockState>,  // all blocks in bounds before run
+    val initialSnapshot: Map<BlockPos, BlockState>,  // keyed by pos relative to spec origin
     val changes: List<BlockStateChange>,             // ordered by simTime naturally
 )
 ```
@@ -51,7 +51,7 @@ class StateRecordingView(val recording: StateRecording) {
 }
 ```
 
-`stateAt` returns the `to` state of the last `BlockStateChange` at `pos` where `change.simTime <= simTime`, falling back to `initialSnapshot` if no changes precede that time.
+All positions are relative to the spec origin. `stateAt` returns the `to` state of the last `BlockStateChange` at `pos` where `change.simTime <= simTime`, falling back to `initialSnapshot` if no changes precede that time.
 
 ---
 
@@ -124,10 +124,10 @@ object StateRecordingStorage {
 {
   "specId": <uuid string>,
   "timestamp": <long>,
-  "initialSnapshot": [ { "pos": [x,y,z], "state": <blockstate string> }, ... ],
+  "initialSnapshot": [ { "pos": [x,y,z], "state": <blockstate string> }, ... ],  // pos relative to spec origin
   "changes": [
     {
-      "pos": [x, y, z],
+      "pos": [x, y, z],              // relative to spec origin
       "tick": <int>,
       "phase": <string>,
       "order": <int>,
