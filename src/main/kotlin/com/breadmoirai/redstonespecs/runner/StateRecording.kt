@@ -5,6 +5,8 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.resources.Identifier
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.world.level.block.state.properties.Property
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import java.util.UUID
@@ -73,7 +75,7 @@ fun stateRecordingFromNbt(tag: CompoundTag): StateRecording {
             val entry = snapshotList.getCompoundOrEmpty(i)
             val arr = entry.getIntArray("pos").orElse(intArrayOf(0, 0, 0))
             val pos = BlockPos(arr[0], arr[1], arr[2])
-            put(pos, blockStateFromString(entry.getStringOr("state", "")))
+            put(pos, blockStateFromString(entry.getStringOr("state", "minecraft:air")))
         }
     }
 
@@ -103,7 +105,8 @@ fun stateRecordingFromNbt(tag: CompoundTag): StateRecording {
 }
 
 private fun blockStateToString(state: BlockState): String {
-    val block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.block).toString()
+    val block = BuiltInRegistries.BLOCK.getKey(state.block)?.toString()
+        ?: return "minecraft:air"
     if (state.block.stateDefinition.properties.isEmpty()) return block
     val props = captureBlockStateProps(state).entries.joinToString(",") { "${it.key}=${it.value}" }
     return "$block[$props]"
@@ -112,22 +115,22 @@ private fun blockStateToString(state: BlockState): String {
 private fun blockStateFromString(str: String): BlockState {
     val bracketIdx = str.indexOf('[')
     val blockId = if (bracketIdx == -1) str else str.substring(0, bracketIdx)
-    val block = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+    val block = BuiltInRegistries.BLOCK
         .getValue(Identifier.parse(blockId))
     if (bracketIdx == -1) return block.defaultBlockState()
     val propsStr = str.substring(bracketIdx + 1, str.length - 1)
     var state = block.defaultBlockState()
     for (part in propsStr.split(",")) {
-        val (name, value) = part.split("=")
+        val (name, value) = part.split("=", limit = 2)
         val property = state.block.stateDefinition.getProperty(name) ?: continue
         @Suppress("UNCHECKED_CAST")
-        state = applyPropertyFromString(state, property as net.minecraft.world.level.block.state.properties.Property<Comparable<Any>>, value)
+        state = applyPropertyFromString(state, property as Property<Comparable<Any>>, value)
     }
     return state
 }
 
 private fun <T : Comparable<T>> applyPropertyFromString(
     state: BlockState,
-    property: net.minecraft.world.level.block.state.properties.Property<T>,
+    property: Property<T>,
     value: String,
 ): BlockState = property.getValue(value).map { state.setValue(property, it) }.orElse(state)
