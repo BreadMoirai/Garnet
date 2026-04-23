@@ -32,6 +32,8 @@ class AutoSpecRecorder(
     }
 
     fun commit(view: StateRecordingView?, boundsWorldMin: BlockPos?): SpecCase {
+        val caseName = autoSpec.label.ifEmpty { "auto_${ticksElapsed + 1}t_${System.currentTimeMillis() % 10000}" }
+        if (view == null) LOGGER.warn("[AutoSpecRecorder#commit] no recording view available for '{}', entries will be empty", caseName)
         val standardMode = SharedSettings.devLevel == DevLevel.STANDARD
 
         fun buildEntries(worldPos: BlockPos, isInput: Boolean): List<Pair<SimTime, StateCondition>> {
@@ -56,7 +58,6 @@ class AutoSpecRecorder(
             return result
         }
 
-        val caseName = autoSpec.label.ifEmpty { "auto_${ticksElapsed + 1}t_${System.currentTimeMillis() % 10000}" }
         LOGGER.debug("[AutoSpecRecorder#commit] committing '{}' duration={}t", caseName, ticksElapsed + 1)
         return SpecCase(
             name = caseName,

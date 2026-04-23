@@ -12,10 +12,6 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
-import com.breadmoirai.redstonespecs.runner.StateRecorder
-import com.breadmoirai.redstonespecs.runner.StateRecordingStorage
-import com.breadmoirai.redstonespecs.runner.StateRecordingView
-
 object SpecRunnerCoordinator {
     private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
@@ -133,7 +129,7 @@ object SpecRunnerCoordinator {
 
     private fun finishRun(be: SpecOriginBlockEntity) {
         val recorder = stateRecorders.remove(be)
-        StateRecorder.deactivate()
+        if (recorder != null) StateRecorder.deactivate()
         val level = be.level as? ServerLevel ?: return
         if (recorder != null) {
             StateRecordingStorage.save(level, recorder.toRecording())
@@ -167,14 +163,18 @@ object SpecRunnerCoordinator {
 
                     when {
                         existing == null && isActive -> {
-                            LOGGER.debug("[SpecRunnerCoordinator#monitorAutoSpecs] autoSpec '{}' activated at {}", autoSpec.label, autoSpec.pos)
-                            val stateRecorder = StateRecorder.forSpec(spec.id, be.blockPos, spec.bounds)
-                            stateRecorder.start(level, be.blockPos, spec.bounds)
-                            stateRecorders[be] = stateRecorder
-                            StateRecorder.activate(stateRecorder)
-                            val recorder = AutoSpecRecorder(autoSpec, be.blockPos, level, specCase)
-                            recorder.start()
-                            autoSpecRecorders[key] = recorder
+                            if (stateRecorders.containsKey(be)) {
+                                LOGGER.warn("[SpecRunnerCoordinator#monitorAutoSpecs] skipping autoSpec '{}': another recording is already active for this spec block", autoSpec.label)
+                            } else {
+                                LOGGER.debug("[SpecRunnerCoordinator#monitorAutoSpecs] autoSpec '{}' activated at {}", autoSpec.label, autoSpec.pos)
+                                val stateRecorder = StateRecorder.forSpec(spec.id, be.blockPos, spec.bounds)
+                                stateRecorder.start(level, be.blockPos, spec.bounds)
+                                stateRecorders[be] = stateRecorder
+                                StateRecorder.activate(stateRecorder)
+                                val recorder = AutoSpecRecorder(autoSpec, be.blockPos, level, specCase)
+                                recorder.start()
+                                autoSpecRecorders[key] = recorder
+                            }
                         }
                         existing != null && isActive -> existing.onPhase(phase)
                         existing != null && !isActive -> {
@@ -182,12 +182,11 @@ object SpecRunnerCoordinator {
                             val stateRecorder = stateRecorders.remove(be)
                             StateRecorder.deactivate()
                             val view = stateRecorder?.let { StateRecordingView.of(it) }
-                            val spec = be.spec
-                            val boundsWorldMin = spec?.bounds?.let { bounds ->
+                            val boundsWorldMin = spec.bounds.let { bounds ->
                                 BlockPos(be.blockPos.x + bounds.minX(), be.blockPos.y + bounds.minY(), be.blockPos.z + bounds.minZ())
                             }
                             val newCase = existing.commit(view, boundsWorldMin)
-                            if (stateRecorder != null && spec != null) {
+                            if (stateRecorder != null) {
                                 StateRecordingStorage.save(level, stateRecorder.toRecording())
                             }
                             LOGGER.debug("[SpecRunnerCoordinator#monitorAutoSpecs] autoSpec '{}' committed as case '{}'", autoSpec.label, newCase.name)
