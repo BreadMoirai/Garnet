@@ -8,237 +8,254 @@ import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
+import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.network.RemoveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
 import com.breadmoirai.redstonespecs.runner.propsToCondition
-import dev.isxander.yacl3.api.ButtonOption
-import dev.isxander.yacl3.api.ConfigCategory
-import dev.isxander.yacl3.api.Option
-import dev.isxander.yacl3.api.OptionGroup
-import dev.isxander.yacl3.api.YetAnotherConfigLib
-import dev.isxander.yacl3.api.controller.ColorControllerBuilder
-import dev.isxander.yacl3.api.controller.StringControllerBuilder
+import dev.isxander.yacl3.gui.LowProfileButtonWidget
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.components.EditBox
+import net.minecraft.client.gui.components.ScrollableLayout
+import net.minecraft.client.gui.components.StringWidget
+import net.minecraft.client.gui.layouts.FrameLayout
+import net.minecraft.client.gui.layouts.LinearLayout
+import net.minecraft.client.gui.layouts.SpacerElement
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.core.BlockPos
+import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component
-import java.awt.Color
-
-// ── Mutable state bridge — persists across YACL screen rebuilds ───────────
-
-class SpecEditorState(
-    val originPos: BlockPos,
-    val entryRelPos: BlockPos,
-    val originalEntry: SpecEntry,
-) {
-    var workingLabel: String = originalEntry.label
-    var workingColor: Int = originalEntry.color
-    val workingEntries: MutableList<Pair<SimTime, StateCondition>>? = when (originalEntry) {
-        is InputSpec -> originalEntry.entries.toMutableList()
-        is OutputSpec -> originalEntry.entries.toMutableList()
-        else -> null
-    }
-}
-
-// ── Public loading screen — opened by ClientNetworkHandler ────────────────
 
 class SpecEditorScreen(
     private val originPos: BlockPos,
     private val entryRelPos: BlockPos,
 ) : Screen(Component.translatable("screen.redstonespecs.spec_editor")) {
 
+    // ── Working state ─────────────────────────────────────────────────────
+
     private var launched = false
+    private var workingLabel: String = ""
+    private var workingColor: Int = 0xFFFFFF
+    private var workingEntries: MutableList<Pair<SimTime, StateCondition>>? = null
+    private var originalEntry: SpecEntry? = null
+    private var specMode: SpecMode = SpecMode.SIMPLE
+
+    // ── Screen lifecycle ──────────────────────────────────────────────────
+
+    override fun isPauseScreen() = false
+    override fun isInGameUi() = true
 
     override fun init() {
         super.init()
-        tryLaunch()
+        if (!launched) return
+        buildLayout()
     }
 
     override fun tick() {
         super.tick()
-        tryLaunch()
-    }
-
-    private fun tryLaunch() {
         if (launched) return
         val be = minecraft?.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity ?: return
         val entry = be.spec?.entryAt(entryRelPos) ?: return
+        originalEntry = entry
+        workingLabel = entry.label
+        workingColor = entry.color
+        workingEntries = when (entry) {
+            is InputSpec -> entry.entries.toMutableList()
+            is OutputSpec -> entry.entries.toMutableList()
+            else -> null
+        }
+        specMode = be.spec?.mode ?: SpecMode.SIMPLE
         launched = true
-        val state = SpecEditorState(originPos, entryRelPos, entry)
-        minecraft?.setScreen(buildSpecEditorYacl(state))
+        rebuildWidgets()
     }
 
-    override fun isPauseScreen() = false
-    override fun isInGameUi() = true
-}
+    // ── Layout builder ────────────────────────────────────────────────────
 
-// ── Lazy loader — rebuilds YACL spec editor from updated state ───────────
+    private fun buildLayout() {
+        val entry = originalEntry ?: return
+        val typeLabel = when (entry) {
+            is InputSpec -> "Input"
+            is OutputSpec -> "Output"
+            is BreakpointSpec -> "Breakpoint"
+            is AutoSpec -> "AutoSpec"
+        }
 
-internal class SpecEditorLazy(val state: SpecEditorState) : Screen(Component.empty()) {
-    override fun init() {
-        super.init()
-        minecraft?.setScreen(buildSpecEditorYacl(state))
-    }
-    override fun isPauseScreen() = false
-    override fun isInGameUi() = true
-}
+        val content = LinearLayout.vertical().spacing(4)
 
-// ── YACL screen builder ───────────────────────────────────────────────────
-
-fun buildSpecEditorYacl(state: SpecEditorState): Screen {
-    val entry = state.originalEntry
-    val typeLabel = when (entry) {
-        is InputSpec -> "Input"
-        is OutputSpec -> "Output"
-        is BreakpointSpec -> "Breakpoint"
-        is AutoSpec -> "AutoSpec"
-    }
-    val mc = Minecraft.getInstance()
-
-    return YetAnotherConfigLib.createBuilder()
-        .title(Component.literal("$typeLabel @ ${state.entryRelPos}"))
-        .category(
-            ConfigCategory.createBuilder()
-                .name(Component.literal("Settings"))
-                .option(
-                    Option.createBuilder<String>()
-                        .name(Component.literal("Label"))
-                        .binding("", { state.workingLabel }, { state.workingLabel = it })
-                        .controller(StringControllerBuilder::create)
-                        .build()
-                )
-                .option(
-                    Option.createBuilder<Color>()
-                        .name(Component.literal("Color"))
-                        .binding(Color(entry.color), { Color(state.workingColor) }, { state.workingColor = it.rgb and 0xFFFFFF })
-                        .controller(ColorControllerBuilder::create)
-                        .build()
-                )
-                .option(
-                    ButtonOption.createBuilder()
-                        .name(Component.literal("Remove Spec"))
-                        .action { _, _ ->
-                            ClientPlayNetworking.send(
-                                RemoveSpecEntryC2SPayload(state.originPos, state.entryRelPos)
-                            )
-                            mc.setScreen(null)
-                        }
-                        .build()
-                )
-                .build()
+        // Title
+        content.addChild(
+            StringWidget(Component.literal("$typeLabel @ $entryRelPos"), font)
         )
-        .apply {
-            val entries = state.workingEntries
-            if (entries != null) {
-                category(
-                    ConfigCategory.createBuilder()
-                        .name(Component.literal("Entries"))
-                        .option(
-                            ButtonOption.createBuilder()
-                                .name(Component.literal("+ Add Entry"))
-                                .action { _, _ ->
-                                    mc.setScreen(
-                                        buildEntryEditorYacl(
-                                            originPos = state.originPos,
-                                            entryRelPos = state.entryRelPos,
-                                            initial = null,
-                                            onConfirm = { simTime, condition -> entries.add(simTime to condition) },
-                                            parent = SpecEditorLazy(state),
-                                        )
-                                    )
-                                }
-                                .build()
-                        )
-                        .option(buildCaptureStateButton(state, entries, mc))
-                        .apply {
-                            entries.forEachIndexed { i, (simTime, condition) ->
-                                group(
-                                    OptionGroup.createBuilder()
-                                        .name(Component.literal(previewEntry(simTime, condition)))
-                                        .option(
-                                            ButtonOption.createBuilder()
-                                                .name(Component.literal("✎ Edit"))
-                                                .action { _, _ ->
-                                                    mc.setScreen(
-                                                        buildEntryEditorYacl(
-                                                            originPos = state.originPos,
-                                                            entryRelPos = state.entryRelPos,
-                                                            initial = simTime to condition,
-                                                            onConfirm = { st, cond -> entries[i] = st to cond },
-                                                            parent = SpecEditorLazy(state),
-                                                        )
-                                                    )
-                                                }
-                                                .build()
-                                        )
-                                        .option(
-                                            ButtonOption.createBuilder()
-                                                .name(Component.literal("✕ Remove"))
-                                                .action { _, _ ->
-                                                    entries.removeAt(i)
-                                                    mc.setScreen(buildSpecEditorYacl(state))
-                                                }
-                                                .build()
-                                        )
-                                        .build()
-                                )
-                            }
-                        }
-                        .build()
-                )
+
+        content.addChild(SpacerElement(0, 4))
+
+        // Label row
+        val labelRow = LinearLayout.horizontal().spacing(4)
+        labelRow.addChild(StringWidget(50, 20, Component.literal("Label:"), font))
+        val labelBox = EditBox(font, 180, 20, Component.empty())
+        labelBox.value = workingLabel
+        labelBox.setResponder { workingLabel = it }
+        labelRow.addChild(labelBox)
+        content.addChild(labelRow)
+
+        // Color row
+        val colorRow = LinearLayout.horizontal().spacing(4)
+        colorRow.addChild(StringWidget(50, 20, Component.literal("Color:"), font))
+        val colorBox = EditBox(font, 80, 20, Component.empty())
+        colorBox.value = "%06X".format(workingColor)
+        colorBox.setMaxLength(6)
+        val swatch = ColorSwatchWidget(0, 0, workingColor)
+        colorBox.setResponder { hex ->
+            val parsed = hex.toLongOrNull(16)
+            if (parsed != null && hex.length <= 6) {
+                workingColor = parsed.toInt() and 0xFFFFFF
+                swatch.setColor(workingColor)
             }
         }
-        .save {
-            val updated = buildUpdatedEntry(state)
-            ClientPlayNetworking.send(SaveSpecEntryC2SPayload(state.originPos, updated))
-        }
-        .build()
-        .generateScreen(null)
-}
+        colorRow.addChild(colorBox)
+        colorRow.addChild(swatch)
+        content.addChild(colorRow)
 
-private fun buildCaptureStateButton(
-    state: SpecEditorState,
-    entries: MutableList<Pair<SimTime, StateCondition>>,
-    mc: Minecraft,
-): ButtonOption = ButtonOption.createBuilder()
-    .name(Component.literal("Capture State"))
-    .action { _, _ ->
-        val level = mc.level ?: return@action
-        val worldPos = state.originPos.offset(state.entryRelPos)
+        content.addChild(SpacerElement(0, 4))
+
+        // Entries section (only for InputSpec / OutputSpec)
+        val entries = workingEntries
+        if (entries != null) {
+            content.addChild(StringWidget(Component.literal("Entries:"), font))
+
+            // Per-entry rows inside a scrollable list
+            val entryListContent = LinearLayout.vertical().spacing(2)
+            entries.forEachIndexed { i, (simTime, condition) ->
+                val row = LinearLayout.horizontal().spacing(4)
+                row.addChild(
+                    StringWidget(180, 18, Component.literal(previewEntry(simTime, condition)), font)
+                )
+                row.addChild(LowProfileButtonWidget(0, 0, 40, 18, Component.literal("Edit")) {
+                    openEntryEditor(i, simTime to condition)
+                })
+                row.addChild(LowProfileButtonWidget(0, 0, 50, 18, Component.literal("Remove")) {
+                    entries.removeAt(i)
+                    rebuildWidgets()
+                })
+                entryListContent.addChild(row)
+            }
+            if (entries.isEmpty()) {
+                entryListContent.addChild(
+                    StringWidget(280, 18, Component.literal("(no entries)"), font)
+                )
+            }
+
+            content.addChild(ScrollableLayout(minecraft, entryListContent, 120))
+
+            // Add Entry button
+            content.addChild(
+                LowProfileButtonWidget(0, 0, 120, 20, Component.literal("+ Add Entry")) {
+                    openEntryEditor(null, null)
+                }
+            )
+
+            // Capture State button
+            content.addChild(
+                LowProfileButtonWidget(0, 0, 120, 20, Component.literal("Capture State")) {
+                    captureState(entries)
+                }
+            )
+
+            content.addChild(SpacerElement(0, 4))
+        }
+
+        // Remove Spec button
+        content.addChild(
+            LowProfileButtonWidget(0, 0, 120, 20, Component.literal("Remove Spec")) {
+                ClientPlayNetworking.send(RemoveSpecEntryC2SPayload(originPos, entryRelPos))
+                minecraft?.setScreen(null)
+            }
+        )
+
+        content.addChild(SpacerElement(0, 4))
+
+        // Bottom: Save + Cancel
+        val bottomRow = LinearLayout.horizontal().spacing(4)
+        bottomRow.addChild(
+            LowProfileButtonWidget(0, 0, 80, 20, Component.literal("Save")) {
+                saveAndClose()
+            }
+        )
+        bottomRow.addChild(
+            LowProfileButtonWidget(0, 0, 80, 20, CommonComponents.GUI_CANCEL) {
+                onClose()
+            }
+        )
+        content.addChild(bottomRow)
+
+        FrameLayout.centerInRectangle(content, 0, 0, width, height)
+        content.arrangeElements()
+        content.visitWidgets { addRenderableWidget(it) }
+    }
+
+    // ── Actions ───────────────────────────────────────────────────────────
+
+    private fun openEntryEditor(index: Int?, initial: Pair<SimTime, StateCondition>?) {
+        val entries = workingEntries ?: return
+        val onConfirm: (SimTime, StateCondition) -> Unit = { simTime, condition ->
+            if (index == null) {
+                entries.add(simTime to condition)
+            } else {
+                entries[index] = simTime to condition
+            }
+            minecraft?.setScreen(this)
+        }
+        minecraft?.setScreen(
+            EntryEditorScreen(
+                originPos = originPos,
+                entryRelPos = entryRelPos,
+                specMode = specMode,
+                initial = initial,
+                onConfirm = onConfirm,
+            )
+        )
+    }
+
+    private fun captureState(entries: MutableList<Pair<SimTime, StateCondition>>) {
+        val level = minecraft?.level ?: return
+        val worldPos = originPos.offset(entryRelPos)
         val blockState = level.getBlockState(worldPos)
         val currentProps = captureBlockStateProps(blockState)
 
         if (entries.isEmpty()) {
             entries.add(0, SimTime.INIT to propsToCondition(currentProps, blockState))
-            mc.setScreen(buildSpecEditorYacl(state))
-            return@action
+            rebuildWidgets()
+            return
         }
 
-        val lastEntry = entries.maxByOrNull { it.first } ?: return@action
+        val lastEntry = entries.maxByOrNull { it.first } ?: return
         val lastKnown = flattenConditionToMap(lastEntry.second)
         val diff = currentProps.filter { (k, v) -> lastKnown[k] != v }
-        if (diff.isEmpty()) return@action
+        if (diff.isEmpty()) return
 
         val newTick = if (lastEntry.first == SimTime.INIT) 0 else lastEntry.first.tick + 1
         entries.add(SimTime(newTick, Phase.END_OF_TICK) to propsToCondition(diff, blockState))
-        mc.setScreen(buildSpecEditorYacl(state))
+        rebuildWidgets()
     }
-    .build()
 
-private fun buildUpdatedEntry(state: SpecEditorState): SpecEntry {
-    val label = state.workingLabel
-    val color = state.workingColor
-    val entries = state.workingEntries?.toList()
-    return when (val e = state.originalEntry) {
-        is InputSpec -> e.copy(label = label, color = color, entries = entries ?: e.entries)
-        is OutputSpec -> e.copy(label = label, color = color, entries = entries ?: e.entries)
-        is BreakpointSpec -> e.copy(label = label, color = color)
-        is AutoSpec -> e.copy(label = label, color = color)
+    private fun saveAndClose() {
+        val entry = originalEntry ?: return
+        val label = workingLabel
+        val color = workingColor
+        val entries = workingEntries?.toList()
+        val updated: SpecEntry = when (entry) {
+            is InputSpec -> entry.copy(label = label, color = color, entries = entries ?: entry.entries)
+            is OutputSpec -> entry.copy(label = label, color = color, entries = entries ?: entry.entries)
+            is BreakpointSpec -> entry.copy(label = label, color = color)
+            is AutoSpec -> entry.copy(label = label, color = color)
+        }
+        ClientPlayNetworking.send(SaveSpecEntryC2SPayload(originPos, updated))
+        onClose()
     }
 }
+
+// ── Helpers (package-level, reusable by EntryEditorScreen) ────────────────
 
 internal fun previewEntry(simTime: SimTime, condition: StateCondition): String {
     val timeStr = if (simTime == SimTime.INIT) "INIT" else "t${simTime.tick} ${simTime.phase.name.take(5)}"
