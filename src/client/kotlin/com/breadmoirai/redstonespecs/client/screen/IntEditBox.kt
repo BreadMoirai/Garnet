@@ -36,7 +36,6 @@ class IntEditBox(
     fun setIntValue(n: Int) {
         val clamped = n.coerceIn(min, max)
         setValue(formatIntValue(clamped, min))
-        onChange(clamped)
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, horizontalAmount: Double, verticalAmount: Double): Boolean {
