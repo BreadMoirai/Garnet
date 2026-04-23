@@ -2,11 +2,14 @@ package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.network.ResizeBoundsC2SPayload
+import dev.isxander.yacl3.gui.LowProfileButtonWidget
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.GuiGraphicsExtractor
-import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.CycleButton
-import net.minecraft.client.gui.components.EditBox
+import net.minecraft.client.gui.components.StringWidget
+import net.minecraft.client.gui.layouts.FrameLayout
+import net.minecraft.client.gui.layouts.LinearLayout
+import net.minecraft.client.gui.layouts.SpacerElement
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.CommonComponents
@@ -18,100 +21,213 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
 
     private enum class DisplayMode { OFFSET_SIZE, MIN_MAX }
 
-    private val panelW = 260
-    private val panelH = 114
-    private val panelX get() = (width - panelW) / 2
-    private val panelY get() = (height - panelH) / 2
-
     private var displayMode = DisplayMode.OFFSET_SIZE
 
-    // Row 1: first triple (Offset X/Y/Z or Min X/Y/Z)
-    private var box1x: EditBox? = null
-    private var box1y: EditBox? = null
-    private var box1z: EditBox? = null
+    // Stored values — updated live via onChange callbacks
+    private var v1x = 0; private var v1y = 0; private var v1z = 0
+    private var v2x = 1; private var v2y = 1; private var v2z = 1
 
-    // Row 2: second triple (Size X/Y/Z or Max X/Y/Z)
-    private var box2x: EditBox? = null
-    private var box2y: EditBox? = null
-    private var box2z: EditBox? = null
+    // IntEditBox refs for reading in save()
+    private var box1x: IntEditBox? = null; private var box1y: IntEditBox? = null; private var box1z: IntEditBox? = null
+    private var box2x: IntEditBox? = null; private var box2y: IntEditBox? = null; private var box2z: IntEditBox? = null
 
+    // Load initial values from block entity only once
+    private var valuesLoaded = false
+
+    override fun isPauseScreen(): Boolean = false
     override fun isInGameUi(): Boolean = true
 
     override fun init() {
         super.init()
-        val x = panelX
-        val y = panelY
-        val bounds = getBounds() ?: BoundingBox(-4, -1, -4, 4, 3, 4)
 
-        // Mode toggle — top-right of header
-        addRenderableWidget(
-            CycleButton.builder<DisplayMode>(
-                { mode -> Component.literal(if (mode == DisplayMode.OFFSET_SIZE) "Offset / Size" else "Corners") },
-                displayMode,
-            ).withValues(*DisplayMode.entries.toTypedArray())
-                .create(x + panelW - 90, y + 8, 86, 18, Component.empty()) { _, value ->
-                    displayMode = value
-                    rebuildWidgets()
-                }
-        )
-
-        val (v1x, v1y, v1z, v2x, v2y, v2z) = toDisplayValues(bounds)
-
-        // Row 1 at y+36: label + X, Y, Z boxes
-        box1x = addBox(x + 68, y + 36, v1x)
-        box1y = addBox(x + 130, y + 36, v1y)
-        box1z = addBox(x + 192, y + 36, v1z)
-
-        // Row 2 at y+58: label + X, Y, Z boxes
-        box2x = addBox(x + 68, y + 58, v2x)
-        box2y = addBox(x + 130, y + 58, v2y)
-        box2z = addBox(x + 192, y + 58, v2z)
-
-        addRenderableWidget(
-            Button.builder(Component.literal("Save")) { save() }
-                .bounds(x + 8, y + panelH - 26, 60, 20).build()
-        )
-        addRenderableWidget(
-            Button.builder(CommonComponents.GUI_CANCEL) { onClose() }
-                .bounds(x + panelW - 68, y + panelH - 26, 60, 20).build()
-        )
-    }
-
-    private fun addBox(bx: Int, by: Int, value: Int): EditBox =
-        EditBox(font, bx, by, 48, 18, Component.empty()).also {
-            it.value = value.toString()
-            addRenderableWidget(it)
+        if (!valuesLoaded) {
+            val bounds = getBounds() ?: BoundingBox(-4, -1, -4, 4, 3, 4)
+            loadFromBounds(bounds)
+            valuesLoaded = true
         }
 
-    private data class DisplayValues(
-        val v1x: Int, val v1y: Int, val v1z: Int,
-        val v2x: Int, val v2y: Int, val v2z: Int,
-    )
+        // Row labels depend on mode
+        val label1 = if (displayMode == DisplayMode.OFFSET_SIZE) "Offset" else "Min"
+        val label2 = if (displayMode == DisplayMode.OFFSET_SIZE) "Size" else "Max"
 
-    private fun toDisplayValues(b: BoundingBox): DisplayValues = if (displayMode == DisplayMode.OFFSET_SIZE)
-        DisplayValues(b.minX(), b.minY(), b.minZ(), b.maxX() - b.minX() + 1, b.maxY() - b.minY() + 1, b.maxZ() - b.minZ() + 1)
-    else
-        DisplayValues(b.minX(), b.minY(), b.minZ(), b.maxX(), b.maxY(), b.maxZ())
+        // Mode cycle button
+        val modeButton = CycleButton.builder<DisplayMode>(
+            { mode -> Component.literal(if (mode == DisplayMode.OFFSET_SIZE) "Offset / Size" else "Min / Max") },
+            displayMode,
+        ).withValues(*DisplayMode.entries.toTypedArray())
+            .create(0, 0, 120, 20, Component.empty()) { _, value ->
+                switchMode(value)
+            }
+
+        // Build coordinate rows
+        val row1 = buildCoordRow(label1, v1x, v1y, v1z,
+            onChange1x = { v1x = it },
+            onChange1y = { v1y = it },
+            onChange1z = { v1z = it },
+            assignBoxes = { bx, by, bz -> box1x = bx; box1y = by; box1z = bz }
+        )
+
+        val row2 = buildCoordRow(label2, v2x, v2y, v2z,
+            onChange1x = { v2x = it },
+            onChange1y = { v2y = it },
+            onChange1z = { v2z = it },
+            assignBoxes = { bx, by, bz -> box2x = bx; box2y = by; box2z = bz }
+        )
+
+        // Bottom buttons
+        val saveBtn = LowProfileButtonWidget(0, 0, 60, 20, Component.literal("Save")) { save() }
+        val cancelBtn = LowProfileButtonWidget(0, 0, 60, 20, CommonComponents.GUI_CANCEL) { onClose() }
+
+        val bottomRow = LinearLayout.horizontal().spacing(8)
+        bottomRow.addChild(saveBtn)
+        bottomRow.addChild(cancelBtn)
+
+        // Main content layout (vertical)
+        val content = LinearLayout.vertical().spacing(6)
+        content.addChild(modeButton)
+        content.addChild(SpacerElement(0, 4))
+        content.addChild(row1)
+        content.addChild(row2)
+        content.addChild(SpacerElement(0, 4))
+        content.addChild(bottomRow)
+
+        FrameLayout.centerInRectangle(content, 0, 0, width, height)
+        content.arrangeElements()
+        content.visitWidgets { addRenderableWidget(it) }
+    }
+
+    /**
+     * Build a single coordinate row: [label] [−][field][+] X  [−][field][+] Y  [−][field][+] Z
+     */
+    private fun buildCoordRow(
+        label: String,
+        initX: Int, initY: Int, initZ: Int,
+        onChange1x: (Int) -> Unit,
+        onChange1y: (Int) -> Unit,
+        onChange1z: (Int) -> Unit,
+        assignBoxes: (IntEditBox, IntEditBox, IntEditBox) -> Unit,
+    ): LinearLayout {
+        val row = LinearLayout.horizontal().spacing(4)
+
+        val labelWidget = StringWidget(60, 20, Component.literal(label), font)
+        row.addChild(labelWidget)
+
+        val bx = makeFieldGroup(initX, onChange1x)
+        val by = makeFieldGroup(initY, onChange1y)
+        val bz = makeFieldGroup(initZ, onChange1z)
+        assignBoxes(bx.second, by.second, bz.second)
+
+        // X axis group
+        val xLabel = StringWidget(10, 20, Component.literal("X"), font)
+        row.addChild(xLabel)
+        row.addChild(bx.first)
+
+        // Y axis group
+        val yLabel = StringWidget(10, 20, Component.literal("Y"), font)
+        row.addChild(yLabel)
+        row.addChild(by.first)
+
+        // Z axis group
+        val zLabel = StringWidget(10, 20, Component.literal("Z"), font)
+        row.addChild(zLabel)
+        row.addChild(bz.first)
+
+        return row
+    }
+
+    /**
+     * Returns a Pair of (container LinearLayout, IntEditBox) for a single field with − and + buttons.
+     */
+    private fun makeFieldGroup(initial: Int, onChange: (Int) -> Unit): Pair<LinearLayout, IntEditBox> {
+        val box = IntEditBox(font, 52, 20, Int.MIN_VALUE, Int.MAX_VALUE, initial, onChange)
+        val decBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("−")) {
+            box.setIntValue(box.getIntValue() - 1)
+        }
+        val incBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("+")) {
+            box.setIntValue(box.getIntValue() + 1)
+        }
+        val group = LinearLayout.horizontal().spacing(2)
+        group.addChild(decBtn)
+        group.addChild(box)
+        group.addChild(incBtn)
+        return Pair(group, box)
+    }
+
+    /**
+     * Load v1/v2 from a BoundingBox according to current displayMode.
+     * In OFFSET_SIZE mode: v1 = minXYZ, v2 = sizeXYZ (always >= 1).
+     * In MIN_MAX mode: v1 = minXYZ, v2 = maxXYZ.
+     */
+    private fun loadFromBounds(b: BoundingBox) {
+        if (displayMode == DisplayMode.OFFSET_SIZE) {
+            v1x = b.minX(); v1y = b.minY(); v1z = b.minZ()
+            v2x = b.maxX() - b.minX() + 1
+            v2y = b.maxY() - b.minY() + 1
+            v2z = b.maxZ() - b.minZ() + 1
+        } else {
+            v1x = b.minX(); v1y = b.minY(); v1z = b.minZ()
+            v2x = b.maxX(); v2y = b.maxY(); v2z = b.maxZ()
+        }
+    }
+
+    /**
+     * Switch display mode, converting current v1/v2 values through canonical min/max.
+     */
+    private fun switchMode(newMode: DisplayMode) {
+        if (newMode == displayMode) return
+
+        // Read current live values from boxes (may differ from stored v1/v2 if user is mid-edit)
+        val cur1x = box1x?.getIntValue() ?: v1x
+        val cur1y = box1y?.getIntValue() ?: v1y
+        val cur1z = box1z?.getIntValue() ?: v1z
+        val cur2x = box2x?.getIntValue() ?: v2x
+        val cur2y = box2y?.getIntValue() ?: v2y
+        val cur2z = box2z?.getIntValue() ?: v2z
+
+        // Convert current mode values to canonical min/max
+        val (minX, minY, minZ, maxX, maxY, maxZ) = when (displayMode) {
+            DisplayMode.OFFSET_SIZE -> {
+                val sx = cur2x.coerceAtLeast(1); val sy = cur2y.coerceAtLeast(1); val sz = cur2z.coerceAtLeast(1)
+                listOf(cur1x, cur1y, cur1z, cur1x + sx - 1, cur1y + sy - 1, cur1z + sz - 1)
+            }
+            DisplayMode.MIN_MAX -> listOf(
+                minOf(cur1x, cur2x), minOf(cur1y, cur2y), minOf(cur1z, cur2z),
+                maxOf(cur1x, cur2x), maxOf(cur1y, cur2y), maxOf(cur1z, cur2z),
+            )
+        }
+
+        // Convert canonical min/max to new mode
+        if (newMode == DisplayMode.OFFSET_SIZE) {
+            v1x = minX; v1y = minY; v1z = minZ
+            v2x = maxX - minX + 1; v2y = maxY - minY + 1; v2z = maxZ - minZ + 1
+        } else {
+            v1x = minX; v1y = minY; v1z = minZ
+            v2x = maxX; v2y = maxY; v2z = maxZ
+        }
+
+        displayMode = newMode
+        rebuildWidgets()
+    }
 
     private fun save() {
-        val v1x = box1x?.value?.toIntOrNull() ?: return
-        val v1y = box1y?.value?.toIntOrNull() ?: return
-        val v1z = box1z?.value?.toIntOrNull() ?: return
-        val v2x = box2x?.value?.toIntOrNull() ?: return
-        val v2y = box2y?.value?.toIntOrNull() ?: return
-        val v2z = box2z?.value?.toIntOrNull() ?: return
+        val cur1x = box1x?.getIntValue() ?: return
+        val cur1y = box1y?.getIntValue() ?: return
+        val cur1z = box1z?.getIntValue() ?: return
+        val cur2x = box2x?.getIntValue() ?: return
+        val cur2y = box2y?.getIntValue() ?: return
+        val cur2z = box2z?.getIntValue() ?: return
 
         val newBounds = if (displayMode == DisplayMode.OFFSET_SIZE) {
             BoundingBox(
-                v1x, v1y, v1z,
-                v1x + v2x.coerceAtLeast(1) - 1,
-                v1y + v2y.coerceAtLeast(1) - 1,
-                v1z + v2z.coerceAtLeast(1) - 1,
+                cur1x, cur1y, cur1z,
+                cur1x + cur2x.coerceAtLeast(1) - 1,
+                cur1y + cur2y.coerceAtLeast(1) - 1,
+                cur1z + cur2z.coerceAtLeast(1) - 1,
             )
         } else {
             BoundingBox(
-                minOf(v1x, v2x), minOf(v1y, v2y), minOf(v1z, v2z),
-                maxOf(v1x, v2x), maxOf(v1y, v2y), maxOf(v1z, v2z),
+                minOf(cur1x, cur2x), minOf(cur1y, cur2y), minOf(cur1z, cur2z),
+                maxOf(cur1x, cur2x), maxOf(cur1y, cur2y), maxOf(cur1z, cur2z),
             )
         }
 
@@ -125,30 +241,8 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         mouseY: Int,
         partialTick: Float,
     ) {
-        val x = panelX
-        val y = panelY
-
         super.extractRenderState(extractor, mouseX, mouseY, partialTick)
-
-        // Title
-        extractor.centeredText(font, title, x + panelW / 2, y + 6, 0xFFFFFFFF.toInt())
-
-        val (label1, label2) = if (displayMode == DisplayMode.OFFSET_SIZE) "Offset" to "Size" else "Min" to "Max"
-
-        // Row 1 labels
-        extractor.text(font, Component.literal(label1), x + 8, y + 41, 0xFF888888.toInt())
-        extractor.text(font, Component.literal("X"), x + 60, y + 41, 0xFFAAAAAA.toInt())
-        extractor.text(font, Component.literal("Y"), x + 122, y + 41, 0xFFAAAAAA.toInt())
-        extractor.text(font, Component.literal("Z"), x + 184, y + 41, 0xFFAAAAAA.toInt())
-
-        // Row 2 labels
-        extractor.text(font, Component.literal(label2), x + 8, y + 63, 0xFF888888.toInt())
-        extractor.text(font, Component.literal("X"), x + 60, y + 63, 0xFFAAAAAA.toInt())
-        extractor.text(font, Component.literal("Y"), x + 122, y + 63, 0xFFAAAAAA.toInt())
-        extractor.text(font, Component.literal("Z"), x + 184, y + 63, 0xFFAAAAAA.toInt())
     }
-
-    override fun isPauseScreen(): Boolean = false
 
     private fun getBounds() =
         (minecraft.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity)?.spec?.bounds
