@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.runner
 
+import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
@@ -14,7 +15,17 @@ fun evaluateCondition(condition: StateCondition, level: Level, worldPos: BlockPo
     return evaluateConditionOnState(condition, state, level, worldPos)
 }
 
-private fun evaluateConditionOnState(condition: StateCondition, state: BlockState, level: Level, worldPos: BlockPos): Boolean = when (condition) {
+fun evaluateCondition(
+    condition: StateCondition,
+    view: StateRecordingView,
+    localPos: BlockPos,
+    simTime: SimTime,
+): Boolean {
+    val state = view.stateAt(localPos, simTime)
+    return evaluateConditionOnState(condition, state, null, localPos)
+}
+
+private fun evaluateConditionOnState(condition: StateCondition, state: BlockState, level: Level?, worldPos: BlockPos): Boolean = when (condition) {
     is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state, level, worldPos) }
     is StateCondition.Any -> condition.conditions.any { evaluateConditionOnState(it, state, level, worldPos) }
     is StateCondition.Not -> !evaluateConditionOnState(condition.condition, state, level, worldPos)

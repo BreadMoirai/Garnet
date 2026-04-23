@@ -119,10 +119,18 @@ object SpecRunnerCoordinator {
         val specCase = spec.specCases.getOrNull(caseIndex) ?: run { startNextCase(be); return }
         val level = be.level as? ServerLevel ?: return
         val snapshot = snapshots[be] ?: return
+        val stateRecorder = stateRecorders[be]
+        val boundsWorldMin = BlockPos(
+            be.blockPos.x + spec.bounds.minX(),
+            be.blockPos.y + spec.bounds.minY(),
+            be.blockPos.z + spec.bounds.minZ(),
+        )
+        val view = stateRecorder?.let { StateRecordingView.of(it) }
+            ?: StateRecordingView(emptyMap(), emptyList())
 
         LOGGER.debug("[SpecRunnerCoordinator#startNextCase] starting case '{}' (index={}) remaining={}", specCase.name, caseIndex, queue.size)
         snapshot.restore(level)
-        val runner = SpecRunner(spec, specCase, be.blockPos, level, snapshot)
+        val runner = SpecRunner(spec, specCase, be.blockPos, level, snapshot, view, boundsWorldMin)
         runner.start()
         runners[be] = runner
     }

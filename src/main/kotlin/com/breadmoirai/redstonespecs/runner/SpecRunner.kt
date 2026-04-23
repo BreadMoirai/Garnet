@@ -31,6 +31,8 @@ class SpecRunner(
     val originPos: BlockPos,
     val level: ServerLevel,
     private val snapshot: SpecSnapshot,
+    private val view: StateRecordingView,
+    private val boundsWorldMin: BlockPos,
 ) {
     private var ticksElapsed = -1
     private val checks = mutableListOf<TickCheck>()
@@ -121,10 +123,11 @@ class SpecRunner(
             val (_, condition) = output.entries.find {
                 it.first == simTime || (userInteractionTime != null && it.first == userInteractionTime)
             } ?: continue
-            val pos = worldPos(output.pos)
-            val state = level.getBlockState(pos)
+            val wPos = worldPos(output.pos)
+            val localPos = worldToLocal(wPos)
+            val state = view.stateAt(localPos, simTime)
             val label = output.label.ifEmpty { output.pos.toString() }
-            collectChecks(condition, state, pos, simTime, label)
+            collectChecks(condition, state, wPos, simTime, label)
         }
     }
 
@@ -189,4 +192,10 @@ class SpecRunner(
 
     private fun worldPos(relPos: BlockPos) =
         BlockPos(originPos.x + relPos.x, originPos.y + relPos.y, originPos.z + relPos.z)
+
+    private fun worldToLocal(worldPos: BlockPos) = BlockPos(
+        worldPos.x - boundsWorldMin.x,
+        worldPos.y - boundsWorldMin.y,
+        worldPos.z - boundsWorldMin.z,
+    )
 }
