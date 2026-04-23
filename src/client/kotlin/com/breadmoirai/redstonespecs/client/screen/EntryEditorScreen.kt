@@ -1,7 +1,5 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.client.config.ModConfig
-import com.breadmoirai.redstonespecs.config.DevLevel
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
@@ -78,11 +76,9 @@ fun buildEntryEditorYacl(
     val blockState = mc.level?.getBlockState(worldPos)
         ?: return parent
 
-    val standardMode = ModConfig.devLevel == DevLevel.STANDARD
     var currentTick: Int = initial?.first?.tick ?: -1
     var currentPhaseStr: String = when {
         initial != null -> initial.first.phase.name
-        standardMode -> Phase.USER_INTERACTION.name
         else -> Phase.END_OF_TICK.name
     }
     val propStates = buildPropStates(blockState, initial?.second)
@@ -101,17 +97,15 @@ fun buildEntryEditorYacl(
                         .controller { opt -> IntegerFieldControllerBuilder.create(opt) }
                         .build()
                 )
-                .apply {
-                    if (!standardMode) option(
-                        Option.createBuilder<String>()
-                            .name(Component.literal("Phase"))
-                            .binding(Phase.END_OF_TICK.name, { currentPhaseStr }, { currentPhaseStr = it })
-                            .controller { opt ->
-                                DropdownStringControllerBuilder.create(opt).values(advancedPhaseNames)
-                            }
-                            .build()
-                    )
-                }
+                .option(
+                    Option.createBuilder<String>()
+                        .name(Component.literal("Phase"))
+                        .binding(Phase.END_OF_TICK.name, { currentPhaseStr }, { currentPhaseStr = it })
+                        .controller { opt ->
+                            DropdownStringControllerBuilder.create(opt).values(advancedPhaseNames)
+                        }
+                        .build()
+                )
                 .build()
         )
         .category(
