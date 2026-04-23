@@ -18,7 +18,7 @@ A foundational system that records all block state changes within a spec's bound
 data class PropertyDiff(val name: String, val to: String)
 
 data class BlockStateChange(
-    val pos: BlockPos,               // relative to spec origin
+    val pos: BlockPos,               // relative to the SpecOriginBlockEntity position (same convention as SpecEntry.pos)
     val simTime: SimTime,
     val toBlock: ResourceLocation?,  // null if block type unchanged
     val diffs: List<PropertyDiff>,   // only changed properties
@@ -27,7 +27,7 @@ data class BlockStateChange(
 data class StateRecording(
     val specId: UUID,
     val timestamp: Long,
-    val initialSnapshot: Map<BlockPos, BlockState>,  // keyed by pos relative to spec origin
+    val initialSnapshot: Map<BlockPos, BlockState>,  // keyed by pos relative to SpecOriginBlockEntity position
     val changes: List<BlockStateChange>,             // ordered by simTime naturally
 )
 ```
@@ -51,7 +51,9 @@ class StateRecordingView(val recording: StateRecording) {
 }
 ```
 
-All positions are relative to the spec origin. `stateAt` returns the `to` state of the last `BlockStateChange` at `pos` where `change.simTime <= simTime`, falling back to `initialSnapshot` if no changes precede that time.
+All positions are relative to the `SpecOriginBlockEntity` block position — the same convention used by `SpecEntry.pos` and `SpecSnapshot`. This is distinct from the bounds min corner: the bounds are themselves offsets from the origin block, so a position like `BlockPos(2, 0, -1)` means 2 blocks east and 1 block north of the origin block, regardless of where the bounds start.
+
+`stateAt` returns the `to` state of the last `BlockStateChange` at `pos` where `change.simTime <= simTime`, falling back to `initialSnapshot` if no changes precede that time.
 
 ---
 
@@ -124,10 +126,10 @@ object StateRecordingStorage {
 {
   "specId": <uuid string>,
   "timestamp": <long>,
-  "initialSnapshot": [ { "pos": [x,y,z], "state": <blockstate string> }, ... ],  // pos relative to spec origin
+  "initialSnapshot": [ { "pos": [x,y,z], "state": <blockstate string> }, ... ],  // pos relative to SpecOriginBlockEntity position
   "changes": [
     {
-      "pos": [x, y, z],              // relative to spec origin
+      "pos": [x, y, z],              // relative to SpecOriginBlockEntity position
       "tick": <int>,
       "phase": <string>,
       "order": <int>,
