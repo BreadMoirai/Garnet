@@ -133,8 +133,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
             ?: throw AssertionError("RedstoneSpecBlockEntity not found at $originPos")
         val result = be.lastTestResult
             ?: throw AssertionError("lastTestResult is null after waitFor succeeded")
-        check(result.results.isNotEmpty()) { "Expected at least one SpecCaseResult" }
-        val checks = result.results.flatMap { it.checks }
+        val checks = result.checks
         check(checks.isNotEmpty()) { "Expected at least one check in results" }
         val failed = checks.filter { !it.pass }
         check(failed.isEmpty()) {
