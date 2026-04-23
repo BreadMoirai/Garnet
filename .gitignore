@@ -26,3 +26,6 @@ run
 # Fabric/Stonecutter per-version build outputs
 versions/**/.fabric/
 versions/**/logs/
+
+# Git worktrees
+.worktrees/
