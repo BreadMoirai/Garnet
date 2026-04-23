@@ -15,7 +15,7 @@ A foundational system that records all block state changes within a spec's bound
 ## Core Data Model
 
 ```kotlin
-data class PropertyDiff(val name: String, val from: String, val to: String)
+data class PropertyDiff(val name: String, val to: String)
 
 data class BlockStateChange(
     val pos: BlockPos,
@@ -32,7 +32,7 @@ data class StateRecording(
 )
 ```
 
-`SimTime.order` is a monotonically increasing counter, reset at `START_OF_TICK`, incremented globally on every intercepted `Level.setBlock` call. It reflects true world update order regardless of whether the position is within bounds.
+`SimTime.order` is a monotonically increasing counter, reset at `START_OF_TICK`, incremented for each in-bounds `Level.setBlock` call where the state actually changed. It reflects relative update order among recorded changes within a tick.
 
 A typical Redstone state change (same block, one property flipped) stores: `pos`, `simTime`, `toBlock=null`, one `PropertyDiff`. The initial block type is recoverable from `initialSnapshot`.
 
@@ -62,9 +62,9 @@ Single injection on `Level.setBlock`. On each call:
 1. Read `BlockState` at `pos` before the call (`from`)
 2. Invoke original method
 3. Read `BlockState` at `pos` after (`to`)
-4. If `from == to` or `StateRecorder` not active: skip
-5. Increment global tick order counter (always — reflects true world update order)
-6. If `pos` within bounds (O(1) AABB check):
+4. If `StateRecorder` not active or `pos` not within bounds (O(1) AABB check): skip
+5. If `from == to`: skip
+6. Increment tick order counter (reflects relative update order among in-bounds changes)
    - Compute `toBlock` (null if block type unchanged)
    - Compute `PropertyDiff` list (only changed properties, using `captureBlockStateProps()`)
    - Append `BlockStateChange` to recorder
@@ -132,7 +132,7 @@ object StateRecordingStorage {
       "phase": <string>,
       "order": <int>,
       "toBlock": <resource location | absent>,
-      "diffs": [ { "name": <string>, "from": <string>, "to": <string> }, ... ]
+      "diffs": [ { "name": <string>, "to": <string> }, ... ]
     },
     ...
   ]
