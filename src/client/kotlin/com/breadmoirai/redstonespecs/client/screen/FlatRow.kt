@@ -69,6 +69,7 @@ fun flattenCondition(condition: StateCondition, blockState: BlockState?): List<R
         listOf(RowProp.RangeInt(condition.name, condition.min, condition.max, lo, hi))
     }
     is StateCondition.EnumProperty -> {
+        // safe: all MC Property implementations use Comparable values; erased by JVM generics
         @Suppress("UNCHECKED_CAST")
         val cast = blockState?.block?.stateDefinition?.getProperty(condition.name) as? Property<Comparable<Any>>
         val options = cast?.possibleValues?.map { cast.getName(it) } ?: listOf(condition.value)
@@ -86,6 +87,8 @@ fun reconstitute(
     val result = grouped.map { (simTime, conditions) ->
         simTime to if (conditions.size == 1) conditions[0] else StateCondition.All(conditions)
     }.toMutableList()
+    // passthrough entries are appended at the end regardless of SimTime order;
+    // this is intentional — the spec evaluator groups by SimTime, not list position
     result.addAll(passthrough)
     return result
 }
