@@ -2,16 +2,16 @@ package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.StateCondition
-import dev.isxander.yacl3.api.ConfigCategory
-import dev.isxander.yacl3.api.Option
-import dev.isxander.yacl3.api.OptionDescription
-import dev.isxander.yacl3.api.YetAnotherConfigLib
-import dev.isxander.yacl3.api.controller.CyclingListControllerBuilder
-import dev.isxander.yacl3.api.controller.DropdownStringControllerBuilder
-import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder
-import net.minecraft.ChatFormatting
-import net.minecraft.client.Minecraft
+import dev.isxander.yacl3.gui.LowProfileButtonWidget
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.components.CycleButton
+import net.minecraft.client.gui.components.ScrollableLayout
+import net.minecraft.client.gui.components.StringWidget
+import net.minecraft.client.gui.layouts.FrameLayout
+import net.minecraft.client.gui.layouts.LinearLayout
+import net.minecraft.client.gui.layouts.SpacerElement
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.state.properties.Property
 
 // ── PropState — mirrors PropertyRow without widget-building code ──────────
 
-private sealed class PropState {
+internal sealed class PropState {
     abstract val name: String
     abstract var included: Boolean
     abstract fun toCondition(): StateCondition?
@@ -62,166 +62,209 @@ private sealed class PropState {
     }
 }
 
-// ── Entry editor YACL screen ──────────────────────────────────────────────
+// ── EntryEditorScreen ─────────────────────────────────────────────────────
 
-fun buildEntryEditorYacl(
-    originPos: BlockPos,
-    entryRelPos: BlockPos,
-    initial: Pair<SimTime, StateCondition>?,
-    onConfirm: (SimTime, StateCondition) -> Unit,
-    parent: Screen,
-): Screen {
-    val mc = Minecraft.getInstance()
-    val worldPos = originPos.offset(entryRelPos)
-    val blockState = mc.level?.getBlockState(worldPos)
-        ?: return parent
+class EntryEditorScreen(
+    private val originPos: BlockPos,
+    private val entryRelPos: BlockPos,
+    private val specMode: SpecMode,
+    private val initial: Pair<SimTime, StateCondition>?,
+    private val onConfirm: (SimTime, StateCondition) -> Unit,
+) : Screen(Component.literal(if (initial == null) "Add Entry" else "Edit Entry")) {
 
-    var currentTick: Int = initial?.first?.tick ?: -1
-    var currentPhaseStr: String = when {
-        initial != null -> initial.first.phase.name
-        else -> Phase.END_OF_TICK.name
+    private var tickBox: IntEditBox? = null
+    private var phaseButton: CycleButton<Phase>? = null
+    private var propStates: List<PropState> = emptyList()
+
+    override fun isPauseScreen(): Boolean = false
+    override fun isInGameUi(): Boolean = true
+
+    override fun init() {
+        super.init()
+
+        // Build prop states from current world block state
+        val worldPos = originPos.offset(entryRelPos)
+        val blockState: BlockState? = minecraft.level?.getBlockState(worldPos)
+        propStates = if (blockState != null) {
+            buildPropStates(blockState, initial?.second)
+        } else {
+            emptyList()
+        }
+
+        val initialTick = initial?.first?.tick ?: -1
+        val initialPhase = initial?.first?.phase ?: Phase.END_OF_TICK
+
+        val content = LinearLayout.vertical().spacing(6)
+
+        // Title
+        content.addChild(StringWidget(title, font))
+        content.addChild(SpacerElement(0, 2))
+
+        // Tick row — only for TICK_AWARE or UPDATE_AWARE
+        if (specMode == SpecMode.TICK_AWARE || specMode == SpecMode.UPDATE_AWARE) {
+            val tickRow = LinearLayout.horizontal().spacing(4)
+            tickRow.addChild(StringWidget(40, 20, Component.literal("Tick:"), font))
+
+            val box = IntEditBox(font, 70, 20, -1, Int.MAX_VALUE, initialTick) {}
+            tickBox = box
+            tickRow.addChild(box)
+
+            val decBtn = Button.builder(Component.literal("-")) {
+                tickBox!!.setIntValue(tickBox!!.getIntValue() - 1)
+            }.size(20, 20).build()
+            val incBtn = Button.builder(Component.literal("+")) {
+                tickBox!!.setIntValue(tickBox!!.getIntValue() + 1)
+            }.size(20, 20).build()
+
+            tickRow.addChild(decBtn)
+            tickRow.addChild(incBtn)
+            content.addChild(tickRow)
+        }
+
+        // Phase row — only for UPDATE_AWARE
+        if (specMode == SpecMode.UPDATE_AWARE) {
+            val advancedPhases = Phase.entries.filter { it != Phase.USER_INTERACTION }
+            val phaseRow = LinearLayout.horizontal().spacing(8)
+            phaseRow.addChild(StringWidget(50, 20, Component.literal("Phase:"), font))
+
+            val btn = CycleButton.builder<Phase>(
+                { phase -> Component.literal(phase.name) },
+                initialPhase,
+            ).withValues(*advancedPhases.toTypedArray())
+                .create(0, 0, 140, 20, Component.empty()) { _, _ -> }
+            phaseButton = btn
+            phaseRow.addChild(btn)
+            content.addChild(phaseRow)
+        }
+
+        // Conditions label
+        content.addChild(StringWidget(Component.literal("Conditions:"), font))
+
+        // Scrollable conditions list
+        val condLayout = LinearLayout.vertical().spacing(2)
+        if (propStates.isEmpty()) {
+            condLayout.addChild(
+                StringWidget(200, 18, Component.literal("(no block state available)"), font)
+            )
+        } else {
+            propStates.forEach { ps ->
+                condLayout.addChild(buildPropRow(ps))
+            }
+        }
+
+        content.addChild(ScrollableLayout(minecraft, condLayout, 150))
+
+        content.addChild(SpacerElement(0, 4))
+
+        // Bottom buttons
+        val bottomRow = LinearLayout.horizontal().spacing(8)
+        bottomRow.addChild(
+            LowProfileButtonWidget(0, 0, 80, 20, Component.literal("Confirm")) { confirm() }
+        )
+        bottomRow.addChild(
+            LowProfileButtonWidget(0, 0, 80, 20, Component.literal("Cancel")) { onClose() }
+        )
+        content.addChild(bottomRow)
+
+        FrameLayout.centerInRectangle(content, 0, 0, width, height)
+        content.arrangeElements()
+        content.visitWidgets { addRenderableWidget(it) }
     }
-    val propStates = buildPropStates(blockState, initial?.second)
-    val advancedPhaseNames = Phase.entries.filter { it != Phase.USER_INTERACTION }.map { it.name }
 
-    return YetAnotherConfigLib.createBuilder()
-        .title(Component.literal(if (initial == null) "Add Entry" else "Edit Entry"))
-        .category(
-            ConfigCategory.createBuilder()
-                .name(Component.literal("Timing"))
-                .option(
-                    Option.createBuilder<Int>()
-                        .name(Component.literal("Tick"))
-                        .description(OptionDescription.of(Component.literal("-1 = INIT (before tick 0)")))
-                        .binding(-1, { currentTick }, { currentTick = it })
-                        .controller { opt -> IntegerFieldControllerBuilder.create(opt) }
-                        .build()
-                )
-                .option(
-                    Option.createBuilder<String>()
-                        .name(Component.literal("Phase"))
-                        .binding(Phase.END_OF_TICK.name, { currentPhaseStr }, { currentPhaseStr = it })
-                        .controller { opt ->
-                            DropdownStringControllerBuilder.create(opt).values(advancedPhaseNames)
+    private fun buildPropRow(ps: PropState): LinearLayout {
+        val row = LinearLayout.horizontal().spacing(4)
+        row.addChild(StringWidget(80, 20, Component.literal(ps.name), font))
+
+        val skipLabel = "—"
+        when (ps) {
+            is PropState.Block -> {
+                val values = listOf(skipLabel, "✓")
+                val initial = if (ps.included) "✓" else skipLabel
+                val btn = CycleButton.builder<String>(
+                    { v ->
+                        if (v == skipLabel) Component.literal(skipLabel)
+                        else Component.literal(ps.blockId.path)
+                    },
+                    initial,
+                ).withValues(*values.toTypedArray())
+                    .create(0, 0, 120, 20, Component.empty()) { _, v ->
+                        ps.included = v != skipLabel
+                    }
+                row.addChild(btn)
+            }
+            is PropState.Bool -> {
+                val values = listOf(skipLabel, "false", "true")
+                val initial = if (ps.included) ps.value.toString() else skipLabel
+                val btn = CycleButton.builder<String>(
+                    { v -> Component.literal(v) },
+                    initial,
+                ).withValues(*values.toTypedArray())
+                    .create(0, 0, 120, 20, Component.empty()) { _, v ->
+                        when (v) {
+                            skipLabel -> ps.included = false
+                            else -> {
+                                ps.included = true
+                                ps.value = v.toBooleanStrict()
+                            }
                         }
-                        .build()
-                )
-                .build()
-        )
-        .category(
-            ConfigCategory.createBuilder()
-                .name(Component.literal("Conditions"))
-                .apply {
-                    propStates.forEach { ps -> option(buildPropOption(ps)) }
-                }
-                .build()
-        )
-        .save {
-            val phase = runCatching { Phase.valueOf(currentPhaseStr) }.getOrElse { Phase.END_OF_TICK }
-            val simTime = if (currentTick < 0) SimTime.INIT else SimTime(currentTick, phase)
-            val conditions = propStates.mapNotNull { it.toCondition() }
-            if (conditions.isEmpty()) return@save
-            val condition = if (conditions.size == 1) conditions[0] else StateCondition.All(conditions)
-            onConfirm(simTime, condition)
-        }
-        .build()
-        .generateScreen(parent)
-}
-
-// ── Per-property option builders — each option row combines include + value ──
-
-private const val SKIP = "—"
-
-private fun buildPropOption(ps: PropState): Option<*> = when (ps) {
-    is PropState.Block -> buildBlockOption(ps)
-    is PropState.Bool -> buildBoolOption(ps)
-    is PropState.Int -> buildIntOption(ps)
-    is PropState.Enum -> buildEnumOption(ps)
-}
-
-private fun buildBlockOption(ps: PropState.Block): Option<String> =
-    Option.createBuilder<String>()
-        .name(Component.literal(ps.name))
-        .binding(
-            SKIP,
-            { if (ps.included) "✓" else SKIP },
-            { v -> ps.included = v != SKIP }
-        )
-        .controller { opt ->
-            CyclingListControllerBuilder.create(opt)
-                .values(SKIP, "✓")
-                .formatValue { v ->
-                    if (v == SKIP) Component.literal(SKIP).withStyle(ChatFormatting.DARK_GRAY)
-                    else Component.literal(ps.blockId.path)
-                }
-        }
-        .build()
-
-private fun buildBoolOption(ps: PropState.Bool): Option<String> =
-    Option.createBuilder<String>()
-        .name(Component.literal(ps.name))
-        .binding(
-            SKIP,
-            { if (ps.included) ps.value.toString() else SKIP },
-            { v ->
-                when (v) {
-                    SKIP -> ps.included = false
-                    else -> { ps.included = true; ps.value = v.toBooleanStrict() }
-                }
+                    }
+                row.addChild(btn)
             }
-        )
-        .controller { opt ->
-            CyclingListControllerBuilder.create(opt)
-                .values(SKIP, "false", "true")
-                .formatValue { v ->
-                    if (v == SKIP) Component.literal(SKIP).withStyle(ChatFormatting.DARK_GRAY)
-                    else Component.literal(v)
-                }
-        }
-        .build()
-
-private fun buildIntOption(ps: PropState.Int): Option<Int> {
-    val sentinel = ps.min - 1
-    return Option.createBuilder<Int>()
-        .name(Component.literal(ps.name))
-        .binding(
-            sentinel,
-            { if (ps.included) ps.value else sentinel },
-            { v ->
-                if (v == sentinel) ps.included = false
-                else { ps.included = true; ps.value = v }
+            is PropState.Int -> {
+                val allValues = (ps.min..ps.max).map { it.toString() }
+                val cycleValues = listOf(skipLabel) + allValues
+                val initial = if (ps.included) ps.value.toString() else skipLabel
+                val btn = CycleButton.builder<String>(
+                    { v -> Component.literal(v) },
+                    initial,
+                ).withValues(*cycleValues.toTypedArray())
+                    .create(0, 0, 120, 20, Component.empty()) { _, v ->
+                        if (v == skipLabel) {
+                            ps.included = false
+                        } else {
+                            ps.included = true
+                            ps.value = v.toIntOrNull() ?: ps.value
+                        }
+                    }
+                row.addChild(btn)
             }
-        )
-        .controller { opt ->
-            CyclingListControllerBuilder.create(opt)
-                .values((sentinel..ps.max).toList())
-                .formatValue { v ->
-                    if (v == sentinel) Component.literal(SKIP).withStyle(ChatFormatting.DARK_GRAY)
-                    else Component.literal(v.toString())
-                }
+            is PropState.Enum -> {
+                val cycleValues = listOf(skipLabel) + ps.options
+                val initial = if (ps.included) ps.value else skipLabel
+                val btn = CycleButton.builder<String>(
+                    { v -> Component.literal(v) },
+                    initial,
+                ).withValues(*cycleValues.toTypedArray())
+                    .create(0, 0, 120, 20, Component.empty()) { _, v ->
+                        if (v == skipLabel) {
+                            ps.included = false
+                        } else {
+                            ps.included = true
+                            ps.value = v
+                        }
+                    }
+                row.addChild(btn)
+            }
         }
-        .build()
+
+        return row
+    }
+
+    private fun confirm() {
+        val rawTick = tickBox?.getIntValue() ?: -1
+        val phase = phaseButton?.value ?: Phase.END_OF_TICK
+        val simTime = if (rawTick < 0) SimTime.INIT else SimTime(rawTick, phase)
+        val conditions = propStates.mapNotNull { it.toCondition() }
+        if (conditions.isEmpty()) return
+        val condition = if (conditions.size == 1) conditions[0] else StateCondition.All(conditions)
+        onConfirm(simTime, condition)
+        onClose()
+    }
 }
-
-private fun buildEnumOption(ps: PropState.Enum): Option<String> =
-    Option.createBuilder<String>()
-        .name(Component.literal(ps.name))
-        .binding(
-            SKIP,
-            { if (ps.included) ps.value else SKIP },
-            { v ->
-                if (v == SKIP) ps.included = false
-                else { ps.included = true; ps.value = v }
-            }
-        )
-        .controller { opt ->
-            DropdownStringControllerBuilder.create(opt).values(listOf(SKIP) + ps.options)
-        }
-        .build()
 
 // ── State construction helpers ────────────────────────────────────────────
 
-private fun buildPropStates(state: BlockState, condition: StateCondition?): List<PropState> {
+internal fun buildPropStates(state: BlockState, condition: StateCondition?): List<PropState> {
     val blockId = BuiltInRegistries.BLOCK.getKey(state.block)
     val props = mutableListOf<PropState>(PropState.Block(blockId))
 
@@ -250,7 +293,7 @@ private fun buildPropStates(state: BlockState, condition: StateCondition?): List
     return props
 }
 
-private fun prePopulate(props: List<PropState>, condition: StateCondition) {
+internal fun prePopulate(props: List<PropState>, condition: StateCondition) {
     when (condition) {
         is StateCondition.All -> condition.conditions.forEach { prePopulate(props, it) }
         is StateCondition.BlockType ->
@@ -266,4 +309,38 @@ private fun prePopulate(props: List<PropState>, condition: StateCondition) {
                 ?.also { it.included = true; it.value = condition.value }
         else -> {}
     }
+}
+
+// ── Preview helpers (package-level, reusable by SpecEditorScreen) ─────────
+
+internal fun previewEntry(simTime: SimTime, condition: StateCondition): String {
+    val timeStr = if (simTime == SimTime.INIT) "INIT" else "t${simTime.tick} ${simTime.phase.name.take(5)}"
+    val condStr = previewCondition(condition).let { if (it.length > 24) it.take(23) + "…" else it }
+    return "$timeStr: $condStr"
+}
+
+internal fun previewCondition(condition: StateCondition): String = when (condition) {
+    is StateCondition.BoolProperty -> "${condition.name}=${condition.value}"
+    is StateCondition.IntProperty -> "${condition.name}=${condition.value}"
+    is StateCondition.EnumProperty -> "${condition.name}=${condition.value}"
+    is StateCondition.BlockType -> "block=${condition.blockId.path}"
+    is StateCondition.All -> condition.conditions.joinToString(",") { previewCondition(it) }
+    is StateCondition.Any -> condition.conditions.joinToString("|") { previewCondition(it) }
+    is StateCondition.Not -> "!${previewCondition(condition.condition)}"
+    is StateCondition.ContainerContents -> "container(...)"
+}
+
+internal fun flattenConditionToMap(condition: StateCondition): Map<String, String> {
+    val out = mutableMapOf<String, String>()
+    fun walk(c: StateCondition) {
+        when (c) {
+            is StateCondition.All -> c.conditions.forEach(::walk)
+            is StateCondition.BoolProperty -> out[c.name] = c.value.toString()
+            is StateCondition.IntProperty -> out[c.name] = c.value.toString()
+            is StateCondition.EnumProperty -> out[c.name] = c.value
+            else -> {}
+        }
+    }
+    walk(condition)
+    return out
 }

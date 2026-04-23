@@ -255,36 +255,3 @@ class SpecEditorScreen(
     }
 }
 
-// ── Helpers (package-level, reusable by EntryEditorScreen) ────────────────
-
-internal fun previewEntry(simTime: SimTime, condition: StateCondition): String {
-    val timeStr = if (simTime == SimTime.INIT) "INIT" else "t${simTime.tick} ${simTime.phase.name.take(5)}"
-    val condStr = previewCondition(condition).let { if (it.length > 24) it.take(23) + "…" else it }
-    return "$timeStr: $condStr"
-}
-
-internal fun previewCondition(condition: StateCondition): String = when (condition) {
-    is StateCondition.BoolProperty -> "${condition.name}=${condition.value}"
-    is StateCondition.IntProperty -> "${condition.name}=${condition.value}"
-    is StateCondition.EnumProperty -> "${condition.name}=${condition.value}"
-    is StateCondition.BlockType -> "block=${condition.blockId.path}"
-    is StateCondition.All -> condition.conditions.joinToString(",") { previewCondition(it) }
-    is StateCondition.Any -> condition.conditions.joinToString("|") { previewCondition(it) }
-    is StateCondition.Not -> "!${previewCondition(condition.condition)}"
-    is StateCondition.ContainerContents -> "container(...)"
-}
-
-internal fun flattenConditionToMap(condition: StateCondition): Map<String, String> {
-    val out = mutableMapOf<String, String>()
-    fun walk(c: StateCondition) {
-        when (c) {
-            is StateCondition.All -> c.conditions.forEach(::walk)
-            is StateCondition.BoolProperty -> out[c.name] = c.value.toString()
-            is StateCondition.IntProperty -> out[c.name] = c.value.toString()
-            is StateCondition.EnumProperty -> out[c.name] = c.value
-            else -> {}
-        }
-    }
-    walk(condition)
-    return out
-}
