@@ -15,6 +15,7 @@ import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
 import com.breadmoirai.redstonespecs.runner.propsToCondition
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
+import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.Item
@@ -23,11 +24,32 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
 import org.slf4j.LoggerFactory
 
+internal fun nextLabel(blockName: String, existing: Set<String>): String {
+    var index = 0
+    while (true) {
+        val suffix = if (index < 26) {
+            ('a' + index).toString()
+        } else {
+            val first = 'a' + (index / 26) - 1
+            val second = 'a' + (index % 26)
+            "$first$second"
+        }
+        val label = "${blockName}_${suffix}"
+        if (label !in existing) return label
+        index++
+    }
+}
+
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(properties) {
 
     abstract fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry
+
+    protected fun defaultLabel(initState: BlockState, spec: RedstoneSpec): String {
+        val blockName = BuiltInRegistries.BLOCK.getKey(initState.block).path
+        return nextLabel(blockName, spec.allEntries.map { it.label }.toSet())
+    }
 
     override fun useOn(context: UseOnContext): InteractionResult {
         val level: Level = context.level
@@ -58,22 +80,22 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 
 class InputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        InputSpec(relPos, "", 0x4488FF, listOf(SimTime.INIT to propsToCondition(initProps, initState)))
+        InputSpec(relPos, defaultLabel(initState, spec), 0x4488FF, listOf(SimTime.INIT to propsToCondition(initProps, initState)))
 }
 
 class OutputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry {
         val time = if (spec.mode == SpecMode.SIMPLE) SimTime(spec.lifespan, Phase.END_OF_TICK) else SimTime.INIT
-        return OutputSpec(relPos, "", 0x44FF88, listOf(time to propsToCondition(initProps, initState)))
+        return OutputSpec(relPos, defaultLabel(initState, spec), 0x44FF88, listOf(time to propsToCondition(initProps, initState)))
     }
 }
 
 class BreakpointSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        BreakpointSpec(relPos, "", 0xFF4444)
+        BreakpointSpec(relPos, defaultLabel(initState, spec), 0xFF4444)
 }
 
 class AutoSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        AutoSpec(relPos, "", 0xFFAA00)
+        AutoSpec(relPos, defaultLabel(initState, spec), 0xFFAA00)
 }

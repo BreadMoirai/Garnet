@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.data
 
+import com.breadmoirai.redstonespecs.item.nextLabel
 import net.minecraft.core.BlockPos
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -23,5 +24,26 @@ class SpecMarkerToolTest {
         val entry = OutputSpec(pos, "", 0x44FF88, initEntries)
         assertEquals(pos, entry.pos)
         assertEquals(SimTime.INIT, entry.entries.first().first)
+    }
+
+    @Test
+    fun `nextLabel returns a when no existing labels`() {
+        assertEquals("lever_a", nextLabel("lever", emptySet()))
+    }
+
+    @Test
+    fun `nextLabel skips taken suffixes`() {
+        assertEquals("lever_c", nextLabel("lever", setOf("lever_a", "lever_b")))
+    }
+
+    @Test
+    fun `nextLabel ignores labels from other blocks`() {
+        assertEquals("lever_a", nextLabel("lever", setOf("button_a", "stone_button_a")))
+    }
+
+    @Test
+    fun `nextLabel wraps to double letter after z`() {
+        val existing = ('a'..'z').map { "lever_$it" }.toSet()
+        assertEquals("lever_aa", nextLabel("lever", existing))
     }
 }
