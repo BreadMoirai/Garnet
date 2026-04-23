@@ -82,10 +82,6 @@ class EntryEditorScreen(
     override fun isPauseScreen(): Boolean = false
     override fun isInGameUi(): Boolean = true
 
-    override fun tick() {
-        super.tick()
-        tickBox?.processDeferredCallback()
-    }
 
     override fun init() {
         super.init()

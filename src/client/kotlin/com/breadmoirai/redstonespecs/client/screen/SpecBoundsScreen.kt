@@ -37,15 +37,6 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
     override fun isPauseScreen(): Boolean = false
     override fun isInGameUi(): Boolean = true
 
-    override fun tick() {
-        super.tick()
-        box1x?.processDeferredCallback()
-        box1y?.processDeferredCallback()
-        box1z?.processDeferredCallback()
-        box2x?.processDeferredCallback()
-        box2y?.processDeferredCallback()
-        box2z?.processDeferredCallback()
-    }
 
     override fun init() {
         super.init()

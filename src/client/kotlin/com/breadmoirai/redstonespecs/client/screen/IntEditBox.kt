@@ -49,7 +49,7 @@ class IntEditBox(
         return true
     }
 
-    fun processDeferredCallback() {
+    fun tick() {
         if (pendingHoverEnd) {
             pendingHoverEnd = false
             onHoverEnd()

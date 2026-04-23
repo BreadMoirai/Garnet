@@ -29,10 +29,6 @@ class SpecOverviewScreen(
     override fun isPauseScreen() = false
     override fun isInGameUi() = true
 
-    override fun tick() {
-        super.tick()
-        lifespanBox?.processDeferredCallback()
-    }
 
     override fun init() {
         super.init()
