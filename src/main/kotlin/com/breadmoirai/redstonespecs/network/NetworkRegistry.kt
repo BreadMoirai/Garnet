@@ -2,7 +2,6 @@ package com.breadmoirai.redstonespecs.network
 
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.item.UndoStack
-import com.breadmoirai.redstonespecs.network.nudgeBounds
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -16,7 +15,8 @@ fun registerNetworking() {
     PayloadTypeRegistry.clientboundPlay().register(OpenEditorS2CPayload.TYPE, OpenEditorS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(TestResultS2CPayload.TYPE, TestResultS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(BreakpointHitS2CPayload.TYPE, BreakpointHitS2CPayload.STREAM_CODEC)
-    PayloadTypeRegistry.clientboundPlay().register(AutoSpecRecordedS2CPayload.TYPE, AutoSpecRecordedS2CPayload.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(StructurePromptS2CPayload.TYPE, StructurePromptS2CPayload.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(OverwritePromptS2CPayload.TYPE, OverwritePromptS2CPayload.STREAM_CODEC)
 
     // C2S registrations
     PayloadTypeRegistry.serverboundPlay().register(UndoC2SPayload.TYPE, UndoC2SPayload.STREAM_CODEC)
@@ -27,13 +27,21 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(RemoveSpecEntryC2SPayload.TYPE, RemoveSpecEntryC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(ResizeBoundsC2SPayload.TYPE, ResizeBoundsC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(NudgeSpecBoundsC2SPayload.TYPE, NudgeSpecBoundsC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(SetSpecIdC2SPayload.TYPE, SetSpecIdC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(SetSpecModeC2SPayload.TYPE, SetSpecModeC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(SetLifespanC2SPayload.TYPE, SetLifespanC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(SetStructureC2SPayload.TYPE, SetStructureC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(SaveSpecC2SPayload.TYPE, SaveSpecC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(LoadSpecC2SPayload.TYPE, LoadSpecC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(StructureDecisionC2SPayload.TYPE, StructureDecisionC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(OverwriteDecisionC2SPayload.TYPE, OverwriteDecisionC2SPayload.STREAM_CODEC)
 
     // C2S handlers
     ServerPlayNetworking.registerGlobalReceiver(UndoC2SPayload.TYPE) { _, context ->
         val player = context.player()
         context.server().execute {
             val record = UndoStack.pop(player.uuid) ?: return@execute
-            LOGGER.debug("[NetworkRegistry#undo] player={} restoring entry at pos={}", player.name.string, record.entry.pos)
+            LOGGER.debug("[NetworkRegistry#undo] player={} restoring entry", player.name.string)
             val be = player.level().getBlockEntity(record.originPos) as? RedstoneSpecBlockEntity ?: return@execute
             be.addOrUpdateEntry(record.entry)
         }
@@ -81,6 +89,38 @@ fun registerNetworking() {
         }
     }
 
+    ServerPlayNetworking.registerGlobalReceiver(SetSpecIdC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#setSpecId] originPos={} id='{}'", payload.originPos, payload.id)
+            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
+            if (payload.id.isNotBlank()) be.setSpecId(payload.id)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(SetSpecModeC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#setSpecMode] originPos={} mode={}", payload.originPos, payload.mode)
+            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
+            be.setMode(payload.mode)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(SetLifespanC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#setLifespan] originPos={} lifespan={}", payload.originPos, payload.lifespan)
+            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
+            if (payload.lifespan >= 1) be.setLifespan(payload.lifespan)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(SetStructureC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#setStructure] originPos={} structure={}", payload.originPos, payload.structure)
+            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
+            be.setStructure(payload.structure)
+        }
+    }
+
     ServerPlayNetworking.registerGlobalReceiver(ResizeBoundsC2SPayload.TYPE) { payload, context ->
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#resizeBounds] originPos={} bounds={}", payload.originPos, payload.bounds)
@@ -98,4 +138,7 @@ fun registerNetworking() {
             be.setSpec(spec.copy(bounds = nudgeBounds(spec.bounds, payload.axis, payload.isMax, payload.delta)))
         }
     }
+
+    // SaveSpec and LoadSpec handlers are added in Task 7 after persistence layer exists.
+    // StructureDecision and OverwriteDecision handlers are also added in Task 7.
 }

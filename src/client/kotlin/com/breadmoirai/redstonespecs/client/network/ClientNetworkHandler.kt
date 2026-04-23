@@ -2,7 +2,6 @@ package com.breadmoirai.redstonespecs.client.network
 
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
-import com.breadmoirai.redstonespecs.network.AutoSpecRecordedS2CPayload
 import com.breadmoirai.redstonespecs.network.BreakpointHitS2CPayload
 import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
@@ -19,7 +18,7 @@ fun registerClientNetworking() {
         val mc = context.client()
         mc.execute {
             LOGGER.debug("[ClientNetworkHandler#openOverview] originPos={}", payload.originPos)
-            mc.setScreen(SpecOverviewScreen(payload.originPos))
+            mc.setScreen(SpecOverviewScreen(payload.originPos, payload.availableStructures))
         }
     }
 
@@ -44,7 +43,7 @@ fun registerClientNetworking() {
             // If the overview screen is open for this origin, reopen to refresh
             val current = mc.screen
             if (current is SpecOverviewScreen && current.originPos == payload.originPos) {
-                mc.setScreen(SpecOverviewScreen(payload.originPos))
+                mc.setScreen(SpecOverviewScreen(payload.originPos, emptyList()))
             }
         }
     }
@@ -55,16 +54,6 @@ fun registerClientNetworking() {
             LOGGER.debug("[ClientNetworkHandler#breakpointHit] '{}' in spec '{}' at {}t {}", payload.breakpointLabel, payload.specId, payload.simTime.tick, payload.simTime.phase.name)
             mc.player?.sendSystemMessage(
                 Component.literal("§6Breakpoint hit: §f${payload.breakpointLabel} §7in spec §f${payload.specId} §7at ${payload.simTime.tick}t ${payload.simTime.phase.name}")
-            )
-        }
-    }
-
-    ClientPlayNetworking.registerGlobalReceiver(AutoSpecRecordedS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#autoSpecRecorded] originPos={} caseName='{}'", payload.originPos, payload.specCaseName)
-            mc.player?.sendSystemMessage(
-                Component.literal("§bAutoSpec recorded: §f${payload.specCaseName}")
             )
         }
     }

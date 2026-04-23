@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.network
 
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
+import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.TestResult
 import io.netty.buffer.ByteBuf
 import net.minecraft.core.BlockPos
@@ -13,13 +14,17 @@ import net.minecraft.resources.Identifier
 
 // === S2C ===
 
-data class OpenOverviewS2CPayload(val originPos: BlockPos) : CustomPacketPayload {
+data class OpenOverviewS2CPayload(
+    val originPos: BlockPos,
+    val availableStructures: List<String>,
+) : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<OpenOverviewS2CPayload>(
             Identifier.fromNamespaceAndPath("redstonespecs", "open_overview")
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, OpenOverviewS2CPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, OpenOverviewS2CPayload::originPos,
+            ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()), OpenOverviewS2CPayload::availableStructures,
             ::OpenOverviewS2CPayload,
         )
     }
@@ -81,18 +86,37 @@ data class BreakpointHitS2CPayload(
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
-data class AutoSpecRecordedS2CPayload(
+// Server asks client: structure differs from saved — "save" or "fork"?
+// promptKind: "SAVE_OR_FORK" (existing structure changed) or "CREATE_OR_FORK" (structure=null, file exists)
+data class StructurePromptS2CPayload(
     val originPos: BlockPos,
-    val specCaseName: String,
+    val currentStructureId: String,
+    val promptKind: String,
 ) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<AutoSpecRecordedS2CPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "auto_spec_recorded")
+        val TYPE = CustomPacketPayload.Type<StructurePromptS2CPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "structure_prompt")
         )
-        val STREAM_CODEC: StreamCodec<ByteBuf, AutoSpecRecordedS2CPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, AutoSpecRecordedS2CPayload::originPos,
-            ByteBufCodecs.STRING_UTF8, AutoSpecRecordedS2CPayload::specCaseName,
-            ::AutoSpecRecordedS2CPayload,
+        val STREAM_CODEC: StreamCodec<ByteBuf, StructurePromptS2CPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, StructurePromptS2CPayload::originPos,
+            ByteBufCodecs.STRING_UTF8, StructurePromptS2CPayload::currentStructureId,
+            ByteBufCodecs.STRING_UTF8, StructurePromptS2CPayload::promptKind,
+            ::StructurePromptS2CPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+// Server asks: non-air blocks in bounds — overwrite?
+data class OverwritePromptS2CPayload(val originPos: BlockPos, val specId: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<OverwritePromptS2CPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "overwrite_prompt")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, OverwritePromptS2CPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, OverwritePromptS2CPayload::originPos,
+            ByteBufCodecs.STRING_UTF8, OverwritePromptS2CPayload::specId,
+            ::OverwritePromptS2CPayload,
         )
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
@@ -139,23 +163,8 @@ data class ResumeSpecC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
-data class CycleSpecCaseC2SPayload(val originPos: BlockPos, val forward: Boolean) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<CycleSpecCaseC2SPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "cycle_spec_case")
-        )
-        val STREAM_CODEC: StreamCodec<ByteBuf, CycleSpecCaseC2SPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, CycleSpecCaseC2SPayload::originPos,
-            ByteBufCodecs.BOOL, CycleSpecCaseC2SPayload::forward,
-            ::CycleSpecCaseC2SPayload,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
-
 data class SaveSpecEntryC2SPayload(
     val originPos: BlockPos,
-    val specCaseIndex: Int,
     val entry: SpecEntry,
 ) : CustomPacketPayload {
     companion object {
@@ -164,7 +173,6 @@ data class SaveSpecEntryC2SPayload(
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, SaveSpecEntryC2SPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, SaveSpecEntryC2SPayload::originPos,
-            ByteBufCodecs.VAR_INT, SaveSpecEntryC2SPayload::specCaseIndex,
             ByteBufCodecs.fromCodec(SpecEntry.CODEC), SaveSpecEntryC2SPayload::entry,
             ::SaveSpecEntryC2SPayload,
         )
@@ -174,7 +182,6 @@ data class SaveSpecEntryC2SPayload(
 
 data class RemoveSpecEntryC2SPayload(
     val originPos: BlockPos,
-    val specCaseIndex: Int,
     val entryRelPos: BlockPos,
 ) : CustomPacketPayload {
     companion object {
@@ -183,96 +190,8 @@ data class RemoveSpecEntryC2SPayload(
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, RemoveSpecEntryC2SPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, RemoveSpecEntryC2SPayload::originPos,
-            ByteBufCodecs.VAR_INT, RemoveSpecEntryC2SPayload::specCaseIndex,
             BlockPos.STREAM_CODEC, RemoveSpecEntryC2SPayload::entryRelPos,
             ::RemoveSpecEntryC2SPayload,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
-
-data class AddSpecCaseC2SPayload(
-    val originPos: BlockPos,
-    val name: String,
-) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<AddSpecCaseC2SPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "add_spec_case")
-        )
-        val STREAM_CODEC: StreamCodec<ByteBuf, AddSpecCaseC2SPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, AddSpecCaseC2SPayload::originPos,
-            ByteBufCodecs.STRING_UTF8, AddSpecCaseC2SPayload::name,
-            ::AddSpecCaseC2SPayload,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
-
-data class RemoveSpecCaseC2SPayload(
-    val originPos: BlockPos,
-    val index: Int,
-) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<RemoveSpecCaseC2SPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "remove_spec_case")
-        )
-        val STREAM_CODEC: StreamCodec<ByteBuf, RemoveSpecCaseC2SPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, RemoveSpecCaseC2SPayload::originPos,
-            ByteBufCodecs.VAR_INT, RemoveSpecCaseC2SPayload::index,
-            ::RemoveSpecCaseC2SPayload,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
-
-data class SelectSpecCaseC2SPayload(
-    val originPos: BlockPos,
-    val index: Int,
-) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<SelectSpecCaseC2SPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "select_spec_case")
-        )
-        val STREAM_CODEC: StreamCodec<ByteBuf, SelectSpecCaseC2SPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, SelectSpecCaseC2SPayload::originPos,
-            ByteBufCodecs.VAR_INT, SelectSpecCaseC2SPayload::index,
-            ::SelectSpecCaseC2SPayload,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
-
-data class RenameSpecC2SPayload(
-    val originPos: BlockPos,
-    val newName: String,
-) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<RenameSpecC2SPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "rename_spec")
-        )
-        val STREAM_CODEC: StreamCodec<ByteBuf, RenameSpecC2SPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, RenameSpecC2SPayload::originPos,
-            ByteBufCodecs.STRING_UTF8, RenameSpecC2SPayload::newName,
-            ::RenameSpecC2SPayload,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
-
-data class RenameSpecCaseC2SPayload(
-    val originPos: BlockPos,
-    val index: Int,
-    val newName: String,
-) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<RenameSpecCaseC2SPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "rename_spec_case")
-        )
-        val STREAM_CODEC: StreamCodec<ByteBuf, RenameSpecCaseC2SPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, RenameSpecCaseC2SPayload::originPos,
-            ByteBufCodecs.VAR_INT, RenameSpecCaseC2SPayload::index,
-            ByteBufCodecs.STRING_UTF8, RenameSpecCaseC2SPayload::newName,
-            ::RenameSpecCaseC2SPayload,
         )
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
@@ -322,6 +241,136 @@ data class NudgeSpecBoundsC2SPayload(
             ByteBufCodecs.BOOL, NudgeSpecBoundsC2SPayload::isMax,
             ByteBufCodecs.VAR_INT, NudgeSpecBoundsC2SPayload::delta,
             ::NudgeSpecBoundsC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class SetSpecIdC2SPayload(val originPos: BlockPos, val id: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SetSpecIdC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "set_spec_id")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, SetSpecIdC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, SetSpecIdC2SPayload::originPos,
+            ByteBufCodecs.STRING_UTF8, SetSpecIdC2SPayload::id,
+            ::SetSpecIdC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class SetSpecModeC2SPayload(val originPos: BlockPos, val mode: SpecMode) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SetSpecModeC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "set_spec_mode")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, SetSpecModeC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, SetSpecModeC2SPayload::originPos,
+            ByteBufCodecs.VAR_INT.map({ SpecMode.entries[it] }, SpecMode::ordinal), SetSpecModeC2SPayload::mode,
+            ::SetSpecModeC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class SetLifespanC2SPayload(val originPos: BlockPos, val lifespan: Int) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SetLifespanC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "set_lifespan")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, SetLifespanC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, SetLifespanC2SPayload::originPos,
+            ByteBufCodecs.VAR_INT, SetLifespanC2SPayload::lifespan,
+            ::SetLifespanC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class SetStructureC2SPayload(val originPos: BlockPos, val structure: String?) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SetStructureC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "set_structure")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, SetStructureC2SPayload> = object : StreamCodec<ByteBuf, SetStructureC2SPayload> {
+            override fun decode(buf: ByteBuf): SetStructureC2SPayload {
+                val pos = BlockPos.STREAM_CODEC.decode(buf)
+                val hasStructure = buf.readBoolean()
+                val structure = if (hasStructure) ByteBufCodecs.STRING_UTF8.decode(buf) else null
+                return SetStructureC2SPayload(pos, structure)
+            }
+            override fun encode(buf: ByteBuf, value: SetStructureC2SPayload) {
+                BlockPos.STREAM_CODEC.encode(buf, value.originPos)
+                val s = value.structure
+                buf.writeBoolean(s != null)
+                if (s != null) ByteBufCodecs.STRING_UTF8.encode(buf, s)
+            }
+        }
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+// Client requests server to save the spec to disk
+data class SaveSpecC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SaveSpecC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "save_spec")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, SaveSpecC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, SaveSpecC2SPayload::originPos,
+            ::SaveSpecC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+// Client requests server to load spec JSON (and optionally structure) from disk
+data class LoadSpecC2SPayload(val originPos: BlockPos, val specId: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<LoadSpecC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "load_spec")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, LoadSpecC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, LoadSpecC2SPayload::originPos,
+            ByteBufCodecs.STRING_UTF8, LoadSpecC2SPayload::specId,
+            ::LoadSpecC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+// Client response to StructurePromptS2CPayload
+// decision: "SAVE", "FORK", or "CANCEL". newId is only set when decision == "FORK".
+data class StructureDecisionC2SPayload(
+    val originPos: BlockPos,
+    val decision: String,
+    val newId: String,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<StructureDecisionC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "structure_decision")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, StructureDecisionC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, StructureDecisionC2SPayload::originPos,
+            ByteBufCodecs.STRING_UTF8, StructureDecisionC2SPayload::decision,
+            ByteBufCodecs.STRING_UTF8, StructureDecisionC2SPayload::newId,
+            ::StructureDecisionC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+// Client response to OverwritePromptS2CPayload
+data class OverwriteDecisionC2SPayload(val originPos: BlockPos, val overwrite: Boolean) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<OverwriteDecisionC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "overwrite_decision")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, OverwriteDecisionC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, OverwriteDecisionC2SPayload::originPos,
+            ByteBufCodecs.BOOL, OverwriteDecisionC2SPayload::overwrite,
+            ::OverwriteDecisionC2SPayload,
         )
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE

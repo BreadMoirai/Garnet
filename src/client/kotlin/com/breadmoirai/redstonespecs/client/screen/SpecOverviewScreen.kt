@@ -3,6 +3,7 @@ package com.breadmoirai.redstonespecs.client.screen
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.network.ResetSpecC2SPayload
 import com.breadmoirai.redstonespecs.network.RunSpecC2SPayload
+import com.breadmoirai.redstonespecs.network.SetSpecIdC2SPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.Button
@@ -13,7 +14,7 @@ import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
-class SpecOverviewScreen(val originPos: BlockPos) :
+class SpecOverviewScreen(val originPos: BlockPos, val availableStructures: List<String> = emptyList()) :
     Screen(Component.translatable("screen.redstonespecs.spec_overview")) {
 
     private val panelW = 320
@@ -39,7 +40,7 @@ class SpecOverviewScreen(val originPos: BlockPos) :
             addRenderableWidget(
                 Button.builder(Component.literal("✔")) {
                     val newId = nameEditBox?.value?.trim()?.takeIf { it.isNotEmpty() } ?: return@builder
-                    // TODO Task 4: send RenameSpecC2SPayload or equivalent
+                    sendPacket(SetSpecIdC2SPayload(originPos, newId))
                     nameEditMode = false
                     rebuildWidgets()
                 }.bounds(x + panelW - 26, y + 12, 18, 16).build()
@@ -56,7 +57,7 @@ class SpecOverviewScreen(val originPos: BlockPos) :
         // Row 1: Run, Bounds, Reset & Load
         addRenderableWidget(
             Button.builder(Component.translatable("screen.redstonespecs.spec_overview.run")) {
-                sendPacket(RunSpecC2SPayload(originPos, false))
+                sendPacket(RunSpecC2SPayload(originPos))
             }.bounds(x + 8, y + panelH - 48, 76, 20).build()
         )
         // TODO Task 3/5: Run All button (removed runAll concept for now)

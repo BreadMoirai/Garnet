@@ -122,7 +122,7 @@ fun buildSpecEditorYacl(state: SpecEditorState): Screen {
                         .name(Component.literal("Remove Spec"))
                         .action { _, _ ->
                             ClientPlayNetworking.send(
-                                RemoveSpecEntryC2SPayload(state.originPos, 0 /* TODO Task 4: remove specCaseIndex */, state.entryRelPos)
+                                RemoveSpecEntryC2SPayload(state.originPos, state.entryRelPos)
                             )
                             mc.setScreen(null)
                         }
@@ -193,7 +193,7 @@ fun buildSpecEditorYacl(state: SpecEditorState): Screen {
         }
         .save {
             val updated = buildUpdatedEntry(state)
-            ClientPlayNetworking.send(SaveSpecEntryC2SPayload(state.originPos, 0 /* TODO Task 4: remove specCaseIndex */, updated))
+            ClientPlayNetworking.send(SaveSpecEntryC2SPayload(state.originPos, updated))
         }
         .build()
         .generateScreen(null)

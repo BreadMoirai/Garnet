@@ -39,7 +39,7 @@ class RedstoneSpecBlock(properties: Properties) : BaseEntityBlock(properties) {
             if (be.spec == null) {
                 be.setSpec(RedstoneSpec.new(UUID.randomUUID().toString()))
             }
-            ServerPlayNetworking.send(player as ServerPlayer, OpenOverviewS2CPayload(pos))
+            ServerPlayNetworking.send(player as ServerPlayer, OpenOverviewS2CPayload(pos, emptyList()))
         }
         return InteractionResult.SUCCESS
     }
