@@ -120,13 +120,17 @@ object SpecRunnerCoordinator {
         val level = be.level as? ServerLevel ?: return
         val snapshot = snapshots[be] ?: return
         val stateRecorder = stateRecorders[be]
+        if (stateRecorder == null) {
+            LOGGER.error("[SpecRunnerCoordinator#startNextCase] no StateRecorder found for '{}', aborting run", spec.name)
+            finishRun(be)
+            return
+        }
         val boundsWorldMin = BlockPos(
             be.blockPos.x + spec.bounds.minX(),
             be.blockPos.y + spec.bounds.minY(),
             be.blockPos.z + spec.bounds.minZ(),
         )
-        val view = stateRecorder?.let { StateRecordingView.of(it) }
-            ?: StateRecordingView(emptyMap(), emptyList())
+        val view = StateRecordingView.of(stateRecorder)
 
         LOGGER.debug("[SpecRunnerCoordinator#startNextCase] starting case '{}' (index={}) remaining={}", specCase.name, caseIndex, queue.size)
         snapshot.restore(level)

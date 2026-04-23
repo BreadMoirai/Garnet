@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.properties.Property
 
 fun evaluateCondition(condition: StateCondition, level: Level, worldPos: BlockPos): Boolean {
     val state = level.getBlockState(worldPos)
-    return evaluateConditionOnState(condition, state, level, worldPos)
+    return evaluateConditionOnState(condition, state, worldPos)
 }
 
 fun evaluateCondition(
@@ -22,13 +22,13 @@ fun evaluateCondition(
     simTime: SimTime,
 ): Boolean {
     val state = view.stateAt(localPos, simTime)
-    return evaluateConditionOnState(condition, state, null, localPos)
+    return evaluateConditionOnState(condition, state, localPos)
 }
 
-private fun evaluateConditionOnState(condition: StateCondition, state: BlockState, level: Level?, worldPos: BlockPos): Boolean = when (condition) {
-    is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state, level, worldPos) }
-    is StateCondition.Any -> condition.conditions.any { evaluateConditionOnState(it, state, level, worldPos) }
-    is StateCondition.Not -> !evaluateConditionOnState(condition.condition, state, level, worldPos)
+private fun evaluateConditionOnState(condition: StateCondition, state: BlockState, worldPos: BlockPos): Boolean = when (condition) {
+    is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state, worldPos) }
+    is StateCondition.Any -> condition.conditions.any { evaluateConditionOnState(it, state, worldPos) }
+    is StateCondition.Not -> !evaluateConditionOnState(condition.condition, state, worldPos)
     is StateCondition.BlockType -> {
         val actualId = BuiltInRegistries.BLOCK.getKey(state.block) ?: return false
         actualId == condition.blockId
