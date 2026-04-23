@@ -185,15 +185,15 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         val cur2z = box2z?.getIntValue() ?: v2z
 
         // Convert current mode values to canonical min/max
-        val (minX, minY, minZ, maxX, maxY, maxZ) = when (displayMode) {
-            DisplayMode.OFFSET_SIZE -> {
-                val sx = cur2x.coerceAtLeast(1); val sy = cur2y.coerceAtLeast(1); val sz = cur2z.coerceAtLeast(1)
-                listOf(cur1x, cur1y, cur1z, cur1x + sx - 1, cur1y + sy - 1, cur1z + sz - 1)
-            }
-            DisplayMode.MIN_MAX -> listOf(
-                minOf(cur1x, cur2x), minOf(cur1y, cur2y), minOf(cur1z, cur2z),
-                maxOf(cur1x, cur2x), maxOf(cur1y, cur2y), maxOf(cur1z, cur2z),
-            )
+        val minX: Int; val minY: Int; val minZ: Int
+        val maxX: Int; val maxY: Int; val maxZ: Int
+        if (displayMode == DisplayMode.OFFSET_SIZE) {
+            val sx = cur2x.coerceAtLeast(1); val sy = cur2y.coerceAtLeast(1); val sz = cur2z.coerceAtLeast(1)
+            minX = cur1x; minY = cur1y; minZ = cur1z
+            maxX = cur1x + sx - 1; maxY = cur1y + sy - 1; maxZ = cur1z + sz - 1
+        } else {
+            minX = minOf(cur1x, cur2x); minY = minOf(cur1y, cur2y); minZ = minOf(cur1z, cur2z)
+            maxX = maxOf(cur1x, cur2x); maxY = maxOf(cur1y, cur2y); maxZ = maxOf(cur1z, cur2z)
         }
 
         // Convert canonical min/max to new mode
@@ -233,15 +233,6 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
 
         ClientPlayNetworking.send(ResizeBoundsC2SPayload(originPos, newBounds))
         onClose()
-    }
-
-    override fun extractRenderState(
-        extractor: GuiGraphicsExtractor,
-        mouseX: Int,
-        mouseY: Int,
-        partialTick: Float,
-    ) {
-        super.extractRenderState(extractor, mouseX, mouseY, partialTick)
     }
 
     private fun getBounds() =
