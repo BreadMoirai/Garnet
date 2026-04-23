@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.runner
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SpecCaseResult
 import com.breadmoirai.redstonespecs.data.TestResult
@@ -15,18 +15,18 @@ import org.slf4j.LoggerFactory
 object SpecRunnerCoordinator {
     private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
-    private val runners = HashMap<SpecOriginBlockEntity, SpecRunner>()
-    private val queues = HashMap<SpecOriginBlockEntity, ArrayDeque<Int>>()
-    private val snapshots = HashMap<SpecOriginBlockEntity, SpecSnapshot>()
-    private val results = HashMap<SpecOriginBlockEntity, MutableList<SpecCaseResult>>()
+    private val runners = HashMap<RedstoneSpecBlockEntity, SpecRunner>()
+    private val queues = HashMap<RedstoneSpecBlockEntity, ArrayDeque<Int>>()
+    private val snapshots = HashMap<RedstoneSpecBlockEntity, SpecSnapshot>()
+    private val results = HashMap<RedstoneSpecBlockEntity, MutableList<SpecCaseResult>>()
 
     // AutoSpec monitoring: (be, caseIndex, autoSpec.relPos) → active recorder
     private val autoSpecRecorders =
-        HashMap<Triple<SpecOriginBlockEntity, Int, BlockPos>, AutoSpecRecorder>()
+        HashMap<Triple<RedstoneSpecBlockEntity, Int, BlockPos>, AutoSpecRecorder>()
 
-    private val stateRecorders = HashMap<SpecOriginBlockEntity, StateRecorder>()
+    private val stateRecorders = HashMap<RedstoneSpecBlockEntity, StateRecorder>()
 
-    fun startRun(be: SpecOriginBlockEntity, runAll: Boolean) {
+    fun startRun(be: RedstoneSpecBlockEntity, runAll: Boolean) {
         if (runners.containsKey(be)) return
         val spec = be.spec ?: return
         val level = be.level as? ServerLevel ?: return
@@ -48,7 +48,7 @@ object SpecRunnerCoordinator {
         startNextCase(be)
     }
 
-    fun resetSpec(be: SpecOriginBlockEntity) {
+    fun resetSpec(be: RedstoneSpecBlockEntity) {
         LOGGER.debug("[SpecRunnerCoordinator#resetSpec] resetting spec at {}", be.blockPos)
         if (stateRecorders.remove(be) != null) StateRecorder.deactivate()
         runners.remove(be)
@@ -59,7 +59,7 @@ object SpecRunnerCoordinator {
         snapshot?.restore(level)
     }
 
-    fun resumeSpec(be: SpecOriginBlockEntity) {
+    fun resumeSpec(be: RedstoneSpecBlockEntity) {
         LOGGER.debug("[SpecRunnerCoordinator#resumeSpec] resuming spec at {}", be.blockPos)
         runners[be]?.resume()
     }
@@ -75,7 +75,7 @@ object SpecRunnerCoordinator {
     }
 
     private fun tickRunners(level: ServerLevel, phase: Phase) {
-        val completed = mutableListOf<SpecOriginBlockEntity>()
+        val completed = mutableListOf<RedstoneSpecBlockEntity>()
 
         for ((be, runner) in runners) {
             if (be.level !== level) continue
@@ -108,7 +108,7 @@ object SpecRunnerCoordinator {
         }
     }
 
-    private fun startNextCase(be: SpecOriginBlockEntity) {
+    private fun startNextCase(be: RedstoneSpecBlockEntity) {
         val queue = queues[be] ?: return
         if (queue.isEmpty()) {
             finishRun(be)
@@ -139,7 +139,7 @@ object SpecRunnerCoordinator {
         runners[be] = runner
     }
 
-    private fun finishRun(be: SpecOriginBlockEntity) {
+    private fun finishRun(be: RedstoneSpecBlockEntity) {
         val recorder = stateRecorders.remove(be)
         if (recorder != null) StateRecorder.deactivate()
         val level = be.level as? ServerLevel ?: return
@@ -162,7 +162,7 @@ object SpecRunnerCoordinator {
     }
 
     private fun monitorAutoSpecs(level: ServerLevel, phase: Phase) {
-        for (be in SpecOriginBlockEntity.allFor(level)) {
+        for (be in RedstoneSpecBlockEntity.allFor(level)) {
             if (runners.containsKey(be)) continue
             val spec = be.spec ?: continue
 

@@ -1,6 +1,6 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "redstonespecs:block/spec_origin"
+    "model": "redstonespecs:block/redstone_spec"
   }
 }

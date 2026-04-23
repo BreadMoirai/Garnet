@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.network.AddSpecCaseC2SPayload
 import com.breadmoirai.redstonespecs.network.RemoveSpecCaseC2SPayload
 import com.breadmoirai.redstonespecs.network.RenameSpecCaseC2SPayload
@@ -134,7 +134,7 @@ class SpecCasesScreen(private val originPos: BlockPos) :
         }
     }
 
-    private fun getBe() = minecraft?.level?.getBlockEntity(originPos) as? SpecOriginBlockEntity
+    private fun getBe() = minecraft?.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity
     private fun getSpec() = getBe()?.spec
     private fun sendPacket(p: CustomPacketPayload) = ClientPlayNetworking.send(p)
 }

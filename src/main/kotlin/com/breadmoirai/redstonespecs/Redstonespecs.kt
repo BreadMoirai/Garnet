@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.event.SubTickPhaseEvents
 import com.breadmoirai.redstonespecs.item.SpecMarkerTool
 import com.breadmoirai.redstonespecs.item.UndoStack
@@ -48,7 +48,7 @@ class Redstonespecs : ModInitializer {
             if (item !is SpecMarkerTool) return@register InteractionResult.PASS
             if (world.isClientSide) return@register InteractionResult.SUCCESS
 
-            val be = SpecOriginBlockEntity.findFor(world, pos) ?: return@register InteractionResult.PASS
+            val be = RedstoneSpecBlockEntity.findFor(world, pos) ?: return@register InteractionResult.PASS
             val relPos = pos.subtract(be.blockPos)
             val removed = be.removeEntry(be.activeSpecCaseIndex, relPos)
             if (removed != null) {

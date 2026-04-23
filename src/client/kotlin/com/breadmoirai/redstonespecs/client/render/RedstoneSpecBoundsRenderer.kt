@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.client.render
 
 import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
 import com.breadmoirai.redstonespecs.data.AutoSpec
@@ -25,25 +25,25 @@ import org.joml.Matrix4f
 
 fun registerBoundsRenderer() {
     BlockEntityRendererRegistry.register(
-        ModRegistries.SPEC_ORIGIN_BLOCK_ENTITY_TYPE,
-        ::SpecOriginBlockEntityRenderer,
+        ModRegistries.REDSTONE_SPEC_BLOCK_ENTITY_TYPE,
+        ::RedstoneSpecBlockEntityRenderer,
     )
 }
 
-class SpecOriginRenderState : BlockEntityRenderState() {
+class RedstoneSpecRenderState : BlockEntityRenderState() {
     var bounds: BoundingBox? = null
     var activeEntries: List<SpecEntry> = emptyList()
     var hoveredFace: HoveredFace? = null
 }
 
-class SpecOriginBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
-    BlockEntityRenderer<SpecOriginBlockEntity, SpecOriginRenderState> {
+class RedstoneSpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
+    BlockEntityRenderer<RedstoneSpecBlockEntity, RedstoneSpecRenderState> {
 
-    override fun createRenderState(): SpecOriginRenderState = SpecOriginRenderState()
+    override fun createRenderState(): RedstoneSpecRenderState = RedstoneSpecRenderState()
 
     override fun extractRenderState(
-        entity: SpecOriginBlockEntity,
-        state: SpecOriginRenderState,
+        entity: RedstoneSpecBlockEntity,
+        state: RedstoneSpecRenderState,
         partialTick: Float,
         cameraPos: net.minecraft.world.phys.Vec3,
         crumbling: net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay?,
@@ -60,7 +60,7 @@ class SpecOriginBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
     }
 
     override fun submit(
-        state: SpecOriginRenderState,
+        state: RedstoneSpecRenderState,
         poseStack: PoseStack,
         collector: net.minecraft.client.renderer.SubmitNodeCollector,
         cameraState: CameraRenderState,

@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.client.render
 
 import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.client.FaceHit
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
@@ -45,7 +45,7 @@ fun registerHudOverlay() {
             val y = extractor.guiHeight() / 2 + 20
 
             // Check if hit block belongs to a spec origin's bounds
-            val ownerBe = SpecOriginBlockEntity.findFor(level, hitPos)
+            val ownerBe = RedstoneSpecBlockEntity.findFor(level, hitPos)
             if (ownerBe != null) {
                 val spec = ownerBe.spec ?: return@HudElement
                 val activeCase = spec.specCases.getOrNull(ownerBe.activeSpecCaseIndex)
@@ -77,7 +77,7 @@ fun registerHudOverlay() {
             }
 
             // Check if looking directly at spec origin block
-            val originBe = level.getBlockEntity(hitPos) as? SpecOriginBlockEntity
+            val originBe = level.getBlockEntity(hitPos) as? RedstoneSpecBlockEntity
             if (originBe != null) {
                 val spec = originBe.spec ?: return@HudElement
                 extractor.text(
@@ -100,12 +100,12 @@ fun registerHudOverlay() {
 
         // Face detection when holding SpecOrigin block item
         val player = mc.player
-        val holdingSpecOrigin = player != null && (
-            (player.mainHandItem.item as? BlockItem)?.block == ModRegistries.SPEC_ORIGIN_BLOCK ||
-            (player.offhandItem.item as? BlockItem)?.block == ModRegistries.SPEC_ORIGIN_BLOCK
+        val holdingRedstoneSpec = player != null && (
+            (player.mainHandItem.item as? BlockItem)?.block == ModRegistries.REDSTONE_SPEC_BLOCK ||
+            (player.offhandItem.item as? BlockItem)?.block == ModRegistries.REDSTONE_SPEC_BLOCK
         )
 
-        if (holdingSpecOrigin && player != null) {
+        if (holdingRedstoneSpec && player != null) {
             val eyePos = player.getEyePosition(1.0f)
             val lookVec = player.getLookAngle()
             val maxReach = 64.0
@@ -113,7 +113,7 @@ fun registerHudOverlay() {
             var bestT = Double.MAX_VALUE
             var bestFace: HoveredFace? = null
 
-            for (be in SpecOriginBlockEntity.allFor(level)) {
+            for (be in RedstoneSpecBlockEntity.allFor(level)) {
                 val spec = be.spec ?: continue
                 val b = spec.bounds
                 val bpX = be.blockPos.x.toDouble()
@@ -137,8 +137,8 @@ fun registerHudOverlay() {
 
         val hitPos = (mc.hitResult as? BlockHitResult)?.blockPos ?: return@register
 
-        val be = SpecOriginBlockEntity.findFor(level, hitPos)
-            ?: (level.getBlockEntity(hitPos) as? SpecOriginBlockEntity)
+        val be = RedstoneSpecBlockEntity.findFor(level, hitPos)
+            ?: (level.getBlockEntity(hitPos) as? RedstoneSpecBlockEntity)
             ?: return@register
 
         if (keyCycleForward.consumeClick()) {

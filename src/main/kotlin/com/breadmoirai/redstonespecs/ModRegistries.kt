@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlock
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlock
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.item.AutoSpecMarkerItem
 import com.breadmoirai.redstonespecs.item.BreakpointSpecMarkerItem
 import com.breadmoirai.redstonespecs.item.InputSpecMarkerItem
@@ -24,17 +24,17 @@ import org.slf4j.LoggerFactory
 
 object ModRegistries {
     private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
-    val SPEC_ORIGIN_BLOCK: SpecOriginBlock = registerBlock(
-        "spec_origin",
-        ::SpecOriginBlock,
+    val REDSTONE_SPEC_BLOCK: RedstoneSpecBlock = registerBlock(
+        "redstone_spec",
+        ::RedstoneSpecBlock,
         BlockBehaviour.Properties.of().strength(2f).noOcclusion()
     )
-    val SPEC_ORIGIN_BLOCK_ENTITY_TYPE: BlockEntityType<SpecOriginBlockEntity> = registerBlockEntity(
-        "spec_origin",
-        ::SpecOriginBlockEntity,
-        SPEC_ORIGIN_BLOCK,
+    val REDSTONE_SPEC_BLOCK_ENTITY_TYPE: BlockEntityType<RedstoneSpecBlockEntity> = registerBlockEntity(
+        "redstone_spec",
+        ::RedstoneSpecBlockEntity,
+        REDSTONE_SPEC_BLOCK,
     )
-    val SPEC_ORIGIN_ITEM: BlockItem = registerBlockItem("spec_origin", SPEC_ORIGIN_BLOCK)
+    val REDSTONE_SPEC_ITEM: BlockItem = registerBlockItem("redstone_spec", REDSTONE_SPEC_BLOCK)
     val INPUT_SPEC_MARKER: InputSpecMarkerItem = registerItem("input_spec_marker", ::InputSpecMarkerItem)
     val OUTPUT_SPEC_MARKER: OutputSpecMarkerItem = registerItem("output_spec_marker", ::OutputSpecMarkerItem)
     val BREAKPOINT_SPEC_MARKER: BreakpointSpecMarkerItem = registerItem("breakpoint_spec_marker", ::BreakpointSpecMarkerItem)
@@ -73,7 +73,7 @@ object ModRegistries {
         )
     }
 
-    private fun registerBlockItem(id: String, block: SpecOriginBlock): BlockItem {
+    private fun registerBlockItem(id: String, block: RedstoneSpecBlock): BlockItem {
         return Registry.register(
             BuiltInRegistries.ITEM,
             id(id),

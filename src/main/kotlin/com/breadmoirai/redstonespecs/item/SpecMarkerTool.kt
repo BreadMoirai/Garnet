@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.item
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.InputSpec
@@ -30,7 +30,7 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
         val hitPos: BlockPos = context.clickedPos
         val player = context.player ?: return InteractionResult.PASS
 
-        val be = SpecOriginBlockEntity.findFor(level, hitPos) ?: return InteractionResult.PASS
+        val be = RedstoneSpecBlockEntity.findFor(level, hitPos) ?: return InteractionResult.PASS
 
         if (!level.isClientSide) {
             val spec = be.spec ?: return InteractionResult.PASS

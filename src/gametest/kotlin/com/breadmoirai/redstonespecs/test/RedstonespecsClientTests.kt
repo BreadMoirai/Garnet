@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.test
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.SpecBoundsScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
@@ -64,7 +64,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
     private fun leverLampFullFlow(ctx: SpecTestContext) {
         // ── World setup ──────────────────────────────────────────────────────
         for (x in 0..3) ctx.runCommand("setblock $x 63 0 minecraft:stone")
-        ctx.runCommand("setblock 0 64 0 redstonespecs:spec_origin")
+        ctx.runCommand("setblock 0 64 0 redstonespecs:redstone_spec")
         ctx.runCommand("setblock 1 64 0 minecraft:lever[face=floor,facing=north,powered=false]")
         ctx.runCommand("setblock 2 64 0 minecraft:redstone_lamp[lit=false]")
         ctx.runCommand("tp @a 0 64 -3")
@@ -124,13 +124,13 @@ class RedstonespecsClientTests : FabricClientGameTest {
 
         // ── Wait for test result ──────────────────────────────────────────────
         ctx.context.waitFor({ mc ->
-            (mc.level?.getBlockEntity(originPos) as? SpecOriginBlockEntity)
+            (mc.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity)
                 ?.lastTestResult != null
         }, 100)
 
         // ── Assert all checks passed ──────────────────────────────────────────
         val be = ctx.getClientBe(originPos)
-            ?: throw AssertionError("SpecOriginBlockEntity not found at $originPos")
+            ?: throw AssertionError("RedstoneSpecBlockEntity not found at $originPos")
         val result = be.lastTestResult
             ?: throw AssertionError("lastTestResult is null after waitFor succeeded")
         check(result.results.isNotEmpty()) { "Expected at least one SpecCaseResult" }

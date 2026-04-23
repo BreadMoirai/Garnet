@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.InputSpec
@@ -65,7 +65,7 @@ class SpecEditorScreen(
 
     private fun tryLaunch() {
         if (launched) return
-        val be = minecraft?.level?.getBlockEntity(originPos) as? SpecOriginBlockEntity ?: return
+        val be = minecraft?.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity ?: return
         val caseIndex = be.activeSpecCaseIndex
         val entry = be.spec?.specCases?.getOrNull(caseIndex)?.entryAt(entryRelPos) ?: return
         launched = true

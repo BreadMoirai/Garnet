@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.test
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import dev.isxander.yacl3.api.ButtonOption
 import dev.isxander.yacl3.api.Option
 import dev.isxander.yacl3.gui.YACLScreen
@@ -147,9 +147,9 @@ class SpecTestContext(
     fun screenshot(name: String): Path = context.takeScreenshot(name)
 
     /** Reads the synced client-side BE (lastTestResult is synced via getUpdatePacket). */
-    fun getClientBe(pos: BlockPos): SpecOriginBlockEntity? =
+    fun getClientBe(pos: BlockPos): RedstoneSpecBlockEntity? =
         fromClient { mc ->
-            mc.level?.getBlockEntity(pos) as? SpecOriginBlockEntity
+            mc.level?.getBlockEntity(pos) as? RedstoneSpecBlockEntity
         }
 
     /**

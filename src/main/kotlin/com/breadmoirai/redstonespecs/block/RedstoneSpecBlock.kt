@@ -20,12 +20,12 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox
 import net.minecraft.world.phys.BlockHitResult
 import java.util.UUID
 
-class SpecOriginBlock(properties: Properties) : BaseEntityBlock(properties) {
+class RedstoneSpecBlock(properties: Properties) : BaseEntityBlock(properties) {
 
     override fun codec(): MapCodec<out BaseEntityBlock> = CODEC
 
     override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity =
-        SpecOriginBlockEntity(pos, state)
+        RedstoneSpecBlockEntity(pos, state)
 
     override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
 
@@ -37,13 +37,13 @@ class SpecOriginBlock(properties: Properties) : BaseEntityBlock(properties) {
         hit: BlockHitResult,
     ): InteractionResult {
         if (!level.isClientSide) {
-            val be = level.getBlockEntity(pos) as? SpecOriginBlockEntity ?: return InteractionResult.PASS
+            val be = level.getBlockEntity(pos) as? RedstoneSpecBlockEntity ?: return InteractionResult.PASS
             if (be.spec == null) {
                 be.setSpec(
                     RedstoneSpec(
                         id = UUID.randomUUID(),
                         name = "New Spec",
-                        bounds = BoundingBox(-4, -1, -4, 4, 3, 4),
+                        bounds = BoundingBox(1, 0, 1, 5, 4, 5),
                         oneShot = false,
                         specCases = listOf(SpecCase("Case 1", 20, emptyList(), emptyList(), emptyList(), emptyList())),
                     )
@@ -61,6 +61,6 @@ class SpecOriginBlock(properties: Properties) : BaseEntityBlock(properties) {
     ): BlockEntityTicker<T>? = null
 
     companion object {
-        val CODEC: MapCodec<SpecOriginBlock> = simpleCodec(::SpecOriginBlock)
+        val CODEC: MapCodec<RedstoneSpecBlock> = simpleCodec(::RedstoneSpecBlock)
     }
 }

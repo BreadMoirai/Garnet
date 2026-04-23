@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.block.SpecOriginBlockEntity
+import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.network.RenameSpecC2SPayload
 import com.breadmoirai.redstonespecs.network.ResetSpecC2SPayload
 import com.breadmoirai.redstonespecs.network.RunSpecC2SPayload
@@ -179,7 +179,7 @@ class SpecOverviewScreen(val originPos: BlockPos) :
 
     override fun isPauseScreen() = false
 
-    private fun getBe() = minecraft?.level?.getBlockEntity(originPos) as? SpecOriginBlockEntity
+    private fun getBe() = minecraft?.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity
     private fun getSpec() = getBe()?.spec
     private fun sendPacket(payload: CustomPacketPayload) = ClientPlayNetworking.send(payload)
 }
