@@ -11,10 +11,8 @@ import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.InputSpec
 import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.network.CycleSpecCaseC2SPayload
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.minecraft.client.KeyMapping
@@ -48,15 +46,12 @@ fun registerHudOverlay() {
             val ownerBe = RedstoneSpecBlockEntity.findFor(level, hitPos)
             if (ownerBe != null) {
                 val spec = ownerBe.spec ?: return@HudElement
-                val activeCase = spec.specCases.getOrNull(ownerBe.activeSpecCaseIndex)
                 val relPos = hitPos.subtract(ownerBe.blockPos)
-                val entry = activeCase?.entryAt(relPos)
+                val entry = spec.entryAt(relPos)
 
                 extractor.text(
                     font,
-                    net.minecraft.network.chat.Component.literal(
-                        "§6${spec.name} §7> §f${activeCase?.name ?: "?"} §7(${ownerBe.activeSpecCaseIndex + 1}/${spec.specCases.size})"
-                    ),
+                    net.minecraft.network.chat.Component.literal("§6${spec.id}"),
                     2, y, 0xFFFFFF,
                 )
                 if (entry != null) {
@@ -68,11 +63,6 @@ fun registerHudOverlay() {
                         2, y + 11, 0xFFFFFF,
                     )
                 }
-                extractor.text(
-                    font,
-                    net.minecraft.network.chat.Component.literal("§8[ ] cycle case"),
-                    2, y + 22, 0xFFFFFF,
-                )
                 return@HudElement
             }
 
@@ -82,9 +72,7 @@ fun registerHudOverlay() {
                 val spec = originBe.spec ?: return@HudElement
                 extractor.text(
                     font,
-                    net.minecraft.network.chat.Component.literal(
-                        "§6${spec.name} §7(${originBe.activeSpecCaseIndex + 1}/${spec.specCases.size})"
-                    ),
+                    net.minecraft.network.chat.Component.literal("§6${spec.id}"),
                     2, y, 0xFFFFFF,
                 )
             }
@@ -135,18 +123,7 @@ fun registerHudOverlay() {
             currentHoveredFace = null
         }
 
-        val hitPos = (mc.hitResult as? BlockHitResult)?.blockPos ?: return@register
-
-        val be = RedstoneSpecBlockEntity.findFor(level, hitPos)
-            ?: (level.getBlockEntity(hitPos) as? RedstoneSpecBlockEntity)
-            ?: return@register
-
-        if (keyCycleForward.consumeClick()) {
-            ClientPlayNetworking.send(CycleSpecCaseC2SPayload(be.blockPos, true))
-        }
-        if (keyCycleBackward.consumeClick()) {
-            ClientPlayNetworking.send(CycleSpecCaseC2SPayload(be.blockPos, false))
-        }
+        // Cycle keybindings removed (no more spec cases to cycle)
     }
 }
 

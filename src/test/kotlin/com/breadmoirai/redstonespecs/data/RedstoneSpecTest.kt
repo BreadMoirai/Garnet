@@ -6,10 +6,10 @@ import net.minecraft.nbt.NbtOps
 import net.minecraft.server.Bootstrap
 import net.minecraft.world.level.levelgen.structure.BoundingBox
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import java.util.UUID
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RedstoneSpecTest {
@@ -29,68 +29,64 @@ class RedstoneSpecTest {
 
     @Test
     fun `empty RedstoneSpec roundtrip`() {
-        val spec = RedstoneSpec(
-            id = UUID.randomUUID(),
-            name = "test-spec",
-            bounds = BoundingBox(0, 0, 0, 10, 5, 10),
-            oneShot = false,
-            specCases = emptyList(),
-        )
+        val spec = RedstoneSpec.new("test-spec")
         assertEquals(spec, roundtrip(spec))
     }
 
     @Test
-    fun `oneShot flag roundtrip`() {
-        val spec = RedstoneSpec(
-            id = UUID.randomUUID(),
-            name = "one-shot",
-            bounds = BoundingBox(0, 0, 0, 4, 4, 4),
-            oneShot = true,
-            specCases = emptyList(),
-        )
-        val decoded = roundtrip(spec)
-        assertEquals(true, decoded.oneShot)
+    fun `mode roundtrip - all modes`() {
+        for (mode in SpecMode.entries) {
+            val spec = RedstoneSpec.new("spec").copy(mode = mode)
+            assertEquals(mode, roundtrip(spec).mode)
+        }
     }
 
     @Test
-    fun `UUID preserved across roundtrip`() {
-        val id = UUID.fromString("550e8400-e29b-41d4-a716-446655440000")
-        val spec = RedstoneSpec(id, "uuid-test", BoundingBox(0, 0, 0, 1, 1, 1), false, emptyList())
-        assertEquals(id, roundtrip(spec).id)
+    fun `id preserved across roundtrip`() {
+        val spec = RedstoneSpec.new("my-circuit")
+        assertEquals("my-circuit", roundtrip(spec).id)
     }
 
     @Test
-    fun `bounds preserved across roundtrip`() {
+    fun `lifespan preserved`() {
+        val spec = RedstoneSpec.new("spec").copy(lifespan = 42)
+        assertEquals(42, roundtrip(spec).lifespan)
+    }
+
+    @Test
+    fun `structure nullable roundtrip`() {
+        val withStructure = RedstoneSpec.new("spec").copy(structure = "shared_counter")
+        assertEquals("shared_counter", roundtrip(withStructure).structure)
+        val noStructure = RedstoneSpec.new("spec")
+        assertNull(roundtrip(noStructure).structure)
+    }
+
+    @Test
+    fun `bounds preserved`() {
         val bounds = BoundingBox(-3, 60, -3, 12, 65, 12)
-        val spec = RedstoneSpec(UUID.randomUUID(), "bounds-test", bounds, false, emptyList())
+        val spec = RedstoneSpec.new("spec").copy(bounds = bounds)
         assertEquals(bounds, roundtrip(spec).bounds)
     }
 
     @Test
-    fun `RedstoneSpec with multiple SpecCases roundtrip`() {
-        val cases = listOf(
-            SpecCase("case-1", 20,
-                inputs = listOf(InputSpec(BlockPos(1, 0, 0), "A", 0xFF0000, initEntries)),
-                outputs = listOf(OutputSpec(BlockPos(5, 0, 0), "Q", 0x0000FF, initEntries)),
-                breakpoints = emptyList(), autoSpecs = emptyList()),
-            SpecCase("case-2", 30, emptyList(), emptyList(), emptyList(), emptyList()),
+    fun `spec with inputs and outputs roundtrip`() {
+        val endEntries = listOf(SimTime(8, Phase.END_OF_TICK) to StateCondition.BoolProperty("lit", true))
+        val spec = RedstoneSpec.new("lever-lamp").copy(
+            lifespan = 8,
+            inputs = listOf(InputSpec(BlockPos(1, 0, 0), "lever", 0x4488FF, initEntries)),
+            outputs = listOf(OutputSpec(BlockPos(3, 0, 0), "lamp", 0x44FF88, endEntries)),
         )
-        val spec = RedstoneSpec(UUID.randomUUID(), "multi-case", BoundingBox(0, 0, 0, 8, 4, 8), false, cases)
         assertEquals(spec, roundtrip(spec))
     }
 
     @Test
     fun `TestResult codec roundtrip`() {
-        val id = UUID.randomUUID()
         val result = TestResult(
-            specId = id,
-            timestamp = System.currentTimeMillis(),
-            results = listOf(
-                SpecCaseResult("case-1", listOf(
-                    TickCheck(SimTime(0, Phase.START_OF_TICK), "Q", "true", "true", pass = true),
-                    TickCheck(SimTime(1, Phase.BLOCK_EVENTS), "Q", "false", "true", pass = false),
-                )),
-                SpecCaseResult("case-2", emptyList()),
+            specId = "my-spec",
+            timestamp = 1000L,
+            checks = listOf(
+                TickCheck(SimTime(0, Phase.END_OF_TICK), "lamp.lit", "true", "true", pass = true),
+                TickCheck(SimTime(1, Phase.END_OF_TICK), "lamp.lit", "true", "false", pass = false),
             ),
         )
         val encoded = TestResult.CODEC.encodeStart(NbtOps.INSTANCE, result).getOrThrow()

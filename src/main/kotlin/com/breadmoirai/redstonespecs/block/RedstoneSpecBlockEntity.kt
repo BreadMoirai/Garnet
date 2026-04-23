@@ -2,8 +2,8 @@ package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.SpecCase
 import com.breadmoirai.redstonespecs.data.SpecEntry
+import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.TestResult
 import net.minecraft.core.BlockPos
 import net.minecraft.core.HolderLookup
@@ -25,23 +25,32 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
     var spec: RedstoneSpec? = null
         private set
 
-    var activeSpecCaseIndex: Int = 0
-        private set
-
     var lastTestResult: TestResult? = null
         private set
 
     fun setSpec(newSpec: RedstoneSpec) {
-        LOGGER.debug("[RedstoneSpecBlockEntity#setSpec] setting spec '{}' at {}", newSpec.name, blockPos)
+        LOGGER.debug("[RedstoneSpecBlockEntity#setSpec] setting spec '{}' at {}", newSpec.id, blockPos)
         spec = newSpec
-        if (activeSpecCaseIndex >= newSpec.specCases.size) activeSpecCaseIndex = 0
         setChangedAndSync()
     }
 
-    fun setActiveSpecCase(index: Int) {
-        val s = spec ?: return
-        require(index in s.specCases.indices) { "Index $index out of bounds for ${s.specCases.size} spec cases" }
-        activeSpecCaseIndex = index
+    fun setSpecId(id: String) {
+        spec = spec?.copy(id = id) ?: return
+        setChangedAndSync()
+    }
+
+    fun setMode(mode: SpecMode) {
+        spec = spec?.copy(mode = mode) ?: return
+        setChangedAndSync()
+    }
+
+    fun setLifespan(lifespan: Int) {
+        spec = spec?.copy(lifespan = lifespan) ?: return
+        setChangedAndSync()
+    }
+
+    fun setStructure(structure: String?) {
+        spec = spec?.copy(structure = structure) ?: return
         setChangedAndSync()
     }
 
@@ -50,72 +59,17 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
         setChangedAndSync()
     }
 
-    fun addOrUpdateEntry(specCaseIndex: Int, entry: SpecEntry) {
-        LOGGER.debug("[RedstoneSpecBlockEntity#addOrUpdateEntry] case={} pos={} type={}", specCaseIndex, entry.pos, entry.javaClass.simpleName)
-        val s = spec ?: return
-        val updatedCases = s.specCases.toMutableList()
-        updatedCases[specCaseIndex] = updatedCases[specCaseIndex].withEntryAddedOrUpdated(entry)
-        spec = s.copy(specCases = updatedCases)
+    fun addOrUpdateEntry(entry: SpecEntry) {
+        LOGGER.debug("[RedstoneSpecBlockEntity#addOrUpdateEntry] pos={} type={}", entry.pos, entry.javaClass.simpleName)
+        spec = spec?.withEntryAddedOrUpdated(entry) ?: return
         setChangedAndSync()
     }
 
-    fun addSpecCase(name: String) {
-        LOGGER.debug("[RedstoneSpecBlockEntity#addSpecCase] adding case '{}' at {}", name, blockPos)
-        val s = spec ?: return
-        val newCase = SpecCase(name, 20, emptyList(), emptyList(), emptyList(), emptyList())
-        spec = s.copy(specCases = s.specCases + newCase)
-        setChangedAndSync()
-    }
-
-    fun addOrUpdateSpecCase(specCase: SpecCase) {
-        val s = spec ?: return
-        val existing = s.specCases.indexOfFirst { it.name == specCase.name }
-        val updated = if (existing >= 0) {
-            s.specCases.toMutableList().also { it[existing] = specCase }
-        } else {
-            s.specCases + specCase
-        }
-        spec = s.copy(specCases = updated)
-        if (activeSpecCaseIndex >= updated.size) activeSpecCaseIndex = updated.size - 1
-        setChangedAndSync()
-    }
-
-    fun removeSpecCase(index: Int) {
-        val s = spec ?: return
-        if (index !in s.specCases.indices) return
-        val updated = s.specCases.toMutableList().also { it.removeAt(index) }
-        spec = s.copy(specCases = updated)
-        if (activeSpecCaseIndex >= updated.size) activeSpecCaseIndex = (updated.size - 1).coerceAtLeast(0)
-        setChangedAndSync()
-    }
-
-    fun renameSpecCase(index: Int, name: String) {
-        val s = spec ?: return
-        if (index !in s.specCases.indices) return
-        val updated = s.specCases.toMutableList()
-        updated[index] = updated[index].copy(name = name)
-        spec = s.copy(specCases = updated)
-        setChangedAndSync()
-    }
-
-    fun setSpecName(name: String) {
-        spec = spec?.copy(name = name) ?: return
-        setChangedAndSync()
-    }
-
-    fun setOneShot(oneShot: Boolean) {
-        spec = spec?.copy(oneShot = oneShot) ?: return
-        setChangedAndSync()
-    }
-
-    fun removeEntry(specCaseIndex: Int, pos: BlockPos): SpecEntry? {
-        LOGGER.debug("[RedstoneSpecBlockEntity#removeEntry] case={} pos={}", specCaseIndex, pos)
+    fun removeEntry(pos: BlockPos): SpecEntry? {
+        LOGGER.debug("[RedstoneSpecBlockEntity#removeEntry] pos={}", pos)
         val s = spec ?: return null
-        val specCase = s.specCases.getOrNull(specCaseIndex) ?: return null
-        val removed = specCase.entryAt(pos) ?: return null
-        val updatedCases = s.specCases.toMutableList()
-        updatedCases[specCaseIndex] = specCase.withEntryRemoved(pos)
-        spec = s.copy(specCases = updatedCases)
+        val removed = s.entryAt(pos) ?: return null
+        spec = s.withEntryRemoved(pos)
         setChangedAndSync()
         return removed
     }
@@ -162,16 +116,14 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
         LOGGER.debug("[RedstoneSpecBlockEntity#saveAdditional] saving at {}", blockPos)
         super.saveAdditional(output)
         spec?.let { output.store("spec", RedstoneSpec.CODEC, it) }
-        output.putInt("active_spec_case", activeSpecCaseIndex)
         lastTestResult?.let { output.store("last_test_result", TestResult.CODEC, it) }
     }
 
     override fun loadAdditional(input: ValueInput) {
         super.loadAdditional(input)
         spec = input.read("spec", RedstoneSpec.CODEC).orElse(null)
-        activeSpecCaseIndex = input.getIntOr("active_spec_case", 0)
         lastTestResult = input.read("last_test_result", TestResult.CODEC).orElse(null)
-        LOGGER.debug("[RedstoneSpecBlockEntity#loadAdditional] loaded at {} spec='{}' activeCase={}", blockPos, spec?.name, activeSpecCaseIndex)
+        LOGGER.debug("[RedstoneSpecBlockEntity#loadAdditional] loaded at {} spec='{}'", blockPos, spec?.id)
     }
 
     override fun getUpdateTag(registries: HolderLookup.Provider): CompoundTag =

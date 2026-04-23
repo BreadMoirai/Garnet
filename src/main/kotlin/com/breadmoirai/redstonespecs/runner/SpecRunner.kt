@@ -3,10 +3,8 @@ package com.breadmoirai.redstonespecs.runner
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
-import com.breadmoirai.redstonespecs.data.SpecCase
-import com.breadmoirai.redstonespecs.data.SpecCaseResult
-import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.data.TickCheck
+import com.breadmoirai.redstonespecs.data.StateCondition
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.level.ServerLevel
@@ -20,14 +18,12 @@ private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 data class BreakpointHit(
     val simTime: SimTime,
-    val specName: String,
-    val caseName: String,
+    val specId: String,
     val breakpointLabel: String,
 )
 
 class SpecRunner(
     val spec: RedstoneSpec,
-    val specCase: SpecCase,
     val originPos: BlockPos,
     val level: ServerLevel,
     private val snapshot: SpecSnapshot,
@@ -43,12 +39,12 @@ class SpecRunner(
         private set
 
     fun start() {
-        LOGGER.debug("[SpecRunner#start] starting case '{}' of spec '{}'", specCase.name, spec.name)
+        LOGGER.debug("[SpecRunner#start] starting spec '{}'", spec.id)
         applyInputsAt(SimTime.INIT)
     }
 
     fun resume() {
-        LOGGER.debug("[SpecRunner#resume] resuming case '{}' frozen at {}", specCase.name, frozenAt)
+        LOGGER.debug("[SpecRunner#resume] resuming spec '{}' frozen at {}", spec.id, frozenAt)
         frozenAt = null
     }
 
@@ -56,13 +52,13 @@ class SpecRunner(
 
     fun resetCircuit() { snapshot.restore(level) }
 
-    fun onPhase(phase: Phase): SpecCaseResult? {
+    fun onPhase(phase: Phase): List<TickCheck>? {
         if (frozenAt != null) return null
         if (phase == Phase.START_OF_TICK) ticksElapsed++
         if (ticksElapsed < 0) return null
-        if (ticksElapsed >= specCase.lifespan) {
-            LOGGER.debug("[SpecRunner#onPhase] case '{}' finished after {} ticks", specCase.name, ticksElapsed)
-            return SpecCaseResult(specCase.name, checks.toList())
+        if (ticksElapsed >= spec.lifespan) {
+            LOGGER.debug("[SpecRunner#onPhase] spec '{}' finished after {} ticks", spec.id, ticksElapsed)
+            return checks.toList()
         }
         val simTime = SimTime(ticksElapsed, phase)
         applyInputsAt(simTime)
@@ -72,10 +68,9 @@ class SpecRunner(
     }
 
     private fun applyInputsAt(simTime: SimTime) {
-        // USER_INTERACTION entries fire at START_OF_TICK
         val userInteractionTime = if (simTime.phase == Phase.START_OF_TICK)
             simTime.copy(phase = Phase.USER_INTERACTION) else null
-        for (input in specCase.inputs) {
+        for (input in spec.inputs) {
             val (_, condition) = input.entries.find {
                 it.first == simTime || (userInteractionTime != null && it.first == userInteractionTime)
             } ?: continue
@@ -104,22 +99,15 @@ class SpecRunner(
             is StateCondition.BoolProperty -> out += condition.name to condition.value.toString()
             is StateCondition.IntProperty -> out += condition.name to condition.value.toString()
             is StateCondition.EnumProperty -> out += condition.name to condition.value
-            is StateCondition.BlockType -> LOGGER.warn(
-                "[SpecRunner] BlockType condition '{}' cannot be applied as block property input, ignoring",
-                condition.blockId
-            )
-            else -> LOGGER.warn(
-                "[SpecRunner] Unsupported condition type '{}' in flattenToProperties, ignoring",
-                condition::class.simpleName
-            )
+            is StateCondition.BlockType -> LOGGER.warn("[SpecRunner] BlockType condition cannot be applied as input, ignoring")
+            else -> LOGGER.warn("[SpecRunner] Unsupported condition type '{}' in flattenToProperties, ignoring", condition::class.simpleName)
         }
     }
 
     private fun checkOutputsAt(simTime: SimTime) {
-        // USER_INTERACTION entries are checked at END_OF_TICK
         val userInteractionTime = if (simTime.phase == Phase.END_OF_TICK)
             simTime.copy(phase = Phase.USER_INTERACTION) else null
-        for (output in specCase.outputs) {
+        for (output in spec.outputs) {
             val (_, condition) = output.entries.find {
                 it.first == simTime || (userInteractionTime != null && it.first == userInteractionTime)
             } ?: continue
@@ -138,47 +126,34 @@ class SpecRunner(
                 val prop = state.block.stateDefinition.getProperty(condition.name) as? BooleanProperty
                 val actual = prop?.let { state.getValue(it).toString() } ?: "missing"
                 val expected = condition.value.toString()
-                val pass = actual == expected
-                LOGGER.debug("[SpecRunner#collectChecks] {} '{}.{}' expected={} actual={} pass={}", simTime, label, condition.name, expected, actual, pass)
-                checks += TickCheck(simTime, "$label.${condition.name}", expected, actual, pass)
+                checks += TickCheck(simTime, "$label.${condition.name}", expected, actual, actual == expected)
             }
             is StateCondition.IntProperty -> {
                 val prop = state.block.stateDefinition.getProperty(condition.name) as? IntegerProperty
                 val actual = prop?.let { state.getValue(it).toString() } ?: "missing"
                 val expected = condition.value.toString()
-                val pass = actual == expected
-                checks += TickCheck(simTime, "$label.${condition.name}", expected, actual, pass)
+                checks += TickCheck(simTime, "$label.${condition.name}", expected, actual, actual == expected)
             }
             is StateCondition.EnumProperty -> {
                 val actual = blockStatePropertyStr(state, condition.name) ?: "missing"
-                val pass = actual == condition.value
-                checks += TickCheck(simTime, "$label.${condition.name}", condition.value, actual, pass)
+                checks += TickCheck(simTime, "$label.${condition.name}", condition.value, actual, actual == condition.value)
             }
             is StateCondition.BlockType -> {
-                val actualId = BuiltInRegistries.BLOCK.getKey(state.block)?.toString() ?: "missing"
+                val actualId = BuiltInRegistries.BLOCK.getKey(state.block).toString()
                 val expected = condition.blockId.toString()
-                val pass = actualId == expected
-                checks += TickCheck(simTime, "$label.block", expected, actualId, pass)
+                checks += TickCheck(simTime, "$label.block", expected, actualId, actualId == expected)
             }
-            is StateCondition.Any -> LOGGER.warn(
-                "[SpecRunner] Any condition not supported in output checks at {}, skipping", label
-            )
-            is StateCondition.Not -> LOGGER.warn(
-                "[SpecRunner] Not condition not supported in output checks at {}, skipping", label
-            )
-            is StateCondition.ContainerContents -> LOGGER.warn(
-                "[SpecRunner] ContainerContents condition not supported in output checks at {}, skipping", label
-            )
+            else -> LOGGER.warn("[SpecRunner] Unsupported condition type '{}' in output check, skipping", condition::class.simpleName)
         }
     }
 
     private fun checkBreakpointsAt(simTime: SimTime) {
-        for (bp in specCase.breakpoints) {
+        for (bp in spec.breakpoints) {
             if (!bp.enabled) continue
             if (evaluateCondition(bp.condition, level, worldPos(bp.pos))) {
                 LOGGER.debug("[SpecRunner#checkBreakpointsAt] breakpoint '{}' hit at {}", bp.label, simTime)
                 frozenAt = simTime
-                pendingBreakpointHit = BreakpointHit(simTime, spec.name, specCase.name, bp.label.ifEmpty { bp.pos.toString() })
+                pendingBreakpointHit = BreakpointHit(simTime, spec.id, bp.label.ifEmpty { bp.pos.toString() })
                 return
             }
         }

@@ -33,7 +33,6 @@ class SpecEditorState(
     val originPos: BlockPos,
     val entryRelPos: BlockPos,
     val originalEntry: SpecEntry,
-    val specCaseIndex: Int,
 ) {
     var workingLabel: String = originalEntry.label
     var workingColor: Int = originalEntry.color
@@ -66,10 +65,9 @@ class SpecEditorScreen(
     private fun tryLaunch() {
         if (launched) return
         val be = minecraft?.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity ?: return
-        val caseIndex = be.activeSpecCaseIndex
-        val entry = be.spec?.specCases?.getOrNull(caseIndex)?.entryAt(entryRelPos) ?: return
+        val entry = be.spec?.entryAt(entryRelPos) ?: return
         launched = true
-        val state = SpecEditorState(originPos, entryRelPos, entry, caseIndex)
+        val state = SpecEditorState(originPos, entryRelPos, entry)
         minecraft?.setScreen(buildSpecEditorYacl(state))
     }
 
@@ -124,7 +122,7 @@ fun buildSpecEditorYacl(state: SpecEditorState): Screen {
                         .name(Component.literal("Remove Spec"))
                         .action { _, _ ->
                             ClientPlayNetworking.send(
-                                RemoveSpecEntryC2SPayload(state.originPos, state.specCaseIndex, state.entryRelPos)
+                                RemoveSpecEntryC2SPayload(state.originPos, state.entryRelPos)
                             )
                             mc.setScreen(null)
                         }
@@ -195,7 +193,7 @@ fun buildSpecEditorYacl(state: SpecEditorState): Screen {
         }
         .save {
             val updated = buildUpdatedEntry(state)
-            ClientPlayNetworking.send(SaveSpecEntryC2SPayload(state.originPos, state.specCaseIndex, updated))
+            ClientPlayNetworking.send(SaveSpecEntryC2SPayload(state.originPos, updated))
         }
         .build()
         .generateScreen(null)

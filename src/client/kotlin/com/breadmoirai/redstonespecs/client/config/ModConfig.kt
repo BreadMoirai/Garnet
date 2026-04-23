@@ -9,6 +9,7 @@ import dev.isxander.yacl3.api.Option
 import dev.isxander.yacl3.api.OptionDescription
 import dev.isxander.yacl3.api.YetAnotherConfigLib
 import dev.isxander.yacl3.api.controller.CyclingListControllerBuilder
+import dev.isxander.yacl3.api.controller.StringControllerBuilder
 import dev.isxander.yacl3.api.controller.TickBoxControllerBuilder
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.gui.screens.Screen
@@ -22,6 +23,7 @@ object ModConfig {
 
     var autoSaveOnExit: Boolean = false
     var devLevel: DevLevel = DevLevel.STANDARD
+    var specSaveDir: String = "redstonespecs"
 
     fun load() {
         if (!configFile.exists()) return
@@ -32,11 +34,13 @@ object ModConfig {
                 devLevel = json.get("devLevel")?.asString
                     ?.let { runCatching { DevLevel.valueOf(it) }.getOrNull() }
                     ?: DevLevel.STANDARD
+                specSaveDir = json.get("specSaveDir")?.asString ?: "redstonespecs"
             }
         }.onFailure { e ->
             LOGGER.warn("Failed to load ModConfig from {}", configFile.absolutePath, e)
         }
         SharedSettings.devLevel = devLevel
+        SharedSettings.specSaveDir = specSaveDir
     }
 
     fun save() {
@@ -44,12 +48,14 @@ object ModConfig {
         val json = JsonObject()
         json.addProperty("autoSaveOnExit", autoSaveOnExit)
         json.addProperty("devLevel", devLevel.name)
+        json.addProperty("specSaveDir", specSaveDir)
         runCatching {
             configFile.writeText(json.toString())
         }.onFailure { e ->
             LOGGER.error("Failed to save ModConfig to {}", configFile.absolutePath, e)
         }
         SharedSettings.devLevel = devLevel
+        SharedSettings.specSaveDir = specSaveDir
     }
 
     fun createScreen(parent: Screen): Screen = YetAnotherConfigLib.createBuilder()
@@ -92,6 +98,18 @@ object ModConfig {
                         )
                         .binding(false, { autoSaveOnExit }, { autoSaveOnExit = it })
                         .controller(TickBoxControllerBuilder::create)
+                        .build()
+                )
+                .option(
+                    Option.createBuilder<String>()
+                        .name(Component.literal("Spec Save Directory"))
+                        .description(
+                            OptionDescription.of(
+                                Component.literal("Folder (relative to world folder) where .json and .nbt spec files are saved.")
+                            )
+                        )
+                        .binding("redstonespecs", { specSaveDir }, { specSaveDir = it })
+                        .controller(StringControllerBuilder::create)
                         .build()
                 )
                 .build()
