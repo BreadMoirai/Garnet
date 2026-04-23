@@ -18,7 +18,7 @@ A foundational system that records all block state changes within a spec's bound
 data class PropertyDiff(val name: String, val to: String)
 
 data class BlockStateChange(
-    val pos: BlockPos,               // relative to the SpecOriginBlockEntity position (same convention as SpecEntry.pos)
+    val pos: BlockPos,               // local to bounds: (0,0,0) = bounds min corner, extends +x/+y/+z
     val simTime: SimTime,
     val toBlock: ResourceLocation?,  // null if block type unchanged
     val diffs: List<PropertyDiff>,   // only changed properties
@@ -27,7 +27,7 @@ data class BlockStateChange(
 data class StateRecording(
     val specId: UUID,
     val timestamp: Long,
-    val initialSnapshot: Map<BlockPos, BlockState>,  // keyed by pos relative to SpecOriginBlockEntity position
+    val initialSnapshot: Map<BlockPos, BlockState>,  // keyed by local pos (bounds min corner = origin)
     val changes: List<BlockStateChange>,             // ordered by simTime naturally
 )
 ```
@@ -51,7 +51,7 @@ class StateRecordingView(val recording: StateRecording) {
 }
 ```
 
-All positions are relative to the `SpecOriginBlockEntity` block position — the same convention used by `SpecEntry.pos` and `SpecSnapshot`. This is distinct from the bounds min corner: the bounds are themselves offsets from the origin block, so a position like `BlockPos(2, 0, -1)` means 2 blocks east and 1 block north of the origin block, regardless of where the bounds start.
+All positions use a local coordinate space where `(0, 0, 0)` is the bounds min corner and the box extends in the `+x`, `+y`, `+z` directions. The `SpecOriginBlockEntity` position plays no role in this space — it is not the origin and is not factored into any local position. To convert a world position to local: `localPos = worldPos - boundsMin`.
 
 `stateAt` returns the `to` state of the last `BlockStateChange` at `pos` where `change.simTime <= simTime`, falling back to `initialSnapshot` if no changes precede that time.
 
@@ -126,10 +126,10 @@ object StateRecordingStorage {
 {
   "specId": <uuid string>,
   "timestamp": <long>,
-  "initialSnapshot": [ { "pos": [x,y,z], "state": <blockstate string> }, ... ],  // pos relative to SpecOriginBlockEntity position
+  "initialSnapshot": [ { "pos": [x,y,z], "state": <blockstate string> }, ... ],  // pos local to bounds (min corner = 0,0,0)
   "changes": [
     {
-      "pos": [x, y, z],              // relative to SpecOriginBlockEntity position
+      "pos": [x, y, z],              // local: (0,0,0) = bounds min corner, extends +x/+y/+z
       "tick": <int>,
       "phase": <string>,
       "order": <int>,
