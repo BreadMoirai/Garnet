@@ -5,7 +5,6 @@ import com.breadmoirai.redstonespecs.data.*
 import com.breadmoirai.redstonespecs.network.*
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.components.Button
-import net.minecraft.client.gui.components.CycleButton
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.components.ScrollableLayout
 import net.minecraft.client.gui.components.StringWidget
@@ -60,27 +59,23 @@ class SpecOverviewScreen(
         // Mode row
         val modeRow = LinearLayout.horizontal().spacing(4)
         modeRow.addChild(StringWidget(40, 20, Component.literal("Mode:"), font))
-        val modeButton = CycleButton.builder<SpecMode>(
-            { mode ->
-                Component.literal(when (mode) {
-                    SpecMode.SIMPLE -> "Simple"
-                    SpecMode.TICK_AWARE -> "Tick-Aware"
-                    SpecMode.UPDATE_AWARE -> "Update-Aware"
-                })
-            },
+        val modeButton = DropdownButton(
+            0, 0, 180, 20, font,
+            SpecMode.entries.toList(),
+            { mode -> Component.literal(when (mode) {
+                SpecMode.SIMPLE -> "Simple"
+                SpecMode.TICK_AWARE -> "Tick-Aware"
+                SpecMode.UPDATE_AWARE -> "Update-Aware"
+            }) },
             spec?.mode ?: SpecMode.SIMPLE,
-        ).withValues(*SpecMode.entries.toTypedArray())
-            .displayOnlyValue()
-            .create(0, 0, 180, 20, Component.empty()) { _, value ->
-                sendPacket(SetSpecModeC2SPayload(originPos, value))
-            }
+        ) { value -> sendPacket(SetSpecModeC2SPayload(originPos, value)) }
         modeRow.addChild(modeButton)
         content.addChild(modeRow)
 
         // Lifespan row
         val lifespanRow = LinearLayout.horizontal().spacing(4)
         lifespanRow.addChild(StringWidget(40, 20, Component.literal("Life:"), font))
-        val box = IntEditBox(font, 100, 20, 1, Int.MAX_VALUE, spec?.lifespan ?: 20, onChange = { sendPacket(SetLifespanC2SPayload(originPos, box.getIntValue())) })
+        val box = IntEditBox(font, 100, 20, 1, Int.MAX_VALUE, spec?.lifespan ?: 20, onChange = { sendPacket(SetLifespanC2SPayload(originPos, it)) })
         lifespanBox = box
         val decBtn = Button.builder(Component.literal("−")) {
             box.setIntValue(box.getIntValue() - 1)
@@ -115,9 +110,11 @@ class SpecOverviewScreen(
             entryListContent.addChild(StringWidget(240, 18, Component.literal("(no entries)"), font))
         }
 
-        // Fixed height rows: title(9) + spacer(4) + idRow(20) + spacer(4) + modeRow(20)
-        // + spacer(4) + lifespanRow(20) + spacer(4) + spacer(4) + result(14) + spacer(2) + actionRow(20) + margins(20)
-        val fixedHeight = 9 + 4 + 20 + 4 + 20 + 4 + 20 + 4 + 4 + 14 + 2 + 20 + 20
+        // Fixed height = sum of non-scroll children + (N-1)*4 spacing gaps + 20px margins.
+        // Without result: 9 children, 8 gaps → (9+4+20+20+20+4+4+20) + 8*4 + 20 = 153
+        // With result: 2 extra children (text=9, spacer=2) + 2 extra gaps → 153 + 9+2+8 = 172
+        val resultFixed = if (result != null) 19 else 0
+        val fixedHeight = 153 + resultFixed
         val entryScrollHeight = (height - fixedHeight).coerceAtLeast(60)
         val scrollable = ScrollableLayout(minecraft, entryListContent, entryScrollHeight)
         content.addChild(scrollable)

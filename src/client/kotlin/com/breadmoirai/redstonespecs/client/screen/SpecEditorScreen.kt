@@ -15,7 +15,6 @@ import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.components.Button
-import net.minecraft.client.gui.components.CycleButton
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.components.ScrollableLayout
 import net.minecraft.client.gui.components.StringWidget
@@ -209,31 +208,31 @@ class SpecEditorScreen(
 
         if (specMode == SpecMode.UPDATE_AWARE) {
             val currentPhase = row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
-            val phaseButton = CycleButton.builder<Phase>(
+            val phaseButton = DropdownButton(
+                0, 0, 110, 16, font,
+                advancedPhases,
                 { phase -> Component.literal(phase.name) },
                 currentPhase,
-            ).withValues(*advancedPhases.toTypedArray())
-                .displayOnlyValue()
-                .create(0, 0, 110, 16, Component.empty()) { _, phase ->
-                    if (row.simTime != SimTime.INIT) {
-                        row.simTime = SimTime(row.simTime.tick, phase)
-                    }
-                    sortAndRebuild()
+            ) { phase ->
+                if (row.simTime != SimTime.INIT) {
+                    row.simTime = SimTime(row.simTime.tick, phase)
                 }
+                sortAndRebuild()
+            }
             phaseButton.active = row.simTime != SimTime.INIT
             rowLayout.addChild(phaseButton)
         }
 
-        val propButton = CycleButton.builder(
+        val propButton = DropdownButton(
+            0, 0, 100, 16, font,
+            availableProps,
             { Component.literal(it) },
             row.prop.name,
-        ).withValues(*availableProps.toTypedArray())
-            .displayOnlyValue()
-            .create(0, 0, 100, 16, Component.empty()) { _, propName ->
-                val newProp = buildRowPropForName(propName, blockState)
-                if (newProp != null) row.prop = newProp
-                rebuildWidgets()
-            }
+        ) { propName ->
+            val newProp = buildRowPropForName(propName, blockState)
+            if (newProp != null) row.prop = newProp
+            rebuildWidgets()
+        }
         rowLayout.addChild(propButton)
 
         rowLayout.addChild(buildValueWidget(row))
@@ -242,7 +241,7 @@ class SpecEditorScreen(
             Button.builder(Component.literal("×")) {
                 rows.removeAt(index)
                 rebuildWidgets()
-            }.pos(0, 0).size(20, 20).build()
+            }.pos(0, 0).size(20, 16).build()
         )
 
         return rowLayout
@@ -251,12 +250,12 @@ class SpecEditorScreen(
     private fun buildValueWidget(row: FlatRow): LayoutElement = when (val prop = row.prop) {
         is RowProp.Block -> StringWidget(110, 16, Component.literal(prop.blockId.path), font)
 
-        is RowProp.Bool -> CycleButton.builder<Boolean>(
+        is RowProp.Bool -> DropdownButton(
+            0, 0, 110, 16, font,
+            listOf(false, true),
             { v -> Component.literal(v.toString()) },
             prop.value,
-        ).withValues(false, true)
-            .displayOnlyValue()
-            .create(0, 0, 110, 16, Component.empty()) { _, v -> prop.value = v }
+        ) { v -> prop.value = v }
 
         is RowProp.ExactInt -> {
             val valRow = LinearLayout.horizontal().spacing(1)
@@ -307,12 +306,12 @@ class SpecEditorScreen(
             valRow
         }
 
-        is RowProp.Enum -> CycleButton.builder<String>(
+        is RowProp.Enum -> DropdownButton(
+            0, 0, 110, 16, font,
+            prop.options,
             { v -> Component.literal(v) },
             prop.value,
-        ).withValues(*prop.options.toTypedArray())
-            .displayOnlyValue()
-            .create(0, 0, 110, 16, Component.empty()) { _, v -> prop.value = v }
+        ) { v -> prop.value = v }
     }
 
     private fun sortAndRebuild() {
