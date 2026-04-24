@@ -135,11 +135,8 @@ class SpecOverviewScreen(
                 is BreakpointSpec -> "BP"
                 is AutoSpec -> "AUTO"
             }
-            val baseLabel = Component.literal("► $tag  ${entry.label.ifEmpty { "—" }}  (${entry.pos.x},${entry.pos.y},${entry.pos.z})")
-            val label = when (entry) {
-                is InputSpec, is OutputSpec -> baseLabel.withStyle { it.withColor(entry.color) }
-                else -> baseLabel
-            }
+            val label = Component.literal("► $tag  ${entry.label.ifEmpty { "—" }}  (${entry.pos.x},${entry.pos.y},${entry.pos.z})")
+                .withStyle { it.withColor(entry.color) }
             entryListContent.addChild(LowProfileButtonWidget(0, 0, 240, 18, label) {
                 minecraft.setScreen(SpecEditorScreen(originPos, entry.pos))
             })
