@@ -23,12 +23,10 @@ class SpecOverviewScreen(
 ) : Screen(Component.translatable("screen.redstonespecs.spec_overview")) {
 
     private var idEditMode = false
-    private var structureEditMode = false
     private var lifespanBox: IntEditBox? = null
 
     override fun isPauseScreen() = false
     override fun isInGameUi() = true
-
 
     override fun init() {
         super.init()
@@ -38,7 +36,6 @@ class SpecOverviewScreen(
 
         // Title
         content.addChild(StringWidget(Component.translatable("screen.redstonespecs.spec_overview"), font))
-
         content.addChild(SpacerElement(0, 4))
 
         // ID row
@@ -98,29 +95,9 @@ class SpecOverviewScreen(
         lifespanRow.addChild(incBtn)
         content.addChild(lifespanRow)
 
-        // Structure row
-        val structureRow = LinearLayout.horizontal().spacing(4)
-        structureRow.addChild(StringWidget(40, 20, Component.literal("Struct:"), font))
-        if (structureEditMode) {
-            val structBox = EditBox(font, 180, 20, Component.empty())
-            structBox.value = spec?.structure ?: (spec?.id ?: "")
-            structureRow.addChild(structBox)
-            structureRow.addChild(Button.builder(Component.literal("✔")) {
-                val s = structBox.value.trim()
-                sendPacket(SetStructureC2SPayload(originPos, s.ifBlank { null }))
-                structureEditMode = false; rebuildWidgets()
-            }.pos(0, 0).width(20).build())
-        } else {
-            structureRow.addChild(StringWidget(180, 20, Component.literal(spec?.structure ?: "(none)"), font))
-            structureRow.addChild(Button.builder(Component.literal("✎")) {
-                structureEditMode = true; rebuildWidgets()
-            }.pos(0, 0).width(20).build())
-        }
-        content.addChild(structureRow)
-
         content.addChild(SpacerElement(0, 4))
 
-        // Entry list
+        // Entry list — dynamic height
         val entries = spec?.allEntries ?: emptyList()
         val entryListContent = LinearLayout.vertical().spacing(2)
         entries.forEach { entry ->
@@ -140,7 +117,10 @@ class SpecOverviewScreen(
             entryListContent.addChild(StringWidget(240, 18, Component.literal("(no entries)"), font))
         }
 
-        val entryScrollHeight = (height - 240).coerceIn(60, 160)
+        // Fixed height rows: title(9) + spacer(4) + spacer(4) + idRow(20) + spacer(4) + modeRow(20)
+        // + spacer(4) + lifespanRow(20) + spacer(4) + spacer(4) + result(14) + spacer(2) + actionRow(20) + margins(20)
+        val fixedHeight = 9 + 4 + 4 + 20 + 4 + 20 + 4 + 20 + 4 + 4 + 14 + 2 + 20 + 20
+        val entryScrollHeight = (height - fixedHeight).coerceAtLeast(60)
         val scrollable = ScrollableLayout(minecraft, entryListContent, entryScrollHeight)
         content.addChild(scrollable)
 
@@ -157,16 +137,10 @@ class SpecOverviewScreen(
             content.addChild(SpacerElement(0, 2))
         }
 
-        // Action buttons row
+        // Action buttons
         val actionRow = LinearLayout.horizontal().spacing(4)
-        actionRow.addChild(Button.builder(Component.translatable("screen.redstonespecs.spec_overview.run")) {
+        actionRow.addChild(Button.builder(Component.literal("Run")) {
             sendPacket(RunSpecC2SPayload(originPos))
-        }.pos(0, 0).width(60).build())
-        actionRow.addChild(Button.builder(Component.literal("Load")) {
-            spec?.id?.let { id -> sendPacket(LoadSpecC2SPayload(originPos, id)) }
-        }.pos(0, 0).width(60).build())
-        actionRow.addChild(Button.builder(Component.literal("Save")) {
-            sendPacket(SaveSpecC2SPayload(originPos))
         }.pos(0, 0).width(60).build())
         actionRow.addChild(Button.builder(Component.literal("Bounds")) {
             minecraft.setScreen(SpecBoundsScreen(originPos))
@@ -183,7 +157,6 @@ class SpecOverviewScreen(
 
     override fun onClose() {
         idEditMode = false
-        structureEditMode = false
         super.onClose()
     }
 
