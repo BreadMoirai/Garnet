@@ -153,7 +153,8 @@ class SpecEditorScreen(
                 }
             )
 
-            content.addChild(ScrollableLayout(minecraft, tableContent, 140))
+            val tableScrollHeight = (height - 220).coerceIn(60, 200)
+            content.addChild(ScrollableLayout(minecraft, tableContent, tableScrollHeight))
 
             content.addChild(
                 LowProfileButtonWidget(0, 0, 120, 20, Component.literal("Capture State")) {

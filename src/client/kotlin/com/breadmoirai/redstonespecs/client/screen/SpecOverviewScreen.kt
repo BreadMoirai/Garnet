@@ -145,7 +145,8 @@ class SpecOverviewScreen(
             entryListContent.addChild(StringWidget(240, 18, Component.literal("(no entries)"), font))
         }
 
-        val scrollable = ScrollableLayout(minecraft, entryListContent, 120)
+        val entryScrollHeight = (height - 240).coerceIn(60, 160)
+        val scrollable = ScrollableLayout(minecraft, entryListContent, entryScrollHeight)
         content.addChild(scrollable)
 
         content.addChild(SpacerElement(0, 4))
@@ -173,6 +174,9 @@ class SpecOverviewScreen(
         })
         actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20, Component.literal("Save")) {
             sendPacket(SaveSpecC2SPayload(originPos))
+        })
+        actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20, Component.literal("Bounds")) {
+            minecraft.setScreen(SpecBoundsScreen(originPos))
         })
         actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20, CommonComponents.GUI_DONE) {
             onClose()

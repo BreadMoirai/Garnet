@@ -86,7 +86,7 @@ class InputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerToo
 class OutputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry {
         val time = if (spec.mode == SpecMode.SIMPLE) SimTime(spec.lifespan, Phase.END_OF_TICK) else SimTime.INIT
-        return OutputSpec(relPos, defaultLabel(initState, spec), 0x44FF88, listOf(time to propsToCondition(initProps, initState)))
+        return OutputSpec(relPos, defaultLabel(initState, spec), 0xFF8800, listOf(time to propsToCondition(initProps, initState)))
     }
 }
 
