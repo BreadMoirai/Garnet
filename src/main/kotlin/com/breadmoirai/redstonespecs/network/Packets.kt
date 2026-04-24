@@ -16,7 +16,6 @@ import net.minecraft.resources.Identifier
 
 data class OpenOverviewS2CPayload(
     val originPos: BlockPos,
-    val availableStructures: List<String>,
 ) : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<OpenOverviewS2CPayload>(
@@ -24,7 +23,6 @@ data class OpenOverviewS2CPayload(
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, OpenOverviewS2CPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, OpenOverviewS2CPayload::originPos,
-            ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()), OpenOverviewS2CPayload::availableStructures,
             ::OpenOverviewS2CPayload,
         )
     }
@@ -335,6 +333,32 @@ data class LoadSpecC2SPayload(val originPos: BlockPos, val specId: String) : Cus
             BlockPos.STREAM_CODEC, LoadSpecC2SPayload::originPos,
             ByteBufCodecs.STRING_UTF8, LoadSpecC2SPayload::specId,
             ::LoadSpecC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class SaveStructureC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SaveStructureC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "save_structure")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, SaveStructureC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, SaveStructureC2SPayload::originPos,
+            ::SaveStructureC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class LoadStructureC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<LoadStructureC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "load_structure")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, LoadStructureC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, LoadStructureC2SPayload::originPos,
+            ::LoadStructureC2SPayload,
         )
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE

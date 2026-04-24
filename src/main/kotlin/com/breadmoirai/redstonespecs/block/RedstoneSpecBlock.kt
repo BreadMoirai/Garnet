@@ -1,9 +1,7 @@
 package com.breadmoirai.redstonespecs.block
 
-import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
-import com.breadmoirai.redstonespecs.persistence.StructurePersistence
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
@@ -17,7 +15,6 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BlockEntityTicker
 import net.minecraft.world.level.block.entity.BlockEntityType
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.level.storage.LevelResource
 import net.minecraft.world.phys.BlockHitResult
 
 class RedstoneSpecBlock(properties: Properties) : BaseEntityBlock(properties) {
@@ -43,10 +40,7 @@ class RedstoneSpecBlock(properties: Properties) : BaseEntityBlock(properties) {
                 val defaultId = serverPlayer.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
                 be.setSpec(RedstoneSpec.new(defaultId))
             }
-            val serverLevel = level as net.minecraft.server.level.ServerLevel
-            val dir = serverLevel.server.getWorldPath(LevelResource.ROOT).resolve(SharedSettings.specSaveDir)
-            val structures = StructurePersistence.listIds(dir)
-            ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos, structures))
+            ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos))
         }
         return InteractionResult.SUCCESS
     }
