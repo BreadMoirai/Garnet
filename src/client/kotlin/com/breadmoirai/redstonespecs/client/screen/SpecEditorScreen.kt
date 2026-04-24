@@ -13,8 +13,8 @@ import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.network.RemoveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
-import dev.isxander.yacl3.gui.LowProfileButtonWidget
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.CycleButton
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.components.ScrollableLayout
@@ -72,7 +72,7 @@ class SpecEditorScreen(
         }
         if (entries != null) {
             val worldPos = originPos.offset(entryRelPos)
-            val blockState = minecraft?.level?.getBlockState(worldPos)
+            val blockState = minecraft.level?.getBlockState(worldPos)
             val (rows, passthrough) = flattenEntries(entries, blockState)
             workingRows = rows
             workingPassthrough = passthrough
@@ -128,7 +128,7 @@ class SpecEditorScreen(
             content.addChild(StringWidget(Component.literal("Entries:"), font))
 
             val worldPos = originPos.offset(entryRelPos)
-            val blockState = minecraft?.level?.getBlockState(worldPos)
+            val blockState = minecraft.level?.getBlockState(worldPos)
             val availableProps = buildAvailableProps(blockState)
             val advancedPhases = Phase.entries.filter { it != Phase.USER_INTERACTION }
 
@@ -138,7 +138,7 @@ class SpecEditorScreen(
             }
 
             tableContent.addChild(
-                LowProfileButtonWidget(0, 0, 400, 16, Component.literal("+ Add Row")) {
+                Button.builder(Component.literal("+ Add Row")) {
                     val lastTime = rows.lastOrNull()?.simTime
                     val newTick = when {
                         lastTime == null -> -1
@@ -150,33 +150,33 @@ class SpecEditorScreen(
                     val firstProp = buildFirstRowProp(blockState)
                     if (firstProp != null) rows.add(FlatRow(newTime, firstProp))
                     rebuildWidgets()
-                }
+                }.pos(0, 0).width(240).build()
             )
 
-            val tableScrollHeight = (height - 220).coerceIn(60, 200)
+            val tableScrollHeight = (height - 166).coerceAtLeast(60)
             content.addChild(ScrollableLayout(minecraft, tableContent, tableScrollHeight))
 
-            content.addChild(
-                LowProfileButtonWidget(0, 0, 120, 20, Component.literal("Capture State")) {
+            val captureRow = LinearLayout.horizontal().spacing(4)
+            captureRow.addChild(
+                Button.builder(Component.literal("Add Properties")) {
                     captureState(rows)
-                }
+                }.pos(0, 0).width(120).build()
             )
+            captureRow.addChild(
+                Button.builder(Component.literal("Add Changed Properties")) {
+                    captureChangedTracked(rows)
+                }.pos(0, 0).width(160).build()
+            )
+            content.addChild(captureRow)
 
             content.addChild(SpacerElement(0, 4))
         }
 
-        content.addChild(
-            LowProfileButtonWidget(0, 0, 120, 20, Component.literal("Remove Spec")) {
-                ClientPlayNetworking.send(RemoveSpecEntryC2SPayload(originPos, entryRelPos))
-                minecraft?.setScreen(null)
-            }
-        )
-
         content.addChild(SpacerElement(0, 4))
 
         val bottomRow = LinearLayout.horizontal().spacing(4)
-        bottomRow.addChild(LowProfileButtonWidget(0, 0, 80, 20, Component.literal("Save")) { saveAndClose() })
-        bottomRow.addChild(LowProfileButtonWidget(0, 0, 80, 20, CommonComponents.GUI_CANCEL) { onClose() })
+        bottomRow.addChild(Button.builder(Component.literal("Save")) { saveAndClose() }.pos(0, 0).width(80).build())
+        bottomRow.addChild(Button.builder(CommonComponents.GUI_CANCEL) { onClose() }.pos(0, 0).width(80).build())
         content.addChild(bottomRow)
 
         content.arrangeElements()
@@ -200,7 +200,7 @@ class SpecEditorScreen(
                 font, 60, 16, -1, Int.MAX_VALUE, tickVal,
                 onChange = { v ->
                     row.simTime = if (v < 0) SimTime.INIT
-                        else SimTime(v, row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK)
+                    else SimTime(v, row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK)
                 },
                 onHoverEnd = { sortAndRebuild() },
             )
@@ -209,40 +209,40 @@ class SpecEditorScreen(
 
         if (specMode == SpecMode.UPDATE_AWARE) {
             val currentPhase = row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
-            val phaseDropdown = DropdownButton(
-                0, 0, 110, 16, font,
-                advancedPhases,
+            val phaseButton = CycleButton.builder<Phase>(
                 { phase -> Component.literal(phase.name) },
                 currentPhase,
-            ) { phase ->
-                if (row.simTime != SimTime.INIT) {
-                    row.simTime = SimTime(row.simTime.tick, phase)
+            ).withValues(*advancedPhases.toTypedArray())
+                .displayOnlyValue()
+                .create(0, 0, 110, 16, Component.empty()) { _, phase ->
+                    if (row.simTime != SimTime.INIT) {
+                        row.simTime = SimTime(row.simTime.tick, phase)
+                    }
+                    sortAndRebuild()
                 }
-                sortAndRebuild()
-            }
-            phaseDropdown.active = row.simTime != SimTime.INIT
-            rowLayout.addChild(phaseDropdown)
+            phaseButton.active = row.simTime != SimTime.INIT
+            rowLayout.addChild(phaseButton)
         }
 
-        val propDropdown = DropdownButton(
-            0, 0, 100, 16, font,
-            availableProps,
+        val propButton = CycleButton.builder(
             { Component.literal(it) },
             row.prop.name,
-        ) { propName ->
-            val newProp = buildRowPropForName(propName, blockState)
-            if (newProp != null) row.prop = newProp
-            rebuildWidgets()
-        }
-        rowLayout.addChild(propDropdown)
+        ).withValues(*availableProps.toTypedArray())
+            .displayOnlyValue()
+            .create(0, 0, 100, 16, Component.empty()) { _, propName ->
+                val newProp = buildRowPropForName(propName, blockState)
+                if (newProp != null) row.prop = newProp
+                rebuildWidgets()
+            }
+        rowLayout.addChild(propButton)
 
         rowLayout.addChild(buildValueWidget(row))
 
         rowLayout.addChild(
-            LowProfileButtonWidget(0, 0, 20, 16, Component.literal("×")) {
+            Button.builder(Component.literal("×")) {
                 rows.removeAt(index)
                 rebuildWidgets()
-            }
+            }.pos(0, 0).size(20, 20).build()
         )
 
         return rowLayout
@@ -260,23 +260,50 @@ class SpecEditorScreen(
 
         is RowProp.ExactInt -> {
             val valRow = LinearLayout.horizontal().spacing(1)
-            valRow.addChild(IntEditBox(font, 80, 16, prop.min, prop.max, prop.value, onChange = { v -> prop.value = v }))
-            valRow.addChild(LowProfileButtonWidget(0, 0, 28, 16, Component.literal("~")) {
+            valRow.addChild(
+                IntEditBox(
+                    font,
+                    60,
+                    16,
+                    prop.min,
+                    prop.max,
+                    prop.value,
+                    onChange = { v -> prop.value = v })
+            )
+            valRow.addChild(Button.builder(Component.literal("Range")) {
                 row.prop = RowProp.RangeInt(prop.name, prop.value, prop.max, prop.min, prop.max)
                 rebuildWidgets()
-            })
+            }.pos(0, 0).width(46).build())
             valRow
         }
 
         is RowProp.RangeInt -> {
             val valRow = LinearLayout.horizontal().spacing(1)
-            valRow.addChild(IntEditBox(font, 37, 16, prop.absMin, prop.absMax, prop.lo, onChange = { v -> prop.lo = v }))
+            valRow.addChild(
+                IntEditBox(
+                    font,
+                    37,
+                    16,
+                    prop.absMin,
+                    prop.absMax,
+                    prop.lo,
+                    onChange = { v -> prop.lo = v })
+            )
             valRow.addChild(StringWidget(6, 16, Component.literal("-"), font))
-            valRow.addChild(IntEditBox(font, 37, 16, prop.absMin, prop.absMax, prop.hi, onChange = { v -> prop.hi = v }))
-            valRow.addChild(LowProfileButtonWidget(0, 0, 20, 16, Component.literal("=")) {
+            valRow.addChild(
+                IntEditBox(
+                    font,
+                    37,
+                    16,
+                    prop.absMin,
+                    prop.absMax,
+                    prop.hi,
+                    onChange = { v -> prop.hi = v })
+            )
+            valRow.addChild(Button.builder(Component.literal("Exact")) {
                 row.prop = RowProp.ExactInt(prop.name, prop.lo, prop.absMin, prop.absMax)
                 rebuildWidgets()
-            })
+            }.pos(0, 0).width(40).build())
             valRow
         }
 
@@ -319,10 +346,14 @@ class SpecEditorScreen(
                 val max = prop.possibleValues.max()
                 RowProp.ExactInt(propName, blockState.getValue(prop), min, max)
             }
+
             else -> {
                 @Suppress("UNCHECKED_CAST")
                 val cast = prop as Property<Comparable<Any>>
-                RowProp.Enum(propName, cast.getName(blockState.getValue(prop)), prop.possibleValues.map { cast.getName(it) })
+                RowProp.Enum(
+                    propName,
+                    cast.getName(blockState.getValue(prop)),
+                    prop.possibleValues.map { cast.getName(it) })
             }
         }
     }
@@ -352,6 +383,46 @@ class SpecEditorScreen(
         }
 
         val diff = currentProps.filter { (k, v) -> lastKnown[k] != v }
+        if (diff.isEmpty()) return
+
+        val newTick = if (lastTime == SimTime.INIT) 0 else lastTime.tick + 1
+        val newTime = SimTime(newTick, Phase.END_OF_TICK)
+        diff.keys.forEach { propName ->
+            val newProp = buildRowPropForName(propName, blockState) ?: return@forEach
+            rows.add(FlatRow(newTime, newProp))
+        }
+        rebuildWidgets()
+    }
+
+    private fun captureChangedTracked(rows: MutableList<FlatRow>) {
+        val level = minecraft?.level ?: return
+        val worldPos = originPos.offset(entryRelPos)
+        val blockState = level.getBlockState(worldPos)
+        val currentProps = captureBlockStateProps(blockState)
+
+        val lastTime = rows.maxByOrNull { it.simTime }?.simTime ?: return
+        val lastKnown = mutableMapOf<String, String>()
+        rows.filter { it.simTime == lastTime }.forEach { r ->
+            when (val p = r.prop) {
+                is RowProp.Bool -> lastKnown[p.name] = p.value.toString()
+                is RowProp.ExactInt -> lastKnown[p.name] = p.value.toString()
+                is RowProp.Enum -> lastKnown[p.name] = p.value
+                else -> {}
+            }
+        }
+
+        // Only consider properties that are already tracked anywhere in this entry list
+        val trackedNames = rows.mapNotNull { r ->
+            when (val p = r.prop) {
+                is RowProp.Bool -> p.name
+                is RowProp.ExactInt -> p.name
+                is RowProp.RangeInt -> p.name
+                is RowProp.Enum -> p.name
+                else -> null
+            }
+        }.toSet()
+
+        val diff = currentProps.filter { (k, v) -> k in trackedNames && lastKnown[k] != v }
         if (diff.isEmpty()) return
 
         val newTick = if (lastTime == SimTime.INIT) 0 else lastTime.tick + 1
