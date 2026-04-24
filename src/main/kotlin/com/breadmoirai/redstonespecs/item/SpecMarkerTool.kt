@@ -8,6 +8,7 @@ import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.data.allEntries
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload
