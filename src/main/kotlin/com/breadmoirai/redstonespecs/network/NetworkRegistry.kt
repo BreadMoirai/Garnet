@@ -3,6 +3,7 @@ package com.breadmoirai.redstonespecs.network
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.item.UndoStack
+import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.breadmoirai.redstonespecs.persistence.StructurePersistence
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
@@ -24,6 +25,7 @@ fun registerNetworking() {
     PayloadTypeRegistry.clientboundPlay().register(TestResultS2CPayload.TYPE, TestResultS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(BreakpointHitS2CPayload.TYPE, BreakpointHitS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(OverwritePromptS2CPayload.TYPE, OverwritePromptS2CPayload.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(OpenFileBrowserS2CPayload.TYPE, OpenFileBrowserS2CPayload.STREAM_CODEC)
 
     // C2S registrations
     PayloadTypeRegistry.serverboundPlay().register(UndoC2SPayload.TYPE, UndoC2SPayload.STREAM_CODEC)
@@ -39,6 +41,8 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(SetLifespanC2SPayload.TYPE, SetLifespanC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SetStructureC2SPayload.TYPE, SetStructureC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(OverwriteDecisionC2SPayload.TYPE, OverwriteDecisionC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(RequestFileBrowserC2SPayload.TYPE, RequestFileBrowserC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(LoadFromFileC2SPayload.TYPE, LoadFromFileC2SPayload.STREAM_CODEC)
 
     // C2S handlers
     ServerPlayNetworking.registerGlobalReceiver(UndoC2SPayload.TYPE) { _, context ->
@@ -169,6 +173,51 @@ fun registerNetworking() {
                 LOGGER.debug("[NetworkRegistry#overwriteDecision] cleared and placed structure '{}'", structureId)
             } else {
                 LOGGER.debug("[NetworkRegistry#overwriteDecision] user skipped structure load")
+            }
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(RequestFileBrowserC2SPayload.TYPE) { payload, context ->
+        val player = context.player()
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#requestFileBrowser] originPos={}", payload.originPos)
+            val dir = saveDir(context.server())
+            val files = SpecPersistence.listIds(dir).mapNotNull { id ->
+                val spec = SpecPersistence.load(dir, id) ?: return@mapNotNull null
+                SpecFileInfo(
+                    id = spec.id,
+                    mode = spec.mode,
+                    lifespan = spec.lifespan,
+                    inputCount = spec.inputs.size,
+                    outputCount = spec.outputs.size,
+                    structure = spec.structure,
+                )
+            }
+            ServerPlayNetworking.send(player, OpenFileBrowserS2CPayload(payload.originPos, files))
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(LoadFromFileC2SPayload.TYPE) { payload, context ->
+        val player = context.player()
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#loadFromFile] originPos={} specId='{}'", payload.originPos, payload.specId)
+            val be = player.level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
+            val dir = saveDir(context.server())
+            val spec = SpecPersistence.load(dir, payload.specId)
+            if (spec == null) {
+                LOGGER.warn("[NetworkRegistry#loadFromFile] spec '{}' not found on disk", payload.specId)
+                return@execute
+            }
+            be.setSpec(spec)
+            LOGGER.debug("[NetworkRegistry#loadFromFile] loaded spec '{}' from disk", payload.specId)
+
+            val structureId = spec.structure ?: spec.id
+            val level = be.level as? ServerLevel ?: return@execute
+            if (StructurePersistence.hasNonAirBlocks(level, be.blockPos, spec.bounds)) {
+                ServerPlayNetworking.send(player, OverwritePromptS2CPayload(payload.originPos, structureId))
+            } else {
+                StructurePersistence.load(dir, structureId, level, be.blockPos, spec.bounds)
+                LOGGER.debug("[NetworkRegistry#loadFromFile] placed structure '{}'", structureId)
             }
         }
     }
