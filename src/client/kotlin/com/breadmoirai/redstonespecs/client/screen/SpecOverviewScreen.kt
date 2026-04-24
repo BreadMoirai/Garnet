@@ -139,6 +139,9 @@ class SpecOverviewScreen(
 
         // Action buttons
         val actionRow = LinearLayout.horizontal().spacing(4)
+        actionRow.addChild(Button.builder(Component.literal("Load")) {
+            sendPacket(RequestFileBrowserC2SPayload(originPos))
+        }.pos(0, 0).width(60).build())
         actionRow.addChild(Button.builder(Component.literal("Run")) {
             sendPacket(RunSpecC2SPayload(originPos))
         }.pos(0, 0).width(60).build())

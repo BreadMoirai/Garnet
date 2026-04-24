@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.client.network
 
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
+import com.breadmoirai.redstonespecs.client.screen.SpecFileBrowserScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
 import com.breadmoirai.redstonespecs.network.*
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer
@@ -69,6 +70,14 @@ fun registerClientNetworking() {
                 Component.literal("Overwrite"),
                 Component.literal("Skip Structure"),
             ))
+        }
+    }
+
+    ClientPlayNetworking.registerGlobalReceiver(OpenFileBrowserS2CPayload.TYPE) { payload, context ->
+        val mc = context.client()
+        mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#openFileBrowser] originPos={} fileCount={}", payload.originPos, payload.files.size)
+            mc.setScreen(SpecFileBrowserScreen(payload.originPos, payload.files))
         }
     }
 }
