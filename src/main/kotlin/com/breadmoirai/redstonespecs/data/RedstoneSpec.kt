@@ -1,11 +1,13 @@
 package com.breadmoirai.redstonespecs.data
 
+import com.livefront.annotation.AutoEmit
 import com.mojang.serialization.Codec
 import com.mojang.serialization.codecs.RecordCodecBuilder
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.levelgen.structure.BoundingBox
 import java.util.Optional
 
+@AutoEmit
 data class RedstoneSpec(
     val id: String,
     val mode: SpecMode,
@@ -17,8 +19,6 @@ data class RedstoneSpec(
     val breakpoints: List<BreakpointSpec>,
     val autoSpecs: List<AutoSpec>,
 ) {
-    val allEntries: List<SpecEntry> get() = inputs + outputs + breakpoints + autoSpecs
-
     fun entryAt(pos: BlockPos): SpecEntry? = allEntries.find { it.pos == pos }
 
     fun withEntryAddedOrUpdated(entry: SpecEntry): RedstoneSpec = when (entry) {
@@ -65,3 +65,6 @@ data class RedstoneSpec(
         }
     }
 }
+
+val RedstoneSpec.allEntries: List<SpecEntry>
+    get() = inputs + outputs + breakpoints + autoSpecs
