@@ -110,19 +110,18 @@ class SpecOverviewScreen(
             entryListContent.addChild(StringWidget(240, 18, Component.literal("(no entries)"), font))
         }
 
+        // Last result — fetched early so fixedHeight can account for the optional rows
+        val result = getBe()?.lastTestResult
+
         // Fixed height = sum of non-scroll children + (N-1)*4 spacing gaps + 20px margins.
         // Without result: 9 children, 8 gaps → (9+4+20+20+20+4+4+20) + 8*4 + 20 = 153
         // With result: 2 extra children (text=9, spacer=2) + 2 extra gaps → 153 + 9+2+8 = 172
-        val resultFixed = if (result != null) 19 else 0
-        val fixedHeight = 153 + resultFixed
+        val fixedHeight = 153 + if (result != null) 19 else 0
         val entryScrollHeight = (height - fixedHeight).coerceAtLeast(60)
         val scrollable = ScrollableLayout(minecraft, entryListContent, entryScrollHeight)
         content.addChild(scrollable)
 
         content.addChild(SpacerElement(0, 4))
-
-        // Last result
-        val result = getBe()?.lastTestResult
         if (result != null) {
             val text = if (result.pass)
                 "✓ ${result.passCount}/${result.checks.size} checks passed"
