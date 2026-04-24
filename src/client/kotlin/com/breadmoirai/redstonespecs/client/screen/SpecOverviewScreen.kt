@@ -80,15 +80,13 @@ class SpecOverviewScreen(
         // Lifespan row
         val lifespanRow = LinearLayout.horizontal().spacing(4)
         lifespanRow.addChild(StringWidget(40, 20, Component.literal("Life:"), font))
-        val box = IntEditBox(font, 100, 20, 1, Int.MAX_VALUE, spec?.lifespan ?: 20, onChange = {})
+        val box = IntEditBox(font, 100, 20, 1, Int.MAX_VALUE, spec?.lifespan ?: 20, onChange = { sendPacket(SetLifespanC2SPayload(originPos, box.getIntValue())) })
         lifespanBox = box
         val decBtn = Button.builder(Component.literal("−")) {
             box.setIntValue(box.getIntValue() - 1)
-            sendPacket(SetLifespanC2SPayload(originPos, box.getIntValue()))
         }.pos(0, 0).width(20).build()
         val incBtn = Button.builder(Component.literal("+")) {
             box.setIntValue(box.getIntValue() + 1)
-            sendPacket(SetLifespanC2SPayload(originPos, box.getIntValue()))
         }.pos(0, 0).width(20).build()
         lifespanRow.addChild(box)
         lifespanRow.addChild(decBtn)
@@ -117,9 +115,9 @@ class SpecOverviewScreen(
             entryListContent.addChild(StringWidget(240, 18, Component.literal("(no entries)"), font))
         }
 
-        // Fixed height rows: title(9) + spacer(4) + spacer(4) + idRow(20) + spacer(4) + modeRow(20)
+        // Fixed height rows: title(9) + spacer(4) + idRow(20) + spacer(4) + modeRow(20)
         // + spacer(4) + lifespanRow(20) + spacer(4) + spacer(4) + result(14) + spacer(2) + actionRow(20) + margins(20)
-        val fixedHeight = 9 + 4 + 4 + 20 + 4 + 20 + 4 + 20 + 4 + 4 + 14 + 2 + 20 + 20
+        val fixedHeight = 9 + 4 + 20 + 4 + 20 + 4 + 20 + 4 + 4 + 14 + 2 + 20 + 20
         val entryScrollHeight = (height - fixedHeight).coerceAtLeast(60)
         val scrollable = ScrollableLayout(minecraft, entryListContent, entryScrollHeight)
         content.addChild(scrollable)
