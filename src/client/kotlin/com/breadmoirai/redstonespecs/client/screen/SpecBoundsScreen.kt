@@ -2,9 +2,8 @@ package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.network.ResizeBoundsC2SPayload
-import dev.isxander.yacl3.gui.LowProfileButtonWidget
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.CycleButton
 import net.minecraft.client.gui.components.StringWidget
 import net.minecraft.client.gui.layouts.FrameLayout
@@ -77,8 +76,8 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         )
 
         // Bottom buttons
-        val saveBtn = LowProfileButtonWidget(0, 0, 60, 20, Component.literal("Save")) { save() }
-        val cancelBtn = LowProfileButtonWidget(0, 0, 60, 20, CommonComponents.GUI_CANCEL) { onClose() }
+        val saveBtn = Button.builder(Component.literal("Save")) { save() }.pos(0, 0).width(60).build()
+        val cancelBtn = Button.builder(CommonComponents.GUI_CANCEL) { onClose() }.pos(0, 0).width(60).build()
 
         val bottomRow = LinearLayout.horizontal().spacing(8)
         bottomRow.addChild(saveBtn)
@@ -142,12 +141,8 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
      */
     private fun makeFieldGroup(initial: Int, onChange: (Int) -> Unit): Pair<LinearLayout, IntEditBox> {
         val box = IntEditBox(font, 52, 20, Int.MIN_VALUE, Int.MAX_VALUE, initial, onChange)
-        val decBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("−")) {
-            box.setIntValue(box.getIntValue() - 1)
-        }
-        val incBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("+")) {
-            box.setIntValue(box.getIntValue() + 1)
-        }
+        val decBtn = Button.builder(Component.literal("−")) { box.setIntValue(box.getIntValue() - 1) }.pos(0, 0).width(20).build()
+        val incBtn = Button.builder(Component.literal("+")) { box.setIntValue(box.getIntValue() + 1) }.pos(0, 0).width(20).build()
         val group = LinearLayout.horizontal().spacing(2)
         group.addChild(decBtn)
         group.addChild(box)

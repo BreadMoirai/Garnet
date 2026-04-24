@@ -3,8 +3,8 @@ package com.breadmoirai.redstonespecs.client.screen
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.data.*
 import com.breadmoirai.redstonespecs.network.*
-import dev.isxander.yacl3.gui.LowProfileButtonWidget
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.CycleButton
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.components.ScrollableLayout
@@ -48,18 +48,15 @@ class SpecOverviewScreen(
             val idBox = EditBox(font, 180, 20, Component.empty())
             idBox.value = spec?.id ?: ""
             idRow.addChild(idBox)
-            idRow.addChild(LowProfileButtonWidget(0, 0, 20, 20, Component.literal("✔")) {
-                val newId = idBox.value.trim().takeIf { it.isNotBlank() } ?: return@LowProfileButtonWidget
-                sendPacket(SetSpecIdC2SPayload(originPos, newId))
-                idEditMode = false
-                rebuildWidgets()
-            })
+            idRow.addChild(Button.builder(Component.literal("✔")) {
+                val newId = idBox.value.trim().takeIf { it.isNotBlank() }
+                if (newId != null) { sendPacket(SetSpecIdC2SPayload(originPos, newId)); idEditMode = false; rebuildWidgets() }
+            }.pos(0, 0).width(20).build())
         } else {
             idRow.addChild(StringWidget(180, 20, Component.literal(spec?.id ?: ""), font))
-            idRow.addChild(LowProfileButtonWidget(0, 0, 20, 20, Component.literal("✎")) {
-                idEditMode = true
-                rebuildWidgets()
-            })
+            idRow.addChild(Button.builder(Component.literal("✎")) {
+                idEditMode = true; rebuildWidgets()
+            }.pos(0, 0).width(20).build())
         }
         content.addChild(idRow)
 
@@ -88,14 +85,14 @@ class SpecOverviewScreen(
         lifespanRow.addChild(StringWidget(40, 20, Component.literal("Life:"), font))
         val box = IntEditBox(font, 100, 20, 1, Int.MAX_VALUE, spec?.lifespan ?: 20, onChange = {})
         lifespanBox = box
-        val decBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("−")) {
+        val decBtn = Button.builder(Component.literal("−")) {
             box.setIntValue(box.getIntValue() - 1)
             sendPacket(SetLifespanC2SPayload(originPos, box.getIntValue()))
-        }
-        val incBtn = LowProfileButtonWidget(0, 0, 20, 20, Component.literal("+")) {
+        }.pos(0, 0).width(20).build()
+        val incBtn = Button.builder(Component.literal("+")) {
             box.setIntValue(box.getIntValue() + 1)
             sendPacket(SetLifespanC2SPayload(originPos, box.getIntValue()))
-        }
+        }.pos(0, 0).width(20).build()
         lifespanRow.addChild(box)
         lifespanRow.addChild(decBtn)
         lifespanRow.addChild(incBtn)
@@ -108,18 +105,16 @@ class SpecOverviewScreen(
             val structBox = EditBox(font, 180, 20, Component.empty())
             structBox.value = spec?.structure ?: (spec?.id ?: "")
             structureRow.addChild(structBox)
-            structureRow.addChild(LowProfileButtonWidget(0, 0, 20, 20, Component.literal("✔")) {
+            structureRow.addChild(Button.builder(Component.literal("✔")) {
                 val s = structBox.value.trim()
                 sendPacket(SetStructureC2SPayload(originPos, s.ifBlank { null }))
-                structureEditMode = false
-                rebuildWidgets()
-            })
+                structureEditMode = false; rebuildWidgets()
+            }.pos(0, 0).width(20).build())
         } else {
             structureRow.addChild(StringWidget(180, 20, Component.literal(spec?.structure ?: "(none)"), font))
-            structureRow.addChild(LowProfileButtonWidget(0, 0, 20, 20, Component.literal("✎")) {
-                structureEditMode = true
-                rebuildWidgets()
-            })
+            structureRow.addChild(Button.builder(Component.literal("✎")) {
+                structureEditMode = true; rebuildWidgets()
+            }.pos(0, 0).width(20).build())
         }
         content.addChild(structureRow)
 
@@ -137,9 +132,9 @@ class SpecOverviewScreen(
             }
             val label = Component.literal("► $tag  ${entry.label.ifEmpty { "—" }}  (${entry.pos.x},${entry.pos.y},${entry.pos.z})")
                 .withStyle { it.withColor(entry.color) }
-            entryListContent.addChild(LowProfileButtonWidget(0, 0, 240, 18, label) {
+            entryListContent.addChild(Button.builder(label) {
                 minecraft.setScreen(SpecEditorScreen(originPos, entry.pos))
-            })
+            }.pos(0, 0).width(240).build())
         }
         if (entries.isEmpty()) {
             entryListContent.addChild(StringWidget(240, 18, Component.literal("(no entries)"), font))
@@ -164,23 +159,21 @@ class SpecOverviewScreen(
 
         // Action buttons row
         val actionRow = LinearLayout.horizontal().spacing(4)
-        actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20,
-            Component.translatable("screen.redstonespecs.spec_overview.run")) {
+        actionRow.addChild(Button.builder(Component.translatable("screen.redstonespecs.spec_overview.run")) {
             sendPacket(RunSpecC2SPayload(originPos))
-        })
-        actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20, Component.literal("Load")) {
-            val id = spec?.id ?: return@LowProfileButtonWidget
-            sendPacket(LoadSpecC2SPayload(originPos, id))
-        })
-        actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20, Component.literal("Save")) {
+        }.pos(0, 0).width(60).build())
+        actionRow.addChild(Button.builder(Component.literal("Load")) {
+            spec?.id?.let { id -> sendPacket(LoadSpecC2SPayload(originPos, id)) }
+        }.pos(0, 0).width(60).build())
+        actionRow.addChild(Button.builder(Component.literal("Save")) {
             sendPacket(SaveSpecC2SPayload(originPos))
-        })
-        actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20, Component.literal("Bounds")) {
+        }.pos(0, 0).width(60).build())
+        actionRow.addChild(Button.builder(Component.literal("Bounds")) {
             minecraft.setScreen(SpecBoundsScreen(originPos))
-        })
-        actionRow.addChild(LowProfileButtonWidget(0, 0, 60, 20, CommonComponents.GUI_DONE) {
+        }.pos(0, 0).width(60).build())
+        actionRow.addChild(Button.builder(CommonComponents.GUI_DONE) {
             onClose()
-        })
+        }.pos(0, 0).width(60).build())
         content.addChild(actionRow)
 
         content.arrangeElements()
