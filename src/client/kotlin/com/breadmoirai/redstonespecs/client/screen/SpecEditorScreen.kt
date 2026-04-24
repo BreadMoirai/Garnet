@@ -180,7 +180,7 @@ class SpecEditorScreen(
         content.addChild(bottomRow)
 
         content.arrangeElements()
-        FrameLayout.centerInRectangle(content, 0, 0, width, height)
+        FrameLayout.centerInRectangle(content, 10, 10, width - 10, height - 10)
         content.visitWidgets { addRenderableWidget(it) }
     }
 
