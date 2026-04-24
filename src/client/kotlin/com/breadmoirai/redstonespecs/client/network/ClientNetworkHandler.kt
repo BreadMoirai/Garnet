@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.client.network
 
-import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
+import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
 import com.breadmoirai.redstonespecs.network.*
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -52,34 +52,6 @@ fun registerClientNetworking() {
             mc.player?.sendSystemMessage(
                 Component.literal("§6Breakpoint: §f${payload.breakpointLabel} §7in §f${payload.specId} §7at ${payload.simTime.tick}t ${payload.simTime.phase.name}")
             )
-        }
-    }
-
-    ClientPlayNetworking.registerGlobalReceiver(StructurePromptS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#structurePrompt] kind={} id={}", payload.promptKind, payload.currentStructureId)
-            val title = when (payload.promptKind) {
-                "SAVE_OR_FORK" -> "Structure '${payload.currentStructureId}' has changed"
-                else -> "Structure file '${payload.currentStructureId}' already exists"
-            }
-            val message = if (payload.promptKind == "SAVE_OR_FORK")
-                "Overwrite '${payload.currentStructureId}'?"
-            else
-                "Overwrite existing file?"
-            mc.setScreen(ConfirmScreen(
-                BooleanConsumer { save ->
-                    mc.setScreen(null)
-                    val decision = if (save) "SAVE" else "CANCEL"
-                    ClientPlayNetworking.send(StructureDecisionC2SPayload(
-                        payload.originPos, decision, payload.currentStructureId
-                    ))
-                },
-                Component.literal(title),
-                Component.literal(message),
-                Component.literal("Overwrite"),
-                Component.literal("Cancel"),
-            ))
         }
     }
 
