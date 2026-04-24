@@ -26,9 +26,8 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
     private var v1x = 0; private var v1y = 0; private var v1z = 0
     private var v2x = 1; private var v2y = 1; private var v2z = 1
 
-    // IntEditBox refs for reading in save()
-    private var box1x: IntEditBox? = null; private var box1y: IntEditBox? = null; private var box1z: IntEditBox? = null
-    private var box2x: IntEditBox? = null; private var box2y: IntEditBox? = null; private var box2z: IntEditBox? = null
+    // Original bounds for Revert
+    private var originalBounds: BoundingBox? = null
 
     // Load initial values from block entity only once
     private var valuesLoaded = false
@@ -42,6 +41,7 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
 
         if (!valuesLoaded) {
             val bounds = getBounds() ?: BoundingBox(-4, -1, -4, 4, 3, 4)
+            originalBounds = bounds
             loadFromBounds(bounds)
             valuesLoaded = true
         }
@@ -62,26 +62,24 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
 
         // Build coordinate rows
         val row1 = buildCoordRow(label1, v1x, v1y, v1z,
-            onChange1x = { v1x = it },
-            onChange1y = { v1y = it },
-            onChange1z = { v1z = it },
-            assignBoxes = { bx, by, bz -> box1x = bx; box1y = by; box1z = bz }
+            onChange1x = { v1x = it; sendBounds() },
+            onChange1y = { v1y = it; sendBounds() },
+            onChange1z = { v1z = it; sendBounds() },
         )
 
         val row2 = buildCoordRow(label2, v2x, v2y, v2z,
-            onChange1x = { v2x = it },
-            onChange1y = { v2y = it },
-            onChange1z = { v2z = it },
-            assignBoxes = { bx, by, bz -> box2x = bx; box2y = by; box2z = bz }
+            onChange1x = { v2x = it; sendBounds() },
+            onChange1y = { v2y = it; sendBounds() },
+            onChange1z = { v2z = it; sendBounds() },
         )
 
         // Bottom buttons
-        val saveBtn = Button.builder(Component.literal("Save")) { save() }.pos(0, 0).width(60).build()
-        val cancelBtn = Button.builder(CommonComponents.GUI_CANCEL) { onClose() }.pos(0, 0).width(60).build()
+        val revertBtn = Button.builder(Component.literal("Revert")) { revert() }.pos(0, 0).width(60).build()
+        val doneBtn = Button.builder(CommonComponents.GUI_DONE) { onClose() }.pos(0, 0).width(60).build()
 
         val bottomRow = LinearLayout.horizontal().spacing(8)
-        bottomRow.addChild(saveBtn)
-        bottomRow.addChild(cancelBtn)
+        bottomRow.addChild(revertBtn)
+        bottomRow.addChild(doneBtn)
 
         // Main content layout (vertical)
         val content = LinearLayout.vertical().spacing(6)
@@ -106,40 +104,27 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         onChange1x: (Int) -> Unit,
         onChange1y: (Int) -> Unit,
         onChange1z: (Int) -> Unit,
-        assignBoxes: (IntEditBox, IntEditBox, IntEditBox) -> Unit,
     ): LinearLayout {
         val row = LinearLayout.horizontal().spacing(4)
 
-        val labelWidget = StringWidget(60, 20, Component.literal(label), font)
-        row.addChild(labelWidget)
+        row.addChild(StringWidget(60, 20, Component.literal(label), font))
 
-        val bx = makeFieldGroup(initX, onChange1x)
-        val by = makeFieldGroup(initY, onChange1y)
-        val bz = makeFieldGroup(initZ, onChange1z)
-        assignBoxes(bx.second, by.second, bz.second)
+        row.addChild(StringWidget(10, 20, Component.literal("X"), font))
+        row.addChild(makeFieldGroup(initX, onChange1x))
 
-        // X axis group
-        val xLabel = StringWidget(10, 20, Component.literal("X"), font)
-        row.addChild(xLabel)
-        row.addChild(bx.first)
+        row.addChild(StringWidget(10, 20, Component.literal("Y"), font))
+        row.addChild(makeFieldGroup(initY, onChange1y))
 
-        // Y axis group
-        val yLabel = StringWidget(10, 20, Component.literal("Y"), font)
-        row.addChild(yLabel)
-        row.addChild(by.first)
-
-        // Z axis group
-        val zLabel = StringWidget(10, 20, Component.literal("Z"), font)
-        row.addChild(zLabel)
-        row.addChild(bz.first)
+        row.addChild(StringWidget(10, 20, Component.literal("Z"), font))
+        row.addChild(makeFieldGroup(initZ, onChange1z))
 
         return row
     }
 
     /**
-     * Returns a Pair of (container LinearLayout, IntEditBox) for a single field with − and + buttons.
+     * Returns a LinearLayout containing − field + for a single axis.
      */
-    private fun makeFieldGroup(initial: Int, onChange: (Int) -> Unit): Pair<LinearLayout, IntEditBox> {
+    private fun makeFieldGroup(initial: Int, onChange: (Int) -> Unit): LinearLayout {
         val box = IntEditBox(font, 52, 20, Int.MIN_VALUE, Int.MAX_VALUE, initial, onChange)
         val decBtn = Button.builder(Component.literal("−")) { box.setIntValue(box.getIntValue() - 1) }.pos(0, 0).width(20).build()
         val incBtn = Button.builder(Component.literal("+")) { box.setIntValue(box.getIntValue() + 1) }.pos(0, 0).width(20).build()
@@ -147,7 +132,7 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         group.addChild(decBtn)
         group.addChild(box)
         group.addChild(incBtn)
-        return Pair(group, box)
+        return group
     }
 
     /**
@@ -173,27 +158,17 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
     private fun switchMode(newMode: DisplayMode) {
         if (newMode == displayMode) return
 
-        // Read current live values from boxes (may differ from stored v1/v2 if user is mid-edit)
-        val cur1x = box1x?.getIntValue() ?: v1x
-        val cur1y = box1y?.getIntValue() ?: v1y
-        val cur1z = box1z?.getIntValue() ?: v1z
-        val cur2x = box2x?.getIntValue() ?: v2x
-        val cur2y = box2y?.getIntValue() ?: v2y
-        val cur2z = box2z?.getIntValue() ?: v2z
-
-        // Convert current mode values to canonical min/max
         val minX: Int; val minY: Int; val minZ: Int
         val maxX: Int; val maxY: Int; val maxZ: Int
         if (displayMode == DisplayMode.OFFSET_SIZE) {
-            val sx = cur2x.coerceAtLeast(1); val sy = cur2y.coerceAtLeast(1); val sz = cur2z.coerceAtLeast(1)
-            minX = cur1x; minY = cur1y; minZ = cur1z
-            maxX = cur1x + sx - 1; maxY = cur1y + sy - 1; maxZ = cur1z + sz - 1
+            val sx = v2x.coerceAtLeast(1); val sy = v2y.coerceAtLeast(1); val sz = v2z.coerceAtLeast(1)
+            minX = v1x; minY = v1y; minZ = v1z
+            maxX = v1x + sx - 1; maxY = v1y + sy - 1; maxZ = v1z + sz - 1
         } else {
-            minX = minOf(cur1x, cur2x); minY = minOf(cur1y, cur2y); minZ = minOf(cur1z, cur2z)
-            maxX = maxOf(cur1x, cur2x); maxY = maxOf(cur1y, cur2y); maxZ = maxOf(cur1z, cur2z)
+            minX = minOf(v1x, v2x); minY = minOf(v1y, v2y); minZ = minOf(v1z, v2z)
+            maxX = maxOf(v1x, v2x); maxY = maxOf(v1y, v2y); maxZ = maxOf(v1z, v2z)
         }
 
-        // Convert canonical min/max to new mode
         if (newMode == DisplayMode.OFFSET_SIZE) {
             v1x = minX; v1y = minY; v1z = minZ
             v2x = maxX - minX + 1; v2y = maxY - minY + 1; v2z = maxZ - minZ + 1
@@ -206,30 +181,28 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
         rebuildWidgets()
     }
 
-    private fun save() {
-        val cur1x = box1x?.getIntValue() ?: return
-        val cur1y = box1y?.getIntValue() ?: return
-        val cur1z = box1z?.getIntValue() ?: return
-        val cur2x = box2x?.getIntValue() ?: return
-        val cur2y = box2y?.getIntValue() ?: return
-        val cur2z = box2z?.getIntValue() ?: return
-
+    private fun sendBounds() {
         val newBounds = if (displayMode == DisplayMode.OFFSET_SIZE) {
             BoundingBox(
-                cur1x, cur1y, cur1z,
-                cur1x + cur2x.coerceAtLeast(1) - 1,
-                cur1y + cur2y.coerceAtLeast(1) - 1,
-                cur1z + cur2z.coerceAtLeast(1) - 1,
+                v1x, v1y, v1z,
+                v1x + v2x.coerceAtLeast(1) - 1,
+                v1y + v2y.coerceAtLeast(1) - 1,
+                v1z + v2z.coerceAtLeast(1) - 1,
             )
         } else {
             BoundingBox(
-                minOf(cur1x, cur2x), minOf(cur1y, cur2y), minOf(cur1z, cur2z),
-                maxOf(cur1x, cur2x), maxOf(cur1y, cur2y), maxOf(cur1z, cur2z),
+                minOf(v1x, v2x), minOf(v1y, v2y), minOf(v1z, v2z),
+                maxOf(v1x, v2x), maxOf(v1y, v2y), maxOf(v1z, v2z),
             )
         }
-
         ClientPlayNetworking.send(ResizeBoundsC2SPayload(originPos, newBounds))
-        onClose()
+    }
+
+    private fun revert() {
+        val b = originalBounds ?: return
+        loadFromBounds(b)
+        rebuildWidgets()
+        ClientPlayNetworking.send(ResizeBoundsC2SPayload(originPos, b))
     }
 
     private fun getBounds() =

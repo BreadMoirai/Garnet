@@ -14,6 +14,7 @@ import com.breadmoirai.redstonespecs.network.RemoveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.components.ScrollableLayout
@@ -23,6 +24,7 @@ import net.minecraft.client.gui.layouts.LayoutElement
 import net.minecraft.client.gui.layouts.LinearLayout
 import net.minecraft.client.gui.layouts.SpacerElement
 import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.chat.CommonComponents
@@ -35,7 +37,7 @@ import net.minecraft.world.level.block.state.properties.Property
 class SpecEditorScreen(
     private val originPos: BlockPos,
     private val entryRelPos: BlockPos,
-) : Screen(Component.translatable("screen.redstonespecs.spec_editor")) {
+) : Screen(Component.translatable("screen.redstonespecs.spec_editor")), DropdownHost {
 
     private var launched = false
     private var workingLabel: String = ""
@@ -45,8 +47,33 @@ class SpecEditorScreen(
     private var originalEntry: SpecEntry? = null
     private var specMode: SpecMode = SpecMode.SIMPLE
 
+    private var openDropdown: DropdownButton<*>? = null
+
+    override fun getOpenDropdown(): DropdownButton<*>? = openDropdown
+    override fun setOpenDropdown(d: DropdownButton<*>?) { openDropdown = d }
+
     override fun isPauseScreen() = false
     override fun isInGameUi() = true
+
+    override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+        val open = openDropdown
+        if (open != null) {
+            super.extractRenderState(graphics, Int.MIN_VALUE, Int.MIN_VALUE, partialTick)
+            graphics.nextStratum()
+            open.extractPopup(graphics, mouseX, mouseY, partialTick)
+        } else {
+            super.extractRenderState(graphics, mouseX, mouseY, partialTick)
+        }
+    }
+
+    override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
+        val open = openDropdown
+        if (open != null) {
+            if (open.popupMouseClicked(event)) return true
+            // Popup closed; fall through so other widgets still receive the click.
+        }
+        return super.mouseClicked(event, doubleClick)
+    }
 
     override fun init() {
         super.init()
@@ -82,6 +109,7 @@ class SpecEditorScreen(
     }
 
     private fun buildLayout() {
+        openDropdown = null
         val entry = originalEntry ?: return
         val typeLabel = when (entry) {
             is InputSpec -> "Input"
@@ -152,7 +180,7 @@ class SpecEditorScreen(
                 }.pos(0, 0).width(240).build()
             )
 
-            val tableScrollHeight = (height - 166).coerceAtLeast(60)
+            val tableScrollHeight = (height - 178).coerceAtLeast(60)
             content.addChild(ScrollableLayout(minecraft, tableContent, tableScrollHeight))
 
             val captureRow = LinearLayout.horizontal().spacing(4)
@@ -209,7 +237,7 @@ class SpecEditorScreen(
         if (specMode == SpecMode.UPDATE_AWARE) {
             val currentPhase = row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
             val phaseButton = DropdownButton(
-                0, 0, 110, 16, font,
+                this, 0, 0, 110, 16, font,
                 advancedPhases,
                 { phase -> Component.literal(phase.name) },
                 currentPhase,
@@ -224,7 +252,7 @@ class SpecEditorScreen(
         }
 
         val propButton = DropdownButton(
-            0, 0, 100, 16, font,
+            this, 0, 0, 100, 16, font,
             availableProps,
             { Component.literal(it) },
             row.prop.name,
@@ -251,7 +279,7 @@ class SpecEditorScreen(
         is RowProp.Block -> StringWidget(110, 16, Component.literal(prop.blockId.path), font)
 
         is RowProp.Bool -> DropdownButton(
-            0, 0, 110, 16, font,
+            this, 0, 0, 110, 16, font,
             listOf(false, true),
             { v -> Component.literal(v.toString()) },
             prop.value,
@@ -307,7 +335,7 @@ class SpecEditorScreen(
         }
 
         is RowProp.Enum -> DropdownButton(
-            0, 0, 110, 16, font,
+            this, 0, 0, 110, 16, font,
             prop.options,
             { v -> Component.literal(v) },
             prop.value,

@@ -31,3 +31,4 @@ versions/**/logs/
 .worktrees/
 /net/
 /dev/
+/.env

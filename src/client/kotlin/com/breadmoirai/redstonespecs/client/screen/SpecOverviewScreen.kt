@@ -4,6 +4,7 @@ import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.data.*
 import com.breadmoirai.redstonespecs.network.*
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.components.ScrollableLayout
@@ -12,6 +13,7 @@ import net.minecraft.client.gui.layouts.FrameLayout
 import net.minecraft.client.gui.layouts.LinearLayout
 import net.minecraft.client.gui.layouts.SpacerElement
 import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component
@@ -19,16 +21,41 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
 class SpecOverviewScreen(
     val originPos: BlockPos,
-) : Screen(Component.translatable("screen.redstonespecs.spec_overview")) {
+) : Screen(Component.translatable("screen.redstonespecs.spec_overview")), DropdownHost {
 
     private var idEditMode = false
     private var lifespanBox: IntEditBox? = null
 
+    private var openDropdown: DropdownButton<*>? = null
+
+    override fun getOpenDropdown(): DropdownButton<*>? = openDropdown
+    override fun setOpenDropdown(d: DropdownButton<*>?) { openDropdown = d }
+
     override fun isPauseScreen() = false
     override fun isInGameUi() = true
 
+    override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+        val open = openDropdown
+        if (open != null) {
+            super.extractRenderState(graphics, Int.MIN_VALUE, Int.MIN_VALUE, partialTick)
+            graphics.nextStratum()
+            open.extractPopup(graphics, mouseX, mouseY, partialTick)
+        } else {
+            super.extractRenderState(graphics, mouseX, mouseY, partialTick)
+        }
+    }
+
+    override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
+        val open = openDropdown
+        if (open != null) {
+            if (open.popupMouseClicked(event)) return true
+        }
+        return super.mouseClicked(event, doubleClick)
+    }
+
     override fun init() {
         super.init()
+        openDropdown = null
         val spec = getSpec()
 
         val content = LinearLayout.vertical().spacing(4)
@@ -60,7 +87,7 @@ class SpecOverviewScreen(
         val modeRow = LinearLayout.horizontal().spacing(4)
         modeRow.addChild(StringWidget(40, 20, Component.literal("Mode:"), font))
         val modeButton = DropdownButton(
-            0, 0, 180, 20, font,
+            this, 0, 0, 180, 20, font,
             SpecMode.entries.toList(),
             { mode -> Component.literal(when (mode) {
                 SpecMode.SIMPLE -> "Simple"

@@ -1,5 +1,6 @@
 plugins {
     id("dev.kikugie.stonecutter")
+    id("co.uzzu.dotenv.gradle")
     id("net.fabricmc.fabric-loom") version "1.15-SNAPSHOT" apply false
 }
 
@@ -25,6 +26,7 @@ fun transformUnnamedVars(toUnnamed: Boolean) {
             if (transformed != original) file.writeText(transformed)
         }
     }
+    env
 }
 
 tasks.register("transformUnnamedVars") {

@@ -7,6 +7,7 @@ import com.breadmoirai.redstonespecs.client.currentHoveredFace
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.SpecEntry
+import com.breadmoirai.redstonespecs.data.allEntries
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.Minecraft

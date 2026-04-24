@@ -12,6 +12,8 @@ pluginManagement {
 plugins {
     id("dev.kikugie.stonecutter") version "0.9"
     kotlin("jvm") version "2.3.20" apply false
+    id("com.google.devtools.ksp") version "2.3.7" apply false
+    id("co.uzzu.dotenv.gradle") version "4.0.0" apply false
 }
 
 stonecutter {

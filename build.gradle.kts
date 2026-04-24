@@ -2,7 +2,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "2.3.20"
+    kotlin("jvm")
+    id("com.google.devtools.ksp")
     id("net.fabricmc.fabric-loom")
     id("maven-publish")
 }
@@ -52,13 +53,25 @@ repositories {
     maven("https://maven.isxander.dev/releases") {
         name = "Xander Maven"
     }
+    maven {
+        url = uri("https://maven.pkg.github.com/livefront/auto-emit")
+        credentials {
+            username = env.GPR_USER.value
+            password = env.GPR_KEY.value
+        }
+    }
 }
+
+
 
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft("com.mojang:minecraft:${project.property("minecraft_version")}")
     implementation("net.fabricmc:fabric-loader:${project.property("loader_version")}")
     implementation("net.fabricmc:fabric-language-kotlin:${project.property("kotlin_loader_version")}")
+
+    implementation("com.livefront.autoemit:annotation:0.1.0")
+    ksp("com.livefront.autoemit:generate:0.1.0")
 
     implementation("com.terraformersmc:modmenu:${property("modmenu_version")}")
     implementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
