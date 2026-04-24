@@ -3,7 +3,6 @@ package com.breadmoirai.redstonespecs.network
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
 import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.item.UndoStack
-import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.breadmoirai.redstonespecs.persistence.StructurePersistence
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
@@ -11,7 +10,6 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.storage.LevelResource
 import org.slf4j.LoggerFactory
-import kotlin.io.path.exists
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
@@ -25,7 +23,6 @@ fun registerNetworking() {
     PayloadTypeRegistry.clientboundPlay().register(OpenEditorS2CPayload.TYPE, OpenEditorS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(TestResultS2CPayload.TYPE, TestResultS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(BreakpointHitS2CPayload.TYPE, BreakpointHitS2CPayload.STREAM_CODEC)
-    PayloadTypeRegistry.clientboundPlay().register(StructurePromptS2CPayload.TYPE, StructurePromptS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(OverwritePromptS2CPayload.TYPE, OverwritePromptS2CPayload.STREAM_CODEC)
 
     // C2S registrations
@@ -41,9 +38,6 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(SetSpecModeC2SPayload.TYPE, SetSpecModeC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SetLifespanC2SPayload.TYPE, SetLifespanC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SetStructureC2SPayload.TYPE, SetStructureC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(SaveSpecC2SPayload.TYPE, SaveSpecC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(LoadSpecC2SPayload.TYPE, LoadSpecC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(StructureDecisionC2SPayload.TYPE, StructureDecisionC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(OverwriteDecisionC2SPayload.TYPE, OverwriteDecisionC2SPayload.STREAM_CODEC)
 
     // C2S handlers
@@ -61,6 +55,12 @@ fun registerNetworking() {
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#runSpec] originPos={}", payload.originPos)
             val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
+            val spec = be.spec ?: return@execute
+            val level = be.level as? ServerLevel ?: return@execute
+            val dir = saveDir(context.server())
+            val structureId = spec.structure ?: spec.id
+            StructurePersistence.save(dir, structureId, level, be.blockPos, spec.bounds)
+            LOGGER.debug("[NetworkRegistry#runSpec] auto-saved structure '{}' before run", structureId)
             SpecRunnerCoordinator.startRun(be)
         }
     }
@@ -103,7 +103,14 @@ fun registerNetworking() {
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#setSpecId] originPos={} id='{}'", payload.originPos, payload.id)
             val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            if (payload.id.isNotBlank()) be.setSpecId(payload.id)
+            if (payload.id.isBlank()) return@execute
+            val spec = be.spec ?: return@execute
+            val oldId = spec.id
+            be.setSpecId(payload.id)
+            // Co-update structure if it was auto-named after the old spec id
+            if (spec.structure == oldId || spec.structure == null) {
+                be.setStructure(payload.id)
+            }
         }
     }
 
@@ -149,93 +156,11 @@ fun registerNetworking() {
         }
     }
 
-    ServerPlayNetworking.registerGlobalReceiver(SaveSpecC2SPayload.TYPE) { payload, context ->
-        val player = context.player()
-        context.server().execute {
-            val be = player.level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            val spec = be.spec ?: return@execute
-            val dir = saveDir(context.server())
-
-            SpecPersistence.save(dir, spec)
-            LOGGER.debug("[NetworkRegistry#saveSpec] saved spec '{}' JSON", spec.id)
-
-            val structureId = spec.structure
-            val level = be.level as? ServerLevel ?: return@execute
-            if (structureId != null) {
-                if (StructurePersistence.hasChanges(dir, structureId, level, be.blockPos, spec.bounds)) {
-                    ServerPlayNetworking.send(player, StructurePromptS2CPayload(
-                        payload.originPos, structureId, "SAVE_OR_FORK"
-                    ))
-                }
-            } else {
-                val defaultId = spec.id
-                if (dir.resolve("$defaultId.nbt").exists()) {
-                    ServerPlayNetworking.send(player, StructurePromptS2CPayload(
-                        payload.originPos, defaultId, "CREATE_OR_FORK"
-                    ))
-                } else {
-                    StructurePersistence.save(dir, defaultId, level, be.blockPos, spec.bounds)
-                    be.setStructure(defaultId)
-                    LOGGER.debug("[NetworkRegistry#saveSpec] auto-saved structure as '{}'", defaultId)
-                }
-            }
-        }
-    }
-
-    ServerPlayNetworking.registerGlobalReceiver(StructureDecisionC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            val spec = be.spec ?: return@execute
-            val level = be.level as? ServerLevel ?: return@execute
-            val dir = saveDir(context.server())
-            when (payload.decision) {
-                "SAVE" -> {
-                    val id = payload.newId.ifBlank { spec.structure ?: spec.id }
-                    StructurePersistence.save(dir, id, level, be.blockPos, spec.bounds)
-                    if (spec.structure != id) be.setStructure(id)
-                    LOGGER.debug("[NetworkRegistry#structureDecision] saved structure as '{}'", id)
-                }
-                "FORK" -> {
-                    val newId = payload.newId
-                    if (newId.isBlank()) return@execute
-                    StructurePersistence.save(dir, newId, level, be.blockPos, spec.bounds)
-                    be.setStructure(newId)
-                    LOGGER.debug("[NetworkRegistry#structureDecision] forked structure to '{}'", newId)
-                }
-                "CANCEL" -> LOGGER.debug("[NetworkRegistry#structureDecision] user cancelled structure save")
-            }
-        }
-    }
-
-    ServerPlayNetworking.registerGlobalReceiver(LoadSpecC2SPayload.TYPE) { payload, context ->
-        val player = context.player()
-        context.server().execute {
-            val be = player.level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
-            val dir = saveDir(context.server())
-            val spec = SpecPersistence.load(dir, payload.specId)
-            if (spec == null) {
-                LOGGER.warn("[NetworkRegistry#loadSpec] spec '{}' not found on disk", payload.specId)
-                return@execute
-            }
-            be.setSpec(spec)
-            LOGGER.debug("[NetworkRegistry#loadSpec] loaded spec '{}' from disk", payload.specId)
-
-            val structureId = spec.structure ?: return@execute
-            val level = be.level as? ServerLevel ?: return@execute
-            if (StructurePersistence.hasNonAirBlocks(level, be.blockPos, spec.bounds)) {
-                ServerPlayNetworking.send(player, OverwritePromptS2CPayload(payload.originPos, structureId))
-            } else {
-                StructurePersistence.load(dir, structureId, level, be.blockPos, spec.bounds)
-                LOGGER.debug("[NetworkRegistry#loadSpec] placed structure '{}'", structureId)
-            }
-        }
-    }
-
     ServerPlayNetworking.registerGlobalReceiver(OverwriteDecisionC2SPayload.TYPE) { payload, context ->
         context.server().execute {
             val be = context.player().level().getBlockEntity(payload.originPos) as? RedstoneSpecBlockEntity ?: return@execute
             val spec = be.spec ?: return@execute
-            val structureId = spec.structure ?: return@execute
+            val structureId = spec.structure ?: spec.id
             val level = be.level as? ServerLevel ?: return@execute
             val dir = saveDir(context.server())
             if (payload.overwrite) {
