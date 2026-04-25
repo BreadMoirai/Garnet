@@ -87,9 +87,14 @@ fun registerHudOverlay() {
 
         // Face detection when holding SpecOrigin block item
         val player = mc.player
+        val specBlocks = setOf(
+            ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK,
+            ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK,
+            ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK,
+        )
         val holdingRedstoneSpec = player != null && (
-            (player.mainHandItem.item as? BlockItem)?.block == ModRegistries.REDSTONE_SPEC_BLOCK ||
-            (player.offhandItem.item as? BlockItem)?.block == ModRegistries.REDSTONE_SPEC_BLOCK
+            (player.mainHandItem.item as? BlockItem)?.block in specBlocks ||
+            (player.offhandItem.item as? BlockItem)?.block in specBlocks
         )
 
         if (holdingRedstoneSpec) {

@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 class SpecBlockEntity(pos: BlockPos, state: BlockState) :
-    BlockEntity(ModRegistries.REDSTONE_SPEC_BLOCK_ENTITY_TYPE, pos, state) {
+    BlockEntity(ModRegistries.SPEC_BLOCK_ENTITY_TYPE, pos, state) {
 
     private var specEmitter: RedstoneSpecEmitter? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())

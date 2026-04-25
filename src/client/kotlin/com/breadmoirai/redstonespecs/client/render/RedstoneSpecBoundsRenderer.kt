@@ -24,7 +24,7 @@ import org.joml.Matrix4f
 
 fun registerBoundsRenderer() {
     BlockEntityRenderers.register(
-        ModRegistries.REDSTONE_SPEC_BLOCK_ENTITY_TYPE,
+        ModRegistries.SPEC_BLOCK_ENTITY_TYPE,
         ::SpecBlockEntityRenderer,
     )
 }
