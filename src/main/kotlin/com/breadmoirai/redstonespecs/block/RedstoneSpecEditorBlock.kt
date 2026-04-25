@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
+import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
@@ -33,7 +34,7 @@ class RedstoneSpecEditorBlock(properties: Properties) : BaseEntityBlock(properti
                 val defaultId = serverPlayer.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
                 be.setSpec(RedstoneSpec.new(defaultId))
             }
-            ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos))
+            ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos, SpecBlockKind.EDITOR))
         }
         return InteractionResult.SUCCESS
     }

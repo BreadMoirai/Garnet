@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.block
 
+import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -28,7 +29,7 @@ class RedstoneSpecRunnerBlock(properties: Properties) : BaseEntityBlock(properti
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
             // Phase 4 will replace this with picker-or-readonly logic.
-            ServerPlayNetworking.send(player as ServerPlayer, OpenOverviewS2CPayload(be.blockPos))
+            ServerPlayNetworking.send(player as ServerPlayer, OpenOverviewS2CPayload(be.blockPos, SpecBlockKind.RUNNER))
         }
         return InteractionResult.SUCCESS
     }

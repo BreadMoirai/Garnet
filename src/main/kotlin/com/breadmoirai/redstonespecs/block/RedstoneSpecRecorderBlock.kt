@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.block
 
+import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
 import com.mojang.serialization.MapCodec
@@ -33,7 +34,7 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
                 val defaultId = serverPlayer.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
                 be.setSpec(RedstoneSpec.new(defaultId))
             }
-            ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos))
+            ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos, SpecBlockKind.RECORDER))
         }
         return InteractionResult.SUCCESS
     }

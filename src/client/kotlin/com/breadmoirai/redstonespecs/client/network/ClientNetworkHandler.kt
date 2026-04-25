@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.client.network
 
+import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecFileBrowserScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
@@ -17,7 +18,7 @@ fun registerClientNetworking() {
         val mc = context.client()
         mc.execute {
             LOGGER.debug("[ClientNetworkHandler#openOverview] originPos={}", payload.originPos)
-            mc.setScreen(SpecOverviewScreen(payload.originPos))
+            mc.setScreen(SpecOverviewScreen(payload.originPos, payload.kind))
         }
     }
 
@@ -40,7 +41,7 @@ fun registerClientNetworking() {
             )
             val current = mc.screen
             if (current is SpecOverviewScreen && current.originPos == payload.originPos) {
-                mc.setScreen(SpecOverviewScreen(payload.originPos))
+                mc.setScreen(SpecOverviewScreen(payload.originPos, current.kind))
             }
         }
     }

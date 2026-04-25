@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.network
 
+import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.SpecMode
@@ -16,6 +17,7 @@ import net.minecraft.resources.Identifier
 
 data class OpenOverviewS2CPayload(
     val originPos: BlockPos,
+    val kind: SpecBlockKind,
 ) : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<OpenOverviewS2CPayload>(
@@ -23,6 +25,7 @@ data class OpenOverviewS2CPayload(
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, OpenOverviewS2CPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, OpenOverviewS2CPayload::originPos,
+            SpecBlockKind.STREAM_CODEC, OpenOverviewS2CPayload::kind,
             ::OpenOverviewS2CPayload,
         )
     }
