@@ -49,6 +49,9 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     var lastTestResult: TestResult? = null
         private set
 
+    /** True while the Recorder block is actively capturing state. Real implementation lands in Task 5.3. */
+    val isRecording: Boolean get() = false
+
     fun setSpec(newSpec: RedstoneSpec) {
         LOGGER.debug("[SpecBlockEntity#setSpec] setting spec '{}' at {}", newSpec.id, blockPos)
         val e = specEmitter

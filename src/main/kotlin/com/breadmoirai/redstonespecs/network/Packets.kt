@@ -457,3 +457,48 @@ data class RunnerLoadSpecC2SPayload(val originPos: BlockPos, val specId: String)
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
+
+// === v1.4: Recorder screen ===
+
+data class OpenRecorderS2CPayload(
+    val originPos: BlockPos,
+    val isRecording: Boolean,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<OpenRecorderS2CPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "open_recorder")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, OpenRecorderS2CPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, OpenRecorderS2CPayload::originPos,
+            ByteBufCodecs.BOOL, OpenRecorderS2CPayload::isRecording,
+            ::OpenRecorderS2CPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class StartRecordingC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<StartRecordingC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "start_recording")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, StartRecordingC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, StartRecordingC2SPayload::originPos,
+            ::StartRecordingC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class StopRecordingC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<StopRecordingC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "stop_recording")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, StopRecordingC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, StopRecordingC2SPayload::originPos,
+            ::StopRecordingC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}

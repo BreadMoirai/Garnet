@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.client.network
 
 import com.breadmoirai.redstonespecs.block.SpecBlockKind
+import com.breadmoirai.redstonespecs.client.screen.RecorderSetupScreen
 import com.breadmoirai.redstonespecs.client.screen.RunnerSpecPickerScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecFileBrowserScreen
@@ -88,6 +89,14 @@ fun registerClientNetworking() {
         mc.execute {
             LOGGER.debug("[ClientNetworkHandler#openRunnerPicker] originPos={} fileCount={}", payload.originPos, payload.files.size)
             mc.setScreen(RunnerSpecPickerScreen(payload.originPos, payload.files))
+        }
+    }
+
+    ClientPlayNetworking.registerGlobalReceiver(OpenRecorderS2CPayload.TYPE) { payload, context ->
+        val mc = context.client()
+        mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#openRecorder] originPos={} isRecording={}", payload.originPos, payload.isRecording)
+            mc.setScreen(RecorderSetupScreen(payload.originPos, payload.isRecording))
         }
     }
 }
