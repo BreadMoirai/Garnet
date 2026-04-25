@@ -1,5 +1,8 @@
 package com.breadmoirai.redstonespecs.network
 
+import com.breadmoirai.redstonespecs.ModRegistries
+import com.breadmoirai.redstonespecs.block.RedstoneSpecEditorBlock
+import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.item.UndoStack
@@ -222,6 +225,37 @@ fun registerNetworking() {
                 StructurePersistence.load(dir, structureId, level, be.blockPos, spec.bounds)
                 LOGGER.debug("[NetworkRegistry#loadFromFile] placed structure '{}'", structureId)
             }
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(TransformToRunnerC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#transformToRunner] originPos={}", payload.originPos)
+            val level = context.player().level()
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecEditorBlock) return@execute
+            be.transformTo(ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(TransformToRecorderC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#transformToRecorder] originPos={}", payload.originPos)
+            val level = context.player().level()
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecEditorBlock) return@execute
+            be.discardForRerecord()
+            be.transformTo(ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(TransformToEditorC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#transformToEditor] originPos={}", payload.originPos)
+            val level = context.player().level()
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return@execute
+            be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
         }
     }
 }

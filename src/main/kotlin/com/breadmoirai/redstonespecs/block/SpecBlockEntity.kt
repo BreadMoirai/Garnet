@@ -2,9 +2,12 @@ package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.config.SharedSettings
+import com.breadmoirai.redstonespecs.data.InputSpec
+import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.RedstoneSpecEmitter
 import com.breadmoirai.redstonespecs.data.RedstoneSpecEmitter.Companion.emitter
+import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.TestResult
@@ -103,6 +106,23 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         e.updateFrom(s.withEntryRemoved(pos))
         setChangedAndSync()
         return removed
+    }
+
+    /**
+     * Wipes everything on the spec EXCEPT id, bounds, and input/output marker positions.
+     * Input entries are reduced to just their INIT condition (required by InputSpec invariant).
+     * Output entries are cleared to empty. Used by Editor → Recorder Discard.
+     */
+    fun discardForRerecord() {
+        val s = spec ?: return
+        val cleared = RedstoneSpec.new(s.id).copy(
+            bounds = s.bounds,
+            inputs = s.inputs.map { InputSpec(it.pos, it.label, it.color, it.entries.filter { e -> e.first == SimTime.INIT }) },
+            outputs = s.outputs.map { OutputSpec(it.pos, it.label, it.color, emptyList()) },
+        )
+        setSpec(cleared)
+        lastTestResult = null
+        setChangedAndSync()
     }
 
     fun transformTo(targetBlock: Block) {
