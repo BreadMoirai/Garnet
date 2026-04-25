@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.block
 
+import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.OpenRecorderS2CPayload
 import com.mojang.serialization.MapCodec
@@ -10,11 +11,13 @@ import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.BaseEntityBlock
+import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.RenderShape
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BlockEntityTicker
 import net.minecraft.world.level.block.entity.BlockEntityType
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.redstone.Orientation
 import net.minecraft.world.phys.BlockHitResult
 
 class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(properties) {
@@ -36,6 +39,27 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
             ServerPlayNetworking.send(serverPlayer, OpenRecorderS2CPayload(be.blockPos, be.isRecording))
         }
         return InteractionResult.SUCCESS
+    }
+
+    override fun neighborChanged(
+        state: BlockState,
+        level: Level,
+        pos: BlockPos,
+        block: Block,
+        orientation: Orientation?,
+        movedByPiston: Boolean,
+    ) {
+        super.neighborChanged(state, level, pos, block, orientation, movedByPiston)
+        if (level.isClientSide) return
+        val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return
+        val powered = level.hasNeighborSignal(pos)
+        if (powered && !be.isRecording) {
+            be.startRecording()
+        } else if (!powered && be.isRecording) {
+            if (be.stopRecordingAndFinalize()) {
+                be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
+            }
+        }
     }
 
     override fun <T : BlockEntity> getTicker(
