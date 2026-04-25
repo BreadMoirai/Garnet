@@ -1,5 +1,10 @@
 {
-  "item.redstonespecs.redstone_spec": "Redstone Spec",
+  "block.redstonespecs.redstone_spec_editor": "Redstone Spec Editor",
+  "block.redstonespecs.redstone_spec_recorder": "Redstone Spec Recorder",
+  "block.redstonespecs.redstone_spec_runner": "Redstone Spec Runner",
+  "item.redstonespecs.redstone_spec_editor": "Redstone Spec Editor",
+  "item.redstonespecs.redstone_spec_recorder": "Redstone Spec Recorder",
+  "item.redstonespecs.redstone_spec_runner": "Redstone Spec Runner",
   "item.redstonespecs.input_spec_marker": "Input Spec Marker",
   "item.redstonespecs.output_spec_marker": "Output Spec Marker",
   "item.redstonespecs.breakpoint_spec_marker": "Breakpoint Spec Marker",
