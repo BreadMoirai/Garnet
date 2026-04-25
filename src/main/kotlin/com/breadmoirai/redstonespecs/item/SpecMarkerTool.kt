@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.item
 
+import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
@@ -58,6 +59,11 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
         val player = context.player ?: return InteractionResult.PASS
 
         val be = SpecBlockEntity.findFor(level, hitPos) ?: return InteractionResult.PASS
+
+        // Marker placement is not allowed on a Runner block — its spec is read-only.
+        if (be.blockState.block is RedstoneSpecRunnerBlock) {
+            return InteractionResult.PASS
+        }
 
         if (!level.isClientSide) {
             val spec = be.spec ?: return InteractionResult.PASS
