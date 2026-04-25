@@ -28,6 +28,12 @@ private val keyCycleBackward = KeyMappingHelper.registerKeyMapping(
     KeyMapping("key.redstonespecs.cycle_backward", 91, KeyMapping.Category.MISC) // [ key
 )
 
+private val specBlocks = setOf(
+    ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK,
+    ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK,
+    ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK,
+)
+
 fun registerHudOverlay() {
     HudElementRegistry.addLast(
         Identifier.fromNamespaceAndPath("redstonespecs", "spec_info"),
@@ -87,11 +93,6 @@ fun registerHudOverlay() {
 
         // Face detection when holding SpecOrigin block item
         val player = mc.player
-        val specBlocks = setOf(
-            ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK,
-            ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK,
-            ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK,
-        )
         val holdingRedstoneSpec = player != null && (
             (player.mainHandItem.item as? BlockItem)?.block in specBlocks ||
             (player.offhandItem.item as? BlockItem)?.block in specBlocks
