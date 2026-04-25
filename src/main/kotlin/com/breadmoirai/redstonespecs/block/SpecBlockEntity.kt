@@ -60,7 +60,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         if (s.id.isBlank()) return false
         if (s.inputs.isEmpty() || s.outputs.isEmpty()) return false
         val b = s.bounds
-        if (b.minX() == b.maxX() && b.minY() == b.maxY() && b.minZ() == b.maxZ()) return false
+        if (b.minX() >= b.maxX() || b.minY() >= b.maxY() || b.minZ() >= b.maxZ()) return false
         val lv = level as? ServerLevel ?: return false
         if (stateRecorder != null) return false
         val recorder = StateRecorder.forSpec(UUID.randomUUID(), blockPos, b)
