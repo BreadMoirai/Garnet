@@ -12,6 +12,8 @@ import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.TestResult
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
+import com.breadmoirai.redstonespecs.runner.RecordingFinalizer
+import com.breadmoirai.redstonespecs.runner.StateRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,6 +37,7 @@ import net.minecraft.world.level.storage.LevelResource
 import net.minecraft.world.level.storage.ValueInput
 import net.minecraft.world.level.storage.ValueOutput
 import org.slf4j.LoggerFactory
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 class SpecBlockEntity(pos: BlockPos, state: BlockState) :
@@ -49,8 +52,40 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     var lastTestResult: TestResult? = null
         private set
 
-    /** True while the Recorder block is actively capturing state. Real implementation lands in Task 5.3. */
-    val isRecording: Boolean get() = false
+    private var stateRecorder: StateRecorder? = null
+    val isRecording: Boolean get() = stateRecorder != null
+
+    fun startRecording(): Boolean {
+        val s = spec ?: return false
+        if (s.id.isBlank()) return false
+        if (s.inputs.isEmpty() || s.outputs.isEmpty()) return false
+        val b = s.bounds
+        if (b.minX() == b.maxX() && b.minY() == b.maxY() && b.minZ() == b.maxZ()) return false
+        val lv = level as? ServerLevel ?: return false
+        if (stateRecorder != null) return false
+        val recorder = StateRecorder.forSpec(UUID.randomUUID(), blockPos, b)
+        recorder.start(lv, blockPos, b)
+        StateRecorder.activate(recorder)
+        stateRecorder = recorder
+        setChangedAndSync()
+        return true
+    }
+
+    fun stopRecordingAndFinalize(): Boolean {
+        val rec = stateRecorder ?: return false
+        StateRecorder.deactivate()
+        val recording = rec.toRecording()
+        stateRecorder = null
+        val s = spec
+        if (s != null) {
+            val finalized = RecordingFinalizer.finalize(s, recording)
+            if (finalized != null) {
+                setSpec(finalized)
+            }
+        }
+        setChangedAndSync()
+        return true
+    }
 
     fun setSpec(newSpec: RedstoneSpec) {
         LOGGER.debug("[SpecBlockEntity#setSpec] setting spec '{}' at {}", newSpec.id, blockPos)

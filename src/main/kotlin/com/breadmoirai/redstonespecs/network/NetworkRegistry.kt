@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.network
 
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.RedstoneSpecEditorBlock
+import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.config.SharedSettings
@@ -268,6 +269,28 @@ fun registerNetworking() {
             }
             be.setSpec(loaded)
             LOGGER.debug("[NetworkRegistry#runnerLoadSpec] loaded spec '{}' into runner at {}", payload.specId, payload.originPos)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(StartRecordingC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#startRecording] originPos={}", payload.originPos)
+            val level = context.player().level()
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return@execute
+            be.startRecording()
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(StopRecordingC2SPayload.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#stopRecording] originPos={}", payload.originPos)
+            val level = context.player().level()
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return@execute
+            if (be.stopRecordingAndFinalize()) {
+                be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
+            }
         }
     }
 }
