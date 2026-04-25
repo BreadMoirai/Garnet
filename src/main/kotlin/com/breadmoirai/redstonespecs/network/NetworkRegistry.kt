@@ -43,6 +43,9 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(OverwriteDecisionC2SPayload.TYPE, OverwriteDecisionC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(RequestFileBrowserC2SPayload.TYPE, RequestFileBrowserC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(LoadFromFileC2SPayload.TYPE, LoadFromFileC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(TransformToRunnerC2SPayload.TYPE, TransformToRunnerC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(TransformToRecorderC2SPayload.TYPE, TransformToRecorderC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(TransformToEditorC2SPayload.TYPE, TransformToEditorC2SPayload.STREAM_CODEC)
 
     // C2S handlers
     ServerPlayNetworking.registerGlobalReceiver(UndoC2SPayload.TYPE) { _, context ->

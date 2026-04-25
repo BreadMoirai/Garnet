@@ -382,3 +382,42 @@ data class LoadFromFileC2SPayload(val originPos: BlockPos, val specId: String) :
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
+
+data class TransformToRunnerC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<TransformToRunnerC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "transform_to_runner")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, TransformToRunnerC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, TransformToRunnerC2SPayload::originPos,
+            ::TransformToRunnerC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class TransformToRecorderC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<TransformToRecorderC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "transform_to_recorder")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, TransformToRecorderC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, TransformToRecorderC2SPayload::originPos,
+            ::TransformToRecorderC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class TransformToEditorC2SPayload(val originPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<TransformToEditorC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "transform_to_editor")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, TransformToEditorC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, TransformToEditorC2SPayload::originPos,
+            ::TransformToEditorC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
