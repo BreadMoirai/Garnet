@@ -1,10 +1,14 @@
 package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.block.SpecBlockKind
+import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
+import com.breadmoirai.redstonespecs.network.OpenRunnerPickerS2CPayload
+import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.player.Player
@@ -15,6 +19,7 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BlockEntityTicker
 import net.minecraft.world.level.block.entity.BlockEntityType
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.storage.LevelResource
 import net.minecraft.world.phys.BlockHitResult
 
 class RedstoneSpecRunnerBlock(properties: Properties) : BaseEntityBlock(properties) {
@@ -28,8 +33,15 @@ class RedstoneSpecRunnerBlock(properties: Properties) : BaseEntityBlock(properti
     ): InteractionResult {
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
-            // Phase 4 will replace this with picker-or-readonly logic.
-            ServerPlayNetworking.send(player as ServerPlayer, OpenOverviewS2CPayload(be.blockPos, SpecBlockKind.RUNNER))
+            val serverPlayer = player as ServerPlayer
+            if (be.spec == null) {
+                val saveDir = (level as ServerLevel).server.getWorldPath(LevelResource.ROOT)
+                    .resolve(SharedSettings.specSaveDir)
+                val files = SpecPersistence.listSpecsInfo(saveDir)
+                ServerPlayNetworking.send(serverPlayer, OpenRunnerPickerS2CPayload(be.blockPos, files))
+            } else {
+                ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos, SpecBlockKind.RUNNER))
+            }
         }
         return InteractionResult.SUCCESS
     }

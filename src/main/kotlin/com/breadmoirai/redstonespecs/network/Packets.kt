@@ -424,3 +424,36 @@ data class TransformToEditorC2SPayload(val originPos: BlockPos) : CustomPacketPa
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
+
+// === v1.3: Runner spec picker ===
+
+data class OpenRunnerPickerS2CPayload(
+    val originPos: BlockPos,
+    val files: List<SpecFileInfo>,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<OpenRunnerPickerS2CPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "open_runner_picker")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, OpenRunnerPickerS2CPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, OpenRunnerPickerS2CPayload::originPos,
+            SpecFileInfo.STREAM_CODEC.apply(ByteBufCodecs.list()), OpenRunnerPickerS2CPayload::files,
+            ::OpenRunnerPickerS2CPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class RunnerLoadSpecC2SPayload(val originPos: BlockPos, val specId: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<RunnerLoadSpecC2SPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "runner_load_spec")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, RunnerLoadSpecC2SPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, RunnerLoadSpecC2SPayload::originPos,
+            ByteBufCodecs.STRING_UTF8, RunnerLoadSpecC2SPayload::specId,
+            ::RunnerLoadSpecC2SPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}

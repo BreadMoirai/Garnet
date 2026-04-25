@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.persistence
 
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.network.SpecFileInfo
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.mojang.serialization.JsonOps
@@ -35,5 +36,19 @@ object SpecPersistence {
     fun listIds(saveDir: Path): List<String> {
         if (!saveDir.exists()) return emptyList()
         return saveDir.listDirectoryEntries("*.json").map { it.nameWithoutExtension }
+    }
+
+    fun listSpecsInfo(saveDir: Path): List<SpecFileInfo> {
+        return listIds(saveDir).mapNotNull { id ->
+            val spec = load(saveDir, id) ?: return@mapNotNull null
+            SpecFileInfo(
+                id = spec.id,
+                mode = spec.mode,
+                lifespan = spec.lifespan,
+                inputCount = spec.inputs.size,
+                outputCount = spec.outputs.size,
+                structure = spec.structure,
+            )
+        }
     }
 }

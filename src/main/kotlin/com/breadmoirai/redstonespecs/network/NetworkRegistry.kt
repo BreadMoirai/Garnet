@@ -49,6 +49,8 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(TransformToRunnerC2SPayload.TYPE, TransformToRunnerC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(TransformToRecorderC2SPayload.TYPE, TransformToRecorderC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(TransformToEditorC2SPayload.TYPE, TransformToEditorC2SPayload.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(OpenRunnerPickerS2CPayload.TYPE, OpenRunnerPickerS2CPayload.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(RunnerLoadSpecC2SPayload.TYPE, RunnerLoadSpecC2SPayload.STREAM_CODEC)
 
     // C2S handlers
     ServerPlayNetworking.registerGlobalReceiver(UndoC2SPayload.TYPE) { _, context ->
@@ -188,17 +190,7 @@ fun registerNetworking() {
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#requestFileBrowser] originPos={}", payload.originPos)
             val dir = saveDir(context.server())
-            val files = SpecPersistence.listIds(dir).mapNotNull { id ->
-                val spec = SpecPersistence.load(dir, id) ?: return@mapNotNull null
-                SpecFileInfo(
-                    id = spec.id,
-                    mode = spec.mode,
-                    lifespan = spec.lifespan,
-                    inputCount = spec.inputs.size,
-                    outputCount = spec.outputs.size,
-                    structure = spec.structure,
-                )
-            }
+            val files = SpecPersistence.listSpecsInfo(dir)
             ServerPlayNetworking.send(player, OpenFileBrowserS2CPayload(payload.originPos, files))
         }
     }
@@ -256,6 +248,23 @@ fun registerNetworking() {
             val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             if (level.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return@execute
             be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(RunnerLoadSpecC2SPayload.TYPE) { payload, context ->
+        val player = context.player()
+        context.server().execute {
+            LOGGER.debug("[NetworkRegistry#runnerLoadSpec] originPos={} specId='{}'", payload.originPos, payload.specId)
+            val level = player.level()
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return@execute
+            val dir = saveDir(context.server())
+            val loaded = SpecPersistence.load(dir, payload.specId) ?: run {
+                LOGGER.warn("[NetworkRegistry#runnerLoadSpec] spec '{}' not found on disk", payload.specId)
+                return@execute
+            }
+            be.setSpec(loaded)
+            LOGGER.debug("[NetworkRegistry#runnerLoadSpec] loaded spec '{}' into runner at {}", payload.specId, payload.originPos)
         }
     }
 }
