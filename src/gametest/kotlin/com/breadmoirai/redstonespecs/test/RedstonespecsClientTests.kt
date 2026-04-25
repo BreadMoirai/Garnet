@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.test
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.SpecBoundsScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
@@ -124,13 +124,13 @@ class RedstonespecsClientTests : FabricClientGameTest {
 
         // ── Wait for test result ──────────────────────────────────────────────
         ctx.context.waitFor({ mc ->
-            (mc.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity)
+            (mc.level?.getBlockEntity(originPos) as? SpecBlockEntity)
                 ?.lastTestResult != null
         }, 100)
 
         // ── Assert all checks passed ──────────────────────────────────────────
         val be = ctx.getClientBe(originPos)
-            ?: throw AssertionError("RedstoneSpecBlockEntity not found at $originPos")
+            ?: throw AssertionError("SpecBlockEntity not found at $originPos")
         val result = be.lastTestResult
             ?: throw AssertionError("lastTestResult is null after waitFor succeeded")
         val checks = result.checks

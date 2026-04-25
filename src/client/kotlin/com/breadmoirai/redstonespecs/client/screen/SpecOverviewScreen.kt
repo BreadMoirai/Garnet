@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.*
 import com.breadmoirai.redstonespecs.network.*
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -184,7 +184,7 @@ class SpecOverviewScreen(
         super.onClose()
     }
 
-    private fun getBe() = minecraft.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity
+    private fun getBe() = minecraft.level?.getBlockEntity(originPos) as? SpecBlockEntity
     private fun getSpec() = getBe()?.spec
     private fun sendPacket(payload: CustomPacketPayload) = ClientPlayNetworking.send(payload)
 }

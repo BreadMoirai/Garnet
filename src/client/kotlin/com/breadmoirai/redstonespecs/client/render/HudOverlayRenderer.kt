@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.client.render
 
 import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.FaceHit
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
@@ -42,7 +42,7 @@ fun registerHudOverlay() {
             val y = extractor.guiHeight() / 2 + 20
 
             // Check if hit block belongs to a spec origin's bounds
-            val ownerBe = RedstoneSpecBlockEntity.findFor(level, hitPos)
+            val ownerBe = SpecBlockEntity.findFor(level, hitPos)
             if (ownerBe != null) {
                 val spec = ownerBe.spec ?: return@HudElement
                 val relPos = hitPos.subtract(ownerBe.blockPos)
@@ -66,7 +66,7 @@ fun registerHudOverlay() {
             }
 
             // Check if looking directly at spec origin block
-            val originBe = level.getBlockEntity(hitPos) as? RedstoneSpecBlockEntity
+            val originBe = level.getBlockEntity(hitPos) as? SpecBlockEntity
             if (originBe != null) {
                 val spec = originBe.spec ?: return@HudElement
                 extractor.text(
@@ -100,7 +100,7 @@ fun registerHudOverlay() {
             var bestT = Double.MAX_VALUE
             var bestFace: HoveredFace? = null
 
-            for (be in RedstoneSpecBlockEntity.allFor(level)) {
+            for (be in SpecBlockEntity.allFor(level)) {
                 val spec = be.spec ?: continue
                 val b = spec.bounds
                 val bpX = be.blockPos.x.toDouble()

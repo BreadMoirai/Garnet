@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.network.ResizeBoundsC2SPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.components.Button
@@ -206,5 +206,5 @@ class SpecBoundsScreen(private val originPos: BlockPos) :
     }
 
     private fun getBounds() =
-        (minecraft.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity)?.spec?.bounds
+        (minecraft.level?.getBlockEntity(originPos) as? SpecBlockEntity)?.spec?.bounds
 }

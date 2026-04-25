@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.runner
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.data.TestResult
@@ -16,11 +16,11 @@ import java.util.UUID
 object SpecRunnerCoordinator {
     private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
-    private val runners = HashMap<RedstoneSpecBlockEntity, SpecRunner>()
-    private val snapshots = HashMap<RedstoneSpecBlockEntity, SpecSnapshot>()
-    private val stateRecorders = HashMap<RedstoneSpecBlockEntity, StateRecorder>()
+    private val runners = HashMap<SpecBlockEntity, SpecRunner>()
+    private val snapshots = HashMap<SpecBlockEntity, SpecSnapshot>()
+    private val stateRecorders = HashMap<SpecBlockEntity, StateRecorder>()
 
-    fun startRun(be: RedstoneSpecBlockEntity) {
+    fun startRun(be: SpecBlockEntity) {
         if (runners.containsKey(be)) return
         val spec = be.spec ?: return
         val level = be.level as? ServerLevel ?: return
@@ -46,7 +46,7 @@ object SpecRunnerCoordinator {
         runners[be] = runner
     }
 
-    fun resetSpec(be: RedstoneSpecBlockEntity) {
+    fun resetSpec(be: SpecBlockEntity) {
         LOGGER.debug("[SpecRunnerCoordinator#resetSpec] resetting spec at {}", be.blockPos)
         if (stateRecorders.remove(be) != null) StateRecorder.deactivate()
         runners.remove(be)
@@ -55,7 +55,7 @@ object SpecRunnerCoordinator {
         snapshot?.restore(level)
     }
 
-    fun resumeSpec(be: RedstoneSpecBlockEntity) {
+    fun resumeSpec(be: SpecBlockEntity) {
         LOGGER.debug("[SpecRunnerCoordinator#resumeSpec] resuming spec at {}", be.blockPos)
         runners[be]?.resume()
     }
@@ -70,7 +70,7 @@ object SpecRunnerCoordinator {
     }
 
     private fun tickRunners(level: ServerLevel, phase: Phase) {
-        val completed = mutableListOf<Pair<RedstoneSpecBlockEntity, List<TickCheck>>>()
+        val completed = mutableListOf<Pair<SpecBlockEntity, List<TickCheck>>>()
 
         for ((be, runner) in runners) {
             if (be.level !== level) continue
@@ -97,7 +97,7 @@ object SpecRunnerCoordinator {
         }
     }
 
-    private fun finishRun(be: RedstoneSpecBlockEntity, checks: List<TickCheck>) {
+    private fun finishRun(be: SpecBlockEntity, checks: List<TickCheck>) {
         val recorder = stateRecorders.remove(be)
         if (recorder != null) StateRecorder.deactivate()
         val level = be.level as? ServerLevel ?: return

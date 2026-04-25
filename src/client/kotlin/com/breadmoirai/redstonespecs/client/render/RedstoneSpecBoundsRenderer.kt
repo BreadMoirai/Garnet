@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.client.render
 
 import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
 import com.breadmoirai.redstonespecs.data.AutoSpec
@@ -25,7 +25,7 @@ import org.joml.Matrix4f
 fun registerBoundsRenderer() {
     BlockEntityRenderers.register(
         ModRegistries.REDSTONE_SPEC_BLOCK_ENTITY_TYPE,
-        ::RedstoneSpecBlockEntityRenderer,
+        ::SpecBlockEntityRenderer,
     )
 }
 
@@ -35,13 +35,13 @@ class RedstoneSpecRenderState : BlockEntityRenderState() {
     var hoveredFace: HoveredFace? = null
 }
 
-class RedstoneSpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
-    BlockEntityRenderer<RedstoneSpecBlockEntity, RedstoneSpecRenderState> {
+class SpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
+    BlockEntityRenderer<SpecBlockEntity, RedstoneSpecRenderState> {
 
     override fun createRenderState(): RedstoneSpecRenderState = RedstoneSpecRenderState()
 
     override fun extractRenderState(
-        entity: RedstoneSpecBlockEntity,
+        entity: SpecBlockEntity,
         state: RedstoneSpecRenderState,
         partialTick: Float,
         cameraPos: Vec3,

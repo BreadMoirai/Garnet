@@ -22,7 +22,7 @@ class RedstoneSpecBlock(properties: Properties) : BaseEntityBlock(properties) {
     override fun codec(): MapCodec<out BaseEntityBlock> = CODEC
 
     override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity =
-        RedstoneSpecBlockEntity(pos, state)
+        SpecBlockEntity(pos, state)
 
     override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
 
@@ -34,7 +34,7 @@ class RedstoneSpecBlock(properties: Properties) : BaseEntityBlock(properties) {
         hit: BlockHitResult,
     ): InteractionResult {
         if (!level.isClientSide) {
-            val be = level.getBlockEntity(pos) as? RedstoneSpecBlockEntity ?: return InteractionResult.PASS
+            val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
             val serverPlayer = player as ServerPlayer
             if (be.spec == null) {
                 val defaultId = serverPlayer.gameProfile.name.lowercase().replace(" ", "_") + "_spec"

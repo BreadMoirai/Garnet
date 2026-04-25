@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs
 
 import com.breadmoirai.redstonespecs.block.RedstoneSpecBlock
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.item.AutoSpecMarkerItem
 import com.breadmoirai.redstonespecs.item.BreakpointSpecMarkerItem
 import com.breadmoirai.redstonespecs.item.InputSpecMarkerItem
@@ -29,9 +29,9 @@ object ModRegistries {
         ::RedstoneSpecBlock,
         BlockBehaviour.Properties.of().strength(2f).noOcclusion()
     )
-    val REDSTONE_SPEC_BLOCK_ENTITY_TYPE: BlockEntityType<RedstoneSpecBlockEntity> = registerBlockEntity(
+    val REDSTONE_SPEC_BLOCK_ENTITY_TYPE: BlockEntityType<SpecBlockEntity> = registerBlockEntity(
         "redstone_spec",
-        ::RedstoneSpecBlockEntity,
+        ::SpecBlockEntity,
         REDSTONE_SPEC_BLOCK,
     )
     val REDSTONE_SPEC_ITEM: BlockItem = registerBlockItem("redstone_spec", REDSTONE_SPEC_BLOCK)

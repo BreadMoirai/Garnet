@@ -25,6 +25,7 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.Level
+import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.storage.LevelResource
@@ -33,7 +34,7 @@ import net.minecraft.world.level.storage.ValueOutput
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
-class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
+class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     BlockEntity(ModRegistries.REDSTONE_SPEC_BLOCK_ENTITY_TYPE, pos, state) {
 
     private var specEmitter: RedstoneSpecEmitter? = null
@@ -46,7 +47,7 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
         private set
 
     fun setSpec(newSpec: RedstoneSpec) {
-        LOGGER.debug("[RedstoneSpecBlockEntity#setSpec] setting spec '{}' at {}", newSpec.id, blockPos)
+        LOGGER.debug("[SpecBlockEntity#setSpec] setting spec '{}' at {}", newSpec.id, blockPos)
         val e = specEmitter
         if (e == null) {
             specEmitter = newSpec.emitter()
@@ -88,20 +89,27 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     fun addOrUpdateEntry(entry: SpecEntry) {
-        LOGGER.debug("[RedstoneSpecBlockEntity#addOrUpdateEntry] pos={} type={}", entry.pos, entry.javaClass.simpleName)
+        LOGGER.debug("[SpecBlockEntity#addOrUpdateEntry] pos={} type={}", entry.pos, entry.javaClass.simpleName)
         val e = specEmitter ?: return
         e.updateFrom(e.value.withEntryAddedOrUpdated(entry))
         setChangedAndSync()
     }
 
     fun removeEntry(pos: BlockPos): SpecEntry? {
-        LOGGER.debug("[RedstoneSpecBlockEntity#removeEntry] pos={}", pos)
+        LOGGER.debug("[SpecBlockEntity#removeEntry] pos={}", pos)
         val e = specEmitter ?: return null
         val s = e.value
         val removed = s.entryAt(pos) ?: return null
         e.updateFrom(s.withEntryRemoved(pos))
         setChangedAndSync()
         return removed
+    }
+
+    fun transformTo(targetBlock: Block) {
+        val lv = level ?: return
+        if (lv.isClientSide) return
+        val newState = targetBlock.defaultBlockState()
+        lv.setBlock(blockPos, newState, 3)
     }
 
     override fun setLevel(level: Level) {
@@ -150,14 +158,14 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
 
     companion object {
         private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
-        private val registry = ConcurrentHashMap<Level, ConcurrentHashMap<BlockPos, RedstoneSpecBlockEntity>>()
+        private val registry = ConcurrentHashMap<Level, ConcurrentHashMap<BlockPos, SpecBlockEntity>>()
 
-        private fun register(be: RedstoneSpecBlockEntity) {
+        private fun register(be: SpecBlockEntity) {
             val level = be.level ?: return
             registry.getOrPut(level, ::ConcurrentHashMap)[be.blockPos] = be
         }
 
-        fun findFor(level: Level, worldPos: BlockPos): RedstoneSpecBlockEntity? =
+        fun findFor(level: Level, worldPos: BlockPos): SpecBlockEntity? =
             registry[level]?.values?.find { be ->
                 val s = be.spec ?: return@find false
                 val b = s.bounds
@@ -167,12 +175,12 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
                 worldPos.z in (o.z + b.minZ())..(o.z + b.maxZ())
             }
 
-        fun allFor(level: Level): Collection<RedstoneSpecBlockEntity> =
+        fun allFor(level: Level): Collection<SpecBlockEntity> =
             registry[level]?.values ?: emptyList()
     }
 
     override fun saveAdditional(output: ValueOutput) {
-        LOGGER.debug("[RedstoneSpecBlockEntity#saveAdditional] saving at {}", blockPos)
+        LOGGER.debug("[SpecBlockEntity#saveAdditional] saving at {}", blockPos)
         super.saveAdditional(output)
         spec?.let { output.store("spec", RedstoneSpec.CODEC, it) }
         lastTestResult?.let { output.store("last_test_result", TestResult.CODEC, it) }
@@ -182,7 +190,7 @@ class RedstoneSpecBlockEntity(pos: BlockPos, state: BlockState) :
         super.loadAdditional(input)
         val loaded = input.read("spec", RedstoneSpec.CODEC).orElse(null)
         lastTestResult = input.read("last_test_result", TestResult.CODEC).orElse(null)
-        LOGGER.debug("[RedstoneSpecBlockEntity#loadAdditional] loaded at {} spec='{}'", blockPos, loaded?.id)
+        LOGGER.debug("[SpecBlockEntity#loadAdditional] loaded at {} spec='{}'", blockPos, loaded?.id)
         if (loaded == null) return
         collectorJob?.cancel()
         specEmitter = loaded.emitter()

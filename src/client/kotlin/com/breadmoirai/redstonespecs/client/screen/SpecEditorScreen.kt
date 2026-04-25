@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecBlockEntity
+import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.AutoSpec
 import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.InputSpec
@@ -12,7 +12,6 @@ import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.network.RemoveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
-import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.Button
@@ -84,7 +83,7 @@ class SpecEditorScreen(
     override fun tick() {
         super.tick()
         if (launched) return
-        val be = minecraft?.level?.getBlockEntity(originPos) as? RedstoneSpecBlockEntity ?: return
+        val be = minecraft?.level?.getBlockEntity(originPos) as? SpecBlockEntity ?: return
         val entry = be.spec?.entryAt(entryRelPos) ?: return
         originalEntry = entry
         workingLabel = entry.label
@@ -161,7 +160,8 @@ class SpecEditorScreen(
 
             val tableContent = LinearLayout.vertical().spacing(1)
             rows.forEachIndexed { i, row ->
-                tableContent.addChild(buildTableRow(i, row, rows, blockState, availableProps, advancedPhases))
+                val rowProps = filterAvailableProps(availableProps, rows, i)
+                tableContent.addChild(buildTableRow(i, row, rows, blockState, rowProps, advancedPhases))
             }
 
             tableContent.addChild(
@@ -174,7 +174,12 @@ class SpecEditorScreen(
                     }
                     val newPhase = lastTime?.phase?.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
                     val newTime = if (newTick < 0) SimTime.INIT else SimTime(newTick, newPhase)
-                    val firstProp = buildFirstRowProp(blockState)
+                    val taken = rows.asSequence()
+                        .filter { conflictsWith(newTime, it.simTime) }
+                        .map { it.prop.name }
+                        .toSet()
+                    val pickName = availableProps.firstOrNull { it !in taken } ?: availableProps.firstOrNull()
+                    val firstProp = pickName?.let { buildRowPropForName(it, blockState) } ?: buildFirstRowProp(blockState)
                     if (firstProp != null) rows.add(FlatRow(newTime, firstProp))
                     rebuildWidgets()
                 }.pos(0, 0).width(240).build()
@@ -182,19 +187,6 @@ class SpecEditorScreen(
 
             val tableScrollHeight = (height - 178).coerceAtLeast(60)
             content.addChild(ScrollableLayout(minecraft, tableContent, tableScrollHeight))
-
-            val captureRow = LinearLayout.horizontal().spacing(4)
-            captureRow.addChild(
-                Button.builder(Component.literal("Add Properties")) {
-                    captureState(rows)
-                }.pos(0, 0).width(120).build()
-            )
-            captureRow.addChild(
-                Button.builder(Component.literal("Add Changed Properties")) {
-                    captureChangedTracked(rows)
-                }.pos(0, 0).width(160).build()
-            )
-            content.addChild(captureRow)
 
             content.addChild(SpacerElement(0, 4))
         }
@@ -251,17 +243,21 @@ class SpecEditorScreen(
             rowLayout.addChild(phaseButton)
         }
 
-        val propButton = DropdownButton(
-            this, 0, 0, 100, 16, font,
-            availableProps,
-            { Component.literal(it) },
-            row.prop.name,
-        ) { propName ->
-            val newProp = buildRowPropForName(propName, blockState)
-            if (newProp != null) row.prop = newProp
-            rebuildWidgets()
+        if (availableProps.isEmpty()) {
+            rowLayout.addChild(StringWidget(100, 16, Component.literal(row.prop.name), font))
+        } else {
+            val propButton = DropdownButton(
+                this, 0, 0, 100, 16, font,
+                availableProps,
+                { Component.literal(it) },
+                row.prop.name,
+            ) { propName ->
+                val newProp = buildRowPropForName(propName, blockState)
+                if (newProp != null) row.prop = newProp
+                rebuildWidgets()
+            }
+            rowLayout.addChild(propButton)
         }
-        rowLayout.addChild(propButton)
 
         rowLayout.addChild(buildValueWidget(row))
 
@@ -347,6 +343,26 @@ class SpecEditorScreen(
         rebuildWidgets()
     }
 
+    private fun filterAvailableProps(
+        all: List<String>,
+        rows: List<FlatRow>,
+        rowIndex: Int,
+    ): List<String> {
+        val current = rows[rowIndex]
+        val taken = rows.asSequence()
+            .filterIndexed { i, other -> i != rowIndex && conflictsWith(current.simTime, other.simTime) }
+            .map { it.prop.name }
+            .toMutableSet()
+        taken.add(current.prop.name)
+        return all.filter { it !in taken }
+    }
+
+    private fun conflictsWith(a: SimTime, b: SimTime): Boolean = when (specMode) {
+        SpecMode.SIMPLE -> true
+        SpecMode.TICK_AWARE -> a.tick == b.tick
+        SpecMode.UPDATE_AWARE -> a == b
+    }
+
     private fun buildAvailableProps(blockState: BlockState?): List<String> {
         val names = mutableListOf("block")
         blockState?.block?.stateDefinition?.properties?.mapTo(names) { it.name }
@@ -383,82 +399,6 @@ class SpecEditorScreen(
                     prop.possibleValues.map { cast.getName(it) })
             }
         }
-    }
-
-    private fun captureState(rows: MutableList<FlatRow>) {
-        val level = minecraft?.level ?: return
-        val worldPos = originPos.offset(entryRelPos)
-        val blockState = level.getBlockState(worldPos)
-        val currentProps = captureBlockStateProps(blockState)
-
-        if (rows.isEmpty()) {
-            val firstProp = buildFirstRowProp(blockState) ?: return
-            rows.add(FlatRow(SimTime.INIT, firstProp))
-            rebuildWidgets()
-            return
-        }
-
-        val lastTime = rows.maxByOrNull { it.simTime }?.simTime ?: return
-        val lastKnown = mutableMapOf<String, String>()
-        rows.filter { it.simTime == lastTime }.forEach { r ->
-            when (val p = r.prop) {
-                is RowProp.Bool -> lastKnown[p.name] = p.value.toString()
-                is RowProp.ExactInt -> lastKnown[p.name] = p.value.toString()
-                is RowProp.Enum -> lastKnown[p.name] = p.value
-                else -> {}
-            }
-        }
-
-        val diff = currentProps.filter { (k, v) -> lastKnown[k] != v }
-        if (diff.isEmpty()) return
-
-        val newTick = if (lastTime == SimTime.INIT) 0 else lastTime.tick + 1
-        val newTime = SimTime(newTick, Phase.END_OF_TICK)
-        diff.keys.forEach { propName ->
-            val newProp = buildRowPropForName(propName, blockState) ?: return@forEach
-            rows.add(FlatRow(newTime, newProp))
-        }
-        rebuildWidgets()
-    }
-
-    private fun captureChangedTracked(rows: MutableList<FlatRow>) {
-        val level = minecraft?.level ?: return
-        val worldPos = originPos.offset(entryRelPos)
-        val blockState = level.getBlockState(worldPos)
-        val currentProps = captureBlockStateProps(blockState)
-
-        val lastTime = rows.maxByOrNull { it.simTime }?.simTime ?: return
-        val lastKnown = mutableMapOf<String, String>()
-        rows.filter { it.simTime == lastTime }.forEach { r ->
-            when (val p = r.prop) {
-                is RowProp.Bool -> lastKnown[p.name] = p.value.toString()
-                is RowProp.ExactInt -> lastKnown[p.name] = p.value.toString()
-                is RowProp.Enum -> lastKnown[p.name] = p.value
-                else -> {}
-            }
-        }
-
-        // Only consider properties that are already tracked anywhere in this entry list
-        val trackedNames = rows.mapNotNull { r ->
-            when (val p = r.prop) {
-                is RowProp.Bool -> p.name
-                is RowProp.ExactInt -> p.name
-                is RowProp.RangeInt -> p.name
-                is RowProp.Enum -> p.name
-                else -> null
-            }
-        }.toSet()
-
-        val diff = currentProps.filter { (k, v) -> k in trackedNames && lastKnown[k] != v }
-        if (diff.isEmpty()) return
-
-        val newTick = if (lastTime == SimTime.INIT) 0 else lastTime.tick + 1
-        val newTime = SimTime(newTick, Phase.END_OF_TICK)
-        diff.keys.forEach { propName ->
-            val newProp = buildRowPropForName(propName, blockState) ?: return@forEach
-            rows.add(FlatRow(newTime, newProp))
-        }
-        rebuildWidgets()
     }
 
     private fun saveAndClose() {
