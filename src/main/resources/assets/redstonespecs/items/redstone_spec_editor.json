@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "redstonespecs:block/redstone_spec_editor"
+  }
+}
