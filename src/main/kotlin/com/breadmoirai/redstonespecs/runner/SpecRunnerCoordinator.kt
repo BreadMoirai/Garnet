@@ -33,15 +33,10 @@ object SpecRunnerCoordinator {
         stateRecorders[be] = recorder
         StateRecorder.activate(recorder)
 
-        val boundsWorldMin = BlockPos(
-            be.blockPos.x + spec.bounds.minX(),
-            be.blockPos.y + spec.bounds.minY(),
-            be.blockPos.z + spec.bounds.minZ(),
-        )
         val view = StateRecordingView.of(recorder)
         val snapshot = snapshots[be]!!
         snapshot.restore(level)
-        val runner = SpecRunner(spec, be.blockPos, level, snapshot, view, boundsWorldMin)
+        val runner = SpecRunner(spec, be.blockPos, level, snapshot, view)
         runner.start()
         runners[be] = runner
     }

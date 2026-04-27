@@ -28,7 +28,6 @@ class SpecRunner(
     val level: ServerLevel,
     private val snapshot: SpecSnapshot,
     private val view: StateRecordingView,
-    private val boundsWorldMin: BlockPos,
 ) {
     private var ticksElapsed = -1
     private val checks = mutableListOf<TickCheck>()
@@ -56,7 +55,7 @@ class SpecRunner(
         if (frozenAt != null) return null
         if (phase == Phase.START_OF_TICK) ticksElapsed++
         if (ticksElapsed < 0) return null
-        if (ticksElapsed >= spec.lifespan) {
+        if (ticksElapsed > spec.lifespan) {
             LOGGER.debug("[SpecRunner#onPhase] spec '{}' finished after {} ticks", spec.id, ticksElapsed)
             return checks.toList()
         }
@@ -112,8 +111,7 @@ class SpecRunner(
                 it.first == simTime || (userInteractionTime != null && it.first == userInteractionTime)
             } ?: continue
             val wPos = worldPos(output.pos)
-            val localPos = worldToLocal(wPos)
-            val state = view.stateAt(localPos, simTime)
+            val state = view.stateAt(output.pos, simTime)
             val label = output.label.ifEmpty { output.pos.toString() }
             collectChecks(condition, state, wPos, simTime, label)
         }
@@ -167,10 +165,4 @@ class SpecRunner(
 
     private fun worldPos(relPos: BlockPos) =
         BlockPos(originPos.x + relPos.x, originPos.y + relPos.y, originPos.z + relPos.z)
-
-    private fun worldToLocal(worldPos: BlockPos) = BlockPos(
-        worldPos.x - boundsWorldMin.x,
-        worldPos.y - boundsWorldMin.y,
-        worldPos.z - boundsWorldMin.z,
-    )
 }

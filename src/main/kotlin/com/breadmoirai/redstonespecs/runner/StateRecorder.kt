@@ -12,6 +12,7 @@ import java.util.UUID
 
 class StateRecorder(
     val specId: UUID,
+    private val originPos: BlockPos,
     private val boundsWorldMin: BlockPos,
     private val boundsWorldMax: BlockPos,
 ) {
@@ -32,8 +33,7 @@ class StateRecorder(
                 for (y in bounds.minY()..bounds.maxY()) {
                     for (z in bounds.minZ()..bounds.maxZ()) {
                         val worldPos = BlockPos(originPos.x + x, originPos.y + y, originPos.z + z)
-                        val localPos = worldToLocal(worldPos)
-                        put(localPos, level.getBlockState(worldPos))
+                        put(worldToOriginRelative(worldPos), level.getBlockState(worldPos))
                     }
                 }
             }
@@ -54,14 +54,18 @@ class StateRecorder(
         worldPos.y in boundsWorldMin.y..boundsWorldMax.y &&
         worldPos.z in boundsWorldMin.z..boundsWorldMax.z
 
-    fun worldToLocal(worldPos: BlockPos): BlockPos = BlockPos(
-        worldPos.x - boundsWorldMin.x,
-        worldPos.y - boundsWorldMin.y,
-        worldPos.z - boundsWorldMin.z,
+    /**
+     * Converts a world position to a position relative to the recorder's origin block —
+     * the same coordinate space used by [com.breadmoirai.redstonespecs.data.SpecEntry.pos].
+     */
+    fun worldToOriginRelative(worldPos: BlockPos): BlockPos = BlockPos(
+        worldPos.x - originPos.x,
+        worldPos.y - originPos.y,
+        worldPos.z - originPos.z,
     )
 
     fun record(worldPos: BlockPos, from: BlockState, to: BlockState) {
-        val localPos = worldToLocal(worldPos)
+        val localPos = worldToOriginRelative(worldPos)
         val toBlock: Identifier? = if (from.block != to.block) {
             BuiltInRegistries.BLOCK.getKey(to.block) ?: return  // unregistered block — skip silently
         } else null
@@ -102,7 +106,7 @@ class StateRecorder(
             val maxX = originPos.x + bounds.maxX()
             val maxY = originPos.y + bounds.maxY()
             val maxZ = originPos.z + bounds.maxZ()
-            return StateRecorder(specId, BlockPos(minX, minY, minZ), BlockPos(maxX, maxY, maxZ))
+            return StateRecorder(specId, originPos, BlockPos(minX, minY, minZ), BlockPos(maxX, maxY, maxZ))
         }
     }
 }
