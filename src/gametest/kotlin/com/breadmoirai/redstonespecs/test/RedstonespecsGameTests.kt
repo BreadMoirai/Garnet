@@ -6,6 +6,7 @@ import com.breadmoirai.redstonespecs.data.InputSpec
 import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import com.breadmoirai.redstonespecs.runner.propsToCondition
 import net.fabricmc.fabric.api.gametest.v1.GameTest
@@ -24,19 +25,46 @@ import net.minecraft.world.level.block.state.properties.AttachFace
  * Drives the full record → finalize → editor → runner → run pipeline through direct
  * BE / coordinator calls (no client, no UI screens). Each scenario describes a small
  * world layout, which blocks are inputs/outputs, and how to mutate the world during
- * recording. The shared [runRecorderScenario] handles the rest.
+ * recording. Each scenario is exercised at all three [SpecMode] values.
  */
 class RedstonespecsGameTests {
 
-    /**
-     * Trivial direct-attachment circuit: a floor-lever sits on top of a redstone
-     * lamp. Toggling the lever directly powers the lamp via its attachment block.
-     */
+    // ── Lever-on-Lamp (direct attachment) ─────────────────────────────────────
+
     @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
-    fun recorderFlowLeverLampDirect(helper: GameTestHelper) {
+    fun recorderFlowSimpleLeverLampDirect(helper: GameTestHelper) =
+        runRecorderScenario(helper, leverLampDirect(SpecMode.SIMPLE))
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowTickAwareLeverLampDirect(helper: GameTestHelper) =
+        runRecorderScenario(helper, leverLampDirect(SpecMode.TICK_AWARE))
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowUpdateAwareLeverLampDirect(helper: GameTestHelper) =
+        runRecorderScenario(helper, leverLampDirect(SpecMode.UPDATE_AWARE))
+
+    // ── Lever → Smooth Stone → Wall Torch (hard-power chain) ──────────────────
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowSimpleLeverStoneTorch(helper: GameTestHelper) =
+        runRecorderScenario(helper, leverStoneTorch(SpecMode.SIMPLE))
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowTickAwareLeverStoneTorch(helper: GameTestHelper) =
+        runRecorderScenario(helper, leverStoneTorch(SpecMode.TICK_AWARE))
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowUpdateAwareLeverStoneTorch(helper: GameTestHelper) =
+        runRecorderScenario(helper, leverStoneTorch(SpecMode.UPDATE_AWARE))
+
+    // ── Scenario factories ────────────────────────────────────────────────────
+
+    /** Floor lever sitting on a redstone lamp; toggling powers the lamp directly. */
+    private fun leverLampDirect(mode: SpecMode): RecorderScenario {
         val lampPos = BlockPos(2, 0, 1)
         val leverPos = BlockPos(2, 1, 1)
-        runRecorderScenario(helper, RecorderScenario(
+        return RecorderScenario(
+            mode = mode,
             recorderRelPos = BlockPos(0, 0, 0),
             placeBlocks = { h ->
                 h.setBlock(lampPos, Blocks.REDSTONE_LAMP.defaultBlockState())
@@ -46,20 +74,20 @@ class RedstonespecsGameTests {
             inputs = listOf(leverPos),
             outputs = listOf(lampPos),
             drive = { h -> h.useBlock(leverPos) },
-        ))
+        )
     }
 
     /**
-     * Hard-power chain: lever → smooth_stone → redstone wall torch. Toggling the
-     * lever hard-powers the stone, which deactivates the torch on the adjacent face.
-     * Exercises full lever neighbor-update propagation through a non-wire block.
+     * Lever → smooth_stone → wall torch. Toggling the lever hard-powers the
+     * stone, which deactivates the torch on the adjacent face. Exercises full
+     * lever neighbor-update propagation through a non-wire block.
      */
-    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
-    fun recorderFlowLeverStoneTorch(helper: GameTestHelper) {
+    private fun leverStoneTorch(mode: SpecMode): RecorderScenario {
         val stonePos = BlockPos(2, 0, 1)
         val leverPos = BlockPos(2, 1, 1)
         val torchPos = BlockPos(3, 0, 1)
-        runRecorderScenario(helper, RecorderScenario(
+        return RecorderScenario(
+            mode = mode,
             recorderRelPos = BlockPos(0, 0, 0),
             placeBlocks = { h ->
                 h.setBlock(stonePos, Blocks.SMOOTH_STONE.defaultBlockState())
@@ -73,12 +101,13 @@ class RedstonespecsGameTests {
             inputs = listOf(leverPos),
             outputs = listOf(torchPos),
             drive = { h -> h.useBlock(leverPos) },
-        ))
+        )
     }
 
     // ── Shared scenario runner ────────────────────────────────────────────────
 
     /**
+     * @param mode the recorder's [SpecMode]; affects how output entries are derived.
      * @param recorderRelPos position of the recorder block in helper-local coords.
      * @param placeBlocks places the input/output blocks (helper-local coords).
      * @param inputs world positions (helper-local) of input marker blocks.
@@ -87,6 +116,7 @@ class RedstonespecsGameTests {
      * @param recordingTicks number of ticks to wait between [drive] and stop.
      */
     private data class RecorderScenario(
+        val mode: SpecMode,
         val recorderRelPos: BlockPos,
         val placeBlocks: (GameTestHelper) -> Unit,
         val inputs: List<BlockPos>,
@@ -104,6 +134,7 @@ class RedstonespecsGameTests {
                 level.setBlock(recorderAbs, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 3)
                 scenario.placeBlocks(helper)
                 val be = beAt(level, recorderAbs)
+                be.setMode(scenario.mode)
                 applyMarkers(level, helper, be, scenario)
                 check(be.startRecording()) { "startRecording returned false (gating not satisfied)" }
             }

@@ -11,6 +11,7 @@ import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.StateCondition
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
@@ -21,15 +22,14 @@ import org.apache.commons.lang3.function.FailableConsumer
 @Suppress("UnstableApiUsage")
 class RedstonespecsClientTests : FabricClientGameTest {
 
-    // Coordinates for recorderToEditorToRunnerFlow.
-    private val recorderPos = BlockPos(30, 64, 0)
-    private val recLampPos  = BlockPos(32, 64, 1)   // relative (2, 0, 1) — in DEFAULT_BOUNDS
-    private val recLeverPos = BlockPos(32, 65, 1)   // relative (2, 1, 1) — on top of lamp
-
     override fun runTest(context: ClientGameTestContext) {
         SpecTestContext.createWorld(context).use { world ->
             val ctx = SpecTestContext(context, world)
-            recorderToEditorToRunnerFlow(ctx)
+            // One pass per SpecMode, on a fresh patch of world each time so the
+            // earlier runner block doesn't interfere with the next iteration.
+            recorderToEditorToRunnerFlow(ctx, SpecMode.SIMPLE,       originX = 30)
+            recorderToEditorToRunnerFlow(ctx, SpecMode.TICK_AWARE,   originX = 50)
+            recorderToEditorToRunnerFlow(ctx, SpecMode.UPDATE_AWARE, originX = 70)
             editorTransformsToRunnerOnSave(ctx)
             discardClearsEverythingExceptIdBoundsAndMarkers(ctx)
             markerToolRejectsRunnerBlock(ctx)
@@ -189,7 +189,16 @@ class RedstonespecsClientTests : FabricClientGameTest {
     }
 
     // ── Test: Recorder → Editor → Runner via UI (Record/Stop, Save, Run) ─────
-    private fun recorderToEditorToRunnerFlow(ctx: SpecTestContext) {
+    /**
+     * Drives the full recorder→editor→runner UI flow for a lever-on-lamp circuit
+     * at the given [SpecMode]. [originX] is the x-coordinate of the recorder block,
+     * letting the caller place each mode's run on a fresh patch of world.
+     */
+    private fun recorderToEditorToRunnerFlow(ctx: SpecTestContext, mode: SpecMode, originX: Int) {
+        val recorderPos = BlockPos(originX, 64, 0)
+        val recLampPos  = BlockPos(originX + 2, 64, 1)   // relative (2, 0, 1) — in DEFAULT_BOUNDS
+        val recLeverPos = BlockPos(originX + 2, 65, 1)   // relative (2, 1, 1) — on top of lamp
+
         // ── World setup ──────────────────────────────────────────────────────
         // Stone floor under the recorder, lamp, and the player's standing spot so the
         // player doesn't fall (falling causes the recorder to silently auto-stop between
@@ -201,6 +210,16 @@ class RedstonespecsClientTests : FabricClientGameTest {
         // Stand the player a few blocks south of the recorder so right-click hits land cleanly.
         ctx.runCommand("tp @a ${recorderPos.x} ${recorderPos.y} ${recorderPos.z - 3}")
         ctx.waitTicks(5)
+
+        // ── Set the recorder's spec mode (server-side, before markers/recording) ─
+        ctx.world.getServer().runOnServer(object : FailableConsumer<net.minecraft.server.MinecraftServer, RuntimeException> {
+            override fun accept(server: net.minecraft.server.MinecraftServer) {
+                val be = server.overworld().getBlockEntity(recorderPos) as? SpecBlockEntity
+                    ?: error("SpecBlockEntity not found at $recorderPos")
+                be.setMode(mode)
+            }
+        })
+        ctx.waitTick()
 
         // ── Apply input marker on the lever (no UI in recorder mode) ─────────
         ctx.runCommand("clear @a")
@@ -266,14 +285,14 @@ class RedstonespecsClientTests : FabricClientGameTest {
         }, 100)
 
         val be = ctx.getClientBe(recorderPos)
-            ?: throw AssertionError("SpecBlockEntity not found at $recorderPos")
+            ?: throw AssertionError("[$mode] SpecBlockEntity not found at $recorderPos")
         val result = be.lastTestResult
-            ?: throw AssertionError("lastTestResult is null after waitFor succeeded")
+            ?: throw AssertionError("[$mode] lastTestResult is null after waitFor succeeded")
         val checks = result.checks
-        check(checks.isNotEmpty()) { "recorderToEditorToRunnerFlow: expected at least one check in results" }
+        check(checks.isNotEmpty()) { "[$mode] recorderToEditorToRunnerFlow: expected at least one check in results" }
         val failed = checks.filter { !it.pass }
         check(failed.isEmpty()) {
-            "recorderToEditorToRunnerFlow: failed checks: ${failed.joinToString { "${it.label}: expected=${it.expected} actual=${it.actual}" }}"
+            "[$mode] recorderToEditorToRunnerFlow: failed checks: ${failed.joinToString { "${it.label}: expected=${it.expected} actual=${it.actual}" }}"
         }
     }
 }
