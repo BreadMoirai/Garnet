@@ -1,8 +1,10 @@
 package com.breadmoirai.redstonespecs.test
 
 import com.breadmoirai.redstonespecs.ModRegistries
+import com.breadmoirai.redstonespecs.block.RedstoneSpecEditorBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
+import com.breadmoirai.redstonespecs.client.screen.RecorderSetupScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecBoundsScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
@@ -26,6 +28,12 @@ class RedstonespecsClientTests : FabricClientGameTest {
     private val leverPos  = BlockPos(1, 64, 0)
     private val lampPos   = BlockPos(2, 64, 0)
 
+    // Coordinates for recorderToEditorToRunnerFlow — offset to avoid collision
+    // with leverLampFullFlow's blocks at x=0..2.
+    private val recorderPos = BlockPos(30, 64, 0)
+    private val recLampPos  = BlockPos(32, 64, 1)   // relative (2, 0, 1) — in DEFAULT_BOUNDS
+    private val recLeverPos = BlockPos(32, 65, 1)   // relative (2, 1, 1) — on top of lamp
+
     override fun runTest(context: ClientGameTestContext) {
         SpecTestContext.createWorld(context).use { world ->
             val ctx = SpecTestContext(context, world)
@@ -35,6 +43,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
             editorTransformsToRunnerOnSave(ctx)
             discardClearsEverythingExceptIdBoundsAndMarkers(ctx)
             markerToolRejectsRunnerBlock(ctx)
+            recorderToEditorToRunnerFlow(ctx)
         }
     }
 
@@ -303,6 +312,89 @@ class RedstonespecsClientTests : FabricClientGameTest {
         val failed = checks.filter { !it.pass }
         check(failed.isEmpty()) {
             "Failed checks: ${failed.joinToString { "${it.label}: expected=${it.expected} actual=${it.actual}" }}"
+        }
+    }
+
+    // ── Test: Recorder → Editor → Runner via UI (Record/Stop, Save, Run) ─────
+    private fun recorderToEditorToRunnerFlow(ctx: SpecTestContext) {
+        // ── World setup ──────────────────────────────────────────────────────
+        // Stone under the lamp for visual support (lamp doesn't strictly need it).
+        ctx.runCommand("setblock ${recLampPos.x} ${recLampPos.y - 1} ${recLampPos.z} minecraft:stone")
+        ctx.runCommand("setblock ${recorderPos.x} ${recorderPos.y} ${recorderPos.z} redstonespecs:redstone_spec_recorder")
+        ctx.runCommand("setblock ${recLampPos.x} ${recLampPos.y} ${recLampPos.z} minecraft:redstone_lamp[lit=false]")
+        ctx.runCommand("setblock ${recLeverPos.x} ${recLeverPos.y} ${recLeverPos.z} minecraft:lever[face=floor,facing=north,powered=false]")
+        // Stand the player a few blocks south of the recorder so right-click hits land cleanly.
+        ctx.runCommand("tp @a ${recorderPos.x} ${recorderPos.y} ${recorderPos.z - 3}")
+        ctx.waitTicks(5)
+
+        // ── Apply input marker on the lever (no UI in recorder mode) ─────────
+        ctx.runCommand("clear @a")
+        ctx.runCommand("give @a redstonespecs:input_spec_marker 1")
+        ctx.waitTick()
+        ctx.rightClickBlock(recLeverPos)
+        ctx.waitTick()
+
+        // ── Apply output marker on the lamp (no UI in recorder mode) ─────────
+        ctx.runCommand("clear @a")
+        ctx.runCommand("give @a redstonespecs:output_spec_marker 1")
+        ctx.waitTick()
+        ctx.rightClickBlock(recLampPos)
+        ctx.waitTick()
+
+        // ── Open recorder UI and click Record ────────────────────────────────
+        ctx.runCommand("clear @a")
+        ctx.waitTick()
+        ctx.rightClickBlock(recorderPos)
+        ctx.waitForScreen(RecorderSetupScreen::class.java)
+        ctx.clickButton("Record")
+        // Record button calls onClose(); wait for screen to clear.
+        ctx.context.waitFor({ mc -> mc.screen == null }, 100)
+
+        // ── Drive state changes during recording ─────────────────────────────
+        ctx.waitTicks(2)
+        ctx.runCommand("setblock ${recLeverPos.x} ${recLeverPos.y} ${recLeverPos.z} minecraft:lever[face=floor,facing=north,powered=true]")
+        ctx.waitTicks(4)
+
+        // ── Open recorder UI again and click Stop ────────────────────────────
+        ctx.rightClickBlock(recorderPos)
+        ctx.waitForScreen(RecorderSetupScreen::class.java)
+        ctx.clickButton("Stop")
+        ctx.context.waitFor({ mc -> mc.screen == null }, 100)
+
+        // Server transforms recorder → editor on stop+finalize success.
+        ctx.context.waitFor({ mc ->
+            mc.level?.getBlockState(recorderPos)?.block is RedstoneSpecEditorBlock
+        }, 100)
+
+        // ── Open editor's overview screen and click Save → transforms to Runner ──
+        ctx.rightClickBlock(recorderPos)
+        ctx.waitForScreen(SpecOverviewScreen::class.java)
+        ctx.clickButton("Save")
+        ctx.context.waitFor({ mc -> mc.screen == null }, 100)
+        ctx.context.waitFor({ mc ->
+            mc.level?.getBlockState(recorderPos)?.block is RedstoneSpecRunnerBlock
+        }, 100)
+
+        // ── Open runner's overview and click Run ─────────────────────────────
+        ctx.rightClickBlock(recorderPos)
+        ctx.waitForScreen(SpecOverviewScreen::class.java)
+        ctx.clickButton("Run")
+
+        // ── Wait for test result and assert ──────────────────────────────────
+        ctx.context.waitFor({ mc ->
+            (mc.level?.getBlockEntity(recorderPos) as? SpecBlockEntity)
+                ?.lastTestResult != null
+        }, 100)
+
+        val be = ctx.getClientBe(recorderPos)
+            ?: throw AssertionError("SpecBlockEntity not found at $recorderPos")
+        val result = be.lastTestResult
+            ?: throw AssertionError("lastTestResult is null after waitFor succeeded")
+        val checks = result.checks
+        check(checks.isNotEmpty()) { "recorderToEditorToRunnerFlow: expected at least one check in results" }
+        val failed = checks.filter { !it.pass }
+        check(failed.isEmpty()) {
+            "recorderToEditorToRunnerFlow: failed checks: ${failed.joinToString { "${it.label}: expected=${it.expected} actual=${it.actual}" }}"
         }
     }
 }
