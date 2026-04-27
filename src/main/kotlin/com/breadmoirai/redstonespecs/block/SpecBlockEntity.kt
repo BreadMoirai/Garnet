@@ -56,13 +56,17 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     val isRecording: Boolean get() = stateRecorder != null
 
     fun startRecording(): Boolean {
-        val s = spec ?: return false
-        if (s.id.isBlank()) return false
-        if (s.inputs.isEmpty() || s.outputs.isEmpty()) return false
+        val s = spec ?: run { LOGGER.debug("[startRecording] no spec at {}", blockPos); return false }
+        if (s.id.isBlank()) { LOGGER.debug("[startRecording] blank id at {}", blockPos); return false }
+        if (s.inputs.isEmpty()) { LOGGER.debug("[startRecording] no inputs at {}", blockPos); return false }
+        if (s.outputs.isEmpty()) { LOGGER.debug("[startRecording] no outputs at {}", blockPos); return false }
         val b = s.bounds
-        if (b.minX() >= b.maxX() || b.minY() >= b.maxY() || b.minZ() >= b.maxZ()) return false
-        val lv = level as? ServerLevel ?: return false
-        if (stateRecorder != null) return false
+        if (b.minX() >= b.maxX() || b.minY() >= b.maxY() || b.minZ() >= b.maxZ()) {
+            LOGGER.debug("[startRecording] empty bounds {} at {}", b, blockPos); return false
+        }
+        val lv = level as? ServerLevel ?: run { LOGGER.debug("[startRecording] not ServerLevel at {}", blockPos); return false }
+        if (stateRecorder != null) { LOGGER.debug("[startRecording] already recording at {}", blockPos); return false }
+        LOGGER.info("[startRecording] starting at {} (id={}, bounds={})", blockPos, s.id, b)
         val recorder = StateRecorder.forSpec(UUID.randomUUID(), blockPos, b)
         recorder.start(lv, blockPos, b)
         StateRecorder.activate(recorder)

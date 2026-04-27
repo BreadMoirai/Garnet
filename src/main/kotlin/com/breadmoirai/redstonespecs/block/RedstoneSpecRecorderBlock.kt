@@ -8,7 +8,9 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionResult
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.BaseEntityBlock
 import net.minecraft.world.level.block.Block
@@ -25,6 +27,20 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
     override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity =
         SpecBlockEntity(pos, state)
     override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
+
+    override fun setPlacedBy(level: Level, pos: BlockPos, state: BlockState, placer: LivingEntity?, stack: ItemStack) {
+        super.setPlacedBy(level, pos, state, placer, stack)
+        if (level.isClientSide) return
+        val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return
+        if (be.spec != null) return
+        val player = placer as? ServerPlayer
+        val defaultId = if (player != null) {
+            player.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
+        } else {
+            "spec"
+        }
+        be.setSpec(RedstoneSpec.new(defaultId))
+    }
 
     override fun useWithoutItem(
         state: BlockState, level: Level, pos: BlockPos, player: Player, hit: BlockHitResult,

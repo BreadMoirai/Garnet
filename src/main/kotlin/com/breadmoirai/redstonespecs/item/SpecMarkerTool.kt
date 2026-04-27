@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.item
 
+import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.AutoSpec
@@ -69,7 +70,8 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
             val spec = be.spec ?: return InteractionResult.PASS
             val relPos = hitPos.subtract(be.blockPos)
             val hitState = level.getBlockState(hitPos)
-            val initProps = captureBlockStateProps(hitState)
+            val isRecorder = be.blockState.block is RedstoneSpecRecorderBlock
+            val initProps = if (isRecorder) emptyMap() else captureBlockStateProps(hitState)
 
             if (spec.entryAt(relPos) == null) {
                 LOGGER.debug("[SpecMarkerTool#useOn] placing {} entry at {}", javaClass.simpleName, relPos)
@@ -78,7 +80,9 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
                 LOGGER.debug("[SpecMarkerTool#useOn] opening editor for existing entry at {}", relPos)
             }
 
-            ServerPlayNetworking.send(player as ServerPlayer, OpenEditorS2CPayload(be.blockPos, relPos))
+            if (!isRecorder) {
+                ServerPlayNetworking.send(player as ServerPlayer, OpenEditorS2CPayload(be.blockPos, relPos))
+            }
         }
 
         return InteractionResult.SUCCESS
