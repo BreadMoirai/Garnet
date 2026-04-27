@@ -28,18 +28,24 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
         SpecBlockEntity(pos, state)
     override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
 
+    override fun onPlace(state: BlockState, level: Level, pos: BlockPos, oldState: BlockState, isMoving: Boolean) {
+        super.onPlace(state, level, pos, oldState, isMoving)
+        if (level.isClientSide) return
+        if (oldState.`is`(this)) return
+        val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return
+        if (be.spec != null) return
+        be.setSpec(RedstoneSpec.new("spec"))
+    }
+
     override fun setPlacedBy(level: Level, pos: BlockPos, state: BlockState, placer: LivingEntity?, stack: ItemStack) {
         super.setPlacedBy(level, pos, state, placer, stack)
         if (level.isClientSide) return
         val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return
-        if (be.spec != null) return
-        val player = placer as? ServerPlayer
-        val defaultId = if (player != null) {
-            player.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
-        } else {
-            "spec"
-        }
-        be.setSpec(RedstoneSpec.new(defaultId))
+        val player = placer as? ServerPlayer ?: return
+        val playerId = player.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
+        val s = be.spec
+        if (s == null) be.setSpec(RedstoneSpec.new(playerId))
+        else if (s.id == "spec") be.setSpecId(playerId)
     }
 
     override fun useWithoutItem(
@@ -47,12 +53,7 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
     ): InteractionResult {
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
-            val serverPlayer = player as ServerPlayer
-            if (be.spec == null) {
-                val defaultId = serverPlayer.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
-                be.setSpec(RedstoneSpec.new(defaultId))
-            }
-            ServerPlayNetworking.send(serverPlayer, OpenRecorderS2CPayload(be.blockPos, be.isRecording))
+            ServerPlayNetworking.send(player as ServerPlayer, OpenRecorderS2CPayload(be.blockPos, be.isRecording))
         }
         return InteractionResult.SUCCESS
     }
