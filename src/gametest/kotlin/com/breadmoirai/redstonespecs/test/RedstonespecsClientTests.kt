@@ -226,8 +226,12 @@ class RedstonespecsClientTests : FabricClientGameTest {
         ctx.context.waitFor({ mc -> mc.screen == null }, 100)
 
         // ── Drive state changes during recording ─────────────────────────────
+        // Toggle the lever via a real right-click so MC's lever logic fires the
+        // proper neighbor-update chain. /setblock would only swap the powered
+        // property and would not propagate redstone through e.g. a smooth-stone
+        // hard-power chain.
         ctx.waitTicks(2)
-        ctx.runCommand("setblock ${recLeverPos.x} ${recLeverPos.y} ${recLeverPos.z} minecraft:lever[face=floor,facing=north,powered=true]")
+        ctx.rightClickBlock(recLeverPos)
         ctx.waitTicks(4)
 
         // ── Open recorder UI again and click Stop ────────────────────────────
