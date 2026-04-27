@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Set;
 
 @Mixin(Level.class)
 abstract class ServerLevelSetBlockMixin {
@@ -38,8 +39,12 @@ abstract class ServerLevelSetBlockMixin {
             BEFORE_STATE_STACK.get().push(SKIP_SENTINEL);
             return;
         }
-        StateRecorder recorder = StateRecorder.getActive();
-        if (recorder == null || !recorder.isInBounds(pos)) {
+        // Capture before-state if any active recorder cares about this position.
+        boolean anyInterested = false;
+        for (StateRecorder recorder : StateRecorder.activeRecorders()) {
+            if (recorder.isInBounds(pos)) { anyInterested = true; break; }
+        }
+        if (!anyInterested) {
             BEFORE_STATE_STACK.get().push(SKIP_SENTINEL);
             return;
         }
@@ -58,8 +63,11 @@ abstract class ServerLevelSetBlockMixin {
         Object fromObj = stack.isEmpty() ? SKIP_SENTINEL : stack.pop();
         if (fromObj == SKIP_SENTINEL) return; // client level, out of bounds, or no recorder
         if (!cir.getReturnValue()) return; // block did not actually change
-        StateRecorder recorder = StateRecorder.getActive();
-        if (recorder == null) return; // recorder deactivated between HEAD and RETURN (edge case)
-        recorder.record(pos, (BlockState) fromObj, newState);
+        BlockState before = (BlockState) fromObj;
+        for (StateRecorder recorder : StateRecorder.activeRecorders()) {
+            if (recorder.isInBounds(pos)) {
+                recorder.record(pos, before, newState);
+            }
+        }
     }
 }

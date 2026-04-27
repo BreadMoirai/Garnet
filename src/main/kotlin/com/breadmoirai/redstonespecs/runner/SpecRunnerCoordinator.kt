@@ -43,7 +43,7 @@ object SpecRunnerCoordinator {
 
     fun resetSpec(be: SpecBlockEntity) {
         LOGGER.debug("[SpecRunnerCoordinator#resetSpec] resetting spec at {}", be.blockPos)
-        if (stateRecorders.remove(be) != null) StateRecorder.deactivate()
+        stateRecorders.remove(be)?.let { StateRecorder.deactivate(it) }
         runners.remove(be)
         val snapshot = snapshots.remove(be)
         val level = be.level as? ServerLevel ?: return
@@ -56,8 +56,7 @@ object SpecRunnerCoordinator {
     }
 
     fun onPhase(level: ServerLevel, phase: Phase) {
-        val recorder = StateRecorder.active
-        if (recorder != null) {
+        for (recorder in StateRecorder.activeRecorders()) {
             if (phase == Phase.START_OF_TICK) recorder.onTickStart()
             recorder.onPhaseStart(phase)
         }
@@ -94,7 +93,7 @@ object SpecRunnerCoordinator {
 
     private fun finishRun(be: SpecBlockEntity, checks: List<TickCheck>) {
         val recorder = stateRecorders.remove(be)
-        if (recorder != null) StateRecorder.deactivate()
+        if (recorder != null) StateRecorder.deactivate(recorder)
         val level = be.level as? ServerLevel ?: return
         if (recorder != null) StateRecordingStorage.save(level, recorder.toRecording())
         val spec = be.spec ?: return

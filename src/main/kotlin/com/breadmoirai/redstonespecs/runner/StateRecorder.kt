@@ -83,19 +83,26 @@ class StateRecorder(
         StateRecording(specId, System.currentTimeMillis(), initialSnapshot, _changes.toList())
 
     companion object {
+        // Multiple recorders may be active at once (e.g. concurrent gametests, or a
+        // user-triggered recording on one BE while another BE's spec is replaying).
+        // The mixin dispatches each setBlock to every recorder whose bounds contain
+        // the position; SpecRunnerCoordinator advances tick state on every recorder
+        // each phase. ConcurrentHashMap-backed set is safe for the rare case of
+        // activate/deactivate happening from a different thread than iteration.
+        private val activeRecorders: MutableSet<StateRecorder> =
+            java.util.concurrent.ConcurrentHashMap.newKeySet()
+
         @JvmStatic
-        @field:Volatile
-        var active: StateRecorder? = null
-            private set
+        fun activeRecorders(): Set<StateRecorder> = activeRecorders
 
         @JvmStatic
         fun activate(recorder: StateRecorder) {
-            active = recorder
+            activeRecorders.add(recorder)
         }
 
         @JvmStatic
-        fun deactivate() {
-            active = null
+        fun deactivate(recorder: StateRecorder) {
+            activeRecorders.remove(recorder)
         }
 
         @JvmStatic

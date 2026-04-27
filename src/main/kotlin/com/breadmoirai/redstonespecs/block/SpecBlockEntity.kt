@@ -77,7 +77,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
 
     fun stopRecordingAndFinalize(): Boolean {
         val rec = stateRecorder ?: return false
-        StateRecorder.deactivate()
+        StateRecorder.deactivate(rec)
         val recording = rec.toRecording()
         stateRecorder = null
         val s = spec
