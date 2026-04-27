@@ -170,8 +170,15 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     fun transformTo(targetBlock: Block) {
         val lv = level ?: return
         if (lv.isClientSide) return
+        // setBlock replaces the BlockEntity when the block type changes, so explicitly
+        // carry spec state across the transition.
+        val carriedSpec = spec
         val newState = targetBlock.defaultBlockState()
         lv.setBlock(blockPos, newState, 3)
+        if (carriedSpec != null) {
+            val newBe = lv.getBlockEntity(blockPos) as? SpecBlockEntity ?: return
+            newBe.setSpec(carriedSpec)
+        }
     }
 
     override fun setLevel(level: Level) {
