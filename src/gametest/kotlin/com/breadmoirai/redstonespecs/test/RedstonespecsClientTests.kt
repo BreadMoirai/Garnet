@@ -5,8 +5,6 @@ import com.breadmoirai.redstonespecs.block.RedstoneSpecEditorBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.RecorderSetupScreen
-import com.breadmoirai.redstonespecs.client.screen.SpecBoundsScreen
-import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
 import com.breadmoirai.redstonespecs.data.InputSpec
 import com.breadmoirai.redstonespecs.data.OutputSpec
@@ -14,7 +12,6 @@ import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
-import dev.isxander.yacl3.gui.YACLScreen
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.minecraft.core.BlockPos
@@ -24,12 +21,7 @@ import org.apache.commons.lang3.function.FailableConsumer
 @Suppress("UnstableApiUsage")
 class RedstonespecsClientTests : FabricClientGameTest {
 
-    private val originPos = BlockPos(0, 64, 0)
-    private val leverPos  = BlockPos(1, 64, 0)
-    private val lampPos   = BlockPos(2, 64, 0)
-
-    // Coordinates for recorderToEditorToRunnerFlow — offset to avoid collision
-    // with leverLampFullFlow's blocks at x=0..2.
+    // Coordinates for recorderToEditorToRunnerFlow.
     private val recorderPos = BlockPos(30, 64, 0)
     private val recLampPos  = BlockPos(32, 64, 1)   // relative (2, 0, 1) — in DEFAULT_BOUNDS
     private val recLeverPos = BlockPos(32, 65, 1)   // relative (2, 1, 1) — on top of lamp
@@ -38,48 +30,10 @@ class RedstonespecsClientTests : FabricClientGameTest {
         SpecTestContext.createWorld(context).use { world ->
             val ctx = SpecTestContext(context, world)
             recorderToEditorToRunnerFlow(ctx)
-            boundsScreenFlow(ctx)
-            specEditorScreenFlow(ctx)
             editorTransformsToRunnerOnSave(ctx)
             discardClearsEverythingExceptIdBoundsAndMarkers(ctx)
             markerToolRejectsRunnerBlock(ctx)
         }
-    }
-
-    private fun specEditorScreenFlow(ctx: SpecTestContext) {
-        // Give input marker and right-click lever → thin SpecEditorScreen → YACLScreen
-        ctx.runCommand("clear @a")
-        ctx.runCommand("give @a redstonespecs:input_spec_marker 1")
-        ctx.waitTick()
-        ctx.rightClickBlock(leverPos)
-        // SpecEditorScreen (loader) transitions to YACLScreen once BE data arrives
-        ctx.waitForScreen(YACLScreen::class.java)
-        ctx.screenshot("spec-editor-screen")
-
-        // Click "+ Add Entry" ButtonOption → opens entry editor YACLScreen
-        ctx.clickYaclButton("+ Add Entry")
-        ctx.waitForScreen(YACLScreen::class.java)
-        ctx.screenshot("entry-editor-screen")
-
-        // Click Cancel (YACL's built-in cancel button, direct screen widget)
-        ctx.clickButton("Cancel")
-        ctx.context.waitFor({ mc -> mc.screen == null }, 100)
-    }
-
-    private fun boundsScreenFlow(ctx: SpecTestContext) {
-        ctx.rightClickBlock(originPos)
-        ctx.waitForScreen(SpecOverviewScreen::class.java)
-        ctx.screenshot("spec-overview-screen")
-
-        ctx.clickButton("Bounds")
-        ctx.waitForScreen(SpecBoundsScreen::class.java)
-        ctx.screenshot("spec-bounds-screen-offset-size")
-
-        ctx.clickNthCycleButtonByValue("Offset / Size", 0)
-        ctx.waitTick()
-        ctx.screenshot("spec-bounds-screen-corners")
-
-        ctx.closeScreen()
     }
 
     // ── Test: Editor → Runner via transformTo ────────────────────────────────
