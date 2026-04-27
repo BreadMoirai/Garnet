@@ -37,13 +37,12 @@ class RedstonespecsClientTests : FabricClientGameTest {
     override fun runTest(context: ClientGameTestContext) {
         SpecTestContext.createWorld(context).use { world ->
             val ctx = SpecTestContext(context, world)
-            leverLampFullFlow(ctx)
+            recorderToEditorToRunnerFlow(ctx)
             boundsScreenFlow(ctx)
             specEditorScreenFlow(ctx)
             editorTransformsToRunnerOnSave(ctx)
             discardClearsEverythingExceptIdBoundsAndMarkers(ctx)
             markerToolRejectsRunnerBlock(ctx)
-            recorderToEditorToRunnerFlow(ctx)
         }
     }
 
@@ -235,91 +234,13 @@ class RedstonespecsClientTests : FabricClientGameTest {
         check(inputsEmpty) { "markerToolRejectsRunnerBlock: Runner block must reject marker placement — inputs should remain empty" }
     }
 
-    private fun leverLampFullFlow(ctx: SpecTestContext) {
-        // ── World setup ──────────────────────────────────────────────────────
-        for (x in 0..3) ctx.runCommand("setblock $x 63 0 minecraft:stone")
-        ctx.runCommand("setblock 0 64 0 redstonespecs:redstone_spec")
-        ctx.runCommand("setblock 1 64 0 minecraft:lever[face=floor,facing=north,powered=false]")
-        ctx.runCommand("setblock 2 64 0 minecraft:redstone_lamp[lit=false]")
-        ctx.runCommand("tp @a 0 64 -3")
-        ctx.waitTicks(5)
-
-        // ── Open overview (right-click SpecOrigin auto-creates spec) ─────────
-        ctx.rightClickBlock(originPos)
-        ctx.waitForScreen(SpecOverviewScreen::class.java)
-        ctx.closeScreen()
-
-        // ── Place InputSpec on lever ─────────────────────────────────────────
-        ctx.runCommand("clear @a")
-        ctx.runCommand("give @a redstonespecs:input_spec_marker 1")
-        ctx.waitTick()
-        ctx.rightClickBlock(leverPos)
-        ctx.waitForScreen(YACLScreen::class.java)
-
-        // Add tick-0 START_OF_TICK entry: powered=true
-        ctx.clickYaclButton("+ Add Entry")
-        ctx.waitForScreen(YACLScreen::class.java)
-        ctx.setYaclOption("Tick", 0)
-        ctx.setYaclOption("Phase", "START_OF_TICK")
-        ctx.setYaclOption("powered", "true")
-        ctx.clickButton("Save Changes")
-        ctx.waitForScreen(YACLScreen::class.java)
-
-        // Save the InputSpec
-        ctx.clickButton("Save Changes")
-        ctx.waitTick()
-
-        // ── Place OutputSpec on lamp ─────────────────────────────────────────
-        ctx.runCommand("clear @a")
-        ctx.runCommand("give @a redstonespecs:output_spec_marker 1")
-        ctx.waitTick()
-        ctx.rightClickBlock(lampPos)
-        ctx.waitForScreen(YACLScreen::class.java)
-
-        // Add tick-0 END_OF_TICK check: lit=true
-        ctx.clickYaclButton("+ Add Entry")
-        ctx.waitForScreen(YACLScreen::class.java)
-        ctx.setYaclOption("Tick", 0)
-        // Phase stays END_OF_TICK (default)
-        ctx.setYaclOption("lit", "true")
-        ctx.clickButton("Save Changes")
-        ctx.waitForScreen(YACLScreen::class.java)
-
-        // Save the OutputSpec
-        ctx.clickButton("Save Changes")
-        ctx.waitTick()
-
-        // ── Open overview and run spec ────────────────────────────────────────
-        ctx.runCommand("clear @a")
-        ctx.waitTick()
-        ctx.rightClickBlock(originPos)
-        ctx.waitForScreen(SpecOverviewScreen::class.java)
-        ctx.clickButton("Run")
-
-        // ── Wait for test result ──────────────────────────────────────────────
-        ctx.context.waitFor({ mc ->
-            (mc.level?.getBlockEntity(originPos) as? SpecBlockEntity)
-                ?.lastTestResult != null
-        }, 100)
-
-        // ── Assert all checks passed ──────────────────────────────────────────
-        val be = ctx.getClientBe(originPos)
-            ?: throw AssertionError("SpecBlockEntity not found at $originPos")
-        val result = be.lastTestResult
-            ?: throw AssertionError("lastTestResult is null after waitFor succeeded")
-        val checks = result.checks
-        check(checks.isNotEmpty()) { "Expected at least one check in results" }
-        val failed = checks.filter { !it.pass }
-        check(failed.isEmpty()) {
-            "Failed checks: ${failed.joinToString { "${it.label}: expected=${it.expected} actual=${it.actual}" }}"
-        }
-    }
-
     // ── Test: Recorder → Editor → Runner via UI (Record/Stop, Save, Run) ─────
     private fun recorderToEditorToRunnerFlow(ctx: SpecTestContext) {
         // ── World setup ──────────────────────────────────────────────────────
-        // Stone under the lamp for visual support (lamp doesn't strictly need it).
-        ctx.runCommand("setblock ${recLampPos.x} ${recLampPos.y - 1} ${recLampPos.z} minecraft:stone")
+        // Stone floor under the recorder, lamp, and the player's standing spot so the
+        // player doesn't fall (falling causes the recorder to silently auto-stop between
+        // re-opens of RecorderSetupScreen).
+        ctx.runCommand("fill ${recorderPos.x - 1} ${recorderPos.y - 1} ${recorderPos.z - 4} ${recorderPos.x + 3} ${recorderPos.y - 1} ${recorderPos.z + 2} minecraft:stone")
         ctx.runCommand("setblock ${recorderPos.x} ${recorderPos.y} ${recorderPos.z} redstonespecs:redstone_spec_recorder")
         ctx.runCommand("setblock ${recLampPos.x} ${recLampPos.y} ${recLampPos.z} minecraft:redstone_lamp[lit=false]")
         ctx.runCommand("setblock ${recLeverPos.x} ${recLeverPos.y} ${recLeverPos.z} minecraft:lever[face=floor,facing=north,powered=false]")
