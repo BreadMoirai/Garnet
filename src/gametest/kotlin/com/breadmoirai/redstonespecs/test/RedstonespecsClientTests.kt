@@ -264,6 +264,25 @@ class RedstonespecsClientTests : FabricClientGameTest {
             mc.level?.getBlockState(recorderPos)?.block is RedstoneSpecEditorBlock
         }, 100)
 
+        // ── Strict assertion on the derived output entry ─────────────────────
+        // The lever and lamp transition on the same tick (direct attachment),
+        // so all three modes derive the single output entry at
+        // SimTime(0, END_OF_TICK) with condition lit=true.
+        val finalizedSpec = ctx.getClientBe(recorderPos)?.spec
+            ?: throw AssertionError("[$mode] spec is null after editor transition")
+        val output = finalizedSpec.outputs.singleOrNull()
+            ?: throw AssertionError("[$mode] expected exactly one output marker, got ${finalizedSpec.outputs.size}")
+        check(output.entries.size == 1) {
+            "[$mode] expected 1 output entry, got ${output.entries.size}: ${output.entries.map { it.first }}"
+        }
+        val (entryTime, entryCondition) = output.entries[0]
+        check(entryTime == SimTime(0, Phase.END_OF_TICK)) {
+            "[$mode] output entry time: expected SimTime(0, END_OF_TICK), got $entryTime"
+        }
+        check(conditionMatchesProperty(entryCondition, "lit", "true")) {
+            "[$mode] output entry condition: expected lit=true, got $entryCondition"
+        }
+
         // ── Open editor's overview screen and click Save → transforms to Runner ──
         ctx.rightClickBlock(recorderPos)
         ctx.waitForScreen(SpecOverviewScreen::class.java)
@@ -294,5 +313,16 @@ class RedstonespecsClientTests : FabricClientGameTest {
         check(failed.isEmpty()) {
             "[$mode] recorderToEditorToRunnerFlow: failed checks: ${failed.joinToString { "${it.label}: expected=${it.expected} actual=${it.actual}" }}"
         }
+    }
+
+    /** Shared with [RedstonespecsGameTests.conditionMatchesProperty] — kept duplicated to
+     *  avoid pulling in cross-test deps. True iff [condition] (or any leaf of an
+     *  [StateCondition.All] wrapper) carries the named property with the given string value. */
+    private fun conditionMatchesProperty(condition: StateCondition, name: String, value: String): Boolean = when (condition) {
+        is StateCondition.BoolProperty -> condition.name == name && condition.value.toString() == value
+        is StateCondition.IntProperty -> condition.name == name && condition.value.toString() == value
+        is StateCondition.EnumProperty -> condition.name == name && condition.value == value
+        is StateCondition.All -> condition.conditions.any { conditionMatchesProperty(it, name, value) }
+        else -> false
     }
 }

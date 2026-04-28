@@ -7,6 +7,7 @@ import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecMode
+import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import com.breadmoirai.redstonespecs.runner.propsToCondition
 import net.fabricmc.fabric.api.gametest.v1.GameTest
@@ -74,6 +75,11 @@ class RedstonespecsGameTests {
             inputs = listOf(leverPos),
             outputs = listOf(lampPos),
             drive = { h -> h.useBlock(leverPos) },
+            // The lamp transitions off→on on the same tick the lever toggles
+            // (direct attachment, no propagation delay), so for every mode the
+            // single derived output entry sits at SimTime(0, END_OF_TICK) with
+            // condition lit=true.
+            expectedOutputs = { listOf(ExpectedEntry(SimTime(0, Phase.END_OF_TICK), "lit", "true")) },
         )
     }
 
@@ -101,6 +107,13 @@ class RedstonespecsGameTests {
             inputs = listOf(leverPos),
             outputs = listOf(torchPos),
             drive = { h -> h.useBlock(leverPos) },
+            // The torch transitions lit=true → lit=false four ticks after the
+            // lever toggles (lever -> stone hard-power propagation -> torch's
+            // own scheduled-tick reaction adds up to a 4-tick gap empirically
+            // in this MC version). lifespan == lastTick-firstTick == 4, and
+            // since the torch transitions only at lastTick, all three modes
+            // place the single derived entry at SimTime(4, END_OF_TICK).
+            expectedOutputs = { listOf(ExpectedEntry(SimTime(4, Phase.END_OF_TICK), "lit", "false")) },
         )
     }
 
@@ -123,7 +136,22 @@ class RedstonespecsGameTests {
         val outputs: List<BlockPos>,
         val drive: (GameTestHelper) -> Unit,
         val recordingTicks: Int = 6,
+        /**
+         * The exact entries the single output marker should have after
+         * RecordingFinalizer runs, given the scenario's mode. Asserted
+         * server-side immediately after stopRecordingAndFinalize, before any
+         * transformTo, so derivation regressions are caught independently of
+         * the runner replay. (Scenarios with more than one output marker
+         * would need this extended to `List<List<ExpectedEntry>>`.)
+         */
+        val expectedOutputs: (SpecMode) -> List<ExpectedEntry>,
     )
+
+    /**
+     * One expected output entry: an exact [SimTime] plus a single property
+     * the entry's condition must match.
+     */
+    private data class ExpectedEntry(val time: SimTime, val propName: String, val propValue: String)
 
     private fun runRecorderScenario(helper: GameTestHelper, scenario: RecorderScenario) {
         val level = helper.level
@@ -144,6 +172,7 @@ class RedstonespecsGameTests {
             .thenExecute {
                 val be = beAt(level, recorderAbs)
                 check(be.stopRecordingAndFinalize()) { "stopRecordingAndFinalize returned false" }
+                assertOutputEntries(helper, be, scenario)
                 be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
             }
             .thenIdle(1)
@@ -177,6 +206,51 @@ class RedstonespecsGameTests {
     private fun beAt(level: net.minecraft.server.level.ServerLevel, pos: BlockPos): SpecBlockEntity =
         level.getBlockEntity(pos) as? SpecBlockEntity
             ?: error("SpecBlockEntity not found at $pos")
+
+    /**
+     * Verify the finalized spec's first output marker has exactly the entries
+     * the scenario declared. Each [ExpectedEntry] matches a single (name, value)
+     * property within the entry's condition (which may be wrapped in an [All]).
+     */
+    private fun assertOutputEntries(helper: GameTestHelper, be: SpecBlockEntity, scenario: RecorderScenario) {
+        val tag = "[${scenario.mode}]"
+        val spec = be.spec ?: throw helper.assertionException("$tag spec is null after finalize")
+        val output = spec.outputs.firstOrNull()
+            ?: throw helper.assertionException("$tag finalized spec has no output markers")
+        val expected = scenario.expectedOutputs(scenario.mode)
+        if (output.entries.size != expected.size) {
+            throw helper.assertionException(
+                "$tag output '${output.label}' expected ${expected.size} entries, got ${output.entries.size}: " +
+                    output.entries.map { (t, c) -> "$t -> $c" }
+            )
+        }
+        output.entries.zip(expected).forEachIndexed { i, pair ->
+            val (actual, exp) = pair
+            val (actualTime, actualCondition) = actual
+            if (actualTime != exp.time) {
+                throw helper.assertionException("$tag output '${output.label}' entry[$i]: expected time=${exp.time}, got $actualTime")
+            }
+            if (!conditionMatchesProperty(actualCondition, exp.propName, exp.propValue)) {
+                throw helper.assertionException("$tag output '${output.label}' entry[$i]: expected ${exp.propName}=${exp.propValue}, got $actualCondition")
+            }
+        }
+    }
+
+    /**
+     * True iff [condition] is a single property check (or an [All] containing
+     * a single property check) for [name] = [value]. Recorder-derived entries
+     * with one property come through propsToCondition as a bare *Property; the
+     * All wrapping shows up only when there are 2+ properties.
+     */
+    private fun conditionMatchesProperty(condition: StateCondition, name: String, value: String): kotlin.Boolean {
+        return when (condition) {
+            is StateCondition.BoolProperty -> condition.name == name && condition.value.toString() == value
+            is StateCondition.IntProperty -> condition.name == name && condition.value.toString() == value
+            is StateCondition.EnumProperty -> condition.name == name && condition.value == value
+            is StateCondition.All -> condition.conditions.any { conditionMatchesProperty(it, name, value) }
+            else -> false
+        }
+    }
 
     private fun applyMarkers(
         level: net.minecraft.server.level.ServerLevel,
