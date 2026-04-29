@@ -18,7 +18,7 @@ class SpecEntryTest {
         Bootstrap.bootStrap()
     }
 
-    private val initEntries = listOf(SimTime.INIT to StateCondition.BoolProperty("powered", false))
+    private val initEntries = listOf(SimTime.START to StateCondition.BoolProperty("powered", false))
     private val pos = BlockPos(1, 2, 3)
     private val color = 0xFF0000
 
@@ -42,7 +42,7 @@ class SpecEntryTest {
     @Test
     fun `InputSpec with multiple entries roundtrip`() {
         val entries = listOf(
-            SimTime.INIT to StateCondition.BoolProperty("powered", false),
+            SimTime.START to StateCondition.BoolProperty("powered", false),
             SimTime(0, Phase.END_OF_TICK) to StateCondition.All(listOf(
                 StateCondition.BoolProperty("powered", true),
                 StateCondition.IntProperty("power", 15),

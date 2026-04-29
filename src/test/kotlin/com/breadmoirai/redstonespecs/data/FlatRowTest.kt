@@ -65,21 +65,21 @@ class FlatRowTest {
     @Test
     fun `flattenEntries separates editable rows from passthrough`() {
         val entries = listOf(
-            SimTime.INIT to StateCondition.BoolProperty("powered", true),
+            SimTime.START to StateCondition.BoolProperty("powered", true),
             SimTime(0, Phase.END_OF_TICK) to StateCondition.Not(StateCondition.BoolProperty("lit", false)),
         )
         val (rows, passthrough) = flattenEntries(entries, null)
         assertEquals(1, rows.size)
         assertEquals(1, passthrough.size)
-        assertEquals(SimTime.INIT, rows[0].simTime)
+        assertEquals(SimTime.START, rows[0].simTime)
     }
 
     @Test
     fun `reconstitute single row stored unwrapped`() {
-        val rows = listOf(FlatRow(SimTime.INIT, RowProp.Bool("powered", true)))
+        val rows = listOf(FlatRow(SimTime.START, RowProp.Bool("powered", true)))
         val result = reconstitute(rows, emptyList())
         assertEquals(1, result.size)
-        assertEquals(SimTime.INIT to StateCondition.BoolProperty("powered", true), result[0])
+        assertEquals(SimTime.START to StateCondition.BoolProperty("powered", true), result[0])
     }
 
     @Test
@@ -98,7 +98,7 @@ class FlatRowTest {
     @Test
     fun `reconstitute passthrough appended after reconstituted rows`() {
         val pt = SimTime(5, Phase.END_OF_TICK) to StateCondition.Not(StateCondition.BoolProperty("powered", false))
-        val rows = listOf(FlatRow(SimTime.INIT, RowProp.Bool("powered", true)))
+        val rows = listOf(FlatRow(SimTime.START, RowProp.Bool("powered", true)))
         val result = reconstitute(rows, listOf(pt))
         assertEquals(2, result.size)
         assertEquals(pt, result[1])

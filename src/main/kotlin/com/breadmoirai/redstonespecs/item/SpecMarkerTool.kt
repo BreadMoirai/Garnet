@@ -91,12 +91,12 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 
 class InputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        InputSpec(relPos, defaultLabel(initState, spec), 0x4488FF, listOf(SimTime.INIT to propsToCondition(initProps, initState)))
+        InputSpec(relPos, defaultLabel(initState, spec), 0x4488FF, listOf(SimTime.START to propsToCondition(initProps, initState)))
 }
 
 class OutputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry {
-        val time = if (spec.mode == SpecMode.SIMPLE) SimTime(spec.lifespan, Phase.END_OF_TICK) else SimTime.INIT
+        val time = if (spec.mode == SpecMode.SIMPLE) SimTime(spec.lifespan, Phase.END_OF_TICK) else SimTime.START
         return OutputSpec(relPos, defaultLabel(initState, spec), 0xFF8800, listOf(time to propsToCondition(initProps, initState)))
     }
 }

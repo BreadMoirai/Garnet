@@ -64,7 +64,7 @@ object RecordingFinalizer {
     ): List<Pair<SimTime, StateCondition>> {
         // INIT state == the input's settled state at the boundary of firstTick (after any changes that happen on firstTick).
         val initState = view.stateAt(pos, SimTime(firstTick, Phase.END_OF_TICK, Int.MAX_VALUE))
-        val initEntry = SimTime.INIT to propsToCondition(captureBlockStateProps(initState), initState)
+        val initEntry = SimTime.START to propsToCondition(captureBlockStateProps(initState), initState)
 
         val laterTicks = changedTicks(recording, pos).filter { it in (firstTick + 1)..lastTick }
         val laterEntries = laterTicks.map { t ->

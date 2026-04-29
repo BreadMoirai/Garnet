@@ -159,7 +159,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         val s = spec ?: return
         val cleared = RedstoneSpec.new(s.id).copy(
             bounds = s.bounds,
-            inputs = s.inputs.map { InputSpec(it.pos, it.label, it.color, it.entries.filter { e -> e.first == SimTime.INIT }) },
+            inputs = s.inputs.map { InputSpec(it.pos, it.label, it.color, it.entries.filter { e -> e.first == SimTime.START }) },
             outputs = s.outputs.map { OutputSpec(it.pos, it.label, it.color, emptyList()) },
         )
         setSpec(cleared)

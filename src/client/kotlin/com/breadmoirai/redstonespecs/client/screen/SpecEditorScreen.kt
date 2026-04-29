@@ -169,11 +169,11 @@ class SpecEditorScreen(
                     val lastTime = rows.lastOrNull()?.simTime
                     val newTick = when {
                         lastTime == null -> -1
-                        lastTime == SimTime.INIT -> 0
+                        lastTime == SimTime.START -> 0
                         else -> lastTime.tick + 1
                     }
                     val newPhase = lastTime?.phase?.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
-                    val newTime = if (newTick < 0) SimTime.INIT else SimTime(newTick, newPhase)
+                    val newTime = if (newTick < 0) SimTime.START else SimTime(newTick, newPhase)
                     val taken = rows.asSequence()
                         .filter { conflictsWith(newTime, it.simTime) }
                         .map { it.prop.name }
@@ -214,11 +214,11 @@ class SpecEditorScreen(
         val rowLayout = LinearLayout.horizontal().spacing(2)
 
         if (specMode == SpecMode.TICK_AWARE || specMode == SpecMode.UPDATE_AWARE) {
-            val tickVal = if (row.simTime == SimTime.INIT) -1 else row.simTime.tick
+            val tickVal = if (row.simTime == SimTime.START) -1 else row.simTime.tick
             val tickBox = IntEditBox(
                 font, 60, 16, -1, Int.MAX_VALUE, tickVal,
                 onChange = { v ->
-                    row.simTime = if (v < 0) SimTime.INIT
+                    row.simTime = if (v < 0) SimTime.START
                     else SimTime(v, row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK)
                 },
                 onHoverEnd = { sortAndRebuild() },
@@ -234,12 +234,12 @@ class SpecEditorScreen(
                 { phase -> Component.literal(phase.name) },
                 currentPhase,
             ) { phase ->
-                if (row.simTime != SimTime.INIT) {
+                if (row.simTime != SimTime.START) {
                     row.simTime = SimTime(row.simTime.tick, phase)
                 }
                 sortAndRebuild()
             }
-            phaseButton.active = row.simTime != SimTime.INIT
+            phaseButton.active = row.simTime != SimTime.START
             rowLayout.addChild(phaseButton)
         }
 

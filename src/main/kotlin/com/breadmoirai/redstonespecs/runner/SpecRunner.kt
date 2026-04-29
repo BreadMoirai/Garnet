@@ -39,7 +39,7 @@ class SpecRunner(
 
     fun start() {
         LOGGER.debug("[SpecRunner#start] starting spec '{}'", spec.id)
-        applyInputsAt(SimTime.INIT)
+        applyInputsAt(SimTime.START)
     }
 
     fun resume() {

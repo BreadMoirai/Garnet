@@ -80,12 +80,12 @@ class RecordingFinalizerTest {
 
     private fun input(pos: BlockPos, label: String = "in") = InputSpec(
         pos, label, 0x4488FF,
-        listOf(SimTime.INIT to StateCondition.BoolProperty("powered", false)),
+        listOf(SimTime.START to StateCondition.BoolProperty("powered", false)),
     )
 
     private fun output(pos: BlockPos, label: String = "out") = OutputSpec(
         pos, label, 0xFF8800,
-        listOf(SimTime.INIT to StateCondition.BoolProperty("powered", false)),
+        listOf(SimTime.START to StateCondition.BoolProperty("powered", false)),
     )
 
     // --- ioActivitySpan tests ---
@@ -192,11 +192,11 @@ class RecordingFinalizerTest {
         val finalized = RecordingFinalizer.finalize(spec, rec) ?: error("expected non-null finalized spec")
         assertEquals(5, finalized.lifespan)
         val derived = finalized.inputs.single()
-        // Must contain INIT plus per-tick changes.
-        // Tick 0 of trimmed window has a change (was tick 2): derived as INIT (first change becomes the init state).
+        // Must contain START plus per-tick changes.
+        // Tick 0 of trimmed window has a change (was tick 2): derived as START (first change becomes the init state).
         // Subsequent changes at relative ticks 3 and 5.
         val times = derived.entries.map { it.first }
-        assertTrue(SimTime.INIT in times, "expected INIT entry; got $times")
+        assertTrue(SimTime.START in times, "expected START entry; got $times")
         assertTrue(times.contains(SimTime(3, Phase.END_OF_TICK))
             || times.contains(SimTime(3, Phase.START_OF_TICK)),
             "expected an entry at relative tick 3; got $times")

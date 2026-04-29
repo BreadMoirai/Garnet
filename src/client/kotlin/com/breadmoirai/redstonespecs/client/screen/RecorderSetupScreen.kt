@@ -54,7 +54,9 @@ class RecorderSetupScreen(
         super.init()
         openDropdown = null
         val spec = currentBe()?.spec
-        val isRecording = currentBe()?.isRecording ?: initialIsRecording
+        // isRecording is server-only state (stateRecorder field), so trust the value the
+        // server sent us in the open packet rather than reading the client BE.
+        val isRecording = initialIsRecording
 
         val content = LinearLayout.vertical().spacing(4)
 
@@ -143,6 +145,7 @@ class RecorderSetupScreen(
         if (isRecording) {
             content.addChild(Button.builder(Component.literal("Stop")) {
                 sendPacket(StopRecordingC2SPayload(originPos))
+                // Server will transform this block to an editor; close the screen.
                 onClose()
             }.pos(0, 0).width(244).build())
         } else {

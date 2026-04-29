@@ -36,7 +36,11 @@ data class SimTime(
         compareValuesBy(this, other, SimTime::tick, { it.phase.ordinal }, SimTime::order)
 
     companion object {
-        val INIT = SimTime(-1, Phase.START_OF_TICK, 0)
+        /** Pre-run sentinel. Sorts before every real tick. Used for input initial conditions and SIMPLE start-of-run output assertions. */
+        val START = SimTime(-1, Phase.START_OF_TICK, 0)
+
+        /** Post-run sentinel. Sorts after every real tick. Used for SIMPLE end-of-run output assertions. */
+        val END = SimTime(Int.MAX_VALUE, Phase.END_OF_TICK, 0)
 
         val CODEC: Codec<SimTime> = RecordCodecBuilder.create { instance ->
             instance.group(

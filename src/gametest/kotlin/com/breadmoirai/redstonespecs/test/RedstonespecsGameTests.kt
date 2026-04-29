@@ -266,7 +266,7 @@ class RedstonespecsGameTests {
             val name = BuiltInRegistries.BLOCK.getKey(state.block).path
             be.addOrUpdateEntry(InputSpec(
                 specRelPos, "in_${name}_$i", 0x4488FF,
-                listOf(SimTime.INIT to propsToCondition(emptyMap(), state)),
+                listOf(SimTime.START to propsToCondition(emptyMap(), state)),
             ))
         }
         scenario.outputs.forEachIndexed { i, relPos ->

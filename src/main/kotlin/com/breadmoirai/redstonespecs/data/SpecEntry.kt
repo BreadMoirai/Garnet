@@ -51,8 +51,8 @@ data class InputSpec(
     val entries: List<Pair<SimTime, StateCondition>>,
 ) : SpecEntry() {
     init {
-        require(entries.count { it.first == SimTime.INIT } == 1) {
-            "InputSpec entries must contain exactly one INIT entry, got: ${entries.map { it.first }}"
+        require(entries.count { it.first == SimTime.START } == 1) {
+            "InputSpec entries must contain exactly one START entry, got: ${entries.map { it.first }}"
         }
     }
     companion object {

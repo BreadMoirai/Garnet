@@ -99,7 +99,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
                         InputSpec(
                             inputRelPos, "in_a", 0,
                             listOf(
-                                SimTime.INIT to initCondition,
+                                SimTime.START to initCondition,
                                 extraTime to StateCondition.BoolProperty("powered", true),
                             ),
                         ),
@@ -124,7 +124,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
                 inputPosOk = s.inputs.size == 1 && s.inputs[0].pos == inputRelPos
                 // discardForRerecord keeps only the INIT entry on each InputSpec.
                 inputEntriesCollapsedToInit = s.inputs[0].entries.size == 1 &&
-                    s.inputs[0].entries[0].first == SimTime.INIT
+                    s.inputs[0].entries[0].first == SimTime.START
                 outputEntriesCleared = s.outputs.size == 1 && s.outputs[0].entries.isEmpty()
                 lifespanReset = s.lifespan != customLifespan
             }

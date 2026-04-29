@@ -20,7 +20,7 @@ class RedstoneSpecTest {
         Bootstrap.bootStrap()
     }
 
-    private val initEntries = listOf(SimTime.INIT to StateCondition.BoolProperty("powered", false))
+    private val initEntries = listOf(SimTime.START to StateCondition.BoolProperty("powered", false))
 
     private fun roundtrip(value: RedstoneSpec): RedstoneSpec {
         val encoded = RedstoneSpec.CODEC.encodeStart(NbtOps.INSTANCE, value).getOrThrow()
