@@ -3,14 +3,10 @@ package com.breadmoirai.redstonespecs.runner
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
-import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.data.StateCondition
 import net.minecraft.core.BlockPos
-import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.level.block.state.properties.BooleanProperty
-import net.minecraft.world.level.block.state.properties.IntegerProperty
 import net.minecraft.world.level.block.state.properties.Property
 import org.slf4j.LoggerFactory
 
@@ -27,10 +23,8 @@ class SpecRunner(
     val originPos: BlockPos,
     val level: ServerLevel,
     private val snapshot: SpecSnapshot,
-    private val view: StateRecordingView,
 ) {
     private var ticksElapsed = -1
-    private val checks = mutableListOf<TickCheck>()
 
     var frozenAt: SimTime? = null
         private set
@@ -51,19 +45,19 @@ class SpecRunner(
 
     fun resetCircuit() { snapshot.restore(level) }
 
-    fun onPhase(phase: Phase): List<TickCheck>? {
-        if (frozenAt != null) return null
+    /** Returns true once the spec has reached its lifespan and the run is complete. */
+    fun onPhase(phase: Phase): Boolean {
+        if (frozenAt != null) return false
         if (phase == Phase.START_OF_TICK) ticksElapsed++
-        if (ticksElapsed < 0) return null
+        if (ticksElapsed < 0) return false
         if (ticksElapsed > spec.lifespan) {
             LOGGER.debug("[SpecRunner#onPhase] spec '{}' finished after {} ticks", spec.id, ticksElapsed)
-            return checks.toList()
+            return true
         }
         val simTime = SimTime(ticksElapsed, phase)
         applyInputsAt(simTime)
-        checkOutputsAt(simTime)
         checkBreakpointsAt(simTime)
-        return null
+        return false
     }
 
     private fun applyInputsAt(simTime: SimTime) {
@@ -100,48 +94,6 @@ class SpecRunner(
             is StateCondition.EnumProperty -> out += condition.name to condition.value
             is StateCondition.BlockType -> LOGGER.warn("[SpecRunner] BlockType condition cannot be applied as input, ignoring")
             else -> LOGGER.warn("[SpecRunner] Unsupported condition type '{}' in flattenToProperties, ignoring", condition::class.simpleName)
-        }
-    }
-
-    private fun checkOutputsAt(simTime: SimTime) {
-        val userInteractionTime = if (simTime.phase == Phase.END_OF_TICK)
-            simTime.copy(phase = Phase.USER_INTERACTION) else null
-        for (output in spec.outputs) {
-            val (_, condition) = output.entries.find {
-                it.first == simTime || (userInteractionTime != null && it.first == userInteractionTime)
-            } ?: continue
-            val wPos = worldPos(output.pos)
-            val state = view.stateAt(output.pos, simTime)
-            val label = output.label.ifEmpty { output.pos.toString() }
-            collectChecks(condition, state, wPos, simTime, label)
-        }
-    }
-
-    private fun collectChecks(condition: StateCondition, state: BlockState, pos: BlockPos, simTime: SimTime, label: String) {
-        when (condition) {
-            is StateCondition.All -> condition.conditions.forEach { collectChecks(it, state, pos, simTime, label) }
-            is StateCondition.BoolProperty -> {
-                val prop = state.block.stateDefinition.getProperty(condition.name) as? BooleanProperty
-                val actual = prop?.let { state.getValue(it).toString() } ?: "missing"
-                val expected = condition.value.toString()
-                checks += TickCheck(simTime, "$label.${condition.name}", expected, actual, actual == expected)
-            }
-            is StateCondition.IntProperty -> {
-                val prop = state.block.stateDefinition.getProperty(condition.name) as? IntegerProperty
-                val actual = prop?.let { state.getValue(it).toString() } ?: "missing"
-                val expected = condition.value.toString()
-                checks += TickCheck(simTime, "$label.${condition.name}", expected, actual, actual == expected)
-            }
-            is StateCondition.EnumProperty -> {
-                val actual = blockStatePropertyStr(state, condition.name) ?: "missing"
-                checks += TickCheck(simTime, "$label.${condition.name}", condition.value, actual, actual == condition.value)
-            }
-            is StateCondition.BlockType -> {
-                val actualId = BuiltInRegistries.BLOCK.getKey(state.block).toString()
-                val expected = condition.blockId.toString()
-                checks += TickCheck(simTime, "$label.block", expected, actualId, actualId == expected)
-            }
-            else -> LOGGER.warn("[SpecRunner] Unsupported condition type '{}' in output check, skipping", condition::class.simpleName)
         }
     }
 

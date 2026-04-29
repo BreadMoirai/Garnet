@@ -2,13 +2,12 @@ package com.breadmoirai.redstonespecs.runner
 
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.data.TestResult
+import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.network.BreakpointHitS2CPayload
 import com.breadmoirai.redstonespecs.network.TestResultS2CPayload
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
-import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -33,10 +32,9 @@ object SpecRunnerCoordinator {
         stateRecorders[be] = recorder
         StateRecorder.activate(recorder)
 
-        val view = StateRecordingView.of(recorder)
         val snapshot = snapshots[be]!!
         snapshot.restore(level)
-        val runner = SpecRunner(spec, be.blockPos, level, snapshot, view)
+        val runner = SpecRunner(spec, be.blockPos, level, snapshot)
         runner.start()
         runners[be] = runner
     }
@@ -64,11 +62,11 @@ object SpecRunnerCoordinator {
     }
 
     private fun tickRunners(level: ServerLevel, phase: Phase) {
-        val completed = mutableListOf<Pair<SpecBlockEntity, List<TickCheck>>>()
+        val completed = mutableListOf<SpecBlockEntity>()
 
         for ((be, runner) in runners) {
             if (be.level !== level) continue
-            val result = runner.onPhase(phase)
+            val done = runner.onPhase(phase)
 
             val bpHit = runner.pendingBreakpointHit
             if (bpHit != null) {
@@ -80,25 +78,30 @@ object SpecRunnerCoordinator {
                 }
             }
 
-            if (result != null) {
-                completed += be to result
-            }
+            if (done) completed += be
         }
 
-        for ((be, checks) in completed) {
+        for (be in completed) {
             runners.remove(be)
-            finishRun(be, checks)
+            finishRun(be)
         }
     }
 
-    private fun finishRun(be: SpecBlockEntity, checks: List<TickCheck>) {
+    private fun finishRun(be: SpecBlockEntity) {
         val recorder = stateRecorders.remove(be)
         if (recorder != null) StateRecorder.deactivate(recorder)
         val level = be.level as? ServerLevel ?: return
-        if (recorder != null) StateRecordingStorage.save(level, recorder.toRecording())
+        val recording = recorder?.toRecording()
+        if (recording != null) StateRecordingStorage.save(level, recording)
         val spec = be.spec ?: return
         val snapshot = snapshots.remove(be)
         snapshot?.restore(level)
+
+        val checks: List<TickCheck> = if (recording != null) {
+            OutputVerifier.verify(spec, recording).checks
+        } else {
+            emptyList()
+        }
 
         LOGGER.debug("[SpecRunnerCoordinator#finishRun] spec '{}' done: {}/{} checks passed",
             spec.id, checks.count { it.pass }, checks.size)
