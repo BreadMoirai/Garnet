@@ -27,16 +27,16 @@ class IntEditBoxLogicTest {
         assertEquals(1, parseIntValue("abc", min = 1, max = 10))
     }
 
-    @Test fun `parse INIT string when min is -1 returns -1`() {
-        assertEquals(-1, parseIntValue("INIT", min = -1, max = 100))
+    @Test fun `parse START string when min is -1 returns -1`() {
+        assertEquals(-1, parseIntValue("START", min = -1, max = 100))
     }
 
-    @Test fun `parse INIT string when min is not -1 returns min`() {
-        assertEquals(1, parseIntValue("INIT", min = 1, max = 10))
+    @Test fun `parse START string when min is not -1 returns min`() {
+        assertEquals(1, parseIntValue("START", min = 1, max = 10))
     }
 
-    @Test fun `format negative one as INIT when min is -1`() {
-        assertEquals("INIT", formatIntValue(-1, min = -1))
+    @Test fun `format negative one as START when min is -1`() {
+        assertEquals("START", formatIntValue(-1, min = -1))
     }
 
     @Test fun `format negative one as string when min is not -1`() {

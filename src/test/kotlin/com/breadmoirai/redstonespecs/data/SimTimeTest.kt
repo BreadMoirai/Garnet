@@ -19,7 +19,7 @@ class SimTimeTest {
     }
 
     @Test
-    fun `INIT sorts before tick 0`() {
+    fun `START sorts before tick 0`() {
         val t0 = SimTime(0, Phase.START_OF_TICK)
         assertTrue(SimTime.START < t0)
     }
@@ -60,7 +60,7 @@ class SimTimeTest {
     }
 
     @Test
-    fun `INIT codec roundtrip`() {
+    fun `START codec roundtrip`() {
         val encoded = SimTime.CODEC.encodeStart(NbtOps.INSTANCE, SimTime.START).getOrThrow()
         val decoded = SimTime.CODEC.parse(NbtOps.INSTANCE, encoded).getOrThrow()
         assertEquals(SimTime.START, decoded)

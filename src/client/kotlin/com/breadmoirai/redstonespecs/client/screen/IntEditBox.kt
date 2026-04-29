@@ -7,12 +7,12 @@ import net.minecraft.network.chat.Component
 import kotlin.math.sign
 
 fun parseIntValue(text: String, min: Int, max: Int): Int {
-    if (text == "INIT" && min == -1) return -1
+    if (text == "START" && min == -1) return -1
     return text.toIntOrNull()?.coerceIn(min, max) ?: min
 }
 
 fun formatIntValue(value: Int, min: Int): String =
-    if (value == -1 && min == -1) "INIT" else value.toString()
+    if (value == -1 && min == -1) "START" else value.toString()
 
 class IntEditBox(
     font: Font,

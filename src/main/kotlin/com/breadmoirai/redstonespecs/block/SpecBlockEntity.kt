@@ -152,7 +152,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
 
     /**
      * Wipes everything on the spec EXCEPT id, bounds, and input/output marker positions.
-     * Input entries are reduced to just their INIT condition (required by InputSpec invariant).
+     * Input entries are reduced to just their START condition (required by InputSpec invariant).
      * Output entries are cleared to empty. Used by Editor → Recorder Discard.
      */
     fun discardForRerecord() {

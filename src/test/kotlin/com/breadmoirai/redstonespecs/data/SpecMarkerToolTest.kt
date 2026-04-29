@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 class SpecMarkerToolTest {
 
     @Test
-    fun `InputSpec created with INIT entry from captured props`() {
+    fun `InputSpec created with START entry from captured props`() {
         val pos = BlockPos(1, 0, 0)
         val initEntries = listOf(SimTime.START to StateCondition.BoolProperty("powered", false))
         val entry = InputSpec(pos, "", 0x4488FF, initEntries)
@@ -18,7 +18,7 @@ class SpecMarkerToolTest {
     }
 
     @Test
-    fun `OutputSpec created with INIT entry from captured props`() {
+    fun `OutputSpec created with START entry from captured props`() {
         val pos = BlockPos(2, 0, 0)
         val initEntries = listOf(SimTime.START to StateCondition.BoolProperty("lit", false))
         val entry = OutputSpec(pos, "", 0x44FF88, initEntries)

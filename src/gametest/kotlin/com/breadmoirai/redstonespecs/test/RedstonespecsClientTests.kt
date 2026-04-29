@@ -75,7 +75,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
         var idOk = false
         var boundsOk = false
         var inputPosOk = false
-        var inputEntriesCollapsedToInit = false
+        var inputEntriesCollapsedToStart = false
         var outputEntriesCleared = false
         var lifespanReset = false
 
@@ -88,9 +88,9 @@ class RedstonespecsClientTests : FabricClientGameTest {
                 val be = level.getBlockEntity(bePos) as? SpecBlockEntity
                     ?: error("SpecBlockEntity not found at $bePos")
 
-                // Build a spec with a custom lifespan, an InputSpec with a non-INIT entry appended,
-                // and an OutputSpec with a non-INIT entry. InputSpec must always contain exactly one
-                // INIT entry (invariant), so we include the required INIT plus an extra entry.
+                // Build a spec with a custom lifespan, an InputSpec with a non-START entry appended,
+                // and an OutputSpec with a non-START entry. InputSpec must always contain exactly one
+                // START entry (invariant), so we include the required START plus an extra entry.
                 val extraTime = SimTime(0, Phase.END_OF_TICK)
                 val original = RedstoneSpec.new("keep_me").copy(
                     bounds = originalBounds,
@@ -122,8 +122,8 @@ class RedstonespecsClientTests : FabricClientGameTest {
                 idOk = s.id == "keep_me"
                 boundsOk = s.bounds == originalBounds
                 inputPosOk = s.inputs.size == 1 && s.inputs[0].pos == inputRelPos
-                // discardForRerecord keeps only the INIT entry on each InputSpec.
-                inputEntriesCollapsedToInit = s.inputs[0].entries.size == 1 &&
+                // discardForRerecord keeps only the START entry on each InputSpec.
+                inputEntriesCollapsedToStart = s.inputs[0].entries.size == 1 &&
                     s.inputs[0].entries[0].first == SimTime.START
                 outputEntriesCleared = s.outputs.size == 1 && s.outputs[0].entries.isEmpty()
                 lifespanReset = s.lifespan != customLifespan
@@ -134,7 +134,7 @@ class RedstonespecsClientTests : FabricClientGameTest {
         check(idOk) { "discardClearsEverythingExceptIdBoundsAndMarkers: id should be preserved" }
         check(boundsOk) { "discardClearsEverythingExceptIdBoundsAndMarkers: bounds should be preserved" }
         check(inputPosOk) { "discardClearsEverythingExceptIdBoundsAndMarkers: input marker position should be preserved" }
-        check(inputEntriesCollapsedToInit) { "discardClearsEverythingExceptIdBoundsAndMarkers: input entries should collapse to INIT only" }
+        check(inputEntriesCollapsedToStart) { "discardClearsEverythingExceptIdBoundsAndMarkers: input entries should collapse to START only" }
         check(outputEntriesCleared) { "discardClearsEverythingExceptIdBoundsAndMarkers: output entries should be cleared" }
         check(lifespanReset) { "discardClearsEverythingExceptIdBoundsAndMarkers: lifespan should be reset to default" }
     }
