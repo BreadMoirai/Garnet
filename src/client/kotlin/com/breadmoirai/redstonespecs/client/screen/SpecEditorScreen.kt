@@ -213,34 +213,45 @@ class SpecEditorScreen(
     ): LinearLayout {
         val rowLayout = LinearLayout.horizontal().spacing(2)
 
-        if (specMode == SpecMode.TICK_AWARE || specMode == SpecMode.UPDATE_AWARE) {
-            val tickVal = if (row.simTime == SimTime.START) -1 else row.simTime.tick
-            val tickBox = IntEditBox(
-                font, 60, 16, -1, Int.MAX_VALUE, tickVal,
-                onChange = { v ->
-                    row.simTime = if (v < 0) SimTime.START
-                    else SimTime(v, row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK)
-                },
-                onHoverEnd = { sortAndRebuild() },
-            )
-            rowLayout.addChild(tickBox)
-        }
-
-        if (specMode == SpecMode.UPDATE_AWARE) {
-            val currentPhase = row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
-            val phaseButton = DropdownButton(
-                this, 0, 0, 110, 16, font,
-                advancedPhases,
-                { phase -> Component.literal(phase.name) },
-                currentPhase,
-            ) { phase ->
-                if (row.simTime != SimTime.START) {
-                    row.simTime = SimTime(row.simTime.tick, phase)
-                }
-                sortAndRebuild()
+        val isSentinelRow = row.simTime == SimTime.START || row.simTime == SimTime.END
+        if (isSentinelRow) {
+            val label = if (row.simTime == SimTime.START) "START" else "END"
+            // Width matches the combined tick + phase widget width per mode for column alignment.
+            val w = when (specMode) {
+                SpecMode.UPDATE_AWARE -> 174   // 60 (tick) + spacing(2) + 110 (phase) ~= 174
+                SpecMode.TICK_AWARE -> 60      // tick only
+                SpecMode.SIMPLE -> 0           // no tick/phase column in SIMPLE
             }
-            phaseButton.active = row.simTime != SimTime.START
-            rowLayout.addChild(phaseButton)
+            if (w > 0) {
+                rowLayout.addChild(StringWidget(w, 16, Component.literal(label), font))
+            }
+        } else {
+            if (specMode == SpecMode.TICK_AWARE || specMode == SpecMode.UPDATE_AWARE) {
+                val tickBox = IntEditBox(
+                    font, 60, 16, 0, Int.MAX_VALUE, row.simTime.tick,
+                    onChange = { v ->
+                        row.simTime = SimTime(
+                            v,
+                            row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK,
+                        )
+                    },
+                    onHoverEnd = { sortAndRebuild() },
+                )
+                rowLayout.addChild(tickBox)
+            }
+            if (specMode == SpecMode.UPDATE_AWARE) {
+                val currentPhase = row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
+                val phaseButton = DropdownButton(
+                    this, 0, 0, 110, 16, font,
+                    advancedPhases,
+                    { phase -> Component.literal(phase.name) },
+                    currentPhase,
+                ) { phase ->
+                    row.simTime = SimTime(row.simTime.tick, phase)
+                    sortAndRebuild()
+                }
+                rowLayout.addChild(phaseButton)
+            }
         }
 
         if (availableProps.isEmpty()) {
@@ -261,12 +272,17 @@ class SpecEditorScreen(
 
         rowLayout.addChild(buildValueWidget(row))
 
-        rowLayout.addChild(
-            Button.builder(Component.literal("×")) {
-                rows.removeAt(index)
-                rebuildWidgets()
-            }.pos(0, 0).size(20, 16).build()
-        )
+        if (!isSentinelRow) {
+            rowLayout.addChild(
+                Button.builder(Component.literal("×")) {
+                    rows.removeAt(index)
+                    rebuildWidgets()
+                }.pos(0, 0).size(20, 16).build()
+            )
+        } else {
+            // Spacer to keep column widths aligned with non-sentinel rows.
+            rowLayout.addChild(StringWidget(20, 16, Component.literal(""), font))
+        }
 
         return rowLayout
     }
