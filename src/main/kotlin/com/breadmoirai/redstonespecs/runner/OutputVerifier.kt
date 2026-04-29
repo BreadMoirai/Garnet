@@ -36,18 +36,9 @@ object OutputVerifier {
         out: MutableList<TickCheck>,
     ) {
         val label = output.label.ifEmpty { output.pos.toString() }
-        val startEntry = output.entries.firstOrNull { it.first == SimTime.START }
-        val endEntry = output.entries.firstOrNull { it.first == SimTime.END }
-
-        if (startEntry != null) {
-            val initial = recording.initialSnapshot[output.pos]
-                ?: error("Output ${output.pos} not in recording snapshot")
-            out += conditionCheck(SimTime.START, "$label@start", startEntry.second, initial)
-        }
-        if (endEntry != null) {
-            val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
-            out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
-        }
+        val endEntry = output.entries.firstOrNull { it.first == SimTime.END } ?: return
+        val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
+        out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
     }
 
     private fun verifyTickAware(

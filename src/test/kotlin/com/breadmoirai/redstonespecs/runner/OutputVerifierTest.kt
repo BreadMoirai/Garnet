@@ -55,27 +55,8 @@ class OutputVerifierTest {
     private val litFalse = StateCondition.BoolProperty("lit", false)
 
     @Test
-    fun `SIMPLE start passes when initial state matches`() {
-        val output = OutputSpec(outputPos, "lamp", 0, listOf(SimTime.START to litFalse))
-        val rec = recording()
-        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
-        assertTrue(result.pass, "expected pass, got $result")
-    }
-
-    @Test
-    fun `SIMPLE start fails when initial state mismatches`() {
-        val output = OutputSpec(outputPos, "lamp", 0, listOf(SimTime.START to litTrue))
-        val rec = recording()
-        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
-        assertFalse(result.pass)
-    }
-
-    @Test
     fun `SIMPLE end passes when final state matches`() {
-        val output = OutputSpec(outputPos, "lamp", 0, listOf(
-            SimTime.START to litFalse,
-            SimTime.END to litTrue,
-        ))
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(SimTime.END to litTrue))
         val rec = recording(changes = listOf(litChangeAt(SimTime(2, Phase.END_OF_TICK))))
         val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
         assertTrue(result.pass, "expected pass, got $result")
@@ -91,16 +72,21 @@ class OutputVerifierTest {
 
     @Test
     fun `SIMPLE ignores intermediate changes`() {
-        val output = OutputSpec(outputPos, "lamp", 0, listOf(
-            SimTime.START to litFalse,
-            SimTime.END to litFalse,
-        ))
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(SimTime.END to litFalse))
         val rec = recording(changes = listOf(
             litChangeAt(SimTime(1, Phase.END_OF_TICK), lit = true),
             litChangeAt(SimTime(3, Phase.END_OF_TICK), lit = false),
         ))
         val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
         assertTrue(result.pass, "intermediate changes should not affect SIMPLE: $result")
+    }
+
+    @Test
+    fun `SIMPLE with no entries produces no checks`() {
+        val output = OutputSpec(outputPos, "lamp", 0, entries = emptyList())
+        val rec = recording()
+        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
+        assertTrue(result.checks.isEmpty(), "expected no checks, got ${result.checks}")
     }
 
     @Test

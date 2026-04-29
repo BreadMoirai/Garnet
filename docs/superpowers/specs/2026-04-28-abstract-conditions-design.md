@@ -4,7 +4,7 @@
 
 Make each `SpecMode` enforce a distinct, well-defined contract on output block-state changes during a test run. Today every mode treats `OutputSpec` entries as spot checks at specific `SimTime`s. This design replaces that with mode-specific contracts:
 
-- **SIMPLE** — only the start state and the end state matter.
+- **SIMPLE** — only the end state matters; inputs apply once at start.
 - **TICK_AWARE** — output transitions are scheduled at tick granularity; any tick with a change must be in the spec, and any tick listed in the spec must produce the expected post-tick state.
 - **UPDATE_AWARE** — output transitions must match the spec at full `(tick, phase, order)` granularity, exactly. Any unlisted change fails the test.
 
@@ -38,13 +38,13 @@ The `InputSpec` initializer's existing requirement of "exactly one INIT entry" i
 
 Per-mode SimTime constraints (validated at editor save / load time, not in the data class init):
 
-| Mode | Allowed entry SimTimes |
-|---|---|
-| SIMPLE | Only `START` and `END`. At most one `END`. |
-| TICK_AWARE | `START`, `END`, or non-sentinel `SimTime` canonicalized to `(tick, START_OF_TICK, 0)`. |
-| UPDATE_AWARE | `START`, `END`, or any `SimTime`. |
+| Mode | InputSpec entries | OutputSpec entries |
+|---|---|---|
+| SIMPLE | Only `START` (the required one). No other entries. | At most one entry, pinned to `END`. |
+| TICK_AWARE | `START` plus zero or more non-sentinel entries canonicalized to `(tick, START_OF_TICK, 0)`. | `START`, `END`, or non-sentinel `(tick, START_OF_TICK, 0)`. |
+| UPDATE_AWARE | `START` plus zero or more entries at any `SimTime`. | `START`, `END`, or any `SimTime`. |
 
-`OutputSpec` has no required entries (an output may be unconstrained).
+`OutputSpec` has no required entries — an output may be unconstrained.
 
 ## Runner Semantics
 
@@ -63,11 +63,11 @@ Output verification runs **after** the test run completes, against the captured 
 
 For each `OutputSpec`:
 
-1. Evaluate the `START` entry's condition against the output position's initial state from the recording's `initialSnapshot`. Fail if false.
-2. Evaluate the `END` entry's condition against the output position's state at `(lifespan, END_OF_TICK)`. Fail if false.
+1. If the `END` entry is present, evaluate its condition against the output position's state at `(lifespan, END_OF_TICK)`. Fail if false.
+2. If the `END` entry is absent, the output is unconstrained — no checks emitted.
 3. Intermediate changes are not checked.
 
-If `START` or `END` is missing on an output, that side is simply not asserted (no failure for absence).
+SIMPLE outputs do not assert the start state. The initial conditions of the circuit are driven by `InputSpec` entries pinned to `START`, not validated against outputs.
 
 #### TICK_AWARE
 
@@ -116,7 +116,7 @@ The finalizer turns a captured recording into a `RedstoneSpec` skeleton (used by
 
 | Mode | Output entries emitted |
 |---|---|
-| SIMPLE | One `START` entry (initial state condition) and one `END` entry (final state condition) per output position. |
+| SIMPLE | One `END` entry (final state condition) per output position. |
 | TICK_AWARE | One entry per change tick, SimTime canonicalized to `(tick, START_OF_TICK, 0)`, condition derived from the post-tick state. |
 | UPDATE_AWARE | One entry per recorded `BlockStateChange`, at full SimTime, condition derived from the post-change state. (Closest to today's behavior.) |
 

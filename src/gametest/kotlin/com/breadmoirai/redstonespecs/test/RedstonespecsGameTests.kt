@@ -76,10 +76,13 @@ class RedstonespecsGameTests {
             outputs = listOf(lampPos),
             drive = { h -> h.useBlock(leverPos) },
             // The lamp transitions off→on on the same tick the lever toggles
-            // (direct attachment, no propagation delay), so for every mode the
-            // single derived output entry sits at SimTime(0, END_OF_TICK) with
-            // condition lit=true.
-            expectedOutputs = { listOf(ExpectedEntry(SimTime(0, Phase.END_OF_TICK), "lit", "true")) },
+            // (direct attachment, no propagation delay). SIMPLE collapses to a
+            // single END entry; TICK_AWARE / UPDATE_AWARE place the derived
+            // entry at SimTime(0, END_OF_TICK).
+            expectedOutputs = { m ->
+                if (m == SpecMode.SIMPLE) listOf(ExpectedEntry(SimTime.END, "lit", "true"))
+                else listOf(ExpectedEntry(SimTime(0, Phase.END_OF_TICK), "lit", "true"))
+            },
         )
     }
 
@@ -110,10 +113,13 @@ class RedstonespecsGameTests {
             // The torch transitions lit=true → lit=false four ticks after the
             // lever toggles (lever -> stone hard-power propagation -> torch's
             // own scheduled-tick reaction adds up to a 4-tick gap empirically
-            // in this MC version). lifespan == lastTick-firstTick == 4, and
-            // since the torch transitions only at lastTick, all three modes
-            // place the single derived entry at SimTime(4, END_OF_TICK).
-            expectedOutputs = { listOf(ExpectedEntry(SimTime(4, Phase.END_OF_TICK), "lit", "false")) },
+            // in this MC version). lifespan == lastTick-firstTick == 4. SIMPLE
+            // collapses to a single END entry; TICK_AWARE / UPDATE_AWARE place
+            // the derived entry at SimTime(4, END_OF_TICK).
+            expectedOutputs = { m ->
+                if (m == SpecMode.SIMPLE) listOf(ExpectedEntry(SimTime.END, "lit", "false"))
+                else listOf(ExpectedEntry(SimTime(4, Phase.END_OF_TICK), "lit", "false"))
+            },
         )
     }
 

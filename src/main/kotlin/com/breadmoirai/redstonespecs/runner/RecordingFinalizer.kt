@@ -84,10 +84,8 @@ object RecordingFinalizer {
         mode: SpecMode,
     ): List<Pair<SimTime, StateCondition>> {
         if (mode == SpecMode.SIMPLE) {
-            val initialState = view.stateAt(pos, SimTime(firstTick - 1, Phase.END_OF_TICK, Int.MAX_VALUE))
             val finalState = view.stateAt(pos, SimTime(lastTick, Phase.END_OF_TICK, Int.MAX_VALUE))
             return listOf(
-                SimTime.START to propsToCondition(captureBlockStateProps(initialState), initialState),
                 SimTime.END to propsToCondition(captureBlockStateProps(finalState), finalState),
             )
         }

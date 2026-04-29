@@ -150,7 +150,7 @@ class RecordingFinalizerTest {
         assertEquals(5, finalized.lifespan)
     }
 
-    @Test fun `SIMPLE mode emits START and END output entries`() {
+    @Test fun `SIMPLE mode emits single END output entry`() {
         val a = BlockPos(1, 0, 0)
         val o = BlockPos(2, 0, 0)
         val rec = recording(setOf(a, o), mapOf(
@@ -168,23 +168,10 @@ class RecordingFinalizerTest {
         val lifespan = finalized.lifespan // 8 - 2 = 6
         assertEquals(6, lifespan)
         val out = finalized.outputs.single()
-        // SIMPLE now emits exactly two entries: START (initial state) and END (final state)
-        assertEquals(2, out.entries.size)
-        val (startTime, startCond) = out.entries[0]
-        val (endTime, endCond) = out.entries[1]
-        assertEquals(SimTime.START, startTime)
+        // SIMPLE emits exactly one entry: END (final state).
+        assertEquals(1, out.entries.size)
+        val (endTime, endCond) = out.entries.single()
         assertEquals(SimTime.END, endTime)
-        // Initial state of output before firstTick=2: output hasn't changed yet, so powered=false
-        assertTrue(startCond is StateCondition.All || startCond is StateCondition.BoolProperty,
-            "expected propsToCondition output for START, got $startCond")
-        val startPowered = when (startCond) {
-            is StateCondition.BoolProperty -> startCond.value
-            is StateCondition.All -> (startCond.conditions.filterIsInstance<StateCondition.BoolProperty>()
-                .firstOrNull { it.name == "powered" })?.value ?: error("no powered property in $startCond")
-            else -> error("unexpected condition type $startCond")
-        }
-        assertEquals(false, startPowered, "START entry should reflect initial state powered=false")
-        // Final state of output at last activity tick (tick 8) was powered=true
         assertTrue(endCond is StateCondition.All || endCond is StateCondition.BoolProperty,
             "expected propsToCondition output for END, got $endCond")
         val endPowered = when (endCond) {
