@@ -155,4 +155,56 @@ class OutputVerifierTest {
         val result = OutputVerifier.verify(spec(SpecMode.TICK_AWARE, output), rec)
         assertTrue(result.pass, "multiple changes within the same tick are one change tick: $result")
     }
+
+    @Test
+    fun `UPDATE_AWARE passes on exact SimTime match`() {
+        val t1 = SimTime(2, Phase.END_OF_TICK, 0)
+        val t2 = SimTime(4, Phase.END_OF_TICK, 0)
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(
+            t1 to litTrue,
+            t2 to litFalse,
+        ))
+        val rec = recording(changes = listOf(
+            litChangeAt(t1, lit = true),
+            litChangeAt(t2, lit = false),
+        ))
+        val result = OutputVerifier.verify(spec(SpecMode.UPDATE_AWARE, output), rec)
+        assertTrue(result.pass, "expected pass, got $result")
+    }
+
+    @Test
+    fun `UPDATE_AWARE fails on unexpected change`() {
+        val t1 = SimTime(2, Phase.END_OF_TICK, 0)
+        val tExtra = SimTime(3, Phase.END_OF_TICK, 0)
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(t1 to litTrue))
+        val rec = recording(changes = listOf(
+            litChangeAt(t1, lit = true),
+            litChangeAt(tExtra, lit = false),
+        ))
+        val result = OutputVerifier.verify(spec(SpecMode.UPDATE_AWARE, output), rec)
+        assertFalse(result.pass)
+        assertTrue(result.checks.any { !it.pass && it.label.contains("unexpected") },
+            "expected unexpected-change diagnostic, got ${result.checks}")
+    }
+
+    @Test
+    fun `UPDATE_AWARE fails on missing change`() {
+        val t1 = SimTime(2, Phase.END_OF_TICK, 0)
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(t1 to litTrue))
+        val rec = recording()       // no changes
+        val result = OutputVerifier.verify(spec(SpecMode.UPDATE_AWARE, output), rec)
+        assertFalse(result.pass)
+        assertTrue(result.checks.any { !it.pass && it.label.contains("missing") },
+            "expected missing-change diagnostic, got ${result.checks}")
+    }
+
+    @Test
+    fun `UPDATE_AWARE fails when SimTimes differ by phase`() {
+        val expected = SimTime(2, Phase.END_OF_TICK, 0)
+        val actual = SimTime(2, Phase.SCHEDULED_TICKS, 0)
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(expected to litTrue))
+        val rec = recording(changes = listOf(litChangeAt(actual, lit = true)))
+        val result = OutputVerifier.verify(spec(SpecMode.UPDATE_AWARE, output), rec)
+        assertFalse(result.pass)
+    }
 }

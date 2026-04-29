@@ -21,9 +21,7 @@ object OutputVerifier {
                 when (spec.mode) {
                     SpecMode.SIMPLE -> verifySimple(output, recording, view, spec.lifespan, this)
                     SpecMode.TICK_AWARE -> verifyTickAware(output, recording, view, spec.lifespan, this)
-                    SpecMode.UPDATE_AWARE -> {
-                        // Implemented in Task 4.
-                    }
+                    SpecMode.UPDATE_AWARE -> verifyUpdateAware(output, recording, view, spec.lifespan, this)
                 }
             }
         }
@@ -105,6 +103,62 @@ object OutputVerifier {
                 out += TickCheck(
                     SimTime(t, Phase.END_OF_TICK, 0),
                     "$label@t$t (unexpected change)",
+                    "no change",
+                    "changed",
+                    pass = false,
+                )
+            }
+        }
+    }
+
+    private fun verifyUpdateAware(
+        output: OutputSpec,
+        recording: StateRecording,
+        view: StateRecordingView,
+        lifespan: Int,
+        out: MutableList<TickCheck>,
+    ) {
+        val label = output.label.ifEmpty { output.pos.toString() }
+
+        val startEntry = output.entries.firstOrNull { it.first == SimTime.START }
+        val endEntry = output.entries.firstOrNull { it.first == SimTime.END }
+        if (startEntry != null) {
+            val initial = recording.initialSnapshot[output.pos]
+                ?: error("Output ${output.pos} not in recording snapshot")
+            out += conditionCheck(SimTime.START, "$label@start", startEntry.second, initial)
+        }
+        if (endEntry != null) {
+            val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
+            out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
+        }
+
+        val nonSentinelEntries = output.entries.filter { it.first != SimTime.START && it.first != SimTime.END }
+        val entrySimTimes = nonSentinelEntries.map { it.first }.toSet()
+
+        val recordedChanges = view.changesAt(output.pos)
+        val recordedSimTimes = recordedChanges.map { it.simTime }.toSet()
+
+        for ((simTime, condition) in nonSentinelEntries) {
+            val matched = simTime in recordedSimTimes
+            if (!matched) {
+                out += TickCheck(
+                    simTime,
+                    "$label@$simTime (missing change)",
+                    "change",
+                    "no change",
+                    pass = false,
+                )
+                continue
+            }
+            val state = view.stateAt(output.pos, simTime)
+            out += conditionCheck(simTime, "$label@$simTime", condition, state)
+        }
+
+        for (change in recordedChanges) {
+            if (change.simTime !in entrySimTimes) {
+                out += TickCheck(
+                    change.simTime,
+                    "$label@${change.simTime} (unexpected change)",
                     "no change",
                     "changed",
                     pass = false,
