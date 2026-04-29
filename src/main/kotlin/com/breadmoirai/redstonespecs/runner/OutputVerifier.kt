@@ -20,9 +20,9 @@ object OutputVerifier {
             for (output in spec.outputs) {
                 when (spec.mode) {
                     SpecMode.SIMPLE -> verifySimple(output, recording, view, spec.lifespan, this)
-                    SpecMode.TICK_AWARE,
+                    SpecMode.TICK_AWARE -> verifyTickAware(output, recording, view, spec.lifespan, this)
                     SpecMode.UPDATE_AWARE -> {
-                        // Implemented in later tasks.
+                        // Implemented in Task 4.
                     }
                 }
             }
@@ -49,6 +49,67 @@ object OutputVerifier {
         if (endEntry != null) {
             val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
             out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
+        }
+    }
+
+    private fun verifyTickAware(
+        output: OutputSpec,
+        recording: StateRecording,
+        view: StateRecordingView,
+        lifespan: Int,
+        out: MutableList<TickCheck>,
+    ) {
+        val label = output.label.ifEmpty { output.pos.toString() }
+
+        // Sentinel-pinned entries reuse SIMPLE behavior.
+        val startEntry = output.entries.firstOrNull { it.first == SimTime.START }
+        val endEntry = output.entries.firstOrNull { it.first == SimTime.END }
+        if (startEntry != null) {
+            val initial = recording.initialSnapshot[output.pos]
+                ?: error("Output ${output.pos} not in recording snapshot")
+            out += conditionCheck(SimTime.START, "$label@start", startEntry.second, initial)
+        }
+        if (endEntry != null) {
+            val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
+            out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
+        }
+
+        // Per-tick post-state baseline.
+        val postState = (0..lifespan).associateWith { t ->
+            view.stateAt(output.pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
+        }
+        val initial = recording.initialSnapshot[output.pos]
+            ?: error("Output ${output.pos} not in recording snapshot")
+
+        // Change ticks: t in 0..lifespan where post(t) != post(t-1) (post(-1) := initial).
+        val changeTicks = sortedSetOf<Int>()
+        var prev: BlockState = initial
+        for (t in 0..lifespan) {
+            val cur = postState.getValue(t)
+            if (cur != prev) changeTicks += t
+            prev = cur
+        }
+
+        // Non-sentinel entries: assert post(tick) satisfies the entry's condition.
+        val entryTicks = sortedSetOf<Int>()
+        for ((time, condition) in output.entries) {
+            if (time == SimTime.START || time == SimTime.END) continue
+            entryTicks += time.tick
+            val state = postState[time.tick] ?: continue
+            out += conditionCheck(time, "$label@t${time.tick}", condition, state)
+        }
+
+        // Unexpected change ticks (in postState but not declared by any entry).
+        for (t in changeTicks) {
+            if (t !in entryTicks) {
+                out += TickCheck(
+                    SimTime(t, Phase.END_OF_TICK, 0),
+                    "$label@t$t (unexpected change)",
+                    "no change",
+                    "changed",
+                    pass = false,
+                )
+            }
         }
     }
 

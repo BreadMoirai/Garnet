@@ -102,4 +102,57 @@ class OutputVerifierTest {
         val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
         assertTrue(result.pass, "intermediate changes should not affect SIMPLE: $result")
     }
+
+    @Test
+    fun `TICK_AWARE passes when entries match per-tick post-state and no extra changes`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(
+            SimTime.START to litFalse,
+            SimTime(2, Phase.START_OF_TICK, 0) to litTrue,
+            SimTime(4, Phase.START_OF_TICK, 0) to litFalse,
+        ))
+        val rec = recording(changes = listOf(
+            litChangeAt(SimTime(2, Phase.END_OF_TICK), lit = true),
+            litChangeAt(SimTime(4, Phase.END_OF_TICK), lit = false),
+        ))
+        val result = OutputVerifier.verify(spec(SpecMode.TICK_AWARE, output), rec)
+        assertTrue(result.pass, "expected pass, got $result")
+    }
+
+    @Test
+    fun `TICK_AWARE fails on unexpected change tick`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(
+            SimTime(2, Phase.START_OF_TICK, 0) to litTrue,
+        ))
+        val rec = recording(changes = listOf(
+            litChangeAt(SimTime(2, Phase.END_OF_TICK), lit = true),
+            litChangeAt(SimTime(3, Phase.END_OF_TICK), lit = false),    // unexpected
+        ))
+        val result = OutputVerifier.verify(spec(SpecMode.TICK_AWARE, output), rec)
+        assertFalse(result.pass)
+        assertTrue(result.checks.any { !it.pass && it.label.contains("unexpected") },
+            "expected an 'unexpected' diagnostic, got ${result.checks}")
+    }
+
+    @Test
+    fun `TICK_AWARE fails when entry tick has wrong post-state`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(
+            SimTime(2, Phase.START_OF_TICK, 0) to litTrue,
+        ))
+        val rec = recording()       // no changes; lit stays false
+        val result = OutputVerifier.verify(spec(SpecMode.TICK_AWARE, output), rec)
+        assertFalse(result.pass)
+    }
+
+    @Test
+    fun `TICK_AWARE collapses multiple in-tick changes to end-of-tick value`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(
+            SimTime(1, Phase.START_OF_TICK, 0) to litTrue,
+        ))
+        val rec = recording(changes = listOf(
+            litChangeAt(SimTime(1, Phase.SCHEDULED_TICKS), lit = true),
+            litChangeAt(SimTime(1, Phase.END_OF_TICK), lit = true),
+        ))
+        val result = OutputVerifier.verify(spec(SpecMode.TICK_AWARE, output), rec)
+        assertTrue(result.pass, "multiple changes within the same tick are one change tick: $result")
+    }
 }
