@@ -150,7 +150,7 @@ class RecordingFinalizerTest {
         assertEquals(5, finalized.lifespan)
     }
 
-    @Test fun `SIMPLE mode collapses output to single end-of-lifespan condition`() {
+    @Test fun `SIMPLE mode emits START and END output entries`() {
         val a = BlockPos(1, 0, 0)
         val o = BlockPos(2, 0, 0)
         val rec = recording(setOf(a, o), mapOf(
@@ -168,12 +168,32 @@ class RecordingFinalizerTest {
         val lifespan = finalized.lifespan // 8 - 2 = 6
         assertEquals(6, lifespan)
         val out = finalized.outputs.single()
-        assertEquals(1, out.entries.size)
-        val (time, cond) = out.entries.single()
-        assertEquals(SimTime(lifespan, Phase.END_OF_TICK), time)
-        // Final state of output at last activity tick was powered=true
-        assertTrue(cond is StateCondition.All || cond is StateCondition.BoolProperty,
-            "expected propsToCondition output, got $cond")
+        // SIMPLE now emits exactly two entries: START (initial state) and END (final state)
+        assertEquals(2, out.entries.size)
+        val (startTime, startCond) = out.entries[0]
+        val (endTime, endCond) = out.entries[1]
+        assertEquals(SimTime.START, startTime)
+        assertEquals(SimTime.END, endTime)
+        // Initial state of output before firstTick=2: output hasn't changed yet, so powered=false
+        assertTrue(startCond is StateCondition.All || startCond is StateCondition.BoolProperty,
+            "expected propsToCondition output for START, got $startCond")
+        val startPowered = when (startCond) {
+            is StateCondition.BoolProperty -> startCond.value
+            is StateCondition.All -> (startCond.conditions.filterIsInstance<StateCondition.BoolProperty>()
+                .firstOrNull { it.name == "powered" })?.value ?: error("no powered property in $startCond")
+            else -> error("unexpected condition type $startCond")
+        }
+        assertEquals(false, startPowered, "START entry should reflect initial state powered=false")
+        // Final state of output at last activity tick (tick 8) was powered=true
+        assertTrue(endCond is StateCondition.All || endCond is StateCondition.BoolProperty,
+            "expected propsToCondition output for END, got $endCond")
+        val endPowered = when (endCond) {
+            is StateCondition.BoolProperty -> endCond.value
+            is StateCondition.All -> (endCond.conditions.filterIsInstance<StateCondition.BoolProperty>()
+                .firstOrNull { it.name == "powered" })?.value ?: error("no powered property in $endCond")
+            else -> error("unexpected condition type $endCond")
+        }
+        assertEquals(true, endPowered, "END entry should reflect final state powered=true")
     }
 
     @Test fun `non-SIMPLE mode derives input conditions at relative SimTimes`() {
