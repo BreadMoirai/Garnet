@@ -123,6 +123,50 @@ class RedstonespecsGameTests {
         )
     }
 
+    // ── Negative cases: contract violations should fail the run ───────────────
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowSimpleFailsOnWrongEnd(helper: GameTestHelper) =
+        runRecorderScenarioExpectingFailure(
+            helper, leverLampDirect(SpecMode.SIMPLE),
+        ) { spec ->
+            // The lamp ends up lit=true; mutate END expectation to lit=false.
+            val output = spec.outputs.first()
+            val mutated = output.copy(entries = listOf(
+                SimTime.END to StateCondition.BoolProperty("lit", false),
+            ))
+            spec.copy(outputs = listOf(mutated))
+        }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowTickAwareFailsOnWrongPostState(helper: GameTestHelper) =
+        runRecorderScenarioExpectingFailure(
+            helper, leverLampDirect(SpecMode.TICK_AWARE),
+        ) { spec ->
+            // The lamp transitions to lit=true at tick 0 (END_OF_TICK); mutate the entry
+            // to expect lit=false instead. The verifier should report a wrong-value check.
+            val output = spec.outputs.first()
+            val mutated = output.copy(entries = output.entries.map { (time, _) ->
+                time to StateCondition.BoolProperty("lit", false)
+            })
+            spec.copy(outputs = listOf(mutated))
+        }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowUpdateAwareFailsOnPhaseMismatch(helper: GameTestHelper) =
+        runRecorderScenarioExpectingFailure(
+            helper, leverStoneTorch(SpecMode.UPDATE_AWARE),
+        ) { spec ->
+            // Move the entry to a different phase so neither the recorded change
+            // matches an entry, nor the entry matches a recorded change. UPDATE_AWARE
+            // should emit both "missing" and "unexpected" diagnostics.
+            val output = spec.outputs.first()
+            val mutated = output.copy(entries = output.entries.map { (time, cond) ->
+                SimTime(time.tick, Phase.BLOCK_EVENTS, time.order) to cond
+            })
+            spec.copy(outputs = listOf(mutated))
+        }
+
     // ── Shared scenario runner ────────────────────────────────────────────────
 
     /**
@@ -204,6 +248,66 @@ class RedstonespecsGameTests {
                     helper.fail("failed checks: " + failed.joinToString {
                         "${it.label}@${it.simTime}: expected=${it.expected} actual=${it.actual}"
                     })
+                }
+            }
+            .thenSucceed()
+    }
+
+    /**
+     * Same flow as [runRecorderScenario], but applies [mutateSpec] to the
+     * finalized spec immediately before transforming to the runner block,
+     * and asserts that [lastTestResult.pass] is `false` (i.e., the strict
+     * contract correctly flags the violation).
+     */
+    private fun runRecorderScenarioExpectingFailure(
+        helper: GameTestHelper,
+        scenario: RecorderScenario,
+        mutateSpec: (com.breadmoirai.redstonespecs.data.RedstoneSpec) -> com.breadmoirai.redstonespecs.data.RedstoneSpec,
+    ) {
+        val level = helper.level
+        val recorderAbs = helper.absolutePos(scenario.recorderRelPos)
+
+        helper.startSequence()
+            .thenExecute {
+                level.setBlock(recorderAbs, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 3)
+                scenario.placeBlocks(helper)
+                val be = beAt(level, recorderAbs)
+                be.setMode(scenario.mode)
+                applyMarkers(level, helper, be, scenario)
+                check(be.startRecording()) { "startRecording returned false (gating not satisfied)" }
+            }
+            .thenIdle(2)
+            .thenExecute { scenario.drive(helper) }
+            .thenIdle(scenario.recordingTicks)
+            .thenExecute {
+                val be = beAt(level, recorderAbs)
+                check(be.stopRecordingAndFinalize()) { "stopRecordingAndFinalize returned false" }
+                be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
+            }
+            .thenIdle(1)
+            .thenExecute {
+                val be = beAt(level, recorderAbs)
+                val mutated = mutateSpec(be.spec ?: error("spec null after finalize"))
+                be.setSpec(mutated)
+                be.transformTo(ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK)
+            }
+            .thenIdle(1)
+            .thenExecute {
+                val be = beAt(level, recorderAbs)
+                SpecRunnerCoordinator.startRun(be)
+            }
+            .thenWaitUntil {
+                val be = beAt(level, recorderAbs)
+                if (be.lastTestResult == null) throw helper.assertionException("lastTestResult not yet set")
+            }
+            .thenExecute {
+                val be = beAt(level, recorderAbs)
+                val result = be.lastTestResult!!
+                if (result.pass) {
+                    helper.fail("expected failing TestResult under contract violation; checks: ${result.checks}")
+                }
+                if (result.checks.none { !it.pass }) {
+                    helper.fail("expected at least one failing check; got all-pass result: ${result.checks}")
                 }
             }
             .thenSucceed()
