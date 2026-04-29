@@ -1,0 +1,105 @@
+package com.breadmoirai.redstonespecs.runner
+
+import com.breadmoirai.redstonespecs.data.OutputSpec
+import com.breadmoirai.redstonespecs.data.Phase
+import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.data.SpecMode
+import com.breadmoirai.redstonespecs.data.StateCondition
+import net.minecraft.core.BlockPos
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.resources.Identifier
+import net.minecraft.world.level.block.state.BlockState
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertFalse
+import java.util.UUID
+
+class OutputVerifierTest {
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun bootstrap() {
+            net.minecraft.SharedConstants.tryDetectVersion()
+            net.minecraft.server.Bootstrap.bootStrap()
+        }
+    }
+
+    private val outputPos = BlockPos(0, 0, 0)
+    private val redstoneLamp: BlockState =
+        BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:redstone_lamp")).defaultBlockState()
+    private val unlitLamp: BlockState = redstoneLamp        // lit=false default
+    private val litLamp: BlockState =
+        redstoneLamp.setValue(redstoneLamp.block.stateDefinition.getProperty("lit") as
+            net.minecraft.world.level.block.state.properties.BooleanProperty, true)
+
+    private fun spec(mode: SpecMode, output: OutputSpec, lifespan: Int = 5): RedstoneSpec =
+        RedstoneSpec.new("test").copy(mode = mode, lifespan = lifespan, outputs = listOf(output))
+
+    private fun recording(
+        initial: BlockState = unlitLamp,
+        changes: List<BlockStateChange> = emptyList(),
+    ): StateRecording = StateRecording(
+        specId = UUID.randomUUID(),
+        timestamp = 0L,
+        initialSnapshot = mapOf(outputPos to initial),
+        changes = changes,
+    )
+
+    private fun litChangeAt(simTime: SimTime, lit: Boolean = true): BlockStateChange =
+        BlockStateChange(outputPos, simTime, toBlock = null, diffs = listOf(PropertyDiff("lit", lit.toString())))
+
+    private val litTrue = StateCondition.BoolProperty("lit", true)
+    private val litFalse = StateCondition.BoolProperty("lit", false)
+
+    @Test
+    fun `SIMPLE start passes when initial state matches`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(SimTime.START to litFalse))
+        val rec = recording()
+        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
+        assertTrue(result.pass, "expected pass, got $result")
+    }
+
+    @Test
+    fun `SIMPLE start fails when initial state mismatches`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(SimTime.START to litTrue))
+        val rec = recording()
+        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
+        assertFalse(result.pass)
+    }
+
+    @Test
+    fun `SIMPLE end passes when final state matches`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(
+            SimTime.START to litFalse,
+            SimTime.END to litTrue,
+        ))
+        val rec = recording(changes = listOf(litChangeAt(SimTime(2, Phase.END_OF_TICK))))
+        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
+        assertTrue(result.pass, "expected pass, got $result")
+    }
+
+    @Test
+    fun `SIMPLE end fails when final state mismatches`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(SimTime.END to litTrue))
+        val rec = recording()       // never changes
+        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
+        assertFalse(result.pass)
+    }
+
+    @Test
+    fun `SIMPLE ignores intermediate changes`() {
+        val output = OutputSpec(outputPos, "lamp", 0, listOf(
+            SimTime.START to litFalse,
+            SimTime.END to litFalse,
+        ))
+        val rec = recording(changes = listOf(
+            litChangeAt(SimTime(1, Phase.END_OF_TICK), lit = true),
+            litChangeAt(SimTime(3, Phase.END_OF_TICK), lit = false),
+        ))
+        val result = OutputVerifier.verify(spec(SpecMode.SIMPLE, output), rec)
+        assertTrue(result.pass, "intermediate changes should not affect SIMPLE: $result")
+    }
+}
