@@ -71,15 +71,20 @@ class StructureGrid(private val server: MinecraftServer) {
             IllegalArgumentException("Structure not found: $id")
         }
         val slot = acquireSlot()
-        val origin = BlockPos(slot * SLOT_SIZE, GRID_Y, 0)
-        val settings = StructurePlaceSettings().setRotation(Rotation.NONE)
-        template.placeInWorld(level, origin, origin, settings, level.getRandom(), 2)
-        val size = template.getSize()
-        val bounds = BoundingBox(
-            origin.x, origin.y, origin.z,
-            origin.x + size.x - 1, origin.y + size.y - 1, origin.z + size.z - 1,
-        )
-        return StructureHandle(origin, bounds, server, this, slot)
+        return try {
+            val origin = BlockPos(slot * SLOT_SIZE, GRID_Y, 0)
+            val settings = StructurePlaceSettings().setRotation(Rotation.NONE)
+            template.placeInWorld(level, origin, origin, settings, level.getRandom(), 2)
+            val size = template.getSize()
+            val bounds = BoundingBox(
+                origin.x, origin.y, origin.z,
+                origin.x + size.x - 1, origin.y + size.y - 1, origin.z + size.z - 1,
+            )
+            StructureHandle(origin, bounds, server, this, slot)
+        } catch (t: Throwable) {
+            releaseSlot(slot)
+            throw t
+        }
     }
 
     companion object {

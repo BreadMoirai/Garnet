@@ -44,3 +44,4 @@ versions/**/logs/
 /versions/**/build/
 /versions/**/usercache.json
 /versions/**/options.txt
+/.claude/settings.local.json

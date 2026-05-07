@@ -3,6 +3,7 @@ package com.breadmoirai.redstonespecs.testing.launcher
 import io.kotest.core.listeners.TestListener
 import io.kotest.core.test.TestCase
 import io.kotest.core.test.TestResult
+import io.kotest.core.test.TestType
 
 data class TestFailureRecord(val name: String, val message: String, val cause: Throwable?)
 
@@ -29,6 +30,8 @@ internal class ResultCollector : TestListener {
         private set
 
     override suspend fun afterTest(testCase: TestCase, result: TestResult) {
+        // Skip container tests (DescribeSpec contexts, etc.) — only count leaves.
+        if (testCase.type != TestType.Test) return
         when (result) {
             is TestResult.Success -> passed++
             is TestResult.Failure -> {
