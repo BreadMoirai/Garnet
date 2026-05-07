@@ -27,7 +27,6 @@ fun registerNetworking() {
     PayloadTypeRegistry.clientboundPlay().register(OpenOverviewS2CPayload.TYPE, OpenOverviewS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(OpenEditorS2CPayload.TYPE, OpenEditorS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(TestResultS2CPayload.TYPE, TestResultS2CPayload.STREAM_CODEC)
-    PayloadTypeRegistry.clientboundPlay().register(BreakpointHitS2CPayload.TYPE, BreakpointHitS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(OverwritePromptS2CPayload.TYPE, OverwritePromptS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(OpenFileBrowserS2CPayload.TYPE, OpenFileBrowserS2CPayload.STREAM_CODEC)
 
@@ -35,13 +34,11 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(UndoC2SPayload.TYPE, UndoC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(RunSpecC2SPayload.TYPE, RunSpecC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(ResetSpecC2SPayload.TYPE, ResetSpecC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(ResumeSpecC2SPayload.TYPE, ResumeSpecC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SaveSpecEntryC2SPayload.TYPE, SaveSpecEntryC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(RemoveSpecEntryC2SPayload.TYPE, RemoveSpecEntryC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(ResizeBoundsC2SPayload.TYPE, ResizeBoundsC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(NudgeSpecBoundsC2SPayload.TYPE, NudgeSpecBoundsC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SetSpecIdC2SPayload.TYPE, SetSpecIdC2SPayload.STREAM_CODEC)
-    PayloadTypeRegistry.serverboundPlay().register(SetSpecModeC2SPayload.TYPE, SetSpecModeC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SetLifespanC2SPayload.TYPE, SetLifespanC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(SetStructureC2SPayload.TYPE, SetStructureC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(OverwriteDecisionC2SPayload.TYPE, OverwriteDecisionC2SPayload.STREAM_CODEC)
@@ -89,14 +86,6 @@ fun registerNetworking() {
         }
     }
 
-    ServerPlayNetworking.registerGlobalReceiver(ResumeSpecC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            LOGGER.debug("[NetworkRegistry#resumeSpec] originPos={}", payload.originPos)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
-            SpecRunnerCoordinator.resumeSpec(be)
-        }
-    }
-
     ServerPlayNetworking.registerGlobalReceiver(SaveSpecEntryC2SPayload.TYPE) { payload, context ->
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#saveSpecEntry] originPos={} pos={}", payload.originPos, payload.entry.pos)
@@ -130,14 +119,6 @@ fun registerNetworking() {
         }
     }
 
-    ServerPlayNetworking.registerGlobalReceiver(SetSpecModeC2SPayload.TYPE) { payload, context ->
-        context.server().execute {
-            LOGGER.debug("[NetworkRegistry#setSpecMode] originPos={} mode={}", payload.originPos, payload.mode)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
-            be.setMode(payload.mode)
-        }
-    }
-
     ServerPlayNetworking.registerGlobalReceiver(SetLifespanC2SPayload.TYPE) { payload, context ->
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#setLifespan] originPos={} lifespan={}", payload.originPos, payload.lifespan)
@@ -156,19 +137,36 @@ fun registerNetworking() {
 
     ServerPlayNetworking.registerGlobalReceiver(ResizeBoundsC2SPayload.TYPE) { payload, context ->
         context.server().execute {
-            LOGGER.debug("[NetworkRegistry#resizeBounds] originPos={} bounds={}", payload.originPos, payload.bounds)
+            LOGGER.debug("[NetworkRegistry#resizeBounds] originPos={} size=({},{},{})",
+                payload.originPos, payload.sizeX, payload.sizeY, payload.sizeZ)
             val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             val spec = be.spec ?: return@execute
-            be.setSpec(spec.copy(bounds = payload.bounds))
+            val size = net.minecraft.core.Vec3i(
+                payload.sizeX.coerceAtLeast(1),
+                payload.sizeY.coerceAtLeast(1),
+                payload.sizeZ.coerceAtLeast(1),
+            )
+            be.setSpec(spec.copy(bounds = size))
         }
     }
 
     ServerPlayNetworking.registerGlobalReceiver(NudgeSpecBoundsC2SPayload.TYPE) { payload, context ->
         context.server().execute {
-            LOGGER.debug("[NetworkRegistry#nudgeSpecBounds] originPos={} axis={} isMax={} delta={}", payload.originPos, payload.axis, payload.isMax, payload.delta)
+            LOGGER.debug("[NetworkRegistry#nudgeSpecBounds] originPos={} axis={} isMax={} delta={}",
+                payload.originPos, payload.axis, payload.isMax, payload.delta)
             val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             val spec = be.spec ?: return@execute
-            be.setSpec(spec.copy(bounds = nudgeBounds(spec.bounds, payload.axis, payload.isMax, payload.delta)))
+            // With size-only bounds, only `isMax = true` (positive face) maps cleanly.
+            // Negative-face nudges would shift the origin; we don't support that here.
+            if (!payload.isMax) return@execute
+            val size = spec.bounds
+            val newSize = when (payload.axis) {
+                0 -> net.minecraft.core.Vec3i((size.x + payload.delta).coerceAtLeast(1), size.y, size.z)
+                1 -> net.minecraft.core.Vec3i(size.x, (size.y + payload.delta).coerceAtLeast(1), size.z)
+                2 -> net.minecraft.core.Vec3i(size.x, size.y, (size.z + payload.delta).coerceAtLeast(1))
+                else -> size
+            }
+            be.setSpec(spec.copy(bounds = newSize))
         }
     }
 
