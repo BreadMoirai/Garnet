@@ -8,11 +8,21 @@ import kotlin.script.experimental.api.ResultValue
 import kotlin.script.experimental.api.ResultWithDiagnostics
 import kotlin.script.experimental.api.ScriptEvaluationConfiguration
 import kotlin.script.experimental.host.toScriptSource
+import kotlin.script.experimental.jvm.baseClassLoader
+import kotlin.script.experimental.jvm.jvm
 import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 
 object KtsSpecLoader {
     private val host = BasicJvmScriptingHost()
-    private val evalConfig = ScriptEvaluationConfiguration { /* defaults */ }
+    private val evalConfig = ScriptEvaluationConfiguration {
+        // Pin the script's runtime classloader to RedstoneSpec's loader so that
+        // the cast `rv.value as RedstoneSpec` succeeds. Otherwise the script
+        // host can pick up the system loader, which sees a different copy of
+        // our data classes than Fabric's mod ("knot") classloader.
+        jvm {
+            baseClassLoader(RedstoneSpec::class.java.classLoader)
+        }
+    }
 
     fun loadFile(path: Path): RedstoneSpec =
         loadString(path.readText(), name = path.fileName.toString())
