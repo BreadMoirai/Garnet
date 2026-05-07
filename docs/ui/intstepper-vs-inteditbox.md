@@ -39,8 +39,8 @@ val mag = when {
 
 (Note: Shift > Ctrl in priority. Shift+Ctrl behaves as Shift.)
 
-This is used for the **tick column** in `SpecEditorScreen.buildTableRow`
-when the spec mode is `TICK_AWARE` or `UPDATE_AWARE`.
+This is used for the **tick stepper** in `SpecEditorScreen` when editing
+a `SpecEntry`'s `time.tick`.
 
 ### Why steppers were chosen over EditBoxes for tick values
 

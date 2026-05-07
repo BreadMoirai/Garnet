@@ -29,7 +29,7 @@ Why this matters at replay time: recordings of player-driven circuits are produc
 - Skip the schedule, so the button stays pressed forever from the world's perspective.
 - Eventually hit the recording's depower entry (e.g. 10 ticks later) and force `POWERED=false` via `setBlock`.
 
-Anything driven by the button's redstone signal between those two events runs off a different cadence than the recording — neighbor updates fire at different SimTimes, and downstream comparators/repeaters fall out of sync. TICK_AWARE and UPDATE_AWARE verification then explode with `unexpected change` / `missing change` failures even though the spec is logically correct.
+Anything driven by the button's redstone signal between those two events runs off a different cadence than the recording — neighbor updates fire at different SimTimes, and downstream comparators/repeaters fall out of sync. The verifier then explodes with `unexpected change` failures even though the spec is logically correct.
 
 ## Current dispatch (SpecRunner.kt:135)
 
@@ -66,4 +66,4 @@ Even with `ButtonBlock.press`, replay timing for the very first input drifts ~1 
 
 ## Related
 
-- `docs/runner/spec-modes.md` — UPDATE_AWARE is the mode most sensitive to this drift.
+- [`output-verifier-post-run.md`](output-verifier-post-run.md) — where unexpected-change diagnostics fire, which is the symptom path for this kind of drift.

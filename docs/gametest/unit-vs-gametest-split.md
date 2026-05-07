@@ -29,24 +29,21 @@ keybinds, payload round-trips driven from the client — it belongs in
 
 ## Where the contracts actually live
 
-- `RecordingFinalizerTest` (unit) — exercises the finalizer's
-  pure-function shape: given a `StateRecording`, produce derived output
-  entries per `SpecMode`. No level, no runner. Fast, hermetic.
-- `OutputVerifierTest`, `StateRecordingStorageTest`,
-  `StateRecordingViewTest`, `StateConditionTest`,
-  `BoundsNudgeTest`, `IntEditBoxLogicTest`, `SimTimeTest`,
-  `RedstoneSpecTest`, `SpecPersistenceTest`, `SpecMarkerToolTest`,
-  `SpecEntryTest`, `FlatRowTest` — all unit tests, all pure data /
-  algorithm checks.
-- `RedstonespecsGameTests` — record-→finalize→runner contract scenarios
-  per `SpecMode`. These need a real level: only the live MC tick loop
-  produces accurate scheduled-tick cadence, neighbor-update ordering,
-  and comparator/piston timing. The unit-test finalizer is asserted
-  against *recordings*; the recordings themselves can only be produced
-  inside MC.
-- `RedstonespecsClientTests` (in `src/clientTest/`) — full client UI
-  flow (recorder screen → marker tool → editor screen → runner block).
-  Drives screens, payloads, keybinds. Runs via `runClientTest`.
+- **Unit (`src/test/`):** `SpecJsonCodecTest`, `SpecDslTest`,
+  `KtsSpecLoaderTest`, `KtsSpecEmitterTest`, `SpecPersistenceTest`,
+  `StateConditionTest`, `StateRecordingStorageTest`,
+  `StateRecordingViewTest`, `IntEditBoxLogicTest`, `SimTimeTest`. All
+  pure data / algorithm checks; no level, no runner.
+- **Server gametest (`src/gametest/`):** `RedstonespecsGameTests` —
+  currently a placeholder stub. Pre-redesign this held the
+  record→finalize→runner contract scenarios; pending re-authoring against
+  the flat `SpecEntry` model. These need a real level: only the live MC
+  tick loop produces accurate scheduled-tick cadence, neighbor-update
+  ordering, and comparator/piston timing.
+- **Client gametest (`src/clientTest/`):** `RedstonespecsClientTests` —
+  also a placeholder stub at the moment. Pre-redesign this drove the full
+  recorder screen → marker tool → editor screen → runner block flow.
+  Runs via `runClientTest`.
 
 ## Why finalizer logic is unit-tested but mode contracts are gametests
 

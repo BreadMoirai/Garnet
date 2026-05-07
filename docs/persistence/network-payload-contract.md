@@ -44,7 +44,7 @@ Note: the `Undo` payload is unit-typed (`StreamCodec.unit`) — the undo stack l
 
 - Fixed records: `StreamCodec.composite(...)` — most payloads.
 - Optional string: hand-rolled `object : StreamCodec` writing a leading bool flag, used by `SetStructureC2SPayload` and `SpecFileInfo`. There is no `optional` combinator on `StreamCodec` in MC 26.1.
-- Enum-by-ordinal: `ByteBufCodecs.VAR_INT.map({ entries[it] }, Enum::ordinal)` — used for `SpecMode`. This is fragile under reorderings; treat the enum order as wire-stable.
-- Reuse a `Codec` over the wire: `ByteBufCodecs.fromCodec(SpecEntry.CODEC)` — used wherever the data type already had a JSON codec (`SpecEntry`, `TestResult`, `BoundingBox`). This re-encodes through NBT under the hood, which is more bytes than a hand-rolled stream codec but trivially correct.
+- Enum-by-ordinal: `ByteBufCodecs.VAR_INT.map({ entries[it] }, Enum::ordinal)` — used for small enums on the wire. This is fragile under reorderings; treat the enum order as wire-stable.
+- Reuse a `Codec` over the wire: `ByteBufCodecs.fromCodec(SpecJsonCodec.ENTRY)` — used for `SpecEntry` and `TestResult`. This re-encodes through NBT under the hood, which is more bytes than a hand-rolled stream codec but trivially correct. **The JSON codecs (`SpecJsonCodec`) only exist for the wire** — there is no JSON file on disk; the on-disk format is `.spec.kts` (see [`spec-on-disk-format.md`](spec-on-disk-format.md)).
 
 All payload types are registered in `NetworkRegistry.registerNetworking()`. If you add a payload, register it in the right direction (`clientboundPlay` vs `serverboundPlay`) — Fabric will silently drop unregistered types.
