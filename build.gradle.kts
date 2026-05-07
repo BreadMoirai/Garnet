@@ -105,6 +105,14 @@ dependencies {
     implementation("com.terraformersmc:modmenu:${property("modmenu_version")}")
     implementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
 
+    // Kotlin scripting host for .spec.kts authoring (data/serial/KtsSpecLoader.kt)
+    implementation(kotlin("scripting-common"))
+    implementation(kotlin("scripting-jvm"))
+    implementation(kotlin("scripting-jvm-host"))
+
+    // KotlinPoet for emitting .spec.kts source from RedstoneSpec (data/serial/KtsSpecEmitter.kt)
+    implementation("com.squareup:kotlinpoet:1.18.1")
+
     implementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
     "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 
