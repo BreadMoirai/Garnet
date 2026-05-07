@@ -4,12 +4,12 @@ import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
 
-class SpecDslTest {
-    @Test
-    fun `redstoneSpec builds a flat entry list`() {
+class SpecDslTest : FunSpec({
+
+    test("redstoneSpec builds a flat entry list") {
         val spec = redstoneSpec("door_latch") {
             bounds(5, 4, 5)
             lifespan = 40
@@ -24,26 +24,26 @@ class SpecDslTest {
             }
         }
 
-        assertEquals("door_latch", spec.id)
-        assertEquals(40, spec.lifespan)
-        assertEquals(3, spec.entries.size)
+        spec.id shouldBe "door_latch"
+        spec.lifespan shouldBe 40
+        spec.entries.size shouldBe 3
 
         val sorted = spec.entries.sortedBy { it.time }
         val e0 = sorted[0]
         val e1 = sorted[1]
         val e2 = sorted[2]
 
-        assertEquals(EntryKind.INPUT, e0.kind)
-        assertEquals(SimTime.START, e0.time)
-        assertEquals(StateCondition.BoolProperty("powered", true), e0.condition)
+        e0.kind shouldBe EntryKind.INPUT
+        e0.time shouldBe SimTime.START
+        e0.condition shouldBe StateCondition.BoolProperty("powered", true)
 
-        assertEquals(EntryKind.INPUT, e1.kind)
-        assertEquals(10, e1.time.tick)
-        assertEquals(StateCondition.Not(StateCondition.BoolProperty("powered", true)), e1.condition)
+        e1.kind shouldBe EntryKind.INPUT
+        e1.time.tick shouldBe 10
+        e1.condition shouldBe StateCondition.Not(StateCondition.BoolProperty("powered", true))
 
-        assertEquals(EntryKind.OUTPUT, e2.kind)
-        assertEquals(11, e2.time.tick)
-        assertEquals(Phase.END_OF_TICK, e2.time.phase)
-        assertEquals(StateCondition.BoolProperty("lit", true), e2.condition)
+        e2.kind shouldBe EntryKind.OUTPUT
+        e2.time.tick shouldBe 11
+        e2.time.phase shouldBe Phase.END_OF_TICK
+        e2.condition shouldBe StateCondition.BoolProperty("lit", true)
     }
-}
+})
