@@ -1,0 +1,33 @@
+package com.breadmoirai.redstonespecs.test
+
+import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
+import com.breadmoirai.redstonespecs.testing.core.TestBridgeLifecycle
+import com.breadmoirai.redstonespecs.testing.launcher.launchKotest
+import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
+import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
+import org.slf4j.LoggerFactory
+import java.nio.file.Path
+
+@Suppress("UnstableApiUsage")
+class ClientTestSentinel : FabricClientGameTest {
+
+    private val logger = LoggerFactory.getLogger("Redstone Specs")
+
+    override fun runTest(context: ClientGameTestContext) {
+        TestBridgeLifecycle.register()
+        ClientContextHolder.install(context)
+        try {
+            val result = launchKotest(
+                sourceSet = "clientTest",
+                reportsDir = Path.of("build/reports/redstonespecs/clientTest"),
+            )
+            if (result.failed > 0) {
+                logger.error(result.summary())
+                error("${result.failed}/${result.total} Kotest test(s) failed")
+            }
+            logger.info(result.summary())
+        } finally {
+            ClientContextHolder.clear()
+        }
+    }
+}
