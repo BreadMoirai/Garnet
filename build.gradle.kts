@@ -150,6 +150,11 @@ dependencies {
     "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 
     testImplementation("net.fabricmc:fabric-loader-junit:${project.property("loader_version")}")
+    testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
+    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation(sourceSets["testBridge"].output)
 
     // Kotlin coroutines (also pulled transitively via fabric-language-kotlin, but declare explicitly)
     "testBridgeImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
@@ -207,6 +212,11 @@ tasks {
         jvmArgs(
             "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
             "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+            // Mockito 5.x bundles Byte Buddy which only officially supports up to Java 24.
+            // Java 25 is used here; this flag lets Byte Buddy instrument Java 25 classes experimentally.
+            "-Dnet.bytebuddy.experimental=true",
+            // Mockito self-attaches a Java agent at runtime; suppress the JDK dynamic-agent warning.
+            "-XX:+EnableDynamicAgentLoading",
         )
     }
 
