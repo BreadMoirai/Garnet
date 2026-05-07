@@ -90,24 +90,6 @@ class SpecOverviewScreen(
         }
         content.addChild(idRow)
 
-        // Mode row — hidden in read-only
-        if (!readOnly) {
-            val modeRow = LinearLayout.horizontal().spacing(4)
-            modeRow.addChild(StringWidget(40, 20, Component.literal("Mode:"), font))
-            val modeButton = DropdownButton(
-                this, 0, 0, 180, 20, font,
-                SpecMode.entries.toList(),
-                { mode -> Component.literal(when (mode) {
-                    SpecMode.SIMPLE -> "Simple"
-                    SpecMode.TICK_AWARE -> "Tick-Aware"
-                    SpecMode.UPDATE_AWARE -> "Update-Aware"
-                }) },
-                spec?.mode ?: SpecMode.SIMPLE,
-            ) { value -> sendPacket(SetSpecModeC2SPayload(originPos, value)) }
-            modeRow.addChild(modeButton)
-            content.addChild(modeRow)
-        }
-
         // Lifespan row — hidden in read-only
         if (!readOnly) {
             val lifespanRow = LinearLayout.horizontal().spacing(4)
@@ -132,11 +114,9 @@ class SpecOverviewScreen(
         val entries = spec?.allEntries ?: emptyList()
         val entryListContent = LinearLayout.vertical().spacing(2)
         entries.forEach { entry ->
-            val tag = when (entry) {
-                is InputSpec -> "IN"
-                is OutputSpec -> "OUT"
-                is BreakpointSpec -> "BP"
-                is AutoSpec -> "AUTO"
+            val tag = when (entry.kind) {
+                EntryKind.INPUT -> "IN"
+                EntryKind.OUTPUT -> "OUT"
             }
             val label = Component.literal("► $tag  ${entry.label.ifEmpty { "—" }}  (${entry.pos.x},${entry.pos.y},${entry.pos.z})")
                 .withStyle { it.withColor(entry.color) }
@@ -157,11 +137,8 @@ class SpecOverviewScreen(
         val result = getBe()?.lastTestResult
 
         // Fixed height calculation:
-        // Base children (non-scroll): title, spacer(4), id row, [mode row if !readOnly], [lifespan row if !readOnly], spacer(4), spacer(4), action row = varies
-        // In edit/recorder mode (readOnly=false): same as before: 153 base + 19 if result
-        // In runner mode (readOnly=true): mode and lifespan rows hidden, 2 fewer children (2*20 height + 2*4 gap = 48 less)
-        val hiddenRowsHeight = if (readOnly) 48 else 0
-        val fixedHeight = 153 - hiddenRowsHeight + if (result != null) 19 else 0
+        val hiddenRowsHeight = if (readOnly) 24 else 0  // lifespan row hidden in runner
+        val fixedHeight = 129 - hiddenRowsHeight + if (result != null) 19 else 0
         val entryScrollHeight = (height - fixedHeight).coerceAtLeast(60)
         val scrollable = ScrollableLayout(minecraft, entryListContent, entryScrollHeight)
         content.addChild(scrollable)

@@ -48,17 +48,6 @@ fun registerClientNetworking() {
         }
     }
 
-    ClientPlayNetworking.registerGlobalReceiver(BreakpointHitS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#breakpointHit] '{}' in '{}' at {}t {}",
-                payload.breakpointLabel, payload.specId, payload.simTime.tick, payload.simTime.phase.name)
-            mc.player?.sendSystemMessage(
-                Component.literal("§6Breakpoint: §f${payload.breakpointLabel} §7in §f${payload.specId} §7at ${payload.simTime.tick}t ${payload.simTime.phase.name}")
-            )
-        }
-    }
-
     ClientPlayNetworking.registerGlobalReceiver(OverwritePromptS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {

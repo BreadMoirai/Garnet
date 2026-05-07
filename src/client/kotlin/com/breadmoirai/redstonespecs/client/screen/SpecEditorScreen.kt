@@ -1,16 +1,11 @@
 package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.data.AutoSpec
-import com.breadmoirai.redstonespecs.data.BreakpointSpec
-import com.breadmoirai.redstonespecs.data.InputSpec
-import com.breadmoirai.redstonespecs.data.OutputSpec
+import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.StateCondition
-import com.breadmoirai.redstonespecs.network.RemoveSpecEntryC2SPayload
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -33,6 +28,14 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty
 import net.minecraft.world.level.block.state.properties.IntegerProperty
 import net.minecraft.world.level.block.state.properties.Property
 
+/**
+ * Edits a single [SpecEntry] (label, color, time, and condition leaves).
+ *
+ * The condition is edited as a list of leaf [RowProp] rows, all sharing the
+ * entry's single [SimTime]. Multiple leaves combine into [StateCondition.All]
+ * on save. Compound conditions (Not / Any / nested All) round-trip through
+ * a passthrough list — they are preserved but not editable in this UI.
+ */
 class SpecEditorScreen(
     private val originPos: BlockPos,
     private val entryRelPos: BlockPos,
@@ -40,11 +43,11 @@ class SpecEditorScreen(
 
     private var launched = false
     private var workingLabel: String = ""
-    private var workingColor: Int = 0xFFFFFF
-    private var workingRows: MutableList<FlatRow>? = null
-    private var workingPassthrough: MutableList<Pair<SimTime, StateCondition>>? = null
+    private var workingColor: Int = -1
+    private var workingTime: SimTime = SimTime.START
+    private var workingRows: MutableList<RowProp>? = null
+    private var workingPassthrough: List<StateCondition> = emptyList()
     private var originalEntry: SpecEntry? = null
-    private var specMode: SpecMode = SpecMode.SIMPLE
 
     private var openDropdown: DropdownButton<*>? = null
 
@@ -69,7 +72,6 @@ class SpecEditorScreen(
         val open = openDropdown
         if (open != null) {
             if (open.popupMouseClicked(event)) return true
-            // Popup closed; fall through so other widgets still receive the click.
         }
         return super.mouseClicked(event, doubleClick)
     }
@@ -84,24 +86,17 @@ class SpecEditorScreen(
         super.tick()
         if (launched) return
         val be = minecraft?.level?.getBlockEntity(originPos) as? SpecBlockEntity ?: return
-        val entry = be.spec?.entryAt(entryRelPos) ?: return
+        val entry = be.spec?.entries?.firstOrNull { it.pos == entryRelPos } ?: return
         originalEntry = entry
         workingLabel = entry.label
         workingColor = entry.color
-        specMode = be.spec?.mode ?: SpecMode.SIMPLE
+        workingTime = entry.time
 
-        val entries: List<Pair<SimTime, StateCondition>>? = when (entry) {
-            is InputSpec -> entry.entries
-            is OutputSpec -> entry.entries
-            else -> null
-        }
-        if (entries != null) {
-            val worldPos = originPos.offset(entryRelPos)
-            val blockState = minecraft.level?.getBlockState(worldPos)
-            val (rows, passthrough) = flattenEntries(entries, blockState)
-            workingRows = rows
-            workingPassthrough = passthrough
-        }
+        val worldPos = originPos.offset(entryRelPos)
+        val blockState = minecraft.level?.getBlockState(worldPos)
+        val (rows, passthrough) = flattenSingleCondition(entry.condition, blockState)
+        workingRows = rows
+        workingPassthrough = passthrough
 
         launched = true
         rebuildWidgets()
@@ -110,18 +105,16 @@ class SpecEditorScreen(
     private fun buildLayout() {
         openDropdown = null
         val entry = originalEntry ?: return
-        val typeLabel = when (entry) {
-            is InputSpec -> "Input"
-            is OutputSpec -> "Output"
-            is BreakpointSpec -> "Breakpoint"
-            is AutoSpec -> "AutoSpec"
+        val typeLabel = when (entry.kind) {
+            EntryKind.INPUT -> "Input"
+            EntryKind.OUTPUT -> "Output"
         }
 
         val content = LinearLayout.vertical().spacing(4)
-
         content.addChild(StringWidget(Component.literal("$typeLabel @ $entryRelPos"), font))
         content.addChild(SpacerElement(0, 4))
 
+        // Label
         val labelRow = LinearLayout.horizontal().spacing(4)
         labelRow.addChild(StringWidget(50, 20, Component.literal("Label:"), font))
         val labelBox = EditBox(font, 180, 20, Component.empty())
@@ -130,16 +123,17 @@ class SpecEditorScreen(
         labelRow.addChild(labelBox)
         content.addChild(labelRow)
 
+        // Color
         val colorRow = LinearLayout.horizontal().spacing(4)
         colorRow.addChild(StringWidget(50, 20, Component.literal("Color:"), font))
         val colorBox = EditBox(font, 80, 20, Component.empty())
-        colorBox.value = "%06X".format(workingColor)
-        colorBox.setMaxLength(6)
+        colorBox.value = "%08X".format(workingColor)
+        colorBox.setMaxLength(8)
         val swatch = ColorSwatchWidget(0, 0, workingColor)
         colorBox.setResponder { hex ->
             val parsed = hex.toLongOrNull(16)
-            if (parsed != null && hex.length <= 6) {
-                workingColor = parsed.toInt() and 0xFFFFFF
+            if (parsed != null && hex.length <= 8) {
+                workingColor = parsed.toInt()
                 swatch.setColor(workingColor)
             }
         }
@@ -147,34 +141,40 @@ class SpecEditorScreen(
         colorRow.addChild(swatch)
         content.addChild(colorRow)
 
+        // Time
+        val timeRow = LinearLayout.horizontal().spacing(4)
+        timeRow.addChild(StringWidget(50, 20, Component.literal("Tick:"), font))
+        timeRow.addChild(intStepper(font, 80, 20, -1, Int.MAX_VALUE, workingTime.tick) { v ->
+            workingTime = if (v < 0) SimTime.START else SimTime(v, workingTime.phase, workingTime.order)
+        })
+        val advancedPhases = Phase.entries.filter { it != Phase.USER_INTERACTION }
+        timeRow.addChild(DropdownButton(
+            this, 0, 0, 130, 20, font,
+            advancedPhases,
+            { phase -> Component.literal(phase.name) },
+            workingTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.START_OF_TICK,
+        ) { phase ->
+            workingTime = SimTime(workingTime.tick.coerceAtLeast(0), phase, workingTime.order)
+        })
+        content.addChild(timeRow)
+
         content.addChild(SpacerElement(0, 4))
 
+        // Condition leaves
         val rows = workingRows
         if (rows != null) {
-            content.addChild(StringWidget(Component.literal("Entries:"), font))
+            content.addChild(StringWidget(Component.literal("Condition leaves:"), font))
 
             val worldPos = originPos.offset(entryRelPos)
             val blockState = minecraft.level?.getBlockState(worldPos)
-            val availableProps = buildAvailableProps(blockState)
-            val advancedPhases = Phase.entries.filter { it != Phase.USER_INTERACTION }
 
             val tableContent = LinearLayout.vertical().spacing(1)
             rows.forEachIndexed { i, row ->
-                tableContent.addChild(buildTableRow(i, row, rows, blockState, advancedPhases))
+                tableContent.addChild(buildRowWidget(i, row, rows))
             }
 
-            val lastTime = rows.lastOrNull()?.simTime
-            val newTick = when {
-                lastTime == null -> -1
-                lastTime == SimTime.START -> 0
-                else -> lastTime.tick + 1
-            }
-            val newPhase = lastTime?.phase?.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
-            val newTime = if (newTick < 0) SimTime.START else SimTime(newTick, newPhase)
-            val taken = rows.asSequence()
-                .filter { conflictsWith(newTime, it.simTime) }
-                .map { it.prop.name }
-                .toSet()
+            val availableProps = buildAvailableProps(blockState)
+            val taken = rows.map { it.name }.toSet()
             val addOptions = availableProps.filter { it !in taken }.ifEmpty { availableProps }
             tableContent.addChild(
                 DropdownButton(
@@ -182,18 +182,22 @@ class SpecEditorScreen(
                     addOptions,
                     { Component.literal(it) },
                     addOptions.first(),
-                    displayOverride = Component.literal("+ Add Row"),
+                    displayOverride = Component.literal("+ Add Leaf"),
                 ) { propName ->
                     val newProp = buildRowPropForName(propName, blockState) ?: buildFirstRowProp(blockState)
-                    if (newProp != null) rows.add(FlatRow(newTime, newProp))
+                    if (newProp != null) rows.add(newProp)
                     rebuildWidgets()
                 }
             )
 
-            val tableScrollHeight = (height - 178).coerceAtLeast(60)
+            val tableScrollHeight = (height - 200).coerceAtLeast(60)
             content.addChild(ScrollableLayout(minecraft, tableContent, tableScrollHeight))
 
-            content.addChild(SpacerElement(0, 4))
+            if (workingPassthrough.isNotEmpty()) {
+                content.addChild(StringWidget(0, 14,
+                    Component.literal("(${workingPassthrough.size} compound condition(s) preserved unchanged)"),
+                    font))
+            }
         }
 
         content.addChild(SpacerElement(0, 4))
@@ -208,97 +212,34 @@ class SpecEditorScreen(
         content.visitWidgets { addRenderableWidget(it) }
     }
 
-    private fun buildTableRow(
-        index: Int,
-        row: FlatRow,
-        rows: MutableList<FlatRow>,
-        blockState: BlockState?,
-        advancedPhases: List<Phase>,
-    ): LinearLayout {
+    private fun buildRowWidget(index: Int, row: RowProp, rows: MutableList<RowProp>): LinearLayout {
         val rowLayout = LinearLayout.horizontal().spacing(2)
-
-        val isSentinelRow = row.simTime == SimTime.START || row.simTime == SimTime.END
-        if (isSentinelRow) {
-            val label = if (row.simTime == SimTime.START) "START" else "END"
-            // Width matches the combined tick + phase widget width per mode for column alignment.
-            val w = when (specMode) {
-                SpecMode.UPDATE_AWARE -> 174   // 60 (tick) + spacing(2) + 110 (phase) ~= 174
-                SpecMode.TICK_AWARE -> 60      // tick only
-                SpecMode.SIMPLE -> 0           // no tick/phase column in SIMPLE
-            }
-            if (w > 0) {
-                rowLayout.addChild(StringWidget(w, 16, Component.literal(label), font))
-            }
-        } else {
-            if (specMode == SpecMode.TICK_AWARE || specMode == SpecMode.UPDATE_AWARE) {
-                rowLayout.addChild(
-                    intStepper(font, 60, 16, 0, Int.MAX_VALUE, row.simTime.tick) { v ->
-                        row.simTime = SimTime(
-                            v,
-                            row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK,
-                        )
-                        sortAndRebuild()
-                    }
-                )
-            }
-            if (specMode == SpecMode.UPDATE_AWARE) {
-                val currentPhase = row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
-                val phaseButton = DropdownButton(
-                    this, 0, 0, 110, 16, font,
-                    advancedPhases,
-                    { phase -> Component.literal(phase.name) },
-                    currentPhase,
-                ) { phase ->
-                    row.simTime = SimTime(row.simTime.tick, phase)
-                    sortAndRebuild()
-                }
-                rowLayout.addChild(phaseButton)
-            }
-        }
-
-        rowLayout.addChild(StringWidget(100, 16, Component.literal(row.prop.name), font))
-
-        rowLayout.addChild(buildValueWidget(row))
-
-        if (!isSentinelRow) {
-            rowLayout.addChild(
-                Button.builder(Component.literal("×")) {
-                    rows.removeAt(index)
-                    rebuildWidgets()
-                }.pos(0, 0).size(20, 16).build()
-            )
-        } else {
-            // Spacer to keep column widths aligned with non-sentinel rows.
-            rowLayout.addChild(StringWidget(20, 16, Component.literal(""), font))
-        }
-
+        rowLayout.addChild(StringWidget(100, 16, Component.literal(row.name), font))
+        rowLayout.addChild(buildValueWidget(row, index, rows))
+        rowLayout.addChild(
+            Button.builder(Component.literal("×")) {
+                rows.removeAt(index)
+                rebuildWidgets()
+            }.pos(0, 0).size(20, 16).build()
+        )
         return rowLayout
     }
 
-    private fun buildValueWidget(row: FlatRow): LayoutElement = when (val prop = row.prop) {
-        is RowProp.Block -> StringWidget(110, 16, Component.literal(prop.blockId.path), font)
+    private fun buildValueWidget(row: RowProp, index: Int, rows: MutableList<RowProp>): LayoutElement = when (row) {
+        is RowProp.Block -> StringWidget(110, 16, Component.literal(row.blockId.path), font)
 
         is RowProp.Bool -> DropdownButton(
             this, 0, 0, 110, 16, font,
             listOf(false, true),
             { v -> Component.literal(v.toString()) },
-            prop.value,
-        ) { v -> prop.value = v }
+            row.value,
+        ) { v -> row.value = v }
 
         is RowProp.ExactInt -> {
             val valRow = LinearLayout.horizontal().spacing(1)
-            valRow.addChild(
-                IntEditBox(
-                    font,
-                    60,
-                    16,
-                    prop.min,
-                    prop.max,
-                    prop.value,
-                    onChange = { v -> prop.value = v })
-            )
+            valRow.addChild(IntEditBox(font, 60, 16, row.min, row.max, row.value, onChange = { v -> row.value = v }))
             valRow.addChild(Button.builder(Component.literal("Range")) {
-                row.prop = RowProp.RangeInt(prop.name, prop.value, prop.max, prop.min, prop.max)
+                rows[index] = RowProp.RangeInt(row.name, row.value, row.max, row.min, row.max)
                 rebuildWidgets()
             }.pos(0, 0).width(46).build())
             valRow
@@ -306,29 +247,11 @@ class SpecEditorScreen(
 
         is RowProp.RangeInt -> {
             val valRow = LinearLayout.horizontal().spacing(1)
-            valRow.addChild(
-                IntEditBox(
-                    font,
-                    37,
-                    16,
-                    prop.absMin,
-                    prop.absMax,
-                    prop.lo,
-                    onChange = { v -> prop.lo = v })
-            )
+            valRow.addChild(IntEditBox(font, 37, 16, row.absMin, row.absMax, row.lo, onChange = { v -> row.lo = v }))
             valRow.addChild(StringWidget(6, 16, Component.literal("-"), font))
-            valRow.addChild(
-                IntEditBox(
-                    font,
-                    37,
-                    16,
-                    prop.absMin,
-                    prop.absMax,
-                    prop.hi,
-                    onChange = { v -> prop.hi = v })
-            )
+            valRow.addChild(IntEditBox(font, 37, 16, row.absMin, row.absMax, row.hi, onChange = { v -> row.hi = v }))
             valRow.addChild(Button.builder(Component.literal("Exact")) {
-                row.prop = RowProp.ExactInt(prop.name, prop.lo, prop.absMin, prop.absMax)
+                rows[index] = RowProp.ExactInt(row.name, row.lo, row.absMin, row.absMax)
                 rebuildWidgets()
             }.pos(0, 0).width(40).build())
             valRow
@@ -336,21 +259,10 @@ class SpecEditorScreen(
 
         is RowProp.Enum -> DropdownButton(
             this, 0, 0, 110, 16, font,
-            prop.options,
+            row.options,
             { v -> Component.literal(v) },
-            prop.value,
-        ) { v -> prop.value = v }
-    }
-
-    private fun sortAndRebuild() {
-        workingRows?.sortWith(compareBy { it.simTime })
-        rebuildWidgets()
-    }
-
-    private fun conflictsWith(a: SimTime, b: SimTime): Boolean = when (specMode) {
-        SpecMode.SIMPLE -> true
-        SpecMode.TICK_AWARE -> a.tick == b.tick
-        SpecMode.UPDATE_AWARE -> a == b
+            row.value,
+        ) { v -> row.value = v }
     }
 
     private fun buildAvailableProps(blockState: BlockState?): List<String> {
@@ -379,7 +291,6 @@ class SpecEditorScreen(
                 val max = prop.possibleValues.max()
                 RowProp.ExactInt(propName, blockState.getValue(prop), min, max)
             }
-
             else -> {
                 @Suppress("UNCHECKED_CAST")
                 val cast = prop as Property<Comparable<Any>>
@@ -393,13 +304,19 @@ class SpecEditorScreen(
 
     private fun saveAndClose() {
         val entry = originalEntry ?: return
-        val entries = workingRows?.let { reconstitute(it, workingPassthrough ?: emptyList()) }
-        val updated: SpecEntry = when (entry) {
-            is InputSpec -> entry.copy(label = workingLabel, color = workingColor, entries = entries ?: entry.entries)
-            is OutputSpec -> entry.copy(label = workingLabel, color = workingColor, entries = entries ?: entry.entries)
-            is BreakpointSpec -> entry.copy(label = workingLabel, color = workingColor)
-            is AutoSpec -> entry.copy(label = workingLabel, color = workingColor)
+        val rows = workingRows ?: return
+        val leaves: List<StateCondition> = rows.map { it.toCondition() } + workingPassthrough
+        val condition: StateCondition = when (leaves.size) {
+            0 -> entry.condition  // nothing left to write — preserve original
+            1 -> leaves.single()
+            else -> StateCondition.All(leaves)
         }
+        val updated = entry.copy(
+            label = workingLabel,
+            color = workingColor,
+            time = workingTime,
+            condition = condition,
+        )
         ClientPlayNetworking.send(SaveSpecEntryC2SPayload(originPos, updated))
         onClose()
     }

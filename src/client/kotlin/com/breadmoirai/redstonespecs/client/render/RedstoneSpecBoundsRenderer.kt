@@ -4,8 +4,6 @@ import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
-import com.breadmoirai.redstonespecs.data.AutoSpec
-import com.breadmoirai.redstonespecs.data.BreakpointSpec
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.allEntries
 import com.mojang.blaze3d.vertex.PoseStack
@@ -18,7 +16,7 @@ import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer
 import net.minecraft.client.renderer.rendertype.RenderTypes
 import net.minecraft.client.renderer.state.level.CameraRenderState
-import net.minecraft.world.level.levelgen.structure.BoundingBox
+import net.minecraft.core.Vec3i
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 
@@ -30,7 +28,7 @@ fun registerBoundsRenderer() {
 }
 
 class RedstoneSpecRenderState : BlockEntityRenderState() {
-    var bounds: BoundingBox? = null
+    var bounds: Vec3i? = null
     var activeEntries: List<SpecEntry> = emptyList()
     var hoveredFace: HoveredFace? = null
 }
@@ -89,11 +87,7 @@ class SpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
 
     override fun getViewDistance(): Int = 256
 
-    private fun entryColor(entry: SpecEntry): Int = when (entry) {
-        is BreakpointSpec -> 0xFF4444
-        is AutoSpec -> 0xFFAA00
-        else -> entry.color
-    }
+    private fun entryColor(entry: SpecEntry): Int = entry.color
 
     private fun unpackColor(color: Int): Triple<Float, Float, Float> = Triple(
         ((color shr 16) and 0xFF) / 255f,
@@ -104,30 +98,26 @@ class SpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
     private fun drawBoundingBox(
         buffer: VertexConsumer,
         matrix: Matrix4f,
-        bounds: BoundingBox,
+        bounds: Vec3i,
         r: Float, g: Float, b: Float, a: Float,
     ) {
-        val x1 = bounds.minX().toFloat()
-        val y1 = bounds.minY().toFloat()
-        val z1 = bounds.minZ().toFloat()
-        val x2 = bounds.maxX().toFloat() + 1f
-        val y2 = bounds.maxY().toFloat() + 1f
-        val z2 = bounds.maxZ().toFloat() + 1f
-        drawBox(buffer, matrix, x1, y1, z1, x2, y2, z2, r, g, b, a)
+        drawBox(buffer, matrix, 0f, 0f, 0f,
+            bounds.x.toFloat(), bounds.y.toFloat(), bounds.z.toFloat(),
+            r, g, b, a)
     }
 
     private fun drawFaceHighlight(
         buffer: VertexConsumer,
         matrix: Matrix4f,
-        bounds: BoundingBox,
+        bounds: Vec3i,
         face: HoveredFace,
     ) {
-        val x1 = bounds.minX().toFloat()
-        val y1 = bounds.minY().toFloat()
-        val z1 = bounds.minZ().toFloat()
-        val x2 = bounds.maxX().toFloat() + 1f
-        val y2 = bounds.maxY().toFloat() + 1f
-        val z2 = bounds.maxZ().toFloat() + 1f
+        val x1 = 0f
+        val y1 = 0f
+        val z1 = 0f
+        val x2 = bounds.x.toFloat()
+        val y2 = bounds.y.toFloat()
+        val z2 = bounds.z.toFloat()
 
         val r: Float; val g: Float; val b: Float; val a = 0.3f
         when (face.axis) {

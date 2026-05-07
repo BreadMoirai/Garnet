@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
 import net.minecraft.resources.Identifier
 import net.minecraft.world.level.block.state.BlockState
@@ -33,62 +32,44 @@ sealed class RowProp {
     }
 }
 
-data class FlatRow(var simTime: SimTime, var prop: RowProp)
-
-fun flattenEntries(
-    entries: List<Pair<SimTime, StateCondition>>,
+/**
+ * Flattens a single condition into editable [RowProp] leaves and a passthrough list
+ * of compound subexpressions (Not / Any / nested All) that the editor preserves
+ * unchanged. The top-level [StateCondition.All] is unwrapped; everything else
+ * becomes a single leaf or a passthrough entry.
+ */
+fun flattenSingleCondition(
+    condition: StateCondition,
     blockState: BlockState?,
-): Pair<MutableList<FlatRow>, MutableList<Pair<SimTime, StateCondition>>> {
-    val rows = mutableListOf<FlatRow>()
-    val passthrough = mutableListOf<Pair<SimTime, StateCondition>>()
-    for ((simTime, condition) in entries) {
-        val leafProps = flattenCondition(condition, blockState)
-        if (leafProps.isEmpty()) {
-            passthrough.add(simTime to condition)
-        } else {
-            leafProps.forEach { rows.add(FlatRow(simTime, it)) }
+): Pair<MutableList<RowProp>, List<StateCondition>> {
+    val rows = mutableListOf<RowProp>()
+    val passthrough = mutableListOf<StateCondition>()
+    fun visit(c: StateCondition) {
+        when (c) {
+            is StateCondition.All -> c.conditions.forEach(::visit)
+            is StateCondition.BlockType -> rows += RowProp.Block(c.blockId)
+            is StateCondition.BoolProperty -> rows += RowProp.Bool(c.name, c.value)
+            is StateCondition.IntProperty -> {
+                val prop = blockState?.block?.stateDefinition?.getProperty(c.name) as? IntegerProperty
+                val lo = prop?.possibleValues?.min() ?: 0
+                val hi = prop?.possibleValues?.max() ?: 15
+                rows += RowProp.ExactInt(c.name, c.value, lo, hi)
+            }
+            is StateCondition.IntRange -> {
+                val prop = blockState?.block?.stateDefinition?.getProperty(c.name) as? IntegerProperty
+                val lo = prop?.possibleValues?.min() ?: 0
+                val hi = prop?.possibleValues?.max() ?: 15
+                rows += RowProp.RangeInt(c.name, c.min, c.max, lo, hi)
+            }
+            is StateCondition.EnumProperty -> {
+                @Suppress("UNCHECKED_CAST")
+                val cast = blockState?.block?.stateDefinition?.getProperty(c.name) as? Property<Comparable<Any>>
+                val options = cast?.possibleValues?.map { cast.getName(it) } ?: listOf(c.value)
+                rows += RowProp.Enum(c.name, c.value, options)
+            }
+            else -> passthrough += c
         }
     }
+    visit(condition)
     return rows to passthrough
-}
-
-fun flattenCondition(condition: StateCondition, blockState: BlockState?): List<RowProp> = when (condition) {
-    is StateCondition.All -> condition.conditions.flatMap { flattenCondition(it, blockState) }
-    is StateCondition.BlockType -> listOf(RowProp.Block(condition.blockId))
-    is StateCondition.BoolProperty -> listOf(RowProp.Bool(condition.name, condition.value))
-    is StateCondition.IntProperty -> {
-        val prop = blockState?.block?.stateDefinition?.getProperty(condition.name) as? IntegerProperty
-        val lo = prop?.possibleValues?.min() ?: 0
-        val hi = prop?.possibleValues?.max() ?: 15
-        listOf(RowProp.ExactInt(condition.name, condition.value, lo, hi))
-    }
-    is StateCondition.IntRange -> {
-        val prop = blockState?.block?.stateDefinition?.getProperty(condition.name) as? IntegerProperty
-        val lo = prop?.possibleValues?.min() ?: 0
-        val hi = prop?.possibleValues?.max() ?: 15
-        listOf(RowProp.RangeInt(condition.name, condition.min, condition.max, lo, hi))
-    }
-    is StateCondition.EnumProperty -> {
-        // safe: all MC Property implementations use Comparable values; erased by JVM generics
-        @Suppress("UNCHECKED_CAST")
-        val cast = blockState?.block?.stateDefinition?.getProperty(condition.name) as? Property<Comparable<Any>>
-        val options = cast?.possibleValues?.map { cast.getName(it) } ?: listOf(condition.value)
-        listOf(RowProp.Enum(condition.name, condition.value, options))
-    }
-    else -> emptyList()
-}
-
-fun reconstitute(
-    rows: List<FlatRow>,
-    passthrough: List<Pair<SimTime, StateCondition>>,
-): List<Pair<SimTime, StateCondition>> {
-    val grouped = linkedMapOf<SimTime, MutableList<StateCondition>>()
-    for (row in rows) grouped.getOrPut(row.simTime) { mutableListOf() }.add(row.prop.toCondition())
-    val result = grouped.map { (simTime, conditions) ->
-        simTime to if (conditions.size == 1) conditions[0] else StateCondition.All(conditions)
-    }.toMutableList()
-    // passthrough entries are appended at the end regardless of SimTime order;
-    // this is intentional — the spec evaluator groups by SimTime, not list position
-    result.addAll(passthrough)
-    return result
 }

@@ -6,10 +6,7 @@ import com.breadmoirai.redstonespecs.client.FaceHit
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
 import com.breadmoirai.redstonespecs.client.findHoveredFace
-import com.breadmoirai.redstonespecs.data.AutoSpec
-import com.breadmoirai.redstonespecs.data.BreakpointSpec
-import com.breadmoirai.redstonespecs.data.InputSpec
-import com.breadmoirai.redstonespecs.data.OutputSpec
+import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
@@ -52,7 +49,7 @@ fun registerHudOverlay() {
             if (ownerBe != null) {
                 val spec = ownerBe.spec ?: return@HudElement
                 val relPos = hitPos.subtract(ownerBe.blockPos)
-                val entry = spec.entryAt(relPos)
+                val entry = spec.entries.firstOrNull { it.pos == relPos }
 
                 extractor.text(
                     font,
@@ -115,8 +112,8 @@ fun registerHudOverlay() {
                 val hit: FaceHit = findHoveredFace(
                     eyePos.x - bpX, eyePos.y - bpY, eyePos.z - bpZ,
                     lookVec.x, lookVec.y, lookVec.z,
-                    b.minX().toDouble(), b.minY().toDouble(), b.minZ().toDouble(),
-                    b.maxX().toDouble() + 1.0, b.maxY().toDouble() + 1.0, b.maxZ().toDouble() + 1.0,
+                    0.0, 0.0, 0.0,
+                    b.x.toDouble(), b.y.toDouble(), b.z.toDouble(),
                 ) ?: continue
                 if (hit.t < bestT && hit.t < maxReach) {
                     bestT = hit.t
@@ -132,9 +129,7 @@ fun registerHudOverlay() {
     }
 }
 
-private fun entryTypeName(entry: SpecEntry) = when (entry) {
-    is InputSpec -> "Input"
-    is OutputSpec -> "Output"
-    is BreakpointSpec -> "Breakpoint"
-    is AutoSpec -> "AutoSpec"
+private fun entryTypeName(entry: SpecEntry) = when (entry.kind) {
+    EntryKind.INPUT -> "Input"
+    EntryKind.OUTPUT -> "Output"
 }

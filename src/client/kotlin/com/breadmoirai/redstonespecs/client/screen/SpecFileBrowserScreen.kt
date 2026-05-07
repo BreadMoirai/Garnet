@@ -51,7 +51,6 @@ class SpecFileBrowserScreen(
         val sel = selected
         if (sel != null) {
             preview.addChild(StringWidget(180, 12, Component.literal("ID: ${sel.id}"), font))
-            preview.addChild(StringWidget(180, 12, Component.literal("Mode: ${sel.mode.name}"), font))
             preview.addChild(StringWidget(180, 12, Component.literal("Lifespan: ${sel.lifespan}"), font))
             preview.addChild(StringWidget(180, 12, Component.literal("Inputs: ${sel.inputCount}"), font))
             preview.addChild(StringWidget(180, 12, Component.literal("Outputs: ${sel.outputCount}"), font))

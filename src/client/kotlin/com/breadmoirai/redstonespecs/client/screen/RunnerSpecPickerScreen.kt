@@ -34,7 +34,7 @@ class RunnerSpecPickerScreen(
             listContent.addChild(StringWidget(300, 18, Component.literal("(no saved specs)"), font))
         } else {
             files.forEach { info ->
-                val label = "${info.id}  (${info.mode}, ${info.lifespan}t, ${info.inputCount}→${info.outputCount})"
+                val label = "${info.id}  (${info.lifespan}t, ${info.inputCount}→${info.outputCount})"
                 listContent.addChild(Button.builder(Component.literal(label)) {
                     ClientPlayNetworking.send(RunnerLoadSpecC2SPayload(originPos, info.id))
                     onClose()

@@ -1,7 +1,8 @@
 package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.data.SpecMode
+import com.breadmoirai.redstonespecs.data.inputs
+import com.breadmoirai.redstonespecs.data.outputs
 import com.breadmoirai.redstonespecs.network.*
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
@@ -76,26 +77,10 @@ class RecorderSetupScreen(
         idRow.addChild(idBox)
         content.addChild(idRow)
 
-        // Mode row: label + DropdownButton
-        val modeRow = LinearLayout.horizontal().spacing(4)
-        modeRow.addChild(StringWidget(40, 20, Component.literal("Mode:"), font))
-        val modeButton = DropdownButton(
-            this, 0, 0, 200, 20, font,
-            SpecMode.entries.toList(),
-            { mode -> Component.literal(when (mode) {
-                SpecMode.SIMPLE -> "Simple"
-                SpecMode.TICK_AWARE -> "Tick-Aware"
-                SpecMode.UPDATE_AWARE -> "Update-Aware"
-            }) },
-            spec?.mode ?: SpecMode.SIMPLE,
-        ) { value -> sendPacket(SetSpecModeC2SPayload(originPos, value)) }
-        modeRow.addChild(modeButton)
-        content.addChild(modeRow)
-
-        // Bounds row: label showing coords + "Edit Bounds" button
+        // Bounds row: label showing size + "Edit Bounds" button
         val bounds = spec?.bounds
         val boundsText = if (bounds != null)
-            "${bounds.minX()},${bounds.minY()},${bounds.minZ()} → ${bounds.maxX()},${bounds.maxY()},${bounds.maxZ()}"
+            "${bounds.x} × ${bounds.y} × ${bounds.z}"
         else
             "(none)"
         val boundsRow = LinearLayout.horizontal().spacing(4)
@@ -129,7 +114,7 @@ class RecorderSetupScreen(
         if (specId.isBlank()) gatingReasons.add("Need spec id")
         if (inputCount < 1) gatingReasons.add("Need ≥1 input marker")
         if (outputCount < 1) gatingReasons.add("Need ≥1 output marker")
-        if (bounds == null || (bounds.maxX() - bounds.minX()) * (bounds.maxY() - bounds.minY()) * (bounds.maxZ() - bounds.minZ()) == 0) {
+        if (bounds == null || bounds.x < 1 || bounds.y < 1 || bounds.z < 1) {
             gatingReasons.add("Need non-empty bounds")
         }
         val canRecord = gatingReasons.isEmpty()
