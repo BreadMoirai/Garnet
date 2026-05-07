@@ -6,6 +6,7 @@
 
 # Gradle build folder
 build
+!docs/build/
 
 # IntelliJ
 out/
