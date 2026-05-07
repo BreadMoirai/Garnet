@@ -1,12 +1,13 @@
 package com.breadmoirai.redstonespecs.data.serial
 
 import com.breadmoirai.redstonespecs.data.EntryKind
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 
-class KtsSpecLoaderTest {
-    @Test
-    fun `loadString parses a minimal spec`() {
+class KtsSpecLoaderTest : FunSpec({
+
+    test("loadString parses a minimal spec") {
         val source = """
             redstoneSpec("simple") {
                 bounds(3, 3, 3)
@@ -18,16 +19,15 @@ class KtsSpecLoaderTest {
 
         val spec = KtsSpecLoader.loadString(source)
 
-        assertEquals("simple", spec.id)
-        assertEquals(5, spec.lifespan)
-        assertEquals(2, spec.entries.size)
-        assertEquals(setOf(EntryKind.INPUT, EntryKind.OUTPUT), spec.entries.map { it.kind }.toSet())
+        spec.id shouldBe "simple"
+        spec.lifespan shouldBe 5
+        spec.entries.size shouldBe 2
+        spec.entries.map { it.kind }.toSet() shouldBe setOf(EntryKind.INPUT, EntryKind.OUTPUT)
     }
 
-    @Test
-    fun `loadString surfaces compilation errors`() {
+    test("loadString surfaces compilation errors") {
         val source = """redstoneSpec("bad") { not_a_function() }"""
         val ex = runCatching { KtsSpecLoader.loadString(source) }.exceptionOrNull()
-        require(ex != null) { "expected exception for invalid script" }
+        ex shouldNotBe null
     }
-}
+})
