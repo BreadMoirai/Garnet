@@ -52,14 +52,14 @@ Dependencies (added at the root project level so the source set inherits): `kotl
 
 ### Producer/consumer primitives
 
-The bridge collapses to four primitives. Everything else is built on them.
+The bridge collapses to four primitives plus a base class. Everything else is built on them.
 
 ```kotlin
 // Producer: tick events as flows. Single subscription, lifetime-scoped to the server.
 val serverTickStart: SharedFlow<MinecraftServer>
 val serverTickEnd: SharedFlow<MinecraftServer>
 
-// Consumer: dispatcher over MinecraftServer.execute, plus a server holder.
+// Consumer: a single dispatcher over MinecraftServer.execute, plus a server holder.
 object McDispatchers {
     val Server: CoroutineDispatcher    // installed on SERVER_STARTED, cleared on SERVER_STOPPED
     val currentServer: MinecraftServer // same lifecycle; throws if accessed before install
@@ -71,13 +71,22 @@ suspend fun awaitTicks(n: Int): MinecraftServer = serverTickEnd.take(n).last()
 suspend fun awaitTickWhere(p: (MinecraftServer) -> Boolean) = serverTickEnd.first(p)
 suspend fun <T> onServer(block: suspend MinecraftServer.() -> T): T =
     withContext(McDispatchers.Server) { block(McDispatchers.currentServer) }
+
+// Spec base class: tests + hooks default to running on McDispatchers.Server.
+abstract class ServerTestSpec(body: ServerTestSpec.() -> Unit = {}) : FunSpec()
 ```
+
+**Same-tick guarantee via executor drain.** When `emitServerTickEnd(server)` fires (server thread, inside END_SERVER_TICK callback), it calls `tryEmit(server)` *and then* invokes `server.runAllTasks()` (inherited from `BlockableEventLoop`). `tryEmit` wakes any consumer suspended on `awaitTickEnd`/`awaitTicks`; their continuations dispatch via `McDispatchers.Server`, which posts to `MinecraftServer.execute`; the immediately-following `runAllTasks()` drains those continuations on the server thread before returning to MC. Result: any code sequence between two `awaitTicks` calls (or before the first / after the last) executes synchronously inside one tick callback, with no race against the next tick.
 
 **Why `SharedFlow` with `replay = 0`, `extraBufferCapacity = 1`, `DROP_OLDEST`:** tests `awaitTicks(n)` *before* the action that triggers the wait, so dropped emissions while no consumer is suspended are correct. Single-slot buffer prevents the emitter from spinning. `MutableSharedFlow` supports multi-consumer fan-out for opt-in concurrent specs.
 
-**Why the dispatcher short-circuits on `isSameThread`:** nested `withContext(ServerThread)` calls (e.g. inside helper functions called from already-server-thread contexts) don't re-bounce through the executor.
+**Why the dispatcher short-circuits on `isSameThread`:** nested `withContext(McDispatchers.Server)` calls (e.g. inside helper functions called from already-server-thread contexts) don't re-bounce through the executor. Inside a `ServerTestSpec` test body, `onServer { }` becomes a no-op — the test is already on the server thread.
+
+**`onServer { }` retains a role outside `ServerTestSpec`.** Specs that aren't extending `ServerTestSpec` (e.g., raw `FunSpec` in `src/test/`, or a `clientTest` spec doing setup before any tick fires) still run on Kotest's default dispatcher; for those, `onServer { }` is the explicit hop. Inside a `ServerTestSpec` it's redundant noise.
 
 **No `ClientThread` dispatcher.** Fabric's `ClientGameTestContext` API (`getInput().pressKey`, `waitForScreen`, `waitFor { mc -> ... }`) already synchronizes with the client thread internally. Adding it would be unused complexity; revisit only if a test genuinely needs raw client-thread dispatch.
+
+**100ms server-thread watchdog.** `ServerThreadDispatcher` wraps each Runnable in a watchdog that logs a warning if it runs longer than 100ms. Per-Runnable, not cumulative. Catches accidental `Thread.sleep` / blocking IO / runaway loops in test bodies that would stall the tick loop.
 
 ### Sentinels
 
