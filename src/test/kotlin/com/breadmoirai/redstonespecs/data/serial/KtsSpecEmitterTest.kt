@@ -6,14 +6,14 @@ import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.StateCondition
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
 
-class KtsSpecEmitterTest {
-    @Test
-    fun `emit then loadString round-trips identity`() {
+class KtsSpecEmitterTest : FunSpec({
+
+    test("emit then loadString round-trips identity") {
         val spec = RedstoneSpec(
             id = "round_trip",
             bounds = Vec3i(5, 4, 5),
@@ -33,6 +33,6 @@ class KtsSpecEmitterTest {
         )
         val source = KtsSpecEmitter.emit(spec)
         val reloaded = KtsSpecLoader.loadString(source, name = "round_trip.spec.kts")
-        assertEquals(spec, reloaded)
+        reloaded shouldBe spec
     }
-}
+})
