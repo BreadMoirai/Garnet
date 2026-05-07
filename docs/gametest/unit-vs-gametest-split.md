@@ -1,21 +1,25 @@
 ---
 title: Unit-test vs gametest split
-tags: [testing, junit, gametest, client-gametest, architecture]
-summary: Which logic belongs in src/test/ (JUnit), src/gametest/ (server @GameTest), or src/clientTest/ (client gametest), and why the lines are drawn where they are.
+tags: [testing, kotest, gametest, client-gametest, architecture]
+summary: Which logic belongs in src/test/, src/gametest/, or src/clientTest/, and why the lines are drawn where they are.
 ---
 
 # Unit-test vs gametest split
 
+All three source sets run Kotest specs; see `kotest-bridge.md` for the DSL and `awaitTicks`/`onServer`/`spawnStructure` cookbook.
+
 The repo uses three separate source sets:
 
-- `src/test/` — JUnit 5 unit tests, run on the JVM with no MC client or
+- `src/test/` — Kotest unit specs, run on the JVM with no MC client or
   server. Bootstrap MC via `SharedConstants.tryDetectVersion()` +
   `Bootstrap.bootStrap()` when registries are needed
   (`RecordingFinalizerTest` is the canonical example).
-- `src/gametest/` — Fabric `@GameTest` server-side flows that run inside
-  a dedicated MC server instance (`runGameTest`).
-- `src/clientTest/` — `FabricClientGameTest` flows that run inside a
-  full MC client (`runClientTest`).
+- `src/gametest/` — Kotest specs driven by a single `@GameTest` sentinel
+  that runs inside a dedicated MC server instance (`runGameTest`). Use the
+  `awaitTicks`/`spawnStructure` primitives from the bridge.
+- `src/clientTest/` — Kotest specs driven by a `FabricClientGameTest`
+  sentinel that runs inside a full MC client (`runClientTest`). Use
+  `ClientContextHolder` to access `ClientGameTestContext`.
 
 ## Decision rule
 
@@ -35,11 +39,10 @@ keybinds, payload round-trips driven from the client — it belongs in
   `StateRecordingViewTest`, `IntEditBoxLogicTest`, `SimTimeTest`. All
   pure data / algorithm checks; no level, no runner.
 - **Server gametest (`src/gametest/`):** `RedstonespecsGameTests` —
-  currently a placeholder stub. Pre-redesign this held the
-  record→finalize→runner contract scenarios; pending re-authoring against
-  the flat `SpecEntry` model. These need a real level: only the live MC
+  currently a placeholder stub. These need a real level: only the live MC
   tick loop produces accurate scheduled-tick cadence, neighbor-update
-  ordering, and comparator/piston timing.
+  ordering, and comparator/piston timing. Pending re-authoring against
+  the flat `SpecEntry` model using the Kotest bridge.
 - **Client gametest (`src/clientTest/`):** `RedstonespecsClientTests` —
   also a placeholder stub at the moment. Pre-redesign this drove the full
   recorder screen → marker tool → editor screen → runner block flow.
@@ -64,13 +67,12 @@ real-world inputs against pinned expectations.
 
 - New algorithm or pure data logic? Add to `src/test/`.
 - New runner / verifier / coordinator behavior that depends on ticks
-  or scheduling? Add a gametest scenario in `RedstonespecsGameTests`.
+  or scheduling? Add a gametest scenario in `RedstonespecsGameTests`
+  using `ServerTestSpec` + `awaitTicks`/`spawnStructure`.
 - New screen, widget, payload, or marker-tool flow? Add to
   `RedstonespecsClientTests` in `src/clientTest/` (uses
-  `SpecTestContext`, which lives alongside it).
-- Match the existing file's style: unit tests are flat JUnit 5;
-  gametests use either `@GameTest` methods (server-only) or
-  `FabricClientGameTest.runTest` with `SpecTestContext` (client).
+  `ClientContextHolder` to access `ClientGameTestContext`).
+- See `kotest-bridge.md` for the full DSL reference and cookbook.
 
 ## Bootstrap caveat for unit tests
 
