@@ -34,13 +34,23 @@ loom {
 }
 
 sourceSets {
-    create("clientTest") {
+    create("testBridge") {
         compileClasspath += sourceSets["main"].output +
             sourceSets["client"].output +
             sourceSets["client"].compileClasspath
         runtimeClasspath += sourceSets["main"].output +
             sourceSets["client"].output +
             sourceSets["client"].runtimeClasspath
+    }
+    create("clientTest") {
+        compileClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].compileClasspath +
+            sourceSets["testBridge"].output
+        runtimeClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].runtimeClasspath +
+            sourceSets["testBridge"].output
     }
 }
 
@@ -51,14 +61,26 @@ loom {
 }
 
 configurations {
+    named("testBridgeImplementation") {
+        extendsFrom(configurations["clientImplementation"])
+    }
+    named("testBridgeCompileOnly") {
+        extendsFrom(configurations["clientCompileOnly"])
+    }
+    named("testBridgeRuntimeOnly") {
+        extendsFrom(configurations["clientRuntimeOnly"])
+    }
     named("clientTestImplementation") {
         extendsFrom(configurations["clientImplementation"])
+        extendsFrom(configurations["testBridgeImplementation"])
     }
     named("clientTestCompileOnly") {
         extendsFrom(configurations["clientCompileOnly"])
+        extendsFrom(configurations["testBridgeCompileOnly"])
     }
     named("clientTestRuntimeOnly") {
         extendsFrom(configurations["clientRuntimeOnly"])
+        extendsFrom(configurations["testBridgeRuntimeOnly"])
     }
 }
 
@@ -70,6 +92,17 @@ fabricApi {
         enableClientGameTests = false
         eula = true
     }
+}
+
+// Loom creates the `gametest` source set during project evaluation, so it must be configured in `afterEvaluate`.
+afterEvaluate {
+    sourceSets.findByName("gametest")?.let { gt ->
+        gt.compileClasspath += sourceSets["testBridge"].output
+        gt.runtimeClasspath += sourceSets["testBridge"].output
+    }
+    configurations.findByName("gametestImplementation")?.extendsFrom(configurations["testBridgeImplementation"])
+    configurations.findByName("gametestCompileOnly")?.extendsFrom(configurations["testBridgeCompileOnly"])
+    configurations.findByName("gametestRuntimeOnly")?.extendsFrom(configurations["testBridgeRuntimeOnly"])
 }
 
 repositories {
@@ -117,6 +150,17 @@ dependencies {
     "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 
     testImplementation("net.fabricmc:fabric-loader-junit:${project.property("loader_version")}")
+
+    // Kotlin coroutines (also pulled transitively via fabric-language-kotlin, but declare explicitly)
+    "testBridgeImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+
+    // Kotest engine + assertions (used by testBridge, gametest, clientTest, and test source sets)
+    "testBridgeImplementation"("io.kotest:kotest-runner-junit5:5.9.1")
+    "testBridgeImplementation"("io.kotest:kotest-assertions-core:5.9.1")
+
+    // Kensa — modular artifacts; Kotest integration lives in kensa-assertions-kotest
+    "testBridgeImplementation"("dev.kensa:kensa-framework-junit:0.5.10")
+    "testBridgeImplementation"("dev.kensa:kensa-assertions-kotest:0.5.10")
 }
 
 tasks {
