@@ -2,15 +2,16 @@ package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.data.InputSpec
-import com.breadmoirai.redstonespecs.data.OutputSpec
+import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.RedstoneSpecEmitter
 import com.breadmoirai.redstonespecs.data.RedstoneSpecEmitter.Companion.emitter
-import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.TestResult
+import com.breadmoirai.redstonespecs.data.allEntries
+import com.breadmoirai.redstonespecs.data.inputs
+import com.breadmoirai.redstonespecs.data.outputs
+import com.breadmoirai.redstonespecs.data.serial.SpecJsonCodec
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.breadmoirai.redstonespecs.runner.RecordingFinalizer
 import com.breadmoirai.redstonespecs.runner.StateRecorder
@@ -61,7 +62,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         if (s.inputs.isEmpty()) { LOGGER.debug("[startRecording] no inputs at {}", blockPos); return false }
         if (s.outputs.isEmpty()) { LOGGER.debug("[startRecording] no outputs at {}", blockPos); return false }
         val b = s.bounds
-        if (b.minX() >= b.maxX() || b.minY() >= b.maxY() || b.minZ() >= b.maxZ()) {
+        if (b.x < 1 || b.y < 1 || b.z < 1) {
             LOGGER.debug("[startRecording] empty bounds {} at {}", b, blockPos); return false
         }
         val lv = level as? ServerLevel ?: run { LOGGER.debug("[startRecording] not ServerLevel at {}", blockPos); return false }
@@ -110,12 +111,6 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         setChangedAndSync()
     }
 
-    fun setMode(mode: SpecMode) {
-        val e = specEmitter ?: return
-        e.mode = mode
-        setChangedAndSync()
-    }
-
     fun setLifespan(lifespan: Int) {
         val e = specEmitter ?: return
         e.lifespan = lifespan
@@ -134,7 +129,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     fun addOrUpdateEntry(entry: SpecEntry) {
-        LOGGER.debug("[SpecBlockEntity#addOrUpdateEntry] pos={} type={}", entry.pos, entry.javaClass.simpleName)
+        LOGGER.debug("[SpecBlockEntity#addOrUpdateEntry] pos={} kind={}", entry.pos, entry.kind)
         val e = specEmitter ?: return
         e.updateFrom(e.value.withEntryAddedOrUpdated(entry))
         setChangedAndSync()
@@ -144,23 +139,27 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         LOGGER.debug("[SpecBlockEntity#removeEntry] pos={}", pos)
         val e = specEmitter ?: return null
         val s = e.value
-        val removed = s.entryAt(pos) ?: return null
-        e.updateFrom(s.withEntryRemoved(pos))
+        val removed = s.entries.firstOrNull { it.pos == pos } ?: return null
+        e.updateFrom(s.withEntriesRemoved(pos))
         setChangedAndSync()
         return removed
     }
 
     /**
-     * Wipes everything on the spec EXCEPT id, bounds, and input/output marker positions.
-     * Input entries are reduced to just their START condition (required by InputSpec invariant).
-     * Output entries are cleared to empty. Used by Editor → Recorder Discard.
+     * Wipes everything on the spec EXCEPT id, bounds, and per-(pos,kind) marker headers.
+     * Marker entries collapse to one placeholder per (pos, kind). Used by Editor → Recorder Discard.
      */
     fun discardForRerecord() {
         val s = spec ?: return
+        // Keep one marker entry per (pos, kind) — first occurrence wins for label/color.
+        val seen = HashSet<Pair<BlockPos, EntryKind>>()
+        val markers = s.allEntries.filter { e ->
+            val key = e.pos to e.kind
+            seen.add(key)
+        }
         val cleared = RedstoneSpec.new(s.id).copy(
             bounds = s.bounds,
-            inputs = s.inputs.map { InputSpec(it.pos, it.label, it.color, it.entries.filter { e -> e.first == SimTime.START }) },
-            outputs = s.outputs.map { OutputSpec(it.pos, it.label, it.color, emptyList()) },
+            entries = markers,
         )
         setSpec(cleared)
         lastTestResult = null
@@ -170,8 +169,6 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     fun transformTo(targetBlock: Block) {
         val lv = level ?: return
         if (lv.isClientSide) return
-        // setBlock replaces the BlockEntity when the block type changes, so explicitly
-        // carry spec state across the transition.
         val carriedSpec = spec
         val newState = targetBlock.defaultBlockState()
         lv.setBlock(blockPos, newState, 3)
@@ -239,9 +236,9 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
                 val s = be.spec ?: return@find false
                 val b = s.bounds
                 val o = be.blockPos
-                worldPos.x in (o.x + b.minX())..(o.x + b.maxX()) &&
-                worldPos.y in (o.y + b.minY())..(o.y + b.maxY()) &&
-                worldPos.z in (o.z + b.minZ())..(o.z + b.maxZ())
+                (worldPos.x - o.x) in 0 until b.x &&
+                (worldPos.y - o.y) in 0 until b.y &&
+                (worldPos.z - o.z) in 0 until b.z
             }
 
         fun allFor(level: Level): Collection<SpecBlockEntity> =
@@ -251,13 +248,13 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     override fun saveAdditional(output: ValueOutput) {
         LOGGER.debug("[SpecBlockEntity#saveAdditional] saving at {}", blockPos)
         super.saveAdditional(output)
-        spec?.let { output.store("spec", RedstoneSpec.CODEC, it) }
+        spec?.let { output.store("spec", SpecJsonCodec.SPEC, it) }
         lastTestResult?.let { output.store("last_test_result", TestResult.CODEC, it) }
     }
 
     override fun loadAdditional(input: ValueInput) {
         super.loadAdditional(input)
-        val loaded = input.read("spec", RedstoneSpec.CODEC).orElse(null)
+        val loaded = input.read("spec", SpecJsonCodec.SPEC).orElse(null)
         lastTestResult = input.read("last_test_result", TestResult.CODEC).orElse(null)
         LOGGER.debug("[SpecBlockEntity#loadAdditional] loaded at {} spec='{}'", blockPos, loaded?.id)
         if (loaded == null) return
@@ -275,12 +272,8 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
 
 private fun RedstoneSpecEmitter.updateFrom(spec: RedstoneSpec) {
     id = spec.id
-    mode = spec.mode
     bounds = spec.bounds
     lifespan = spec.lifespan
     structure = spec.structure
-    inputs = spec.inputs
-    outputs = spec.outputs
-    breakpoints = spec.breakpoints
-    autoSpecs = spec.autoSpecs
+    entries = spec.entries
 }

@@ -4,8 +4,6 @@ import com.breadmoirai.redstonespecs.block.RedstoneSpecEditorBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.item.AutoSpecMarkerItem
-import com.breadmoirai.redstonespecs.item.BreakpointSpecMarkerItem
 import com.breadmoirai.redstonespecs.item.InputSpecMarkerItem
 import com.breadmoirai.redstonespecs.item.OutputSpecMarkerItem
 import net.fabricmc.fabric.api.`object`.builder.v1.block.entity.FabricBlockEntityTypeBuilder
@@ -55,8 +53,6 @@ object ModRegistries {
 
     val INPUT_SPEC_MARKER: InputSpecMarkerItem = registerItem("input_spec_marker", ::InputSpecMarkerItem)
     val OUTPUT_SPEC_MARKER: OutputSpecMarkerItem = registerItem("output_spec_marker", ::OutputSpecMarkerItem)
-    val BREAKPOINT_SPEC_MARKER: BreakpointSpecMarkerItem = registerItem("breakpoint_spec_marker", ::BreakpointSpecMarkerItem)
-    val AUTO_SPEC_MARKER: AutoSpecMarkerItem = registerItem("auto_spec_marker", ::AutoSpecMarkerItem)
 
     fun register() {
         LOGGER.debug("[ModRegistries#register] registering blocks, block entities, and items")

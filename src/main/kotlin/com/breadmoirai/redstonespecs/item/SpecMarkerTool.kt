@@ -3,16 +3,11 @@ package com.breadmoirai.redstonespecs.item
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.data.AutoSpec
-import com.breadmoirai.redstonespecs.data.BreakpointSpec
-import com.breadmoirai.redstonespecs.data.InputSpec
-import com.breadmoirai.redstonespecs.data.OutputSpec
-import com.breadmoirai.redstonespecs.data.Phase
+import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.allEntries
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload
 import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
 import com.breadmoirai.redstonespecs.runner.propsToCondition
@@ -61,7 +56,6 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 
         val be = SpecBlockEntity.findFor(level, hitPos) ?: return InteractionResult.PASS
 
-        // Marker placement is not allowed on a Runner block — its spec is read-only.
         if (be.blockState.block is RedstoneSpecRunnerBlock) {
             return InteractionResult.PASS
         }
@@ -73,7 +67,8 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
             val isRecorder = be.blockState.block is RedstoneSpecRecorderBlock
             val initProps = if (isRecorder) emptyMap() else captureBlockStateProps(hitState)
 
-            if (spec.entryAt(relPos) == null) {
+            val existing = spec.entries.any { it.pos == relPos }
+            if (!existing) {
                 LOGGER.debug("[SpecMarkerTool#useOn] placing {} entry at {}", javaClass.simpleName, relPos)
                 be.addOrUpdateEntry(createEntry(relPos, initProps, hitState, spec))
             } else {
@@ -91,22 +86,24 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 
 class InputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        InputSpec(relPos, defaultLabel(initState, spec), 0x4488FF, listOf(SimTime.START to propsToCondition(initProps, initState)))
+        SpecEntry(
+            pos = relPos,
+            label = defaultLabel(initState, spec),
+            color = 0xFF4488FF.toInt(),
+            kind = EntryKind.INPUT,
+            time = SimTime.START,
+            condition = propsToCondition(initProps, initState),
+        )
 }
 
 class OutputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry {
-        val time = if (spec.mode == SpecMode.SIMPLE) SimTime.END else SimTime.START
-        return OutputSpec(relPos, defaultLabel(initState, spec), 0xFF8800, listOf(time to propsToCondition(initProps, initState)))
-    }
-}
-
-class BreakpointSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
     override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        BreakpointSpec(relPos, defaultLabel(initState, spec), 0xFF4444)
-}
-
-class AutoSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        AutoSpec(relPos, defaultLabel(initState, spec), 0xFFAA00)
+        SpecEntry(
+            pos = relPos,
+            label = defaultLabel(initState, spec),
+            color = 0xFFFF8800.toInt(),
+            kind = EntryKind.OUTPUT,
+            time = SimTime.START,
+            condition = propsToCondition(initProps, initState),
+        )
 }
