@@ -1,100 +1,85 @@
 package com.breadmoirai.redstonespecs.data
 
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
 import net.minecraft.SharedConstants
 import net.minecraft.nbt.NbtOps
 import net.minecraft.resources.Identifier
 import net.minecraft.server.Bootstrap
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestInstance
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class StateConditionTest {
+class StateConditionTest : FunSpec({
 
-    @BeforeAll
-    fun bootstrap() {
+    beforeSpec {
         SharedConstants.tryDetectVersion()
         Bootstrap.bootStrap()
     }
 
-    private fun <T> roundtrip(value: T, codec: com.mojang.serialization.Codec<T>): T {
+    fun <T> roundtrip(value: T, codec: com.mojang.serialization.Codec<T>): T {
         val encoded = codec.encodeStart(NbtOps.INSTANCE, value).getOrThrow()
         return codec.parse(NbtOps.INSTANCE, encoded).getOrThrow()
     }
 
-    @Test
-    fun `BlockType roundtrip`() {
+    test("BlockType roundtrip") {
         val cond = StateCondition.BlockType(Identifier.fromNamespaceAndPath("minecraft", "redstone_lamp"))
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `BoolProperty roundtrip true`() {
+    test("BoolProperty roundtrip true") {
         val cond = StateCondition.BoolProperty("powered", true)
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `BoolProperty roundtrip false`() {
+    test("BoolProperty roundtrip false") {
         val cond = StateCondition.BoolProperty("lit", false)
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `IntProperty roundtrip`() {
+    test("IntProperty roundtrip") {
         val cond = StateCondition.IntProperty("power", 7)
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `EnumProperty roundtrip`() {
+    test("EnumProperty roundtrip") {
         val cond = StateCondition.EnumProperty("facing", "north")
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `ContainerContents no optionals roundtrip`() {
+    test("ContainerContents no optionals roundtrip") {
         val cond = StateCondition.ContainerContents()
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `ContainerContents with slot and item roundtrip`() {
+    test("ContainerContents with slot and item roundtrip") {
         val cond = StateCondition.ContainerContents(
             slot = 3,
             item = Identifier.fromNamespaceAndPath("minecraft", "diamond"),
             minCount = 5,
         )
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `All roundtrip`() {
+    test("All roundtrip") {
         val cond = StateCondition.All(listOf(
             StateCondition.BoolProperty("powered", true),
             StateCondition.IntProperty("power", 4),
         ))
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `Any roundtrip`() {
+    test("Any roundtrip") {
         val cond = StateCondition.Any(listOf(
             StateCondition.BoolProperty("lit", true),
             StateCondition.BoolProperty("powered", true),
         ))
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `Not roundtrip`() {
+    test("Not roundtrip") {
         val cond = StateCondition.Not(StateCondition.BoolProperty("powered", true))
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `nested recursive condition roundtrip`() {
+    test("nested recursive condition roundtrip") {
         val cond = StateCondition.All(listOf(
             StateCondition.Not(
                 StateCondition.Any(listOf(
@@ -104,17 +89,15 @@ class StateConditionTest {
             ),
             StateCondition.EnumProperty("facing", "south"),
         ))
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
 
-    @Test
-    fun `DEFAULT_CONDITION is BoolProperty powered=true`() {
-        assertEquals(StateCondition.BoolProperty("powered", true), DEFAULT_CONDITION)
+    test("DEFAULT_CONDITION is BoolProperty powered=true") {
+        DEFAULT_CONDITION shouldBe StateCondition.BoolProperty("powered", true)
     }
 
-    @Test
-    fun `IntRange roundtrip`() {
+    test("IntRange roundtrip") {
         val cond = StateCondition.IntRange("power", 1, 15)
-        assertEquals(cond, roundtrip(cond, StateCondition.CODEC))
+        roundtrip(cond, StateCondition.CODEC) shouldBe cond
     }
-}
+})
