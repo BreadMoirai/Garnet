@@ -198,7 +198,7 @@ tasks {
             "-Dlog4j2.logger.redstonespecs.level=DEBUG",
         )
 
-        dependsOn("clientTestClasses")
+        dependsOn("clientTestClasses", "generateDLIConfig")
     }
 
 }
