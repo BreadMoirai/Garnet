@@ -1,41 +1,40 @@
 package com.breadmoirai.redstonespecs.persistence
 
+import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
+import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
 import com.breadmoirai.redstonespecs.network.SpecFileInfo
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonParser
-import com.mojang.serialization.JsonOps
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.*
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
-private val GSON = GsonBuilder().setPrettyPrinting().create()
+
+private const val EXT = ".spec.kts"
 
 object SpecPersistence {
 
     fun save(saveDir: Path, spec: RedstoneSpec) {
         saveDir.createDirectories()
-        val jsonElement = RedstoneSpec.CODEC.encodeStart(JsonOps.INSTANCE, spec).getOrThrow()
-        val file = saveDir.resolve("${spec.id}.json")
-        file.writeText(GSON.toJson(jsonElement))
+        val file = saveDir.resolve("${spec.id}$EXT")
+        file.writeText(KtsSpecEmitter.emit(spec))
         LOGGER.debug("[SpecPersistence#save] saved spec '{}' to {}", spec.id, file)
     }
 
     fun load(saveDir: Path, id: String): RedstoneSpec? {
-        val file = saveDir.resolve("$id.json")
+        val file = saveDir.resolve("$id$EXT")
         if (!file.exists()) return null
-        return runCatching {
-            val json = JsonParser.parseReader(file.reader())
-            RedstoneSpec.CODEC.parse(JsonOps.INSTANCE, json).getOrThrow()
-        }.onFailure { e ->
-            LOGGER.warn("[SpecPersistence#load] failed to load spec '{}': {}", id, e.message)
-        }.getOrNull()
+        return runCatching { KtsSpecLoader.loadFile(file) }
+            .onFailure { e -> LOGGER.warn("[SpecPersistence#load] failed to load '{}': {}", id, e.message) }
+            .getOrNull()
     }
 
     fun listIds(saveDir: Path): List<String> {
         if (!saveDir.exists()) return emptyList()
-        return saveDir.listDirectoryEntries("*.json").map { it.nameWithoutExtension }
+        return saveDir.listDirectoryEntries("*$EXT").map {
+            it.fileName.toString().removeSuffix(EXT)
+        }
     }
 
     fun listSpecsInfo(saveDir: Path): List<SpecFileInfo> {
@@ -43,10 +42,9 @@ object SpecPersistence {
             val spec = load(saveDir, id) ?: return@mapNotNull null
             SpecFileInfo(
                 id = spec.id,
-                mode = spec.mode,
                 lifespan = spec.lifespan,
-                inputCount = spec.inputs.size,
-                outputCount = spec.outputs.size,
+                inputCount = spec.entries.count { it.kind == EntryKind.INPUT },
+                outputCount = spec.entries.count { it.kind == EntryKind.OUTPUT },
                 structure = spec.structure,
             )
         }
