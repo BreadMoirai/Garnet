@@ -150,7 +150,6 @@ dependencies {
     "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
     "testBridgeImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 
-    testImplementation("net.fabricmc:fabric-loader-junit:${project.property("loader_version")}")
     testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
