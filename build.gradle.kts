@@ -33,6 +33,25 @@ loom {
     }
 }
 
+sourceSets {
+    create("clientTest") {
+        compileClasspath += sourceSets["main"].output + sourceSets["client"].output
+        runtimeClasspath += sourceSets["main"].output + sourceSets["client"].output
+    }
+}
+
+loom {
+    mods.register("redstonespecs-clienttest") {
+        sourceSet("clientTest")
+    }
+}
+
+configurations {
+    named("clientTestImplementation") {
+        extendsFrom(configurations["clientImplementation"])
+    }
+}
+
 fabricApi {
     configureTests {
         createSourceSet = true
