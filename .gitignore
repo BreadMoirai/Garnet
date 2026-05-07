@@ -33,3 +33,14 @@ versions/**/logs/
 /net/
 /dev/
 /.env
+/versions/**/saves/
+/versions/**/data/
+/versions/**/downloads/
+/versions/**/logs/
+/versions/**/mods/
+/versions/**/resourcepacks/
+/versions/**/run/
+/versions/**/config/
+/versions/**/build/
+/versions/**/usercache.json
+/versions/**/options.txt
