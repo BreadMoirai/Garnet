@@ -165,4 +165,40 @@ tasks {
         )
     }
 
+    register<JavaExec>("runClientTest") {
+        group = "fabric"
+        description = "Runs FabricClientGameTest flows from the clientTest sourceset."
+
+        val clientTestSrc = sourceSets["clientTest"]
+        classpath = clientTestSrc.runtimeClasspath
+        mainClass.set("net.fabricmc.devlaunchinjector.Main")
+        // loom sets workingDir to the version subproject dir; projectDirectory IS versions/26.1 for :26.1:
+        workingDir = project.layout.projectDirectory.asFile
+
+        val launchCfg = project.layout.projectDirectory
+            .dir(".gradle/loom-cache")
+            .file("launch.cfg")
+            .asFile
+        val testResources = clientTestSrc.resources.srcDirs.first()
+
+        jvmArgumentProviders.add(CommandLineArgumentProvider {
+            listOf(
+                "-Dfabric.dli.config=${launchCfg.absolutePath}",
+                "-Dfabric.dli.env=client",
+                "-Dfabric.client.gametest",
+                "-Dfabric.client.gametest.testModResourcesPath=${testResources.absolutePath}",
+                "-Dfabric.dli.main=net.fabricmc.loader.impl.launch.knot.KnotClient",
+                "--sun-misc-unsafe-memory-access=allow",
+                "--enable-native-access=ALL-UNNAMED",
+            )
+        })
+
+        jvmArgs(
+            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
+            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+        )
+
+        dependsOn("clientTestClasses")
+    }
+
 }
