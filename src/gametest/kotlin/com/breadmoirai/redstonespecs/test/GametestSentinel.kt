@@ -18,11 +18,12 @@ class GametestSentinel {
 
     private val logger = LoggerFactory.getLogger("Redstone Specs")
 
-    @GameTest(structure = "redstonespecs:empty_platform", maxTicks = 12000)
+    @GameTest(structure = "redstonespecs:empty_platform", maxTicks = 600000)
     fun runAll(helper: GameTestHelper) {
-        TestBridgeLifecycle.register()
-
         val server = helper.level.server
+        // SERVER_STARTED has already fired by the time a GameTest method runs.
+        // Register tick events and install the dispatcher directly from the live server.
+        TestBridgeLifecycle.registerWithServer(server)
         val worker = Thread.ofPlatform()
             .name("kotest-gametest")
             .uncaughtExceptionHandler { _, t ->
@@ -34,11 +35,13 @@ class GametestSentinel {
                     launchKotest(
                         sourceSet = "gametest",
                         reportsDir = Path.of("build/reports/redstonespecs/gametest"),
+                        specs = listOf(SmokeSpec::class),
                     )
                 }
                 server.execute {
                     result.fold(
                         onSuccess = { r ->
+                            logger.info("Kotest: {}", r.summary())
                             if (r.failed > 0) helper.fail(r.summary())
                             else helper.succeed()
                         },

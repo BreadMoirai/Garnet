@@ -30,4 +30,17 @@ object TestBridgeLifecycle {
             emitServerTickEnd(server)
         }
     }
+
+    /**
+     * Variant for GameTest sentinels: registers tick events and installs the dispatcher
+     * directly from the provided server. Use this when [register] is called after
+     * SERVER_STARTED has already fired (which is always the case inside a @GameTest method).
+     *
+     * Calling this after [register] is a no-op for the event registrations (idempotent),
+     * but [McDispatchers.install] is always called to ensure the dispatcher is available.
+     */
+    fun registerWithServer(server: net.minecraft.server.MinecraftServer) {
+        register()
+        McDispatchers.install(server)
+    }
 }
