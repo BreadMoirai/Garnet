@@ -1,16 +1,15 @@
 package com.breadmoirai.redstonespecs.persistence
 
 import com.breadmoirai.redstonespecs.data.dsl.redstoneSpec
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.exists
 
-class SpecPersistenceTest {
-    @Test
-    fun `save then load round-trips a spec via spec_kts`(@TempDir tmp: Path) {
+class SpecPersistenceTest : FunSpec({
+
+    test("save then load round-trips a spec via spec_kts") {
+        val tmp = createTempDirectory("SpecPersistenceTest")
         val spec = redstoneSpec("rt") {
             bounds(3, 3, 3)
             lifespan = 10
@@ -18,9 +17,9 @@ class SpecPersistenceTest {
             output(2, 0, 2, label = "out") { at(tick = 5) { lit() } }
         }
         SpecPersistence.save(tmp, spec)
-        assertTrue(tmp.resolve("rt.spec.kts").exists())
+        tmp.resolve("rt.spec.kts").exists() shouldBe true
 
         val loaded = SpecPersistence.load(tmp, "rt")
-        assertEquals(spec, loaded)
+        loaded shouldBe spec
     }
-}
+})
