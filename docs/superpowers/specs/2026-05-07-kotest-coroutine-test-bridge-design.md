@@ -31,12 +31,15 @@ This was chosen over:
 
 ### Module layout
 
+A new `testBridge` source set in the root project (not a separate Gradle subproject — the project has no real subprojects; introducing one would entangle with Stonecutter and loom configuration). The `gametest` and `clientTest` source sets pull `testBridge` into their compile/runtime classpaths via existing source-set plumbing.
+
 ```
-:test-bridge (Gradle subproject, single 26.1 target)
+src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/
 ├── core/
 │   ├── Ticks.kt          — serverTickStart, serverTickEnd: SharedFlow<MinecraftServer>
 │   ├── Dispatchers.kt    — ServerThreadDispatcher, McDispatchers.Server
-│   └── Lifecycle.kt      — Fabric event subscriptions; install/teardown
+│   ├── Lifecycle.kt      — Fabric event subscriptions; install/teardown
+│   └── ClientContextHolder.kt — exposes ClientGameTestContext to client specs
 ├── server/
 │   ├── Suspending.kt     — awaitTicks, awaitTickEnd, awaitTickWhere, onServer
 │   └── Structures.kt     — spawnStructure, StructureGrid, StructureHandle
@@ -45,7 +48,7 @@ This was chosen over:
     └── ResultCollector.kt — Kotest TestListener that aggregates pass/fail counts
 ```
 
-Dependencies: `minecraft`, `fabric-api`, `kotlin-coroutines`, `io.kotest:kotest-runner-junit5`, `io.kotest:kotest-assertions-core`, `dev.kensa:kensa`. Output consumed by `gametest` and `clientTest` source sets via `implementation`.
+Dependencies (added at the root project level so the source set inherits): `kotlin-coroutines-core`, `io.kotest:kotest-runner-junit5`, `io.kotest:kotest-assertions-core`, `dev.kensa:kensa`. The Minecraft/Fabric API classpath is already on `main`/`client` and is inherited via the source-set wiring.
 
 ### Producer/consumer primitives
 
@@ -246,4 +249,4 @@ One `@GameTest` that spawns `redstonespecs:empty_platform`, runs a 3-leaf Kotest
 
 ## Module naming
 
-`:test-bridge` (kebab-case). Establishes the convention for future modules (`:spec-runner`, etc.); matches the JVM artifact-naming convention used by all dependencies on the classpath.
+The source set is named `testBridge` (Gradle source-set names are conventionally camelCase — `clientTest` already follows this pattern). If the bridge is later promoted to a real Gradle subproject, the subproject would be `:test-bridge` (kebab-case) per the JVM artifact-naming convention.
