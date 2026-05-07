@@ -282,6 +282,51 @@ git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Dispatc
 git commit -m "feat(testBridge): add ServerThreadDispatcher with 100ms watchdog"
 ```
 
+### Task 4a: Add executor drain to tick emitters
+
+**Files:**
+- Modify: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt`
+
+After Task 2 shipped, the design unified on `ServerThreadDispatcher` (no separate `TickDispatcher`). Same-tick semantics now come from calling `server.runAllTasks()` inside the emitter to drain woken consumer continuations on the server thread before returning to MC.
+
+- [ ] **Step 1: Update Ticks.kt**
+
+Replace the bodies of `emitServerTickStart` and `emitServerTickEnd` with:
+
+```kotlin
+internal fun emitServerTickStart(server: MinecraftServer) {
+    _serverTickStart.tryEmit(server)
+    server.runAllTasks()
+}
+
+internal fun emitServerTickEnd(server: MinecraftServer) {
+    _serverTickEnd.tryEmit(server)
+    server.runAllTasks()
+}
+```
+
+`runAllTasks()` is inherited from `MinecraftServer`'s `BlockableEventLoop` superclass. Drains the executor queue synchronously on the server thread. Consumers suspended on `awaitTickEnd` / `awaitTicks` were just woken by `tryEmit`; their continuations queued on `McDispatchers.Server`'s executor (via `MinecraftServer.execute`); `runAllTasks` runs them inline.
+
+If `runAllTasks()` doesn't resolve (API drift across MC versions), the equivalent loop is:
+```kotlin
+while (server.pollTask()) { /* keep draining */ }
+```
+
+- [ ] **Step 2: Verify compile**
+
+```
+cmd.exe /c "./gradlew.bat :26.1:testBridgeClasses"
+```
+
+Expected: BUILD SUCCESSFUL.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt
+git commit -m "feat(testBridge): drain executor in tick emitters for same-tick semantics"
+```
+
 ### Task 4: Lifecycle wiring (`Lifecycle.kt`)
 
 **Files:**
@@ -555,6 +600,92 @@ If `ClientGameTestContext` doesn't resolve at compile time, `testBridge` doesn't
 git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/ClientContextHolder.kt
 # include build.gradle.kts in the commit if step 2 required the dep addition
 git commit -m "feat(testBridge): add ClientContextHolder for client specs"
+```
+
+### Task 7a: ServerTestSpec base class (`ServerTestSpec.kt`)
+
+**Files:**
+- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/ServerTestSpec.kt`
+
+Tests extending `ServerTestSpec` get `McDispatchers.Server` as the default dispatcher for both test bodies and lifecycle hooks. Combined with the executor drain (Task 4a), test bodies run synchronously on the server thread inside the tick window.
+
+- [ ] **Step 1: Write the file**
+
+```kotlin
+package com.breadmoirai.redstonespecs.testing
+
+import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.engine.concurrency.SpecExecutionMode
+import io.kotest.engine.concurrency.TestExecutionMode
+import io.kotest.core.spec.IsolationMode
+import kotlinx.coroutines.CoroutineDispatcher
+import io.kotest.core.coroutines.CoroutineDispatcherFactory
+
+/**
+ * Base class for specs that run on Minecraft's server thread.
+ *
+ * Both test bodies and lifecycle hooks (`beforeTest`, `beforeSpec`, `afterTest`,
+ * `afterSpec`) default to `McDispatchers.Server`. Combined with the executor
+ * drain in `emitServerTickEnd`, code between `awaitTicks` calls executes
+ * synchronously on the server thread inside the tick callback — no `onServer { }`
+ * boilerplate required.
+ *
+ * Caveats:
+ * - Don't `Thread.sleep`, do blocking IO, or run heavy compute on the server thread.
+ *   The 100ms watchdog in `ServerThreadDispatcher` will warn.
+ * - `McDispatchers.Server` must be installed before the first test runs (i.e., the
+ *   server must be started). The sentinel arranges this; raw use outside a
+ *   sentinel will throw on first dispatch.
+ */
+abstract class ServerTestSpec(body: ServerTestSpec.() -> Unit = {}) : FunSpec() {
+
+    init {
+        // Use the server-thread dispatcher for tests + hooks in this spec.
+        coroutineDispatcher = ServerCoroutineDispatcherFactory
+        body()
+    }
+}
+
+private object ServerCoroutineDispatcherFactory : CoroutineDispatcherFactory {
+    override fun dispatcherFor(testCase: io.kotest.core.test.TestCase): CoroutineDispatcher =
+        McDispatchers.Server
+}
+```
+
+The exact symbol for "set this spec's dispatcher" varies across Kotest 5.x point releases. Symbols to try in order:
+1. `coroutineDispatcher` field on the Spec class (5.9+).
+2. `coroutineDispatcherFactory` field.
+3. Registering a `CoroutineDispatcherFactory` extension via `extensions(...)`.
+4. Override `defaultCoroutineDispatcherFactory()` method.
+
+If none compile, fall back to wrapping each test body in `withContext(McDispatchers.Server) { ... }` via a `TestCaseExtension`:
+
+```kotlin
+class ServerThreadTestCaseExtension : TestCaseExtension {
+    override suspend fun intercept(
+        testCase: TestCase,
+        execute: suspend (TestCase) -> TestResult,
+    ): TestResult = withContext(McDispatchers.Server) { execute(testCase) }
+}
+// Register with: extensions(ServerThreadTestCaseExtension())
+```
+
+This wraps the entire test execution (including hooks) in the server-thread dispatcher.
+
+- [ ] **Step 2: Verify compile**
+
+```
+cmd.exe /c "./gradlew.bat :26.1:testBridgeClasses"
+```
+
+Expected: BUILD SUCCESSFUL. If compile fails on Kotest API symbols, iterate per the fallback ladder above and document the resolution in your DONE_WITH_CONCERNS report.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/ServerTestSpec.kt
+git commit -m "feat(testBridge): add ServerTestSpec base class"
 ```
 
 ### Task 8: Structure spawning (`Structures.kt`)
@@ -1061,40 +1192,33 @@ This is the first actual Kotest spec in the gametest source set. It exercises `a
 
 - [ ] **Step 1: Write the spec**
 
+The spec extends `ServerTestSpec` so the body runs on the server thread directly — no `onServer { }` boilerplate, same-tick guaranteed via the executor drain.
+
 ```kotlin
 package com.breadmoirai.redstonespecs.test
 
+import com.breadmoirai.redstonespecs.testing.ServerTestSpec
+import com.breadmoirai.redstonespecs.testing.core.McDispatchers
 import com.breadmoirai.redstonespecs.testing.server.awaitTicks
-import com.breadmoirai.redstonespecs.testing.server.onServer
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.shouldBe
 
-class SmokeSpec : FunSpec({
+class SmokeSpec : ServerTestSpec({
 
     test("awaitTicks advances the server tick counter") {
-        val before = onServer { tickCount }
+        val before = McDispatchers.currentServer.tickCount
         awaitTicks(3)
-        val after = onServer { tickCount }
+        val after = McDispatchers.currentServer.tickCount
         (after - before) shouldBeGreaterThan 2
     }
 
-    test("onServer hops to the server thread") {
-        val onServerThread = onServer { isSameThread }
-        onServerThread shouldBe true
+    test("test body runs on the server thread") {
+        McDispatchers.currentServer.isSameThread shouldBe true
     }
 })
 ```
 
-(Imports: ensure `io.kotest.matchers.shouldBe` is present if the `shouldBe` matcher is used elsewhere; the `shouldBeGreaterThan` import is from `io.kotest.matchers.ints`.)
-
-Final imports:
-```kotlin
-import com.breadmoirai.redstonespecs.testing.server.awaitTicks
-import com.breadmoirai.redstonespecs.testing.server.onServer
-import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.ints.shouldBeGreaterThan
-import io.kotest.matchers.shouldBe
-```
+Both reads are direct — no `onServer { }` hop. The first test verifies the tick clock advanced; the second verifies we're actually executing on the server thread (not a worker).
 
 - [ ] **Step 2: Verify it compiles**
 
