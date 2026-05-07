@@ -6,7 +6,7 @@
   "environment": "*",
   "entrypoints": {
     "fabric-gametest": [
-      "com.breadmoirai.redstonespecs.test.RedstonespecsGameTests"
+      "com.breadmoirai.redstonespecs.test.GametestSentinel"
     ]
   },
   "depends": {

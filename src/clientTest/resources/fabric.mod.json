@@ -6,7 +6,7 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "com.breadmoirai.redstonespecs.test.RedstonespecsClientTests"
+      "com.breadmoirai.redstonespecs.test.ClientTestSentinel"
     ]
   },
   "depends": {
