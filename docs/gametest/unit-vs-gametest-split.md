@@ -1,7 +1,7 @@
 ---
 title: Unit-test vs gametest split
 tags: [testing, junit, gametest, client-gametest, architecture]
-summary: Which logic belongs in src/test/ JUnit unit tests versus src/gametest/ Fabric gametests, and why the split is drawn where it is.
+summary: Which logic belongs in src/test/ (JUnit), src/gametest/ (server @GameTest), or src/clientTest/ (client gametest), and why the lines are drawn where they are.
 ---
 
 # Unit-test vs gametest split
