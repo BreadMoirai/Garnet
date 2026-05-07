@@ -4,7 +4,6 @@ import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.TestResult
 import com.breadmoirai.redstonespecs.data.TickCheck
-import com.breadmoirai.redstonespecs.network.BreakpointHitS2CPayload
 import com.breadmoirai.redstonespecs.network.TestResultS2CPayload
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -48,11 +47,6 @@ object SpecRunnerCoordinator {
         snapshot?.restore(level)
     }
 
-    fun resumeSpec(be: SpecBlockEntity) {
-        LOGGER.debug("[SpecRunnerCoordinator#resumeSpec] resuming spec at {}", be.blockPos)
-        runners[be]?.resume()
-    }
-
     fun onPhase(level: ServerLevel, phase: Phase) {
         for (recorder in StateRecorder.activeRecorders()) {
             if (phase == Phase.START_OF_TICK) recorder.onTickStart()
@@ -63,24 +57,10 @@ object SpecRunnerCoordinator {
 
     private fun tickRunners(level: ServerLevel, phase: Phase) {
         val completed = mutableListOf<SpecBlockEntity>()
-
         for ((be, runner) in runners) {
             if (be.level !== level) continue
-            val done = runner.onPhase(phase)
-
-            val bpHit = runner.pendingBreakpointHit
-            if (bpHit != null) {
-                runner.clearPendingBreakpointHit()
-                PlayerLookup.level(level).forEach { player ->
-                    ServerPlayNetworking.send(player, BreakpointHitS2CPayload(
-                        be.blockPos, bpHit.simTime, bpHit.specId, bpHit.breakpointLabel,
-                    ))
-                }
-            }
-
-            if (done) completed += be
+            if (runner.onPhase(phase)) completed += be
         }
-
         for (be in completed) {
             runners.remove(be)
             finishRun(be)

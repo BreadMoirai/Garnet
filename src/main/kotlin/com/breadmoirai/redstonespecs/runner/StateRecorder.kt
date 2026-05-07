@@ -3,11 +3,11 @@ package com.breadmoirai.redstonespecs.runner
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.level.levelgen.structure.BoundingBox
 import java.util.UUID
 
 class StateRecorder(
@@ -27,11 +27,11 @@ class StateRecorder(
     private val _changes: MutableList<BlockStateChange> = mutableListOf()
     val changes: List<BlockStateChange> get() = _changes
 
-    fun start(level: ServerLevel, originPos: BlockPos, bounds: BoundingBox) {
+    fun start(level: ServerLevel, originPos: BlockPos, bounds: Vec3i) {
         initialSnapshot = buildMap {
-            for (x in bounds.minX()..bounds.maxX()) {
-                for (y in bounds.minY()..bounds.maxY()) {
-                    for (z in bounds.minZ()..bounds.maxZ()) {
+            for (x in 0 until bounds.x) {
+                for (y in 0 until bounds.y) {
+                    for (z in 0 until bounds.z) {
                         val worldPos = BlockPos(originPos.x + x, originPos.y + y, originPos.z + z)
                         put(worldToOriginRelative(worldPos), level.getBlockState(worldPos))
                     }
@@ -106,14 +106,14 @@ class StateRecorder(
         }
 
         @JvmStatic
-        fun forSpec(specId: UUID, originPos: BlockPos, bounds: BoundingBox): StateRecorder {
-            val minX = originPos.x + bounds.minX()
-            val minY = originPos.y + bounds.minY()
-            val minZ = originPos.z + bounds.minZ()
-            val maxX = originPos.x + bounds.maxX()
-            val maxY = originPos.y + bounds.maxY()
-            val maxZ = originPos.z + bounds.maxZ()
-            return StateRecorder(specId, originPos, BlockPos(minX, minY, minZ), BlockPos(maxX, maxY, maxZ))
+        fun forSpec(specId: UUID, originPos: BlockPos, bounds: Vec3i): StateRecorder {
+            val min = BlockPos(originPos.x, originPos.y, originPos.z)
+            val max = BlockPos(
+                originPos.x + bounds.x - 1,
+                originPos.y + bounds.y - 1,
+                originPos.z + bounds.z - 1,
+            )
+            return StateRecorder(specId, originPos, min, max)
         }
     }
 }

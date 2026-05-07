@@ -1,46 +1,52 @@
 package com.breadmoirai.redstonespecs.runner
 
-import com.breadmoirai.redstonespecs.data.InputSpec
-import com.breadmoirai.redstonespecs.data.OutputSpec
+import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
-import com.breadmoirai.redstonespecs.data.SpecMode
+import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.StateCondition
+import com.breadmoirai.redstonespecs.data.allEntries
 import net.minecraft.core.BlockPos
-import net.minecraft.world.level.block.state.BlockState
 
 object RecordingFinalizer {
 
     /**
+     * Header derived from the marker entries placed by the user before recording:
+     * preserves the (pos, kind, label, color) per I/O position. The first entry seen
+     * for a given (pos, kind) wins for label/color.
+     */
+    private data class IoHeader(val pos: BlockPos, val kind: EntryKind, val label: String, val color: Int)
+
+    /**
      * Produces a finalized [RedstoneSpec] from a recording.
      *
-     * @param baseSpec spec on the BE before finalize: provides id, mode, bounds, structure, marker positions/labels.
-     *                 Marker conditions are ignored — they are re-derived from the recording.
+     * @param baseSpec spec on the BE before finalize: provides id, bounds, structure, marker positions/labels.
+     *                 Marker times/conditions are ignored — they are re-derived from the recording.
      * @param recording full state recording captured by [StateRecorder] over the bounds.
      * @return new spec with derived entries and lifespan (count of ticks spanned by I/O activity, inclusive);
      *         or null if the recording contains no I/O activity.
      */
     fun finalize(baseSpec: RedstoneSpec, recording: StateRecording): RedstoneSpec? {
-        val ioPositions: Set<BlockPos> =
-            (baseSpec.inputs.map { it.pos } + baseSpec.outputs.map { it.pos }).toSet()
-        if (ioPositions.isEmpty()) return null
+        val headers: List<IoHeader> = baseSpec.allEntries
+            .map { IoHeader(it.pos, it.kind, it.label, it.color) }
+            .distinct()
+        if (headers.isEmpty()) return null
 
+        val ioPositions: Set<BlockPos> = headers.map { it.pos }.toSet()
         val (firstTick, lastTick) = ioActivitySpan(recording, ioPositions) ?: return null
         val lifespan = (lastTick - firstTick + 1).coerceAtLeast(1)
         val view = StateRecordingView.of(recording)
 
-        val derivedInputs = baseSpec.inputs.map { input ->
-            input.copy(entries = deriveInputEntries(input.pos, recording, view, firstTick, lastTick))
+        val derivedEntries = buildList {
+            for (header in headers) {
+                addAll(when (header.kind) {
+                    EntryKind.INPUT -> deriveInputEntries(header, recording, view, firstTick, lastTick)
+                    EntryKind.OUTPUT -> deriveOutputEntries(header, recording, view, firstTick, lastTick)
+                })
+            }
         }
-        val derivedOutputs = baseSpec.outputs.map { output ->
-            output.copy(entries = deriveOutputEntries(output.pos, recording, view, firstTick, lastTick, lifespan, baseSpec.mode))
-        }
-        return baseSpec.copy(
-            lifespan = lifespan,
-            inputs = derivedInputs,
-            outputs = derivedOutputs,
-        )
+        return baseSpec.copy(lifespan = lifespan, entries = derivedEntries)
     }
 
     /** Returns inclusive [first, last] tick indices where any I/O block changed state, or null if none did. */
@@ -57,47 +63,48 @@ object RecordingFinalizer {
     }
 
     private fun deriveInputEntries(
-        pos: BlockPos,
+        header: IoHeader,
         recording: StateRecording,
         view: StateRecordingView,
         firstTick: Int,
         lastTick: Int,
-    ): List<Pair<SimTime, StateCondition>> {
-        // START state == the input's settled state at the boundary of firstTick (after any changes that happen on firstTick).
-        val initState = view.stateAt(pos, SimTime(firstTick, Phase.END_OF_TICK, Int.MAX_VALUE))
-        val initEntry = SimTime.START to propsToCondition(captureBlockStateProps(initState), initState)
-
-        val laterTicks = changedTicks(recording, pos).filter { it in (firstTick + 1)..lastTick }
-        val laterEntries = laterTicks.map { t ->
-            val state = view.stateAt(pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
-            SimTime(t - firstTick, Phase.END_OF_TICK) to propsToCondition(captureBlockStateProps(state), state)
+    ): List<SpecEntry> {
+        val initState = view.stateAt(header.pos, SimTime(firstTick, Phase.END_OF_TICK, Int.MAX_VALUE))
+        val initEntry = SpecEntry(
+            header.pos, header.label, header.color, EntryKind.INPUT,
+            SimTime.START,
+            propsToCondition(captureBlockStateProps(initState), initState),
+        )
+        val laterTicks = changedTicks(recording, header.pos).filter { it in (firstTick + 1)..lastTick }
+        val later = laterTicks.map { t ->
+            val state = view.stateAt(header.pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
+            SpecEntry(
+                header.pos, header.label, header.color, EntryKind.INPUT,
+                SimTime(t - firstTick, Phase.END_OF_TICK),
+                propsToCondition(captureBlockStateProps(state), state),
+            )
         }
-        return listOf(initEntry) + laterEntries
+        return listOf(initEntry) + later
     }
 
     private fun deriveOutputEntries(
-        pos: BlockPos,
+        header: IoHeader,
         recording: StateRecording,
         view: StateRecordingView,
         firstTick: Int,
         lastTick: Int,
-        lifespan: Int,
-        mode: SpecMode,
-    ): List<Pair<SimTime, StateCondition>> {
-        if (mode == SpecMode.SIMPLE) {
-            val finalState = view.stateAt(pos, SimTime(lastTick, Phase.END_OF_TICK, Int.MAX_VALUE))
-            return listOf(
-                SimTime.END to propsToCondition(captureBlockStateProps(finalState), finalState),
-            )
-        }
-        val ticks = changedTicks(recording, pos).filter { it in firstTick..lastTick }
+    ): List<SpecEntry> {
+        val ticks = changedTicks(recording, header.pos).filter { it in firstTick..lastTick }
         return ticks.map { t ->
-            val state = view.stateAt(pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
-            SimTime(t - firstTick, Phase.END_OF_TICK) to propsToCondition(captureBlockStateProps(state), state)
+            val state = view.stateAt(header.pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
+            SpecEntry(
+                header.pos, header.label, header.color, EntryKind.OUTPUT,
+                SimTime(t - firstTick, Phase.END_OF_TICK),
+                propsToCondition(captureBlockStateProps(state), state),
+            )
         }
     }
 
-    /** Sorted unique tick indices at which [pos] has at least one recorded change. */
     private fun changedTicks(rec: StateRecording, pos: BlockPos): List<Int> =
         rec.changes.asSequence()
             .filter { it.pos == pos }

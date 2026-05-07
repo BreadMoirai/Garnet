@@ -1,9 +1,9 @@
 package com.breadmoirai.redstonespecs.runner
 
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.level.levelgen.structure.BoundingBox
 
 class SpecSnapshot private constructor(
     private val positions: Map<BlockPos, BlockState>,
@@ -15,11 +15,11 @@ class SpecSnapshot private constructor(
     }
 
     companion object {
-        fun capture(level: ServerLevel, origin: BlockPos, bounds: BoundingBox): SpecSnapshot {
+        fun capture(level: ServerLevel, origin: BlockPos, bounds: Vec3i): SpecSnapshot {
             val positions = HashMap<BlockPos, BlockState>()
-            for (x in bounds.minX()..bounds.maxX()) {
-                for (y in bounds.minY()..bounds.maxY()) {
-                    for (z in bounds.minZ()..bounds.maxZ()) {
+            for (x in 0 until bounds.x) {
+                for (y in 0 until bounds.y) {
+                    for (z in 0 until bounds.z) {
                         val pos = BlockPos(origin.x + x, origin.y + y, origin.z + z)
                         positions[pos] = level.getBlockState(pos)
                     }
