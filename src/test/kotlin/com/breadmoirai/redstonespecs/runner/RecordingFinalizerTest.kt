@@ -139,7 +139,7 @@ class RecordingFinalizerTest {
         assertNull(RecordingFinalizer.finalize(spec, rec))
     }
 
-    @Test fun `finalize sets lifespan to lastTick minus firstTick`() {
+    @Test fun `finalize sets lifespan to inclusive tick count of IO activity`() {
         val a = BlockPos(1, 0, 0)
         val rec = recording(setOf(a), mapOf(
             3 to setOf(a),
@@ -147,7 +147,8 @@ class RecordingFinalizerTest {
         ))
         val spec = baseSpec(inputs = listOf(input(a)))
         val finalized = RecordingFinalizer.finalize(spec, rec) ?: error("expected non-null finalized spec")
-        assertEquals(5, finalized.lifespan)
+        // Activity spans ticks 3..8 inclusive — that's 6 ticks.
+        assertEquals(6, finalized.lifespan)
     }
 
     @Test fun `SIMPLE mode emits single END output entry`() {
@@ -165,8 +166,8 @@ class RecordingFinalizerTest {
             outputs = listOf(output(o)),
         )
         val finalized = RecordingFinalizer.finalize(spec, rec) ?: error("expected non-null finalized spec")
-        val lifespan = finalized.lifespan // 8 - 2 = 6
-        assertEquals(6, lifespan)
+        val lifespan = finalized.lifespan // ticks 2..8 inclusive = 7
+        assertEquals(7, lifespan)
         val out = finalized.outputs.single()
         // SIMPLE emits exactly one entry: END (final state).
         assertEquals(1, out.entries.size)
@@ -185,7 +186,7 @@ class RecordingFinalizerTest {
 
     @Test fun `non-SIMPLE mode derives input conditions at relative SimTimes`() {
         val a = BlockPos(1, 0, 0)
-        // Input toggles at ticks 2, 5, 7. Span is (2, 7), lifespan = 5.
+        // Input toggles at ticks 2, 5, 7. Span is (2, 7), lifespan = 6 (ticks 2..7 inclusive).
         // Relative ticks: 0 (was tick 2), 3 (was tick 5), 5 (was tick 7).
         val rec = recording(setOf(a), mapOf(
             2 to setOf(a),
@@ -197,7 +198,7 @@ class RecordingFinalizerTest {
             inputs = listOf(input(a)),
         )
         val finalized = RecordingFinalizer.finalize(spec, rec) ?: error("expected non-null finalized spec")
-        assertEquals(5, finalized.lifespan)
+        assertEquals(6, finalized.lifespan)
         val derived = finalized.inputs.single()
         // Must contain START plus per-tick changes.
         // Tick 0 of trimmed window has a change (was tick 2): derived as START (first change becomes the init state).

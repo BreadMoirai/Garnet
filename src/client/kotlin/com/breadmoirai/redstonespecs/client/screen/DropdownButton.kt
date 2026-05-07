@@ -25,8 +25,9 @@ class DropdownButton<T>(
     val options: List<T>,
     private val toComponent: (T) -> Component,
     initial: T,
+    private val displayOverride: Component? = null,
     private val onChange: (T) -> Unit,
-) : Button(x, y, width, height, toComponent(initial), OnPress {}, DEFAULT_NARRATION) {
+) : Button(x, y, width, height, displayOverride ?: toComponent(initial), OnPress {}, DEFAULT_NARRATION) {
 
     var selected: T = initial
         private set
@@ -49,7 +50,7 @@ class DropdownButton<T>(
 
     override fun extractContents(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         extractDefaultSprite(graphics)
-        graphics.centeredText(font, toComponent(selected), x + width / 2, y + (height - 8) / 2, -1)
+        graphics.centeredText(font, displayOverride ?: toComponent(selected), x + width / 2, y + (height - 8) / 2, -1)
     }
 
     fun extractPopup(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {

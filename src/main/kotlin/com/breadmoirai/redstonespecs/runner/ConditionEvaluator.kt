@@ -62,20 +62,22 @@ fun captureBlockStateProps(state: BlockState): Map<String, String> =
         prop.name to readPropertyStr(state, prop as Property<Comparable<Any>>)
     }
 
-/** Converts a Map<String,String> property diff (from captureBlockStateProps) to a typed StateCondition. */
+/**
+ * Converts a captured block state into a typed [StateCondition]: the block's identifier
+ * plus any of its properties listed in [props]. Block type is always included so that
+ * blocks without properties (e.g. air, blue_concrete) still produce a meaningful check.
+ */
 fun propsToCondition(props: Map<String, String>, state: BlockState): StateCondition {
-    val conditions = props.map { (name, value) ->
+    val blockType = StateCondition.BlockType(BuiltInRegistries.BLOCK.getKey(state.block))
+    val propConditions = props.map { (name, value) ->
         when (state.block.stateDefinition.getProperty(name)) {
             is BooleanProperty -> StateCondition.BoolProperty(name, value.toBoolean())
             is IntegerProperty -> StateCondition.IntProperty(name, value.toInt())
             else -> StateCondition.EnumProperty(name, value)
         }
     }
-    return when (conditions.size) {
-        0 -> StateCondition.All(emptyList())
-        1 -> conditions[0]
-        else -> StateCondition.All(conditions)
-    }
+    val all = listOf<StateCondition>(blockType) + propConditions
+    return if (all.size == 1) all[0] else StateCondition.All(all)
 }
 
 internal fun <T : Comparable<T>> applyPropertyFromString(

@@ -18,7 +18,8 @@ object RecordingFinalizer {
      * @param baseSpec spec on the BE before finalize: provides id, mode, bounds, structure, marker positions/labels.
      *                 Marker conditions are ignored — they are re-derived from the recording.
      * @param recording full state recording captured by [StateRecorder] over the bounds.
-     * @return new spec with derived entries and trimmed lifespan; or null if the recording contains no I/O activity.
+     * @return new spec with derived entries and lifespan (count of ticks spanned by I/O activity, inclusive);
+     *         or null if the recording contains no I/O activity.
      */
     fun finalize(baseSpec: RedstoneSpec, recording: StateRecording): RedstoneSpec? {
         val ioPositions: Set<BlockPos> =
@@ -26,7 +27,7 @@ object RecordingFinalizer {
         if (ioPositions.isEmpty()) return null
 
         val (firstTick, lastTick) = ioActivitySpan(recording, ioPositions) ?: return null
-        val lifespan = (lastTick - firstTick).coerceAtLeast(0)
+        val lifespan = (lastTick - firstTick + 1).coerceAtLeast(1)
         val view = StateRecordingView.of(recording)
 
         val derivedInputs = baseSpec.inputs.map { input ->

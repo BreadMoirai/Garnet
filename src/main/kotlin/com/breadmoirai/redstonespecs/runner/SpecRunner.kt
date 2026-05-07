@@ -6,7 +6,9 @@ import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.block.ButtonBlock
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.state.properties.BlockStateProperties
 import net.minecraft.world.level.block.state.properties.Property
 import org.slf4j.LoggerFactory
 
@@ -50,7 +52,7 @@ class SpecRunner(
         if (frozenAt != null) return false
         if (phase == Phase.START_OF_TICK) ticksElapsed++
         if (ticksElapsed < 0) return false
-        if (ticksElapsed > spec.lifespan) {
+        if (ticksElapsed >= spec.lifespan) {
             LOGGER.debug("[SpecRunner#onPhase] spec '{}' finished after {} ticks", spec.id, ticksElapsed)
             return true
         }
@@ -73,17 +75,79 @@ class SpecRunner(
         }
     }
 
+    /**
+     * Applies an input [condition] to the block at [pos] for replay.
+     *
+     * Generic path: flattens the condition into property name/value pairs and
+     * issues a single [setBlock] with flag 3 (block + neighbor updates).
+     *
+     * Block-type-specific dispatch: certain blocks expose interaction methods
+     * that produce side effects beyond simple state mutation — most notably
+     * `ButtonBlock.press`, which schedules an auto-depower tick. Recording
+     * captures both the press *and* the natural depower as separate I/O
+     * events; replaying the press via raw `setBlock` skips the schedule,
+     * producing timing drift relative to the original recording. For these
+     * blocks we route through their player-input methods to preserve
+     * scheduler-driven timing.
+     *
+     * NOTE: when a block-type-specific path is taken (e.g. [ButtonBlock.press])
+     * we return early and DO NOT also issue the generic setBlock, since the
+     * specific path already mutates state. The spec's later input entry for
+     * the depower transition will fire after the natural schedule has already
+     * run; both attempts to set `powered=false` collapse into a no-op.
+     */
     private fun applyCondition(condition: StateCondition, pos: BlockPos) {
-        var state = level.getBlockState(pos)
+        val currentState = level.getBlockState(pos)
         val mods = mutableListOf<Pair<String, String>>()
         flattenToProperties(condition, mods)
         if (mods.isEmpty()) return
+
+        if (tryApplyAsPlayerInteraction(currentState, pos, mods)) return
+
+        // Generic fall-through: setBlock with merged property values.
+        var state = currentState
         for ((name, value) in mods) {
             val property = state.block.stateDefinition.getProperty(name) ?: continue
             @Suppress("UNCHECKED_CAST")
             state = applyProperty(state, property as Property<Comparable<Any>>, value)
         }
-        level.setBlock(pos, state, 3)
+        if (state != currentState) level.setBlock(pos, state, 3)
+    }
+
+    /**
+     * Attempts to apply [mods] using a block-specific player-interaction path
+     * (so that side effects like scheduled ticks fire as they would for a real
+     * player action). Returns `true` if the dispatch handled the change and the
+     * caller should NOT fall through to the generic setBlock path.
+     *
+     * Currently handled:
+     *  - [ButtonBlock]: `powered` false→true triggers [ButtonBlock.press],
+     *    which sets powered=true, fires neighbor updates, and schedules the
+     *    depower tick. The `powered`=true→false transition is left to the
+     *    natural schedule (the caller's later input entry for that SimTime
+     *    becomes a no-op once the schedule has fired).
+     *
+     * Extension points: when adding more block types, prefer methods that go
+     * through the same code path a player would take (e.g. `LeverBlock.pull`,
+     * `BlockState.useWithoutItem`) so neighbor notifications, scheduled ticks,
+     * and game events all fire identically to the original recording.
+     */
+    private fun tryApplyAsPlayerInteraction(
+        state: BlockState,
+        pos: BlockPos,
+        mods: List<Pair<String, String>>,
+    ): Boolean {
+        val block = state.block
+        if (block is ButtonBlock) {
+            val targetPowered = mods.firstOrNull { it.first == "powered" }?.second?.toBoolean() ?: return false
+            val currentPowered = state.getValue(BlockStateProperties.POWERED)
+            if (targetPowered && !currentPowered) {
+                LOGGER.debug("[SpecRunner#applyCondition] press button at {}", pos)
+                block.press(state, level, pos, null)
+                return true
+            }
+        }
+        return false
     }
 
     private fun flattenToProperties(condition: StateCondition, out: MutableList<Pair<String, String>>) {

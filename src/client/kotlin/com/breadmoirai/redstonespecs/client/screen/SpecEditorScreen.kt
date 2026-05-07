@@ -160,29 +160,34 @@ class SpecEditorScreen(
 
             val tableContent = LinearLayout.vertical().spacing(1)
             rows.forEachIndexed { i, row ->
-                val rowProps = filterAvailableProps(availableProps, rows, i)
-                tableContent.addChild(buildTableRow(i, row, rows, blockState, rowProps, advancedPhases))
+                tableContent.addChild(buildTableRow(i, row, rows, blockState, advancedPhases))
             }
 
+            val lastTime = rows.lastOrNull()?.simTime
+            val newTick = when {
+                lastTime == null -> -1
+                lastTime == SimTime.START -> 0
+                else -> lastTime.tick + 1
+            }
+            val newPhase = lastTime?.phase?.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
+            val newTime = if (newTick < 0) SimTime.START else SimTime(newTick, newPhase)
+            val taken = rows.asSequence()
+                .filter { conflictsWith(newTime, it.simTime) }
+                .map { it.prop.name }
+                .toSet()
+            val addOptions = availableProps.filter { it !in taken }.ifEmpty { availableProps }
             tableContent.addChild(
-                Button.builder(Component.literal("+ Add Row")) {
-                    val lastTime = rows.lastOrNull()?.simTime
-                    val newTick = when {
-                        lastTime == null -> -1
-                        lastTime == SimTime.START -> 0
-                        else -> lastTime.tick + 1
-                    }
-                    val newPhase = lastTime?.phase?.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
-                    val newTime = if (newTick < 0) SimTime.START else SimTime(newTick, newPhase)
-                    val taken = rows.asSequence()
-                        .filter { conflictsWith(newTime, it.simTime) }
-                        .map { it.prop.name }
-                        .toSet()
-                    val pickName = availableProps.firstOrNull { it !in taken } ?: availableProps.firstOrNull()
-                    val firstProp = pickName?.let { buildRowPropForName(it, blockState) } ?: buildFirstRowProp(blockState)
-                    if (firstProp != null) rows.add(FlatRow(newTime, firstProp))
+                DropdownButton(
+                    this, 0, 0, 240, 16, font,
+                    addOptions,
+                    { Component.literal(it) },
+                    addOptions.first(),
+                    displayOverride = Component.literal("+ Add Row"),
+                ) { propName ->
+                    val newProp = buildRowPropForName(propName, blockState) ?: buildFirstRowProp(blockState)
+                    if (newProp != null) rows.add(FlatRow(newTime, newProp))
                     rebuildWidgets()
-                }.pos(0, 0).width(240).build()
+                }
             )
 
             val tableScrollHeight = (height - 178).coerceAtLeast(60)
@@ -208,7 +213,6 @@ class SpecEditorScreen(
         row: FlatRow,
         rows: MutableList<FlatRow>,
         blockState: BlockState?,
-        availableProps: List<String>,
         advancedPhases: List<Phase>,
     ): LinearLayout {
         val rowLayout = LinearLayout.horizontal().spacing(2)
@@ -227,17 +231,15 @@ class SpecEditorScreen(
             }
         } else {
             if (specMode == SpecMode.TICK_AWARE || specMode == SpecMode.UPDATE_AWARE) {
-                val tickBox = IntEditBox(
-                    font, 60, 16, 0, Int.MAX_VALUE, row.simTime.tick,
-                    onChange = { v ->
+                rowLayout.addChild(
+                    intStepper(font, 60, 16, 0, Int.MAX_VALUE, row.simTime.tick) { v ->
                         row.simTime = SimTime(
                             v,
                             row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK,
                         )
-                    },
-                    onHoverEnd = { sortAndRebuild() },
+                        sortAndRebuild()
+                    }
                 )
-                rowLayout.addChild(tickBox)
             }
             if (specMode == SpecMode.UPDATE_AWARE) {
                 val currentPhase = row.simTime.phase.takeIf { it != Phase.USER_INTERACTION } ?: Phase.END_OF_TICK
@@ -254,21 +256,7 @@ class SpecEditorScreen(
             }
         }
 
-        if (availableProps.isEmpty()) {
-            rowLayout.addChild(StringWidget(100, 16, Component.literal(row.prop.name), font))
-        } else {
-            val propButton = DropdownButton(
-                this, 0, 0, 100, 16, font,
-                availableProps,
-                { Component.literal(it) },
-                row.prop.name,
-            ) { propName ->
-                val newProp = buildRowPropForName(propName, blockState)
-                if (newProp != null) row.prop = newProp
-                rebuildWidgets()
-            }
-            rowLayout.addChild(propButton)
-        }
+        rowLayout.addChild(StringWidget(100, 16, Component.literal(row.prop.name), font))
 
         rowLayout.addChild(buildValueWidget(row))
 
@@ -357,20 +345,6 @@ class SpecEditorScreen(
     private fun sortAndRebuild() {
         workingRows?.sortWith(compareBy { it.simTime })
         rebuildWidgets()
-    }
-
-    private fun filterAvailableProps(
-        all: List<String>,
-        rows: List<FlatRow>,
-        rowIndex: Int,
-    ): List<String> {
-        val current = rows[rowIndex]
-        val taken = rows.asSequence()
-            .filterIndexed { i, other -> i != rowIndex && conflictsWith(current.simTime, other.simTime) }
-            .map { it.prop.name }
-            .toMutableSet()
-        taken.add(current.prop.name)
-        return all.filter { it !in taken }
     }
 
     private fun conflictsWith(a: SimTime, b: SimTime): Boolean = when (specMode) {

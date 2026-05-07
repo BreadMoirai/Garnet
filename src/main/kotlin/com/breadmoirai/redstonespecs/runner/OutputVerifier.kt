@@ -37,7 +37,7 @@ object OutputVerifier {
     ) {
         val label = output.label.ifEmpty { output.pos.toString() }
         val endEntry = output.entries.firstOrNull { it.first == SimTime.END } ?: return
-        val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
+        val finalState = view.stateAt(output.pos, SimTime(lifespan - 1, Phase.END_OF_TICK, Int.MAX_VALUE))
         out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
     }
 
@@ -59,21 +59,21 @@ object OutputVerifier {
             out += conditionCheck(SimTime.START, "$label@start", startEntry.second, initial)
         }
         if (endEntry != null) {
-            val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
+            val finalState = view.stateAt(output.pos, SimTime(lifespan - 1, Phase.END_OF_TICK, Int.MAX_VALUE))
             out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
         }
 
         // Per-tick post-state baseline.
-        val postState = (0..lifespan).associateWith { t ->
+        val postState = (0 until lifespan).associateWith { t ->
             view.stateAt(output.pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
         }
         val initial = recording.initialSnapshot[output.pos]
             ?: error("Output ${output.pos} not in recording snapshot")
 
-        // Change ticks: t in 0..lifespan where post(t) != post(t-1) (post(-1) := initial).
+        // Change ticks: t in 0 until lifespan where post(t) != post(t-1) (post(-1) := initial).
         val changeTicks = sortedSetOf<Int>()
         var prev: BlockState = initial
-        for (t in 0..lifespan) {
+        for (t in 0 until lifespan) {
             val cur = postState.getValue(t)
             if (cur != prev) changeTicks += t
             prev = cur
@@ -119,7 +119,7 @@ object OutputVerifier {
             out += conditionCheck(SimTime.START, "$label@start", startEntry.second, initial)
         }
         if (endEntry != null) {
-            val finalState = view.stateAt(output.pos, SimTime(lifespan, Phase.END_OF_TICK, Int.MAX_VALUE))
+            val finalState = view.stateAt(output.pos, SimTime(lifespan - 1, Phase.END_OF_TICK, Int.MAX_VALUE))
             out += conditionCheck(SimTime.END, "$label@end", endEntry.second, finalState)
         }
 
