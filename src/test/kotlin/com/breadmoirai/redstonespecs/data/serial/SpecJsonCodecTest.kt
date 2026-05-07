@@ -7,14 +7,14 @@ import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.StateCondition
 import com.mojang.serialization.JsonOps
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
 
-class SpecJsonCodecTest {
-    @Test
-    fun `RedstoneSpec round-trips through SPEC codec`() {
+class SpecJsonCodecTest : FunSpec({
+
+    test("RedstoneSpec round-trips through SPEC codec") {
         val spec = RedstoneSpec(
             id = "test",
             bounds = Vec3i(5, 4, 5),
@@ -43,6 +43,6 @@ class SpecJsonCodecTest {
         val json = SpecJsonCodec.SPEC.encodeStart(JsonOps.INSTANCE, spec).getOrThrow()
         val decoded = SpecJsonCodec.SPEC.parse(JsonOps.INSTANCE, json).getOrThrow()
 
-        assertEquals(spec, decoded)
+        decoded shouldBe spec
     }
-}
+})
