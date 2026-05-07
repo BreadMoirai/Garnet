@@ -25,8 +25,10 @@ val serverTickEnd: SharedFlow<MinecraftServer> = _serverTickEnd.asSharedFlow()
 
 internal fun emitServerTickStart(server: MinecraftServer) {
     _serverTickStart.tryEmit(server)
+    server.managedBlock { server.pendingTasksCount == 0 }
 }
 
 internal fun emitServerTickEnd(server: MinecraftServer) {
     _serverTickEnd.tryEmit(server)
+    server.managedBlock { server.pendingTasksCount == 0 }
 }
