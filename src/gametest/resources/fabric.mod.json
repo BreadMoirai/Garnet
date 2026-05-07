@@ -1,13 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "redstonespecs-test",
+  "id": "redstonespecs-gametest",
   "version": "1.0.0",
-  "name": "RedstoneSpecs Testmod",
+  "name": "RedstoneSpecs Server Testmod",
   "environment": "*",
   "entrypoints": {
-    "fabric-client-gametest": [
-      "com.breadmoirai.redstonespecs.test.RedstonespecsClientTests"
-    ],
     "fabric-gametest": [
       "com.breadmoirai.redstonespecs.test.RedstonespecsGameTests"
     ]

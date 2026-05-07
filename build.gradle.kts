@@ -35,8 +35,12 @@ loom {
 
 sourceSets {
     create("clientTest") {
-        compileClasspath += sourceSets["main"].output + sourceSets["client"].output
-        runtimeClasspath += sourceSets["main"].output + sourceSets["client"].output
+        compileClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].compileClasspath
+        runtimeClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].runtimeClasspath
     }
 }
 
@@ -50,14 +54,20 @@ configurations {
     named("clientTestImplementation") {
         extendsFrom(configurations["clientImplementation"])
     }
+    named("clientTestCompileOnly") {
+        extendsFrom(configurations["clientCompileOnly"])
+    }
+    named("clientTestRuntimeOnly") {
+        extendsFrom(configurations["clientRuntimeOnly"])
+    }
 }
 
 fabricApi {
     configureTests {
         createSourceSet = true
-        modId = "redstonespecs-test"
+        modId = "redstonespecs-gametest"
         enableGameTests = true
-        enableClientGameTests = true
+        enableClientGameTests = false
         eula = true
     }
 }
@@ -96,6 +106,7 @@ dependencies {
     implementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
 
     implementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
+    "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 
     testImplementation("net.fabricmc:fabric-loader-junit:${project.property("loader_version")}")
 }
@@ -154,10 +165,4 @@ tasks {
         )
     }
 
-    named<JavaExec>("runClientGameTest") {
-        jvmArgs(
-            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
-            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
-        )
-    }
 }

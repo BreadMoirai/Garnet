@@ -5,6 +5,7 @@ import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.InputSpec
 import com.breadmoirai.redstonespecs.data.OutputSpec
 import com.breadmoirai.redstonespecs.data.Phase
+import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.SpecMode
 import com.breadmoirai.redstonespecs.data.StateCondition
@@ -16,9 +17,14 @@ import net.minecraft.core.Direction
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.gametest.framework.GameTestHelper
 import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.ButtonBlock
+import net.minecraft.world.level.block.ComparatorBlock
+import net.minecraft.world.level.block.DirectionalBlock
+import net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock
 import net.minecraft.world.level.block.LeverBlock
 import net.minecraft.world.level.block.RedstoneWallTorchBlock
 import net.minecraft.world.level.block.state.properties.AttachFace
+import net.minecraft.world.level.levelgen.structure.BoundingBox
 
 /**
  * Server-side counterpart to [RedstonespecsClientTests.recorderToEditorToRunnerFlow].
@@ -58,6 +64,18 @@ class RedstonespecsGameTests {
     fun recorderFlowUpdateAwareLeverStoneTorch(helper: GameTestHelper) =
         runRecorderScenario(helper, leverStoneTorch(SpecMode.UPDATE_AWARE))
 
+    // ── Button → wire → piston pushes blue_concrete into air slot ─────────────
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 200)
+    fun recorderFlowSimpleButtonPistonConcrete(helper: GameTestHelper) =
+        runRecorderScenario(helper, buttonPistonConcrete())
+
+    // ── Comparator feedback loop: pulse decays one step per loop cycle ───────
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 1000)
+    fun recorderFlowTickAwareComparatorDecayLoop(helper: GameTestHelper) =
+        runRecorderScenario(helper, comparatorDecayLoop())
+
     // ── Scenario factories ────────────────────────────────────────────────────
 
     /** Floor lever sitting on a redstone lamp; toggling powers the lamp directly. */
@@ -80,8 +98,9 @@ class RedstonespecsGameTests {
             // single END entry; TICK_AWARE / UPDATE_AWARE place the derived
             // entry at SimTime(0, END_OF_TICK).
             expectedOutputs = { m ->
-                if (m == SpecMode.SIMPLE) listOf(ExpectedEntry(SimTime.END, "lit", "true"))
-                else listOf(ExpectedEntry(SimTime(0, Phase.END_OF_TICK), "lit", "true"))
+                listOf(if (m == SpecMode.SIMPLE)
+                    listOf(ExpectedEntry.Property(SimTime.END, "lit", "true"))
+                else listOf(ExpectedEntry.Property(SimTime(0, Phase.END_OF_TICK), "lit", "true")))
             },
         )
     }
@@ -113,13 +132,154 @@ class RedstonespecsGameTests {
             // The torch transitions lit=true → lit=false four ticks after the
             // lever toggles (lever -> stone hard-power propagation -> torch's
             // own scheduled-tick reaction adds up to a 4-tick gap empirically
-            // in this MC version). lifespan == lastTick-firstTick == 4. SIMPLE
+            // in this MC version). lifespan == lastTick-firstTick+1 == 5. SIMPLE
             // collapses to a single END entry; TICK_AWARE / UPDATE_AWARE place
             // the derived entry at SimTime(4, END_OF_TICK).
             expectedOutputs = { m ->
-                if (m == SpecMode.SIMPLE) listOf(ExpectedEntry(SimTime.END, "lit", "false"))
-                else listOf(ExpectedEntry(SimTime(4, Phase.END_OF_TICK), "lit", "false"))
+                listOf(if (m == SpecMode.SIMPLE)
+                    listOf(ExpectedEntry.Property(SimTime.END, "lit", "false"))
+                else listOf(ExpectedEntry.Property(SimTime(4, Phase.END_OF_TICK), "lit", "false")))
             },
+        )
+    }
+
+    /**
+     * Button on top of a stone anchor; the button strongly powers the anchor,
+     * which weakly powers an adjacent stone block carrying redstone dust on top.
+     * The dust drives an east-facing piston that pushes blue_concrete one step
+     * east into a previously-air slot. After the button depowers, the piston
+     * retracts, leaving:
+     *   - the original blue_concrete slot empty (air)
+     *   - the original air slot occupied by blue_concrete
+     *
+     * Layout (recorder at origin, looking down the +x axis):
+     *   y=2:    .  button   wire  piston  concrete  air
+     *   y=1:    .  anchor   anchor   .       .       .
+     *   x =     0    1        2      3       4       5    (helper-local)
+     *
+     * Note: maxX is extended to 6 because the air output sits at x=6.
+     */
+    private fun buttonPistonConcrete(): RecorderScenario {
+        val anchor1Pos = BlockPos(2, 1, 1)
+        val buttonPos = BlockPos(2, 2, 1)
+        val anchor2Pos = BlockPos(3, 1, 1)
+        val wirePos = BlockPos(3, 2, 1)
+        val pistonPos = BlockPos(4, 2, 1)
+        val concretePos = BlockPos(5, 2, 1)
+        val airPos = BlockPos(6, 2, 1)
+        return RecorderScenario(
+            mode = SpecMode.SIMPLE,
+            recorderRelPos = BlockPos(0, 0, 0),
+            // DEFAULT_BOUNDS stops at x=5; widen to include airPos at x=6.
+            bounds = BoundingBox(1, 0, 1, 6, 4, 5),
+            placeBlocks = { h ->
+                h.setBlock(anchor1Pos, Blocks.SMOOTH_STONE.defaultBlockState())
+                // Stone button on top of anchor1 (FACE=FLOOR). Pressing it
+                // strongly powers anchor1 below.
+                h.setBlock(buttonPos, Blocks.STONE_BUTTON.defaultBlockState()
+                    .setValue(FaceAttachedHorizontalDirectionalBlock.FACE, AttachFace.FLOOR))
+                h.setBlock(anchor2Pos, Blocks.SMOOTH_STONE.defaultBlockState())
+                h.setBlock(wirePos, Blocks.REDSTONE_WIRE.defaultBlockState())
+                h.setBlock(pistonPos, Blocks.PISTON.defaultBlockState()
+                    .setValue(DirectionalBlock.FACING, Direction.EAST))
+                h.setBlock(concretePos, Blocks.BLUE_CONCRETE.defaultBlockState())
+                // airPos is left untouched (already air in the empty structure).
+            },
+            inputs = listOf(buttonPos),
+            outputs = listOf(concretePos, airPos),
+            drive = { h -> h.useBlock(buttonPos) },
+            // Stone button stays pressed for 10 ticks; piston extension plus
+            // retraction takes ~3 ticks at each end. Wait long enough for the
+            // piston to fully retract before stopping the recording.
+            recordingTicks = 22,
+            // Final state at the END sentinel:
+            //   - concretePos transitions blue_concrete → piston_head (extension)
+            //     → air (after retraction), so its captured block is air.
+            //   - airPos transitions air → blue_concrete (push) and stays.
+            expectedOutputs = { _ ->
+                listOf(
+                    listOf(ExpectedEntry.Block(SimTime.END, "minecraft:air")),
+                    listOf(ExpectedEntry.Block(SimTime.END, "minecraft:blue_concrete")),
+                )
+            },
+        )
+    }
+
+    /**
+     * Comparator feedback loop. Pressing the button drives the input wire to
+     * power=15; the east-output comparator forwards that into the output wire,
+     * which fans south into a tap wire. The tap wire feeds the back of the
+     * west-output comparator whose front strong-powers a stone block sitting
+     * adjacent to the input wire — completing the loop.
+     *
+     * While the button is held, the input wire is clamped at 15 by the button.
+     * When the button releases, the only signal feeding the input wire is the
+     * loop's strong-power feedback (one less than the previous cycle), so the
+     * output decays by 1 per round-trip through both comparators until it
+     * reaches 0.
+     *
+     * Layout (recorder at origin; viewing y=2 from above, north up):
+     * ```
+     *   y=2  z=1: button   wire     comp(out E)  wire(OUTPUT)
+     *   y=2  z=2: air      stone    comp(out W)  wire
+     *   y=1: 4×2 smooth_stone floor under everything (z=1..2, x=1..4)
+     * ```
+     *
+     * IMPORTANT — vanilla [DiodeBlock.FACING] is the *back* direction (where
+     * input is read from). Output emits to `FACING.getOpposite()`. So a
+     * "comparator pointing east" (output east) is encoded as `FACING=WEST` in
+     * MC. See [DiodeBlock.getInputSignal] and [DiodeBlock.updateNeighborsInFront].
+     *
+     * TICK_AWARE captures every per-tick power-level change of the output wire.
+     * Pinned expectations were captured from a deterministic recording: the
+     * stone button stays pressed for ~60 ticks; the loop then decays power
+     * 15→14→…→0 in 12-tick steps (two 1-redstone-tick comparator delays per
+     * round trip).
+     */
+    private fun comparatorDecayLoop(): RecorderScenario {
+        val buttonPos = BlockPos(1, 2, 1)
+        val inWirePos = BlockPos(2, 2, 1)
+        val feedbackStonePos = BlockPos(2, 2, 2)
+        val compFwdPos = BlockPos(3, 2, 1)
+        val compBackPos = BlockPos(3, 2, 2)
+        val outWirePos = BlockPos(4, 2, 1)
+        val tapWirePos = BlockPos(4, 2, 2)
+        return RecorderScenario(
+            mode = SpecMode.TICK_AWARE,
+            recorderRelPos = BlockPos(0, 0, 0),
+            placeBlocks = { h ->
+                // y=1: solid stone floor (4×2) under the circuit so wires/buttons have anchors.
+                for (x in 1..4) for (z in 1..2) {
+                    h.setBlock(BlockPos(x, 1, z), Blocks.SMOOTH_STONE.defaultBlockState())
+                }
+                // y=2 row z=1: button — wire — comparator(out east) — wire(OUTPUT)
+                // Comparators placed BEFORE wires so wire setBlock triggers neighbor
+                // updates onto already-existing comparators.
+                //
+                // NOTE: vanilla DiodeBlock.FACING is the BACK direction (where input
+                // is read from). Output emits to FACING.getOpposite(). The user's
+                // diagram says "facing=east" meaning the output points east, which
+                // in MC code is FACING=WEST.
+                h.setBlock(compFwdPos, Blocks.COMPARATOR.defaultBlockState()
+                    .setValue(ComparatorBlock.FACING, Direction.WEST))
+                h.setBlock(compBackPos, Blocks.COMPARATOR.defaultBlockState()
+                    .setValue(ComparatorBlock.FACING, Direction.EAST))
+                h.setBlock(feedbackStonePos, Blocks.SMOOTH_STONE.defaultBlockState())
+                h.setBlock(buttonPos, Blocks.STONE_BUTTON.defaultBlockState()
+                    .setValue(FaceAttachedHorizontalDirectionalBlock.FACE, AttachFace.FLOOR))
+                h.setBlock(inWirePos, Blocks.REDSTONE_WIRE.defaultBlockState())
+                h.setBlock(outWirePos, Blocks.REDSTONE_WIRE.defaultBlockState())
+                h.setBlock(tapWirePos, Blocks.REDSTONE_WIRE.defaultBlockState())
+            },
+            inputs = listOf(buttonPos),
+            outputs = listOf(outWirePos),
+            drive = { h -> h.useBlock(buttonPos) },
+            // Stone button holds for 60 ticks; after release the comparator
+            // feedback loop decays the output wire 15 → 0, one step per ~12
+            // ticks per round-trip through both comparators. Total run is
+            // ~233 relative ticks — give generous headroom.
+            recordingTicks = 240,
+            expectedOutputs = null,
         )
     }
 
@@ -186,22 +346,33 @@ class RedstonespecsGameTests {
         val outputs: List<BlockPos>,
         val drive: (GameTestHelper) -> Unit,
         val recordingTicks: Int = 6,
+        /** Spec bounds (relative to the recorder). Defaults to [RedstoneSpec.DEFAULT_BOUNDS]. */
+        val bounds: BoundingBox = RedstoneSpec.DEFAULT_BOUNDS,
         /**
-         * The exact entries the single output marker should have after
+         * Per-output expected entries (outer list parallel to [outputs]) after
          * RecordingFinalizer runs, given the scenario's mode. Asserted
          * server-side immediately after stopRecordingAndFinalize, before any
          * transformTo, so derivation regressions are caught independently of
-         * the runner replay. (Scenarios with more than one output marker
-         * would need this extended to `List<List<ExpectedEntry>>`.)
+         * the runner replay.
+         *
+         * When `null`, exact-entry assertions are skipped — useful for circuits
+         * whose per-tick output pattern is hard to predict statically (e.g.
+         * comparator-feedback loops). Each output is still required to have
+         * derived at least one entry. The runner replay continues to verify
+         * record/replay consistency.
          */
-        val expectedOutputs: (SpecMode) -> List<ExpectedEntry>,
+        val expectedOutputs: ((SpecMode) -> List<List<ExpectedEntry>>)? = null,
     )
 
     /**
-     * One expected output entry: an exact [SimTime] plus a single property
-     * the entry's condition must match.
+     * One expected output entry: an exact [SimTime] plus a single property or
+     * block-type check the entry's condition must satisfy.
      */
-    private data class ExpectedEntry(val time: SimTime, val propName: String, val propValue: String)
+    private sealed interface ExpectedEntry {
+        val time: SimTime
+        data class Property(override val time: SimTime, val propName: String, val propValue: String) : ExpectedEntry
+        data class Block(override val time: SimTime, val blockId: String) : ExpectedEntry
+    }
 
     private fun runRecorderScenario(helper: GameTestHelper, scenario: RecorderScenario) {
         val level = helper.level
@@ -213,6 +384,7 @@ class RedstonespecsGameTests {
                 scenario.placeBlocks(helper)
                 val be = beAt(level, recorderAbs)
                 be.setMode(scenario.mode)
+                be.setSpec((be.spec ?: error("recorder has no default spec")).copy(bounds = scenario.bounds))
                 applyMarkers(level, helper, be, scenario)
                 check(be.startRecording()) { "startRecording returned false (gating not satisfied)" }
             }
@@ -273,6 +445,7 @@ class RedstonespecsGameTests {
                 scenario.placeBlocks(helper)
                 val be = beAt(level, recorderAbs)
                 be.setMode(scenario.mode)
+                be.setSpec((be.spec ?: error("recorder has no default spec")).copy(bounds = scenario.bounds))
                 applyMarkers(level, helper, be, scenario)
                 check(be.startRecording()) { "startRecording returned false (gating not satisfied)" }
             }
@@ -318,39 +491,58 @@ class RedstonespecsGameTests {
             ?: error("SpecBlockEntity not found at $pos")
 
     /**
-     * Verify the finalized spec's first output marker has exactly the entries
-     * the scenario declared. Each [ExpectedEntry] matches a single (name, value)
-     * property within the entry's condition (which may be wrapped in an [All]).
+     * Verify each finalized output marker has exactly the entries the scenario
+     * declared (outer list of [scenario.expectedOutputs] is parallel to
+     * [scenario.outputs]). Each [ExpectedEntry] matches either a property or a
+     * block-type check within the entry's condition (which may be wrapped in an [All]).
      */
     private fun assertOutputEntries(helper: GameTestHelper, be: SpecBlockEntity, scenario: RecorderScenario) {
         val tag = "[${scenario.mode}]"
         val spec = be.spec ?: throw helper.assertionException("$tag spec is null after finalize")
-        val output = spec.outputs.firstOrNull()
-            ?: throw helper.assertionException("$tag finalized spec has no output markers")
-        val expected = scenario.expectedOutputs(scenario.mode)
-        if (output.entries.size != expected.size) {
+        val expectedFn = scenario.expectedOutputs
+        if (expectedFn == null) {
+            spec.outputs.forEachIndexed { oi, output ->
+                if (output.entries.isEmpty()) {
+                    throw helper.assertionException("$tag output[$oi] '${output.label}' derived 0 entries")
+                }
+            }
+            return
+        }
+        val expectedPerOutput = expectedFn(scenario.mode)
+        if (spec.outputs.size != expectedPerOutput.size) {
             throw helper.assertionException(
-                "$tag output '${output.label}' expected ${expected.size} entries, got ${output.entries.size}: " +
-                    output.entries.map { (t, c) -> "$t -> $c" }
+                "$tag expected ${expectedPerOutput.size} output markers, got ${spec.outputs.size}"
             )
         }
-        output.entries.zip(expected).forEachIndexed { i, pair ->
-            val (actual, exp) = pair
-            val (actualTime, actualCondition) = actual
-            if (actualTime != exp.time) {
-                throw helper.assertionException("$tag output '${output.label}' entry[$i]: expected time=${exp.time}, got $actualTime")
+        spec.outputs.zip(expectedPerOutput).forEachIndexed { oi, (output, expected) ->
+            if (output.entries.size != expected.size) {
+                throw helper.assertionException(
+                    "$tag output[$oi] '${output.label}' expected ${expected.size} entries, got ${output.entries.size}: " +
+                        output.entries.map { (t, c) -> "$t -> $c" }
+                )
             }
-            if (!conditionMatchesProperty(actualCondition, exp.propName, exp.propValue)) {
-                throw helper.assertionException("$tag output '${output.label}' entry[$i]: expected ${exp.propName}=${exp.propValue}, got $actualCondition")
+            output.entries.zip(expected).forEachIndexed { i, pair ->
+                val (actual, exp) = pair
+                val (actualTime, actualCondition) = actual
+                if (actualTime != exp.time) {
+                    throw helper.assertionException("$tag output[$oi] '${output.label}' entry[$i]: expected time=${exp.time}, got $actualTime")
+                }
+                val ok = when (exp) {
+                    is ExpectedEntry.Property -> conditionMatchesProperty(actualCondition, exp.propName, exp.propValue)
+                    is ExpectedEntry.Block -> conditionMatchesBlock(actualCondition, exp.blockId)
+                }
+                if (!ok) {
+                    throw helper.assertionException("$tag output[$oi] '${output.label}' entry[$i]: expected $exp, got $actualCondition")
+                }
             }
         }
     }
 
     /**
      * True iff [condition] is a single property check (or an [All] containing
-     * a single property check) for [name] = [value]. Recorder-derived entries
-     * with one property come through propsToCondition as a bare *Property; the
-     * All wrapping shows up only when there are 2+ properties.
+     * a property check) matching [name] = [value]. Recorder-derived entries
+     * with one component come through propsToCondition as a bare condition; the
+     * All wrapping shows up when there are 2+ components.
      */
     private fun conditionMatchesProperty(condition: StateCondition, name: String, value: String): kotlin.Boolean {
         return when (condition) {
@@ -362,13 +554,22 @@ class RedstonespecsGameTests {
         }
     }
 
+    /** True iff [condition] is (or contains, inside an [All]) a [BlockType] matching [blockId]. */
+    private fun conditionMatchesBlock(condition: StateCondition, blockId: String): kotlin.Boolean {
+        return when (condition) {
+            is StateCondition.BlockType -> condition.blockId.toString() == blockId
+            is StateCondition.All -> condition.conditions.any { conditionMatchesBlock(it, blockId) }
+            else -> false
+        }
+    }
+
     private fun applyMarkers(
         level: net.minecraft.server.level.ServerLevel,
         helper: GameTestHelper,
         be: SpecBlockEntity,
         scenario: RecorderScenario,
     ) {
-        val spec = be.spec ?: error("recorder has no default spec at ${be.blockPos}")
+        be.spec ?: error("recorder has no default spec at ${be.blockPos}")
         scenario.inputs.forEachIndexed { i, relPos ->
             val worldPos = helper.absolutePos(relPos)
             val state = level.getBlockState(worldPos)
@@ -387,7 +588,7 @@ class RedstonespecsGameTests {
             // Time and condition are placeholders — RecordingFinalizer rederives them.
             be.addOrUpdateEntry(OutputSpec(
                 specRelPos, "out_${name}_$i", 0xFF8800,
-                listOf(SimTime(spec.lifespan, Phase.END_OF_TICK) to propsToCondition(emptyMap(), state)),
+                listOf(SimTime.END to propsToCondition(emptyMap(), state)),
             ))
         }
     }
