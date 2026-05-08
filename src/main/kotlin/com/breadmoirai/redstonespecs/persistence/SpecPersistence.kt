@@ -5,6 +5,7 @@ import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
 import com.breadmoirai.redstonespecs.network.SpecFileInfo
+import com.breadmoirai.redstonespecs.runner.StateRecording
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -15,12 +16,19 @@ private const val EXT = ".spec.kts"
 
 object SpecPersistence {
 
-    fun save(saveDir: Path, spec: RedstoneSpec) {
+    fun save(saveDir: Path, spec: RedstoneSpec, recording: StateRecording? = null) {
         saveDir.createDirectories()
         val file = saveDir.resolve("${spec.id}$EXT")
         file.writeText(KtsSpecEmitter.emit(spec))
-        LOGGER.debug("[SpecPersistence#save] saved spec '{}' to {}", spec.id, file)
+        if (recording != null) {
+            RecordingSidecar.save(saveDir, spec.id, recording)
+        }
+        LOGGER.debug("[SpecPersistence#save] saved spec '{}' to {} (recording={})",
+            spec.id, file, recording != null)
     }
+
+    fun loadRecording(saveDir: Path, id: String): StateRecording? =
+        RecordingSidecar.load(saveDir, id)
 
     fun load(saveDir: Path, id: String): RedstoneSpec? {
         val file = saveDir.resolve("$id$EXT")
