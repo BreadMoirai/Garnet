@@ -11,6 +11,7 @@ import com.breadmoirai.redstonespecs.data.TestResult
 import com.breadmoirai.redstonespecs.data.allEntries
 import com.breadmoirai.redstonespecs.data.inputs
 import com.breadmoirai.redstonespecs.data.outputs
+import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
 import com.breadmoirai.redstonespecs.data.serial.SpecJsonCodec
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.breadmoirai.redstonespecs.runner.RecordingFinalizer
@@ -23,6 +24,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.io.path.writeText
 import net.minecraft.core.BlockPos
 import net.minecraft.core.HolderLookup
 import net.minecraft.nbt.CompoundTag
@@ -201,11 +203,19 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         collectorJob = coroutineScope.launch {
             e.drop(1).collect { spec ->
                 val serverLevel = lv as? ServerLevel ?: return@collect
-                val saveDir = serverLevel.server
-                    .getWorldPath(LevelResource.ROOT)
-                    .resolve(SharedSettings.specSaveDir)
-                withContext(Dispatchers.IO) {
-                    SpecPersistence.save(saveDir, spec)
+                val src = managedSourcePath
+                if (src != null) {
+                    withContext(Dispatchers.IO) {
+                        src.writeText(KtsSpecEmitter.emit(spec))
+                    }
+                    LOGGER.debug("[finalize] managed: wrote back to {}", src)
+                } else {
+                    val saveDir = serverLevel.server
+                        .getWorldPath(LevelResource.ROOT)
+                        .resolve(SharedSettings.specSaveDir)
+                    withContext(Dispatchers.IO) {
+                        SpecPersistence.save(saveDir, spec)
+                    }
                 }
             }
         }
@@ -213,11 +223,19 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
 
     private fun triggerSave(spec: RedstoneSpec) {
         val serverLevel = level as? ServerLevel ?: return
-        val saveDir = serverLevel.server
-            .getWorldPath(LevelResource.ROOT)
-            .resolve(SharedSettings.specSaveDir)
-        coroutineScope.launch(Dispatchers.IO) {
-            SpecPersistence.save(saveDir, spec)
+        val src = managedSourcePath
+        if (src != null) {
+            coroutineScope.launch(Dispatchers.IO) {
+                src.writeText(KtsSpecEmitter.emit(spec))
+                LOGGER.debug("[finalize] managed: wrote back to {}", src)
+            }
+        } else {
+            val saveDir = serverLevel.server
+                .getWorldPath(LevelResource.ROOT)
+                .resolve(SharedSettings.specSaveDir)
+            coroutineScope.launch(Dispatchers.IO) {
+                SpecPersistence.save(saveDir, spec)
+            }
         }
     }
 
