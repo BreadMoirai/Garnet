@@ -45,6 +45,8 @@ fun registerClientNetworking() {
             if (current is SpecOverviewScreen && current.originPos == payload.originPos) {
                 mc.setScreen(SpecOverviewScreen(payload.originPos, current.kind))
             }
+            // Cache the latest result+recording for the timeline scrubber screen.
+            com.breadmoirai.redstonespecs.client.state.ClientRunnerState.put(payload.originPos, payload.result)
         }
     }
 
