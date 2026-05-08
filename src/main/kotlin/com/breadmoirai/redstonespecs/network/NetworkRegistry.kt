@@ -50,6 +50,7 @@ fun registerNetworking() {
     PayloadTypeRegistry.clientboundPlay().register(OpenRunnerPickerS2CPayload.TYPE, OpenRunnerPickerS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(RunnerLoadSpecC2SPayload.TYPE, RunnerLoadSpecC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(OpenRecorderS2CPayload.TYPE, OpenRecorderS2CPayload.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(OpenTimelineS2CPayload.TYPE, OpenTimelineS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(StartRecordingC2SPayload.TYPE, StartRecordingC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(StopRecordingC2SPayload.TYPE, StopRecordingC2SPayload.STREAM_CODEC)
 

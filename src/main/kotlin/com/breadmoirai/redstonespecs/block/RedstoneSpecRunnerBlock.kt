@@ -4,6 +4,7 @@ import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
 import com.breadmoirai.redstonespecs.network.OpenRunnerPickerS2CPayload
+import com.breadmoirai.redstonespecs.network.OpenTimelineS2CPayload
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -34,6 +35,13 @@ class RedstoneSpecRunnerBlock(properties: Properties) : BaseEntityBlock(properti
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
             val serverPlayer = player as ServerPlayer
+
+            // Shift-right-click: open the timeline scrubber for the most recent run.
+            if (player.isShiftKeyDown) {
+                ServerPlayNetworking.send(serverPlayer, OpenTimelineS2CPayload(pos))
+                return InteractionResult.SUCCESS
+            }
+
             if (be.spec == null) {
                 val saveDir = (level as ServerLevel).server.getWorldPath(LevelResource.ROOT)
                     .resolve(SharedSettings.specSaveDir)

@@ -409,6 +409,21 @@ data class RunnerLoadSpecC2SPayload(val originPos: BlockPos, val specId: String)
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
+// === v1.5: Timeline screen ===
+
+data class OpenTimelineS2CPayload(val runnerPos: BlockPos) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<OpenTimelineS2CPayload>(
+            Identifier.fromNamespaceAndPath("redstonespecs", "open_timeline")
+        )
+        val STREAM_CODEC: StreamCodec<ByteBuf, OpenTimelineS2CPayload> = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, OpenTimelineS2CPayload::runnerPos,
+            ::OpenTimelineS2CPayload,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 // === v1.4: Recorder screen ===
 
 data class OpenRecorderS2CPayload(
