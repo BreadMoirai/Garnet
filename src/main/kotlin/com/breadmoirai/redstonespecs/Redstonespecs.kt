@@ -1,17 +1,24 @@
 package com.breadmoirai.redstonespecs
 
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
+import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.event.SubTickPhaseEvents
 import com.breadmoirai.redstonespecs.item.SpecMarkerTool
 import com.breadmoirai.redstonespecs.item.UndoStack
+import com.breadmoirai.redstonespecs.managed.ManagedCommand
+import com.breadmoirai.redstonespecs.managed.ManagedRoot
+import com.breadmoirai.redstonespecs.managed.ManagedServerContext
 import com.breadmoirai.redstonespecs.network.registerNetworking
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.api.ModInitializer
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback
 import net.fabricmc.fabric.api.event.player.UseBlockCallback
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.context.UseOnContext
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
@@ -25,6 +32,18 @@ class Redstonespecs : ModInitializer {
         registerUseBlockCallback()
         SubTickPhaseEvents.PHASE.register { level, phase ->
             SpecRunnerCoordinator.onPhase(level, phase)
+        }
+        ServerLifecycleEvents.SERVER_STARTING.register { server ->
+            val cfg = SharedSettings.managedRootPath
+            if (cfg.isNotBlank() && ManagedServerContext.get(server) == null) {
+                ManagedServerContext.set(
+                    server,
+                    ManagedServerContext(ManagedRoot(Path.of(cfg).toAbsolutePath())),
+                )
+            }
+        }
+        CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
+            ManagedCommand.register(dispatcher)
         }
         LOGGER.debug("[Redstonespecs#onInitialize] initialization complete")
     }
