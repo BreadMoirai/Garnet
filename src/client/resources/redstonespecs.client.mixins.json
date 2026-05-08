@@ -4,7 +4,8 @@
   "package": "com.breadmoirai.redstonespecs.mixin.client",
   "compatibilityLevel": "JAVA_25",
   "client": [
-    "ScrollWheelHandlerMixin"
+    "ScrollWheelHandlerMixin",
+    "SelectWorldScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
