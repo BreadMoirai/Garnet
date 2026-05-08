@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.runner
 
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.Phase
+import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.TestResult
 import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.network.TestResultS2CPayload
@@ -9,51 +10,42 @@ import net.fabricmc.fabric.api.networking.v1.PlayerLookup
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
-import java.util.UUID
 
 object SpecRunnerCoordinator {
     private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
-
-    private val runners = HashMap<SpecBlockEntity, SpecRunner>()
-    private val snapshots = HashMap<SpecBlockEntity, SpecSnapshot>()
-    private val stateRecorders = HashMap<SpecBlockEntity, StateRecorder>()
     private val standaloneRunners = mutableListOf<SpecRunner>()
 
+    fun registerStandalone(runner: SpecRunner) { standaloneRunners += runner }
+    fun unregisterStandalone(runner: SpecRunner) { standaloneRunners -= runner }
+
     fun startRun(be: SpecBlockEntity) {
-        if (runners.containsKey(be)) return
         val spec = be.spec ?: return
         val level = be.level as? ServerLevel ?: return
+        LOGGER.debug("[SpecRunnerCoordinator#startRun] launching '{}' via Kotest engine", spec.id)
 
-        LOGGER.debug("[SpecRunnerCoordinator#startRun] starting '{}'", spec.id)
-        snapshots[be] = SpecSnapshot.capture(level, be.blockPos, spec.bounds)
-        val recorderId = UUID.randomUUID()
-        val recorder = StateRecorder.forSpec(recorderId, be.blockPos, spec.bounds)
-        recorder.start(level, be.blockPos, spec.bounds)
-        stateRecorders[be] = recorder
-        StateRecorder.activate(recorder)
-
-        val snapshot = snapshots[be]!!
-        snapshot.restore(level)
-        val runner = SpecRunner(spec, be.blockPos, level, snapshot)
-        runner.start()
-        runners[be] = runner
-    }
-
-    fun registerStandalone(runner: SpecRunner) {
-        standaloneRunners += runner
-    }
-
-    fun unregisterStandalone(runner: SpecRunner) {
-        standaloneRunners -= runner
+        Thread({
+            val testResult = try {
+                EngineDrivenRun.run(spec, be.blockPos, level)
+            } catch (t: Throwable) {
+                LOGGER.warn("[SpecRunnerCoordinator] engine crashed for '{}'", spec.id, t)
+                TestResult(spec.id, System.currentTimeMillis(), listOf(
+                    TickCheck(SimTime.START, "engine-error",
+                        expected = "ok", actual = t.message ?: "(no message)", pass = false),
+                ))
+            }
+            level.server.execute {
+                be.setLastTestResult(testResult)
+                PlayerLookup.level(level).forEach { player ->
+                    ServerPlayNetworking.send(player, TestResultS2CPayload(be.blockPos, testResult))
+                }
+            }
+        }, "redstonespecs-engine-launch-${spec.id}").start()
     }
 
     fun resetSpec(be: SpecBlockEntity) {
-        LOGGER.debug("[SpecRunnerCoordinator#resetSpec] resetting spec at {}", be.blockPos)
-        stateRecorders.remove(be)?.let { StateRecorder.deactivate(it) }
-        runners.remove(be)
-        val snapshot = snapshots.remove(be)
-        val level = be.level as? ServerLevel ?: return
-        snapshot?.restore(level)
+        // No BE-tracked state to clear. If SpecBlockEntity has a way to reset
+        // lastTestResult, do that here; otherwise no-op.
+        LOGGER.debug("[SpecRunnerCoordinator#resetSpec] no-op (engine-driven path)")
     }
 
     fun onPhase(level: ServerLevel, phase: Phase) {
@@ -61,51 +53,11 @@ object SpecRunnerCoordinator {
             if (phase == Phase.START_OF_TICK) recorder.onTickStart()
             recorder.onPhaseStart(phase)
         }
-        tickRunners(level, phase)
-    }
-
-    private fun tickRunners(level: ServerLevel, phase: Phase) {
-        // Existing BE-bound runners
-        val completed = mutableListOf<SpecBlockEntity>()
-        for ((be, runner) in runners) {
-            if (be.level !== level) continue
-            if (runner.onPhase(phase)) completed += be
-        }
-        // Standalone (test-body driven) runners
-        val completedStandalone = mutableListOf<SpecRunner>()
+        val completed = mutableListOf<SpecRunner>()
         for (runner in standaloneRunners) {
             if (runner.level !== level) continue
-            if (runner.onPhase(phase)) completedStandalone += runner
+            if (runner.onPhase(phase)) completed += runner
         }
-        standaloneRunners.removeAll(completedStandalone)
-        for (be in completed) {
-            runners.remove(be)
-            finishRun(be)
-        }
-    }
-
-    private fun finishRun(be: SpecBlockEntity) {
-        val recorder = stateRecorders.remove(be)
-        if (recorder != null) StateRecorder.deactivate(recorder)
-        val level = be.level as? ServerLevel ?: return
-        val recording = recorder?.toRecording()
-        if (recording != null) StateRecordingStorage.save(level, recording)
-        val spec = be.spec ?: return
-        val snapshot = snapshots.remove(be)
-        snapshot?.restore(level)
-
-        val checks: List<TickCheck> = if (recording != null) {
-            OutputVerifier.verify(spec, recording).checks
-        } else {
-            emptyList()
-        }
-
-        LOGGER.debug("[SpecRunnerCoordinator#finishRun] spec '{}' done: {}/{} checks passed",
-            spec.id, checks.count { it.pass }, checks.size)
-        val testResult = TestResult(spec.id, System.currentTimeMillis(), checks)
-        be.setLastTestResult(testResult)
-        PlayerLookup.level(level).forEach { player ->
-            ServerPlayNetworking.send(player, TestResultS2CPayload(be.blockPos, testResult))
-        }
+        standaloneRunners.removeAll(completed)
     }
 }

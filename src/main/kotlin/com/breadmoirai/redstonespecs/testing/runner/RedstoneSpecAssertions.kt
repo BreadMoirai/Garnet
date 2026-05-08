@@ -17,7 +17,7 @@ import net.minecraft.world.level.block.state.BlockState
 /**
  * Asserts that all declared OUTPUT entries in [spec] are satisfied by [recording].
  *
- * Mirrors [com.breadmoirai.redstonespecs.runner.OutputVerifier.verify] logic but throws
+ * Throws
  * [AssertionError] on mismatch instead of returning a result object, making it suitable
  * for direct use inside Kotest test bodies.
  *

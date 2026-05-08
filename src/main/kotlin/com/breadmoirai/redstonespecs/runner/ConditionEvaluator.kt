@@ -28,7 +28,7 @@ fun evaluateCondition(
 
 /**
  * Evaluates a [StateCondition] purely against a [BlockState] snapshot (no world access).
- * Used by [OutputVerifier] and [com.breadmoirai.redstonespecs.testing.runner.assertOutputsMatch].
+ * Used by [com.breadmoirai.redstonespecs.testing.runner.assertOutputsMatch].
  */
 fun evaluateConditionOnState(condition: StateCondition, state: BlockState): Boolean = when (condition) {
     is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state) }

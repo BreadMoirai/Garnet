@@ -18,18 +18,16 @@ import net.minecraft.server.level.ServerLevel
 abstract class RedstoneTestSpec(body: RedstoneTestSpec.() -> Unit = {}) : FunSpec() {
 
     /**
-     * World-relative origin of this spec's run. Bound by EngineDrivenRun (Plan D).
-     * Throws if accessed before Plan D wires it to a thread-local context.
+     * World-relative origin of this spec's run. Read from [RedstoneTestSpecContext],
+     * which EngineDrivenRun binds before instantiating the Spec class.
      */
-    open val originPos: BlockPos
-        get() = error("originPos is not bound; this RedstoneTestSpec must be launched via EngineDrivenRun (Plan D)")
+    val originPos: BlockPos get() = RedstoneTestSpecContext.current().originPos
 
     /**
-     * Server level for this spec's run. Bound by EngineDrivenRun (Plan D).
-     * Throws if accessed before Plan D wires it to a thread-local context.
+     * Server level for this spec's run. Read from [RedstoneTestSpecContext],
+     * which EngineDrivenRun binds before instantiating the Spec class.
      */
-    open val level: ServerLevel
-        get() = error("level is not bound; this RedstoneTestSpec must be launched via EngineDrivenRun (Plan D)")
+    val level: ServerLevel get() = RedstoneTestSpecContext.current().level
 
     init {
         coroutineDispatcherFactory = object : CoroutineDispatcherFactory {
