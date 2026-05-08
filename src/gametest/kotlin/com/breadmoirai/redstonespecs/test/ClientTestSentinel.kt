@@ -16,6 +16,9 @@ class ClientTestSentinel : FabricClientGameTest {
     override fun runTest(context: ClientGameTestContext) {
         RedstoneTestLifecycle.register()
         ClientContextHolder.install(context)
+        // Construct a singleplayer world to fire SERVER_STARTED, which installs McDispatchers.
+        // The returned context is unused — the framework cleans up the world when runTest returns.
+        SpecTestContext.createWorld(context)
         try {
             val result = launchKotest(
                 sourceSet = "clientTest",
