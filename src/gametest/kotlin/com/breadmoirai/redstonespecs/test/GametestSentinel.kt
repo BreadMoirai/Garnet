@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.test
 
+import com.breadmoirai.redstonespecs.test.managed.ManagedDimSpec
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
 import com.breadmoirai.redstonespecs.testing.launcher.launchKotest
 import net.fabricmc.fabric.api.gametest.v1.GameTest
@@ -35,7 +36,7 @@ class GametestSentinel {
                     launchKotest(
                         sourceSet = "gametest",
                         reportsDir = Path.of("build/reports/redstonespecs/gametest"),
-                        specs = listOf(SmokeSpec::class),
+                        specs = listOf(SmokeSpec::class, ManagedDimSpec::class),
                     )
                 }
                 server.execute {
