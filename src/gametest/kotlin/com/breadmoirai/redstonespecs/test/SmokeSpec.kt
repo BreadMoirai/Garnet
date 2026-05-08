@@ -1,12 +1,12 @@
 package com.breadmoirai.redstonespecs.test
 
-import com.breadmoirai.redstonespecs.testing.ServerTestSpec
+import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.core.McDispatchers
 import com.breadmoirai.redstonespecs.testing.server.awaitTicks
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 
-class SmokeSpec : ServerTestSpec({
+class SmokeSpec : RedstoneTestSpec({
 
     test("awaitTicks advances the server tick counter") {
         val before = McDispatchers.currentServer.tickCount
