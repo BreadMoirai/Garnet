@@ -57,6 +57,7 @@ object EngineDrivenRun {
     }
 
     private fun toTestResult(specId: String, lr: LauncherResult): TestResult {
+        val recording = lr.recordings.values.firstOrNull()  // one-spec-one-test invariant
         val checks: List<TickCheck> = if (lr.failed == 0) {
             listOf(TickCheck(SimTime.START, "spec '$specId'", expected = "ok", actual = "ok", pass = true))
         } else {
@@ -64,6 +65,6 @@ object EngineDrivenRun {
                 TickCheck(SimTime.START, e.name, expected = "(see test message)", actual = e.message, pass = false)
             }
         }
-        return TestResult(specId, System.currentTimeMillis(), checks)
+        return TestResult(specId, System.currentTimeMillis(), checks, recording = recording)
     }
 }

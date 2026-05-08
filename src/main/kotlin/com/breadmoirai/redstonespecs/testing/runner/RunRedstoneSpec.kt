@@ -6,6 +6,7 @@ import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import com.breadmoirai.redstonespecs.runner.SpecSnapshot
 import com.breadmoirai.redstonespecs.runner.StateRecorder
 import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import com.breadmoirai.redstonespecs.testing.launcher.DiagnosticRecorderListener
 import com.breadmoirai.redstonespecs.testing.server.awaitTickEnd
 import kotlinx.coroutines.withContext
 import net.minecraft.core.BlockPos
@@ -62,6 +63,7 @@ suspend fun runRedstoneSpec(
     }
 
     val recording = recorder.toRecording()
+    DiagnosticRecorderListener.recordingThreadLocal.set(recording)
     assertOutputsMatch(spec, recording)
     recording
 }

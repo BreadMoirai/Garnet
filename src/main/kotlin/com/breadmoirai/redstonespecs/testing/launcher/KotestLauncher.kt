@@ -30,13 +30,14 @@ fun launchKotest(
     System.setProperty("kotest.framework.classpath.scanning.config.disable", "true")
 
     val collector = ResultCollector()
+    val diagListener = DiagnosticRecorderListener()
     val config = object : AbstractProjectConfig() {
         override val parallelism: Int = 1
     }
 
     val launcher = TestEngineLauncher()
         .withProjectConfig(config)
-        .withExtensions(collector)
+        .withExtensions(collector, diagListener)
 
     if (specs.isNotEmpty()) {
         launcher.withClasses(specs).launch()
@@ -44,5 +45,5 @@ fun launchKotest(
         launcher.launch()
     }
 
-    return collector.result
+    return collector.result.copy(recordings = diagListener.snapshot())
 }
