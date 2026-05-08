@@ -97,9 +97,8 @@ class ManagedRootListScreen(private val parent: Screen) :
     }
 
     private fun openRoot(rootPath: String) {
-        // T21 will implement ManagedIntegratedBoot; for now, log + close.
-        LoggerFactory.getLogger("Redstone Specs")
-            .info("[ManagedRootListScreen] requested open root '{}' (T21 not yet implemented)", rootPath)
-        onClose()
+        val path = Path.of(rootPath).toAbsolutePath()
+        ManagedIntegratedBoot.boot(path)
+        Minecraft.getInstance().setScreen(parent)  // back to world list, user picks a world
     }
 }
