@@ -93,9 +93,26 @@ New package: `net.breadmoirai.redstonespecs.testing` in the `main` source set.
 Removed:
 
 - `OutputVerifier` (entire class).
-- `RecordingFinalizer.deriveEntries` (replaced by `RecordingToKts`); the rest of `RecordingFinalizer` is consumed by `RecordingToKts`.
-- `SpecEntry`, `SpecJsonCodec`, `SaveSpecEntryC2SPayload` (data model retired).
 - The dev-only `ServerTestSpec` class (collapsed into `RedstoneTestSpec`).
+
+### Out of scope (deferred to a future plan)
+
+The original design listed these as candidates for retirement, but the implementation
+landed in 2026-05-07's six plans (A–F) deliberately scoped to the engine bridge only.
+The data-model retirement is left for a future "Plan G" follow-up:
+
+- `SpecEntry` and the per-entry data shape — still consumed by `RedstoneSpec.entries`,
+  `data/dsl/EntryDsl.kt`, `client/screen/SpecEditorScreen.kt`, HUD/bounds renderers.
+  The in-game editor still authors and edits per-entry rows.
+- `SpecJsonCodec` — still used for BE NBT serialization and the in-flight per-entry
+  C2S edit payloads.
+- `SaveSpecEntryC2SPayload` and `RemoveSpecEntryC2SPayload` — still the granular-edit
+  network layer.
+- `RecordingFinalizer.deriveEntries` — still called from `SpecBlockEntity` after a
+  recording completes; produces `SpecEntry` rows that round-trip through `KtsSpecEmitter`.
+
+These pieces remain functional. A follow-up plan can retire them once the editor UI
+is reworked to operate directly on `.spec.kts` text or generated test bodies.
 
 ## Authored DSL — example
 

@@ -51,9 +51,9 @@ The `data/` package depends on nothing else in the project and is the foundation
 - `StateRecording.kt` / `StateRecordingStorage.kt` / `StateRecordingView.kt` / `SpecSnapshot.kt` — the recorded data in flight + persisted form.
 - `RecordingFinalizer.kt` — derives a `RedstoneSpec` (flat `SpecEntry` rows for inputs and outputs) from a `StateRecording`. Reads the `(pos, kind, label, color)` markers off the base spec and emits one entry per recorded change-tick.
 - `SpecRunner.kt` — single-run engine: applies inputs at scheduled times, samples outputs, returns per-phase progress. Includes `tryApplyAsPlayerInteraction` for player-style input dispatch (see runner/player-interaction-dispatch.md).
-- `SpecRunnerCoordinator.kt` — singleton that owns active runners, dispatches `onPhase`, and triggers post-run verification.
+- `SpecRunnerCoordinator.kt` — singleton that owns active runners, dispatches `onPhase`, and hands off to `EngineDrivenRun`.
+- `EngineDrivenRun.kt` — per-run object; drives `SpecRunner` from inside a Kotest test body and holds the diagnostic `StateRecording`.
 - `ConditionEvaluator.kt` — evaluates `StateCondition` against a sampled block state.
-- `OutputVerifier.kt` — post-run validator: per declared output entry, checks the recorded post-tick state matches; emits failures for unexpected change ticks.
 
 ## `persistence/` — disk I/O
 
@@ -93,5 +93,5 @@ data/  ←  runner/  ←  block/  ←  network/  ←  client/
 ## Where to start reading
 
 - *"How does a spec get from the world onto disk?"* → start at `block/RedstoneSpecRecorderBlock.kt`, then `runner/StateRecorder.kt` → `runner/RecordingFinalizer.kt` → `persistence/SpecPersistence.kt`. See also [recording-pipeline.md](recording-pipeline.md).
-- *"How is a spec replayed?"* → `block/RedstoneSpecRunnerBlock.kt` → `runner/SpecRunnerCoordinator.kt` → `runner/SpecRunner.kt` → `runner/OutputVerifier.kt`.
+- *"How is a spec replayed and verified?"* → `block/RedstoneSpecRunnerBlock.kt` → `runner/SpecRunnerCoordinator.kt` → `runner/EngineDrivenRun.kt` → `runner/SpecRunner.kt`; assertions in the test body via `testing/RedstoneSpecAssertions.kt`. See [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
 - *"Why is the GUI structured this way?"* → `src/client/kotlin/.../screen/SpecEditorScreen.kt` plus [ui/dropdown-host-popup-stratum.md](../ui/dropdown-host-popup-stratum.md).

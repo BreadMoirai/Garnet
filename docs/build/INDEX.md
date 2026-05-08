@@ -10,4 +10,4 @@ Multi-version build setup. Stonecutter task paths, gradle wrappers, fabric/loom 
 - [Stonecutter Task Paths and the Active Version](stonecutter-task-paths.md) — Tasks are `:26.1:<task>` (not `:versions:26.1:...`); how the active version is declared and switched. Tags: stonecutter, gradle, multi-version.
 - [Local Compile Verification Across All Source Sets](local-verification-commands.md) — Why `compileKotlin` is insufficient; run `clientClasses classes gametestClasses clientTestClasses testClasses` to cover main/client/gametest/clientTest/test. Tags: gradle, source-sets, verification, loom.
 - [Retired — split-wiring](gametest-sourceset-split-wiring.md) — Retired; merged into main. Tags: retired.
-- [testBridge source set wiring](test-bridge-source-set.md) — Why it's a source set, not a subproject; how gametest and clientTest pull it in (incl. the afterEvaluate patch for loom-created gametest). Tags: gradle, source-sets, testing.
+- [Retired — testBridge source set wiring](test-bridge-source-set.md) — Retired; testBridge dissolved into main in Plan A (2026-05-07). Tags: retired.
