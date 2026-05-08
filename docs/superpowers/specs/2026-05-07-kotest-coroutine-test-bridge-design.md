@@ -19,13 +19,13 @@ Authors writing tests have to switch frameworks per source set, and reporting is
 
 ## Decision
 
-Adopt **Kotest** as the single test framework. Build a `:test-bridge` Gradle subproject that exposes coroutine-friendly primitives over MC's tick events and thread executors. Each non-unit source set has a single sentinel entry point (`@GameTest` or `FabricClientGameTest`) whose body launches Kotest on a worker thread; specs run as Kotest specs, suspend on tick events as flows, and hop to the server thread via `withContext(ServerThread)`. **Kensa** auto-registers via ServiceLoader and produces literate HTML reports for every source set.
+Adopt **Kotest** as the single test framework, with **`FunSpec`** as the project-standard spec style. Build a `:test-bridge` Gradle subproject that exposes coroutine-friendly primitives over MC's tick events and thread executors. Each non-unit source set has a single sentinel entry point (`@GameTest` or `FabricClientGameTest`) whose body launches Kotest on a worker thread; specs run as Kotest specs, suspend on tick events as flows, and hop to the server thread via `withContext(ServerThread)`. Kotest's built-in HTML reporter handles output across all source sets — Kensa was evaluated but rejected (its Kotest "integration" requires JUnit Jupiter `@Test` methods plus a parser-fragile no-lambdas-in-test-bodies constraint that would 4–6× the line count of every assertion-style test for a literate report whose sentence rendering had cosmetic bugs).
 
 This was chosen over:
 
 - Native frameworks per source set with a shared assertion DSL — partial unification only; doesn't address discovery or reporting.
 - A custom Kotest `TestEngine` that drives MC — reimplements `GameTestRunner` and tracks MC version drift; rejected.
-- Kensa-only on JUnit Jupiter for `src/test/` — supplanted by Kensa-on-Kotest, which composes with the bridge.
+- Kensa for literate HTML reports — its Kotest integration turned out to be JUnit-Jupiter-flavored with severe parser constraints; cost outweighed benefit. Kotest's HTML reporter is sufficient.
 
 ## Architecture
 
@@ -44,11 +44,11 @@ src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/
 │   ├── Suspending.kt     — awaitTicks, awaitTickEnd, awaitTickWhere, onServer
 │   └── Structures.kt     — spawnStructure, StructureGrid, StructureHandle
 └── launcher/
-    ├── KotestLauncher.kt — TestEngineLauncher invocation, JUnit XML + Kensa output dirs
+    ├── KotestLauncher.kt — TestEngineLauncher invocation, JUnit XML output dir
     └── ResultCollector.kt — Kotest TestListener that aggregates pass/fail counts
 ```
 
-Dependencies (added at the root project level so the source set inherits): `kotlin-coroutines-core`, `io.kotest:kotest-runner-junit5`, `io.kotest:kotest-assertions-core`, `dev.kensa:kensa`. The Minecraft/Fabric API classpath is already on `main`/`client` and is inherited via the source-set wiring.
+Dependencies (added at the root project level so the source set inherits): `kotlin-coroutines-core`, `io.kotest:kotest-runner-junit5`, `io.kotest:kotest-assertions-core`. The Minecraft/Fabric API classpath is already on `main`/`client` and is inherited via the source-set wiring.
 
 ### Producer/consumer primitives
 
@@ -158,9 +158,9 @@ Kotest configured with `concurrentSpecs = 1`, `concurrentTests = 1` by default f
 
 ```
 build/reports/redstonespecs/
-├── test/        — Kotest HTML, Kensa HTML
-├── gametest/    — Kotest HTML, Kensa HTML, JUnit XML
-└── clientTest/  — Kotest HTML, Kensa HTML, JUnit XML
+├── test/        — Kotest HTML
+├── gametest/    — Kotest HTML, JUnit XML
+└── clientTest/  — Kotest HTML, JUnit XML
 
 build/test-results/
 ├── test/        — JUnit XML (existing convention, picked up by CI)
@@ -168,7 +168,7 @@ build/test-results/
 └── clientTest/  — JUnit XML
 ```
 
-Kensa registers itself via ServiceLoader; we pass `-Dkensa.report.dir=...` per source set so reports don't collide. MC's `JUnitLikeTestReporter` is dropped from the gametest path — Kotest owns reporting end-to-end.
+Kotest's HTML reporter is the only reporting backend. MC's `JUnitLikeTestReporter` is dropped from the gametest path — Kotest owns reporting end-to-end.
 
 ## Error handling and lifecycle
 
@@ -254,7 +254,7 @@ One `@GameTest` that spawns `redstonespecs:empty_platform`, runs a 3-leaf Kotest
 - **`ClientThread` dispatcher / `clientTicks` flow.** Not needed; Fabric's `ClientGameTestContext` covers client-thread work.
 - **Native MC `@GameTest` discovery alongside Kotest.** Sentinel-only.
 - **`GameTestInfo`-driven isolation per spec.** Grid + cleanup is sufficient; can add a `gametest("name", structure = ...) { helper -> ... }` overlay later if anyone wants the native sequence DSL back.
-- **Custom Kensa report shaping.** Default ServiceLoader registration, default config.
+- **Kensa integration.** Evaluated and rejected — see "Decision" section above.
 
 ## Module naming
 

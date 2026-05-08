@@ -16,7 +16,7 @@ All three test source sets (`src/test/`, `src/gametest/`, `src/clientTest/`) run
 | `src/gametest/` | `GametestSentinel` — single `@GameTest` method that spawns a worker | `./gradlew :26.1:runGameTest` |
 | `src/clientTest/` | `ClientTestSentinel` — `FabricClientGameTest.runTest` (already on a worker thread) | `./gradlew :26.1:runClientTest` |
 
-All three produce reports under `build/reports/redstonespecs/<sourceSet>/` (Kotest HTML + Kensa HTML) and JUnit XML under `build/test-results/<sourceSet>/`.
+All three produce Kotest's built-in HTML report under `build/reports/redstonespecs/<sourceSet>/` and JUnit XML under `build/test-results/<sourceSet>/`.
 
 ## Base class
 
@@ -107,13 +107,17 @@ Use `spawnStructure` per test for isolation. With sequential mode (the default: 
 
 **Call `awaitTicks` before the action when waiting for a specific number of ticks.** The `serverTickEnd` `SharedFlow` has `replay = 0` and `DROP_OLDEST` overflow. Emissions while no consumer is suspended are dropped. Start collecting (enter `awaitTicks`) before performing the action that triggers the ticks you need to observe.
 
+## Spec style
+
+The project standard is Kotest's `FunSpec`. `ServerTestSpec` extends `FunSpec`; unit tests in `src/test/` extend `FunSpec` directly. Use `context("group") { test("case") { ... } }` nesting when a logical group of cases shares setup or wants to be documented together. Other Kotest styles (`DescribeSpec`, `BehaviorSpec`, `StringSpec`) are not used to keep specs uniform across the codebase.
+
 ## Reports
 
 ```
 build/reports/redstonespecs/
-├── test/        — Kotest HTML, Kensa HTML
-├── gametest/    — Kotest HTML, Kensa HTML
-└── clientTest/  — Kotest HTML, Kensa HTML
+├── test/        — Kotest HTML
+├── gametest/    — Kotest HTML
+└── clientTest/  — Kotest HTML
 
 build/test-results/
 ├── test/        — JUnit XML (picked up by CI)
@@ -121,4 +125,4 @@ build/test-results/
 └── clientTest/  — JUnit XML
 ```
 
-Kensa registers itself via ServiceLoader. Report directories are scoped per source set via `-Dkensa.report.dir`.
+Kotest's HTML reporter is the standard. JUnit XML is emitted automatically by the JUnit Platform engine for unit tests; the gametest/clientTest sentinels rely on Kotest's `LauncherResult.summary()` for in-log feedback.

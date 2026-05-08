@@ -4,13 +4,11 @@ import io.kotest.core.spec.Spec
 import io.kotest.engine.TestEngineLauncher
 import io.kotest.core.config.AbstractProjectConfig
 import java.nio.file.Path
-import kotlin.io.path.absolutePathString
 import kotlin.io.path.createDirectories
 import kotlin.reflect.KClass
 
 /**
- * Launches the Kotest engine on the calling thread. Sets per-source-set output directories
- * for Kotest's reports and Kensa's HTML before invoking the engine.
+ * Launches the Kotest engine on the calling thread.
  *
  * If [specs] is non-empty, those specs are passed directly to the engine (no classpath scan).
  * If empty, the engine uses classpath scanning to discover specs automatically.
@@ -25,9 +23,9 @@ fun launchKotest(
     specs: List<KClass<out Spec>> = emptyList(),
 ): LauncherResult {
     reportsDir.createDirectories()
-    val kensaDir = reportsDir.resolve("kensa").also { it.createDirectories() }
 
-    System.setProperty("kensa.report.dir", kensaDir.absolutePathString())
+    // Disable Kotest's classpath autoscan: it walks the entire MC classpath looking for
+    // @AutoScan extensions, which is slow and unnecessary for our explicit-spec setup.
     System.setProperty("kotest.framework.classpath.scanning.autoscan.disable", "true")
     System.setProperty("kotest.framework.classpath.scanning.config.disable", "true")
 

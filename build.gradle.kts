@@ -154,8 +154,6 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("org.mockito:mockito-core:5.14.2")
-    testImplementation("dev.kensa:kensa-framework-junit:0.5.10")
-    testImplementation("dev.kensa:kensa-assertions-kotest:0.5.10")
     testImplementation(sourceSets["testBridge"].output)
 
     // Kotlin coroutines (also pulled transitively via fabric-language-kotlin, but declare explicitly)
@@ -164,10 +162,6 @@ dependencies {
     // Kotest engine + assertions (used by testBridge, gametest, clientTest, and test source sets)
     "testBridgeImplementation"("io.kotest:kotest-runner-junit5:5.9.1")
     "testBridgeImplementation"("io.kotest:kotest-assertions-core:5.9.1")
-
-    // Kensa — modular artifacts; Kotest integration lives in kensa-assertions-kotest
-    "testBridgeImplementation"("dev.kensa:kensa-framework-junit:0.5.10")
-    "testBridgeImplementation"("dev.kensa:kensa-assertions-kotest:0.5.10")
 }
 
 tasks {
@@ -211,17 +205,6 @@ tasks {
 
     test {
         useJUnitPlatform()
-        // Kensa's source parser walks user.dir to locate .kt files.
-        // Point it at src/test/kotlin so the walker finds exactly the test sources without
-        // also matching Stonecutter-generated copies under build/generated/stonecutter/.
-        workingDir = rootProject.layout.projectDirectory.dir("src/test/kotlin").asFile
-        // Kensa reads kensa.output.root (not kensa.report.dir) to place HTML reports.
-        // Point it at a per-source-set subdirectory so the test sourceset doesn't share
-        // the default %TEMP%/kensa-output with gametest/clientTest runs.
-        systemProperty(
-            "kensa.output.root",
-            layout.buildDirectory.dir("reports/redstonespecs/test/kensa").get().asFile.absolutePath,
-        )
         jvmArgs(
             "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
             "-Dlog4j2.logger.redstonespecs.level=DEBUG",
