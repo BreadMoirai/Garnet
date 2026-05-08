@@ -56,8 +56,17 @@ object EngineDrivenRun {
         return dir
     }
 
-    private fun toTestResult(specId: String, lr: LauncherResult): TestResult {
-        val recording = lr.recordings.values.firstOrNull()  // one-spec-one-test invariant
+    internal fun toTestResult(specId: String, lr: LauncherResult): TestResult {
+        val recording = when (lr.recordings.size) {
+            0 -> null
+            1 -> lr.recordings.values.first()
+            else -> {
+                LOGGER.warn("[EngineDrivenRun] expected 1 recording for spec '{}', got {} (taking first); " +
+                    "if this spec has multiple `test(...)` blocks, only the first recording is preserved",
+                    specId, lr.recordings.size)
+                lr.recordings.values.first()
+            }
+        }
         val checks: List<TickCheck> = if (lr.failed == 0) {
             listOf(TickCheck(SimTime.START, "spec '$specId'", expected = "ok", actual = "ok", pass = true))
         } else {

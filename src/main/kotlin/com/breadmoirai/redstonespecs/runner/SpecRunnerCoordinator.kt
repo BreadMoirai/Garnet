@@ -8,12 +8,14 @@ import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.network.TestResultS2CPayload
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
 
 object SpecRunnerCoordinator {
     private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
     private val standaloneRunners = mutableListOf<SpecRunner>()
+    private val inFlightRuns = java.util.concurrent.ConcurrentHashMap.newKeySet<BlockPos>()
 
     fun registerStandalone(runner: SpecRunner) { standaloneRunners += runner }
     fun unregisterStandalone(runner: SpecRunner) { standaloneRunners -= runner }
@@ -21,6 +23,10 @@ object SpecRunnerCoordinator {
     fun startRun(be: SpecBlockEntity) {
         val spec = be.spec ?: return
         val level = be.level as? ServerLevel ?: return
+        if (!inFlightRuns.add(be.blockPos)) {
+            LOGGER.debug("[startRun] '{}' already running, ignoring duplicate click", be.spec?.id)
+            return
+        }
         LOGGER.debug("[SpecRunnerCoordinator#startRun] launching '{}' via Kotest engine", spec.id)
 
         Thread({
@@ -32,6 +38,8 @@ object SpecRunnerCoordinator {
                     TickCheck(SimTime.START, "engine-error",
                         expected = "ok", actual = t.message ?: "(no message)", pass = false),
                 ))
+            } finally {
+                inFlightRuns.remove(be.blockPos)
             }
             level.server.execute {
                 be.setLastTestResult(testResult)

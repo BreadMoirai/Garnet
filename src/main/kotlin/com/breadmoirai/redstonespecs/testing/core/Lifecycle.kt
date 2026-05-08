@@ -4,13 +4,13 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 
 /**
- * Idempotent registration of the bridge's Fabric event subscriptions.
+ * Idempotent registration of Fabric event subscriptions for the testing module.
  *
- * Must be invoked from a mod-init context (the bridge does not register itself
+ * Must be invoked from a mod-init context (the testing module does not register itself
  * automatically — it has no fabric.mod.json entrypoint). Each test source set's
  * sentinel arranges for this to be called exactly once per server lifecycle.
  */
-object TestBridgeLifecycle {
+object RedstoneTestLifecycle {
     @Volatile private var registered = false
 
     fun register() {

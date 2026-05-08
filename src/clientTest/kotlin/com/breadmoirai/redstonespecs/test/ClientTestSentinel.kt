@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.test
 
 import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
-import com.breadmoirai.redstonespecs.testing.core.TestBridgeLifecycle
+import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
 import com.breadmoirai.redstonespecs.testing.launcher.launchKotest
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
@@ -14,7 +14,7 @@ class ClientTestSentinel : FabricClientGameTest {
     private val logger = LoggerFactory.getLogger("Redstone Specs")
 
     override fun runTest(context: ClientGameTestContext) {
-        TestBridgeLifecycle.register()
+        RedstoneTestLifecycle.register()
         ClientContextHolder.install(context)
         try {
             val result = launchKotest(
