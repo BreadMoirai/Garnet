@@ -39,13 +39,14 @@ suspend fun runRedstoneSpec(
     val snapshot = SpecSnapshot.capture(level, originPos, spec.bounds)
     val recorderId = UUID.randomUUID()
     val recorder = StateRecorder.forSpec(recorderId, originPos, spec.bounds)
-    recorder.start(level, originPos, spec.bounds)
-    StateRecorder.activate(recorder)
-    snapshot.restore(level)
-
     val runner = SpecRunner(spec, originPos, level, snapshot)
-    SpecRunnerCoordinator.registerStandalone(runner)
+
     try {
+        recorder.start(level, originPos, spec.bounds)
+        StateRecorder.activate(recorder)
+        snapshot.restore(level)
+        SpecRunnerCoordinator.registerStandalone(runner)
+
         runner.start()
         // Each awaitTickEnd advances exactly one server tick.
         // SpecRunnerCoordinator.onPhase forwards START_OF_TICK and END_OF_TICK to standalone
