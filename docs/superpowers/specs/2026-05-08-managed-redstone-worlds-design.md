@@ -62,21 +62,27 @@ data/managed/  ←  runner/ (reused)  ←  block/ (reused)  ←  network/managed
 
 No new upward dependencies.
 
-## 4. Folder → Dimension Mapping
+## 4. Folder → Region Mapping (revised 2026-05-08)
 
-The relative subpath under the root is the dim path:
+**Original design** specified one void dimension per folder via `FabricDimensions.add(...)`. **That API was removed in fabric-api v5 (MC 26.1)** — verified from the v5.1.4 jar contents.
+
+**Revised approach:** one statically-registered managed void dim (`redstonespecs:managed`); each loaded folder occupies a distinct **region** within that dim. Multiple folders coexist spatially; the GUI tracks which is "active" for save / new-spec purposes.
 
 ```
-<root>/pistons/doors/2x2/  →  redstonespecs:managed/pistons/doors/2x2
+<root>/pistons/doors/2x2/  →  region #N inside dim redstonespecs:managed
 ```
 
-**Sanitization.** Lowercase; replace any character outside `[a-z0-9_/.-]` with `_`. The sanitized id is the wire form; the canonical lookup key is the **original subpath**. The original subpath is stored in the dim's persistent state so we can round-trip even if two paths sanitize the same.
+**Region assignment.** Counter-based, in-memory, per-server. On first load of a new folder, `ManagedDimRegistry` assigns it `regionIndex = next++`; the region's origin is `(regionIndex * REGION_SPACING_X, Y_BASE, 0)` where `REGION_SPACING_X` is `cellSize.x * rowMax + cellGap * (rowMax + 1) + REGION_PAD` — guaranteed wider than any folder's grid plus a buffer. Resets on server restart (ephemeral).
 
-**Collision.** If two distinct subpaths sanitize to the same dim id, the second `LoadManagedFolder` fails with a `ManagedError("dim id collision")`; user must rename a folder.
+**Static registration.** Two JSON resources at server bootstrap:
+- `data/redstonespecs/dimension_type/managed_void.json` — the dim *type*.
+- `data/redstonespecs/dimension/managed.json` — the dim *instance* (LevelStem) referencing the type, with a flat-void generator.
 
-**Dim type.** A single registered `DimensionType` `redstonespecs:managed_void`: no skylight, no spawning, void chunk generator (empty chunks, fixed sea level). Per-folder `LevelStem`s reuse this type; only the `ResourceKey<Level>` differs per folder.
+No runtime registration; the `ServerLevel` exists from server start. We just look it up via `server.getLevel(ManagedDimensions.MANAGED_LEVEL_KEY)`.
 
-**Dynamic registration.** Use Fabric's `Dimensions.add(...)` to register a `LevelStem` at runtime when a folder is loaded for the first time in a session. The `ServerLevel` is created via vanilla's level map. Once registered, the key stays alive for the session (rapid folder swap doesn't churn registration); only the level instance is recreated on reload.
+**Subpath-to-id sanitization** (kept): subpaths still sanitize for use in error messages and the `Map<BlockPos, spec-id>` cell map. No dim id collision check needed — there's only one dim.
+
+**Trade-off accepted.** Folders never auto-clean from the dim within a session — if you load A, then B, then go back to A's region, A's cells are still there (modified or not). This is fine: A's `loaded` map and snapshot are gone after switching to B, so on re-load A its blocks are reset to the disk state. The visual "abandoned region" is acceptable; the dim is ephemeral on shutdown.
 
 ## 5. Lifecycle
 
