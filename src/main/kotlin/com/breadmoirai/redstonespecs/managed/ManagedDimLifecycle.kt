@@ -164,4 +164,33 @@ object ManagedDimLifecycle {
         snapshot.fillFromWorld(level, absOrigin, spec.bounds, false, emptyList())
         return snapshot
     }
+
+    fun saveNow(server: MinecraftServer, playerId: java.util.UUID): List<CellSaveResult> {
+        val session = ManagedSession.get(playerId) ?: return emptyList()
+        val registry = ManagedDimRegistry.of(server)
+        val level = registry.managedLevel() ?: return emptyList()
+        val results = mutableListOf<CellSaveResult>()
+        val refreshed = mutableMapOf<String, LoadedSpec>()
+        for ((id, loaded) in session.loaded) {
+            val abs = session.absoluteCellOrigin(id) ?: continue
+            val r = ManagedCellSaver.captureAndSaveIfDirty(level, loaded, abs, session.folderAbsolute)
+            results.add(r)
+            if (r.saved) {
+                // Refresh in-memory snapshot to the just-saved state.
+                val newSnap = StructureTemplate()
+                newSnap.fillFromWorld(level, abs, loaded.spec.bounds, false, emptyList())
+                refreshed[id] = loaded.copy(loadedSnapshot = newSnap)
+            }
+        }
+        if (refreshed.isNotEmpty()) {
+            session.loaded.putAll(refreshed)
+        }
+        return results
+    }
+
+    fun unload(server: MinecraftServer, playerId: java.util.UUID, save: Boolean = true): List<CellSaveResult> {
+        val results = if (save) saveNow(server, playerId) else emptyList()
+        ManagedSession.clear(playerId)
+        return results
+    }
 }
