@@ -211,10 +211,15 @@ tasks {
 
     test {
         useJUnitPlatform()
-        // Kensa autoregisters via ServiceLoader; point it at a per-source-set output dir
-        // so reports don't collide with the gametest/clientTest sentinels' outputs.
+        // Kensa's source parser walks user.dir to locate .kt files.
+        // Point it at src/test/kotlin so the walker finds exactly the test sources without
+        // also matching Stonecutter-generated copies under build/generated/stonecutter/.
+        workingDir = rootProject.layout.projectDirectory.dir("src/test/kotlin").asFile
+        // Kensa reads kensa.output.root (not kensa.report.dir) to place HTML reports.
+        // Point it at a per-source-set subdirectory so the test sourceset doesn't share
+        // the default %TEMP%/kensa-output with gametest/clientTest runs.
         systemProperty(
-            "kensa.report.dir",
+            "kensa.output.root",
             layout.buildDirectory.dir("reports/redstonespecs/test/kensa").get().asFile.absolutePath,
         )
         jvmArgs(

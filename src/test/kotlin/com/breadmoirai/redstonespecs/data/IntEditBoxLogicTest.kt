@@ -2,48 +2,115 @@ package com.breadmoirai.redstonespecs.data
 
 import com.breadmoirai.redstonespecs.client.screen.formatIntValue
 import com.breadmoirai.redstonespecs.client.screen.parseIntValue
-import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.shouldBe
+import dev.kensa.ActionUnderTest
+import dev.kensa.RenderedValue
+import dev.kensa.StateExtractor
+import dev.kensa.junit.KensaTest
+import dev.kensa.kotest.WithKotest
+import io.kotest.matchers.Matcher
+import io.kotest.matchers.MatcherResult
+import org.junit.jupiter.api.Test
 
-class IntEditBoxLogicTest : FunSpec({
+/**
+ * Tests for [parseIntValue] and [formatIntValue].
+ * Lambdas live in private helpers so Kensa's Kotlin source parser never enters InLambda state
+ * while walking a @Test method body.
+ */
+class IntEditBoxLogicTest : KensaTest, WithKotest {
 
-    test("parse normal integer") {
-        parseIntValue("5", min = 1, max = 10) shouldBe 5
+    @RenderedValue
+    private var intResult: Int = 0
+
+    @RenderedValue
+    private var strResult: String = ""
+
+    // ── @Test methods: no lambda literals ──────────────────────────────────
+
+    @Test
+    fun parseNormalInteger() {
+        whenever(parseIntAction("5", 1, 10))
+        then(capturedInt(), equalInt(5))
     }
 
-    test("parse clamps to min") {
-        parseIntValue("0", min = 1, max = 10) shouldBe 1
+    @Test
+    fun parseClampsToMin() {
+        whenever(parseIntAction("0", 1, 10))
+        then(capturedInt(), equalInt(1))
     }
 
-    test("parse clamps to max") {
-        parseIntValue("99", min = 1, max = 10) shouldBe 10
+    @Test
+    fun parseClampsToMax() {
+        whenever(parseIntAction("99", 1, 10))
+        then(capturedInt(), equalInt(10))
     }
 
-    test("parse blank returns min") {
-        parseIntValue("", min = 1, max = 10) shouldBe 1
+    @Test
+    fun parseBlankReturnsMin() {
+        whenever(parseIntAction("", 1, 10))
+        then(capturedInt(), equalInt(1))
     }
 
-    test("parse non-numeric returns min") {
-        parseIntValue("abc", min = 1, max = 10) shouldBe 1
+    @Test
+    fun parseNonNumericReturnsMin() {
+        whenever(parseIntAction("abc", 1, 10))
+        then(capturedInt(), equalInt(1))
     }
 
-    test("parse START string when min is -1 returns -1") {
-        parseIntValue("START", min = -1, max = 100) shouldBe -1
+    @Test
+    fun parseStartStringWhenMinIsMinusOneReturnsMinusOne() {
+        whenever(parseIntAction("START", -1, 100))
+        then(capturedInt(), equalInt(-1))
     }
 
-    test("parse START string when min is not -1 returns min") {
-        parseIntValue("START", min = 1, max = 10) shouldBe 1
+    @Test
+    fun parseStartStringWhenMinIsNotMinusOneReturnsMin() {
+        whenever(parseIntAction("START", 1, 10))
+        then(capturedInt(), equalInt(1))
     }
 
-    test("format negative one as START when min is -1") {
-        formatIntValue(-1, min = -1) shouldBe "START"
+    @Test
+    fun formatNegativeOneAsStartWhenMinIsMinusOne() {
+        whenever(formatIntAction(-1, -1))
+        then(capturedStr(), equalStr("START"))
     }
 
-    test("format negative one as string when min is not -1") {
-        formatIntValue(-1, min = 0) shouldBe "-1"
+    @Test
+    fun formatNegativeOneAsStringWhenMinIsNotMinusOne() {
+        whenever(formatIntAction(-1, 0))
+        then(capturedStr(), equalStr("-1"))
     }
 
-    test("format normal value") {
-        formatIntValue(42, min = 0) shouldBe "42"
+    @Test
+    fun formatNormalValue() {
+        whenever(formatIntAction(42, 0))
+        then(capturedStr(), equalStr("42"))
     }
-})
+
+    // ── Helpers: lambdas live here, not in @Test bodies ────────────────────
+
+    private fun parseIntAction(text: String, min: Int, max: Int) =
+        ActionUnderTest { _, _ -> intResult = parseIntValue(text, min, max) }
+
+    private fun formatIntAction(value: Int, min: Int) =
+        ActionUnderTest { _, _ -> strResult = formatIntValue(value, min) }
+
+    private fun capturedInt() = StateExtractor<Int> { intResult }
+
+    private fun capturedStr() = StateExtractor<String> { strResult }
+
+    private fun equalInt(expected: Int): Matcher<Int> = Matcher { actual ->
+        MatcherResult(
+            actual == expected,
+            { "expected $expected but was $actual" },
+            { "expected not $expected but was $actual" },
+        )
+    }
+
+    private fun equalStr(expected: String): Matcher<String> = Matcher { actual ->
+        MatcherResult(
+            actual == expected,
+            { "expected \"$expected\" but was \"$actual\"" },
+            { "expected not \"$expected\" but was \"$actual\"" },
+        )
+    }
+}
