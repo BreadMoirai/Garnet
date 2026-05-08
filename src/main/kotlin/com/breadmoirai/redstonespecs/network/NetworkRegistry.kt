@@ -292,4 +292,6 @@ fun registerNetworking() {
             }
         }
     }
+
+    com.breadmoirai.redstonespecs.network.managed.ManagedNetworkRegistry.register()
 }
