@@ -68,7 +68,7 @@ real-world inputs against pinned expectations.
 - New algorithm or pure data logic? Add to `src/test/`.
 - New runner / verifier / coordinator behavior that depends on ticks
   or scheduling? Add a gametest scenario in `RedstonespecsGameTests`
-  using `ServerTestSpec` + `awaitTicks`/`spawnStructure`.
+  using `RedstoneTestSpec` + `awaitTicks`/`spawnStructure`.
 - New screen, widget, payload, or marker-tool flow? Add to
   `RedstonespecsClientTests` in `src/clientTest/` (uses
   `ClientContextHolder` to access `ClientGameTestContext`).
