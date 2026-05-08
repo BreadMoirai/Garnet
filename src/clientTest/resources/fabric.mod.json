@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "redstonespecs-clienttest",
+  "version": "1.0.0",
+  "name": "RedstoneSpecs Client Testmod",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "com.breadmoirai.redstonespecs.test.ClientTestSentinel"
+    ]
+  },
+  "depends": {
+    "redstonespecs": "*"
+  }
+}

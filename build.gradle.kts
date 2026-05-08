@@ -22,6 +22,11 @@ val requiredJava = when {
 }
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(requiredJava))
 
+// Create clientTest sourceset early so Loom's runs DSL can reference it via source().
+// Classpath wiring against main/client is deferred to afterEvaluate (those sourcesets
+// are created by loom.splitEnvironmentSourceSets() and fabricApi.configureTests()).
+val clientTestSourceSet = sourceSets.create("clientTest")
+
 loom {
     splitEnvironmentSourceSets()
 
@@ -29,6 +34,21 @@ loom {
         register("redstonespecs") {
             sourceSet("main")
             sourceSet("client")
+        }
+        register("redstonespecs-clienttest") {
+            sourceSet(clientTestSourceSet)
+        }
+    }
+
+    runs {
+        register("clientTest") {
+            client()
+            source(clientTestSourceSet)
+            property("fabric.client.gametest", "true")
+            vmArg("-Dlog4j2.logger.redstonespecs.name=Redstone Specs")
+            vmArg("-Dlog4j2.logger.redstonespecs.level=DEBUG")
+            vmArg("--sun-misc-unsafe-memory-access=allow")
+            vmArg("--enable-native-access=ALL-UNNAMED")
         }
     }
 }
@@ -38,16 +58,13 @@ fabricApi {
         createSourceSet = true
         modId = "redstonespecs-gametest"
         enableGameTests = true
-        enableClientGameTests = true
+        enableClientGameTests = false
         eula = true
     }
 }
 
-// Loom creates the `gametest` source set during project evaluation; the same source set
-// hosts both server (`runGameTest`) and client (`runClientGameTest`) test code, since
-// `enableClientGameTests = true` reuses `gametest` rather than creating a separate one.
-// Wire client-only deps so `gametest` can compile against client APIs (Minecraft, EditBox,
-// FabricClientGameTest, etc.).
+// Loom creates the `gametest` source set during project evaluation.
+// Wire client-only deps so `gametest` can compile against client APIs.
 configurations {
     named("gametestImplementation") {
         extendsFrom(configurations["clientImplementation"])
@@ -58,12 +75,29 @@ configurations {
     named("gametestRuntimeOnly") {
         extendsFrom(configurations["clientRuntimeOnly"])
     }
+    named("clientTestImplementation") {
+        extendsFrom(configurations["clientImplementation"])
+    }
+    named("clientTestCompileOnly") {
+        extendsFrom(configurations["clientCompileOnly"])
+    }
+    named("clientTestRuntimeOnly") {
+        extendsFrom(configurations["clientRuntimeOnly"])
+    }
 }
 
 afterEvaluate {
     sourceSets.named("gametest") {
         compileClasspath += sourceSets["client"].output
         runtimeClasspath += sourceSets["client"].output
+    }
+    clientTestSourceSet.apply {
+        compileClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].compileClasspath
+        runtimeClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].runtimeClasspath
     }
 }
 
@@ -119,7 +153,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("org.mockito:mockito-core:5.14.2")
 
-    "gametestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
+    "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 }
 
 tasks {
@@ -181,22 +215,6 @@ tasks {
             "--sun-misc-unsafe-memory-access=allow",
             "--enable-native-access=ALL-UNNAMED",
         )
-    }
-
-    named<JavaExec>("runClientGameTest") {
-        jvmArgs(
-            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
-            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
-            "--sun-misc-unsafe-memory-access=allow",
-            "--enable-native-access=ALL-UNNAMED",
-        )
-    }
-
-    // Backwards-compatible alias for the previous hand-rolled task name.
-    register("runClientTest") {
-        group = "fabric"
-        description = "Alias for runClientGameTest (kept for muscle memory)."
-        dependsOn("runClientGameTest")
     }
 
 }

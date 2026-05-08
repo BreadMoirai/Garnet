@@ -7,9 +7,6 @@
   "entrypoints": {
     "fabric-gametest": [
       "com.breadmoirai.redstonespecs.test.GametestSentinel"
-    ],
-    "fabric-client-gametest": [
-      "com.breadmoirai.redstonespecs.test.ClientTestSentinel"
     ]
   },
   "depends": {
