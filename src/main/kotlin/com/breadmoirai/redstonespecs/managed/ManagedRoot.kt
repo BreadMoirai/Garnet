@@ -19,7 +19,12 @@ data class ManagedRoot(val path: Path) {
      * Empty subpath is allowed and returns the root itself. Absolute or escaping subpaths return null.
      */
     fun resolveSubpath(subpath: String): Path? {
-        if (Path.of(subpath).isAbsolute) return null
+        val isAbs = try {
+            Path.of(subpath).isAbsolute
+        } catch (e: java.nio.file.InvalidPathException) {
+            return null
+        }
+        if (isAbs) return null
         val candidate = path.resolve(subpath).normalize()
         if (!candidate.exists()) return null
         val real = candidate.toRealPath()
