@@ -1,0 +1,26 @@
+@file:OptIn(io.kotest.common.ExperimentalKotest::class)
+
+package com.breadmoirai.redstonespecs.testing
+
+import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import io.kotest.core.concurrency.CoroutineDispatcherFactory
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.core.test.TestCase
+import kotlinx.coroutines.withContext
+
+/**
+ * Base class for specs whose test bodies and lifecycle hooks run on the server thread.
+ * Used by both shipped `.spec.kts` files (loaded at runtime) and dev tests in `src/gametest/`,
+ * `src/clientTest/`, and `src/test/`.
+ */
+abstract class RedstoneTestSpec(body: RedstoneTestSpec.() -> Unit = {}) : FunSpec() {
+    init {
+        coroutineDispatcherFactory = object : CoroutineDispatcherFactory {
+            override suspend fun <T> withDispatcher(testCase: TestCase, block: suspend () -> T): T =
+                withContext(McDispatchers.Server) { block() }
+
+            override fun close() = Unit
+        }
+        body()
+    }
+}

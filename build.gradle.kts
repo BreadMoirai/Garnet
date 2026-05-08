@@ -34,23 +34,13 @@ loom {
 }
 
 sourceSets {
-    create("testBridge") {
+    create("clientTest") {
         compileClasspath += sourceSets["main"].output +
             sourceSets["client"].output +
             sourceSets["client"].compileClasspath
         runtimeClasspath += sourceSets["main"].output +
             sourceSets["client"].output +
             sourceSets["client"].runtimeClasspath
-    }
-    create("clientTest") {
-        compileClasspath += sourceSets["main"].output +
-            sourceSets["client"].output +
-            sourceSets["client"].compileClasspath +
-            sourceSets["testBridge"].output
-        runtimeClasspath += sourceSets["main"].output +
-            sourceSets["client"].output +
-            sourceSets["client"].runtimeClasspath +
-            sourceSets["testBridge"].output
     }
 }
 
@@ -61,26 +51,14 @@ loom {
 }
 
 configurations {
-    named("testBridgeImplementation") {
-        extendsFrom(configurations["clientImplementation"])
-    }
-    named("testBridgeCompileOnly") {
-        extendsFrom(configurations["clientCompileOnly"])
-    }
-    named("testBridgeRuntimeOnly") {
-        extendsFrom(configurations["clientRuntimeOnly"])
-    }
     named("clientTestImplementation") {
         extendsFrom(configurations["clientImplementation"])
-        extendsFrom(configurations["testBridgeImplementation"])
     }
     named("clientTestCompileOnly") {
         extendsFrom(configurations["clientCompileOnly"])
-        extendsFrom(configurations["testBridgeCompileOnly"])
     }
     named("clientTestRuntimeOnly") {
         extendsFrom(configurations["clientRuntimeOnly"])
-        extendsFrom(configurations["testBridgeRuntimeOnly"])
     }
 }
 
@@ -94,16 +72,8 @@ fabricApi {
     }
 }
 
-// Loom creates the `gametest` source set during project evaluation, so it must be configured in `afterEvaluate`.
-afterEvaluate {
-    sourceSets.findByName("gametest")?.let { gt ->
-        gt.compileClasspath += sourceSets["testBridge"].output
-        gt.runtimeClasspath += sourceSets["testBridge"].output
-    }
-    configurations.findByName("gametestImplementation")?.extendsFrom(configurations["testBridgeImplementation"])
-    configurations.findByName("gametestCompileOnly")?.extendsFrom(configurations["testBridgeCompileOnly"])
-    configurations.findByName("gametestRuntimeOnly")?.extendsFrom(configurations["testBridgeRuntimeOnly"])
-}
+// Loom creates the `gametest` source set during project evaluation; nothing extra to wire
+// since gametest now picks up Kotest via main's `implementation` classpath transitively.
 
 repositories {
     maven("https://maven.gegy.dev") {
@@ -147,21 +117,17 @@ dependencies {
     implementation("com.squareup:kotlinpoet:1.18.1")
 
     implementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
-    "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
-    "testBridgeImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
+    // Kotest engine + assertions ship in main: used by .spec.kts at runtime AND by all dev test source sets.
+    implementation("io.kotest:kotest-runner-junit5:5.9.1")
+    implementation("io.kotest:kotest-assertions-core:5.9.1")
 
-    testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
-    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    // kotlinx-coroutines-core (also pulled by fabric-language-kotlin transitively, declared explicitly).
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("org.mockito:mockito-core:5.14.2")
-    testImplementation(sourceSets["testBridge"].output)
 
-    // Kotlin coroutines (also pulled transitively via fabric-language-kotlin, but declare explicitly)
-    "testBridgeImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-
-    // Kotest engine + assertions (used by testBridge, gametest, clientTest, and test source sets)
-    "testBridgeImplementation"("io.kotest:kotest-runner-junit5:5.9.1")
-    "testBridgeImplementation"("io.kotest:kotest-assertions-core:5.9.1")
+    "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 }
 
 tasks {
