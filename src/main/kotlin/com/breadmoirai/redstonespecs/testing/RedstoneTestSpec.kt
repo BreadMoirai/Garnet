@@ -3,6 +3,7 @@
 package com.breadmoirai.redstonespecs.testing
 
 import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import com.breadmoirai.redstonespecs.testing.runner.RecordingHolder
 import io.kotest.core.concurrency.CoroutineDispatcherFactory
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.core.test.TestCase
@@ -32,7 +33,7 @@ abstract class RedstoneTestSpec(body: RedstoneTestSpec.() -> Unit = {}) : FunSpe
     init {
         coroutineDispatcherFactory = object : CoroutineDispatcherFactory {
             override suspend fun <T> withDispatcher(testCase: TestCase, block: suspend () -> T): T =
-                withContext(McDispatchers.Server) { block() }
+                withContext(McDispatchers.Server + RecordingHolder()) { block() }
 
             override fun close() = Unit
         }
