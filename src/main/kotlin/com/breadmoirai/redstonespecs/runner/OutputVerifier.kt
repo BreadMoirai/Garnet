@@ -63,12 +63,6 @@ object OutputVerifier {
         return VerificationResult(checks)
     }
 
-    /** Resolves a SpecEntry time to the SimTime used for stateAt lookups (tail of the tick by default). */
-    private fun anchorTime(time: SimTime): SimTime =
-        if (time.order == 0 && time.phase == Phase.END_OF_TICK)
-            SimTime(time.tick, Phase.END_OF_TICK, Int.MAX_VALUE)
-        else time
-
     private fun conditionCheck(
         simTime: SimTime,
         label: String,

@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.runner
 
+import com.breadmoirai.redstonespecs.data.Phase
 import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
 import net.minecraft.core.BlockPos
@@ -12,7 +13,7 @@ import net.minecraft.world.level.block.state.properties.Property
 
 fun evaluateCondition(condition: StateCondition, level: Level, worldPos: BlockPos): Boolean {
     val state = level.getBlockState(worldPos)
-    return evaluateConditionOnState(condition, state, worldPos)
+    return evaluateConditionOnState(condition, state)
 }
 
 fun evaluateCondition(
@@ -22,13 +23,17 @@ fun evaluateCondition(
     simTime: SimTime,
 ): Boolean {
     val state = view.stateAt(localPos, simTime)
-    return evaluateConditionOnState(condition, state, localPos)
+    return evaluateConditionOnState(condition, state)
 }
 
-private fun evaluateConditionOnState(condition: StateCondition, state: BlockState, worldPos: BlockPos): Boolean = when (condition) {
-    is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state, worldPos) }
-    is StateCondition.Any -> condition.conditions.any { evaluateConditionOnState(it, state, worldPos) }
-    is StateCondition.Not -> !evaluateConditionOnState(condition.condition, state, worldPos)
+/**
+ * Evaluates a [StateCondition] purely against a [BlockState] snapshot (no world access).
+ * Used by [OutputVerifier] and [com.breadmoirai.redstonespecs.testing.runner.assertOutputsMatch].
+ */
+fun evaluateConditionOnState(condition: StateCondition, state: BlockState): Boolean = when (condition) {
+    is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state) }
+    is StateCondition.Any -> condition.conditions.any { evaluateConditionOnState(it, state) }
+    is StateCondition.Not -> !evaluateConditionOnState(condition.condition, state)
     is StateCondition.BlockType -> {
         val actualId = BuiltInRegistries.BLOCK.getKey(state.block) ?: return false
         actualId == condition.blockId
@@ -42,8 +47,37 @@ private fun evaluateConditionOnState(condition: StateCondition, state: BlockStat
         state.getValue(prop) == condition.value
     }
     is StateCondition.EnumProperty -> blockStatePropertyStr(state, condition.name) == condition.value
-    is StateCondition.ContainerContents -> false
+    is StateCondition.ContainerContents,
     is StateCondition.IntRange -> false
+}
+
+/**
+ * Returns a human-readable description of what a [StateCondition] expects.
+ * Used in [TickCheck] "expected" field.
+ */
+fun describeCondition(condition: StateCondition): String = when (condition) {
+    is StateCondition.BoolProperty -> "${condition.name}=${condition.value}"
+    is StateCondition.IntProperty -> "${condition.name}=${condition.value}"
+    is StateCondition.EnumProperty -> "${condition.name}=${condition.value}"
+    is StateCondition.BlockType -> "block=${condition.blockId}"
+    is StateCondition.All -> condition.conditions.joinToString(",") { describeCondition(it) }
+    is StateCondition.Any -> condition.conditions.joinToString("|") { describeCondition(it) }
+    is StateCondition.Not -> "!${describeCondition(condition.condition)}"
+    is StateCondition.ContainerContents -> "container"
+    is StateCondition.IntRange -> "${condition.name}=${condition.min}..${condition.max}"
+}
+
+/**
+ * Returns a human-readable description of the relevant portion of [state] for the given [condition].
+ * Used in [TickCheck] "actual" field.
+ */
+fun describeStateForCondition(condition: StateCondition, state: BlockState): String = when (condition) {
+    is StateCondition.BoolProperty -> blockStatePropertyStr(state, condition.name) ?: "missing"
+    is StateCondition.IntProperty -> blockStatePropertyStr(state, condition.name) ?: "missing"
+    is StateCondition.EnumProperty -> blockStatePropertyStr(state, condition.name) ?: "missing"
+    is StateCondition.BlockType ->
+        BuiltInRegistries.BLOCK.getKey(state.block).toString()
+    else -> "(complex)"
 }
 
 fun blockStatePropertyStr(state: BlockState, propName: String): String? {
@@ -85,3 +119,9 @@ internal fun <T : Comparable<T>> applyPropertyFromString(
     property: Property<T>,
     value: String,
 ): BlockState = property.getValue(value).map { state.setValue(property, it) }.orElse(state)
+
+/** Resolves a SpecEntry time to the SimTime used for stateAt lookups (tail of the tick by default). */
+internal fun anchorTime(time: SimTime): SimTime =
+    if (time.order == 0 && time.phase == Phase.END_OF_TICK)
+        SimTime(time.tick, Phase.END_OF_TICK, Int.MAX_VALUE)
+    else time

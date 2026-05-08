@@ -7,6 +7,7 @@ import com.breadmoirai.redstonespecs.data.SimTime
 import com.breadmoirai.redstonespecs.data.outputs
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import com.breadmoirai.redstonespecs.runner.StateRecordingView
+import com.breadmoirai.redstonespecs.runner.anchorTime
 import com.breadmoirai.redstonespecs.runner.describeCondition
 import com.breadmoirai.redstonespecs.runner.describeStateForCondition
 import com.breadmoirai.redstonespecs.runner.evaluateConditionOnState
@@ -67,8 +68,3 @@ fun assertOutputsMatch(spec: RedstoneSpec, recording: StateRecording) {
     }
 }
 
-/** Resolves a SpecEntry time to the SimTime used for stateAt lookups (tail of the tick by default). */
-private fun anchorTime(time: SimTime): SimTime =
-    if (time.order == 0 && time.phase == Phase.END_OF_TICK)
-        SimTime(time.tick, Phase.END_OF_TICK, Int.MAX_VALUE)
-    else time
