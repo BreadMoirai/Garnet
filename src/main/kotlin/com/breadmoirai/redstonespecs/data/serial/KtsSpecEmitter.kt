@@ -11,7 +11,43 @@ import com.squareup.kotlinpoet.CodeBlock
 object KtsSpecEmitter {
 
     fun emit(spec: RedstoneSpec): String {
+        val className = classNameFor(spec.id)
         val out = CodeBlock.builder()
+
+        // class FooSpec : RedstoneTestSpec({
+        //     ...
+        // })
+        //
+        // We can't use beginControlFlow for this because the brace is inside the
+        // constructor argument, not after the class header. Instead, emit the opening
+        // line literally and indent the body manually.
+        out.add("class $className : RedstoneTestSpec({\n")
+        out.indent()
+
+        // SpecLiteralCapture.record(...) — runs at class-init time so loadRedstoneSpec
+        // can extract the literal by instantiating the class without running any test body.
+        out.add("%T.record(\n", SpecLiteralCapture::class)
+        out.indent()
+        emitSpecLiteral(out, spec)
+        out.unindent()
+        out.add(")\n")
+
+        // test("foo") { runRedstoneSpec(..., originPos, level) }
+        out.beginControlFlow("test(%S)", spec.id)
+        out.add("runRedstoneSpec(\n")
+        out.indent()
+        emitSpecLiteral(out, spec)
+        out.unindent()
+        out.add(", originPos, level)\n")
+        out.endControlFlow()  // end test
+
+        out.unindent()
+        out.add("})\n")  // close lambda and constructor call
+
+        return out.build().toString()
+    }
+
+    private fun emitSpecLiteral(out: CodeBlock.Builder, spec: RedstoneSpec) {
         out.beginControlFlow("redstoneSpec(%S)", spec.id)
         out.addStatement("bounds(%L, %L, %L)", spec.bounds.x, spec.bounds.y, spec.bounds.z)
         out.addStatement("lifespan = %L", spec.lifespan)
@@ -31,8 +67,12 @@ object KtsSpecEmitter {
             out.endControlFlow()
         }
         out.endControlFlow()
-        return out.build().toString()
     }
+
+    internal fun classNameFor(id: String): String =
+        id.split('-', '_', ' ', '.', '/')
+            .filter { it.isNotEmpty() }
+            .joinToString("") { it.replaceFirstChar(Char::uppercase) } + "Spec"
 
     private data class EntryHeader(val label: String, val color: Int)
 

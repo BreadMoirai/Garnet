@@ -25,7 +25,7 @@ object SpecPersistence {
     fun load(saveDir: Path, id: String): RedstoneSpec? {
         val file = saveDir.resolve("$id$EXT")
         if (!file.exists()) return null
-        return runCatching { KtsSpecLoader.loadFile(file) }
+        return runCatching { KtsSpecLoader.loadFileAsRedstoneSpec(file) }
             .onFailure { e -> LOGGER.warn("[SpecPersistence#load] failed to load '{}': {}", id, e.message) }
             .getOrNull()
     }
