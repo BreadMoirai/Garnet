@@ -33,6 +33,16 @@ class ManagedDimRegistry(private val server: MinecraftServer) {
     fun managedLevel(): ServerLevel? = server.getLevel(ManagedDimensions.MANAGED_LEVEL_KEY)
 
     /**
+     * Returns the per-folder ServerLevel if the runtime datapack registered it; otherwise null.
+     * Caller falls back to `managedLevel()` + `getOrAssignRegion(subpath)` for the single-dim path.
+     */
+    fun perFolderLevel(subpath: String): ServerLevel? {
+        val sanitized = DimIdSanitizer.toPath(subpath)
+        val key = ManagedDimensions.levelKey(sanitized)
+        return server.getLevel(key)
+    }
+
+    /**
      * Returns the region origin for `subpath`, assigning a fresh region if this is the first time.
      * Region width is sized to fit the largest possible folder grid plus padding, so regions never overlap.
      */

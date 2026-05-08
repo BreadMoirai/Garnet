@@ -1,9 +1,11 @@
 package com.breadmoirai.redstonespecs.client.managed
 
+import com.breadmoirai.redstonespecs.managed.ManagedDatapackWriter
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
 import com.breadmoirai.redstonespecs.managed.ManagedServerContext
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.minecraft.server.MinecraftServer
+import net.minecraft.world.level.storage.LevelResource
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicBoolean
@@ -31,6 +33,17 @@ object ManagedIntegratedBoot {
             if (!fired.compareAndSet(false, true)) return@ServerStarting
             ManagedServerContext.set(server, pendingContext)
             LOGGER.info("[ManagedIntegratedBoot] pinned root '{}' to integrated server", rootPath)
+            // Write per-folder dim datapack into the active save. Caveat: levels are already
+            // being constructed by the time this fires, so the per-folder dims will not be live
+            // until the *next* server start of this same save. The fallback single-dim handles
+            // the current session.
+            try {
+                val saveDir = server.getWorldPath(LevelResource.ROOT)
+                ManagedDatapackWriter.writeForRoot(root, saveDir)
+                LOGGER.info("[ManagedIntegratedBoot] wrote per-folder dim datapack into {}", saveDir)
+            } catch (e: Exception) {
+                LOGGER.error("[ManagedIntegratedBoot] datapack write failed: {}", e.message, e)
+            }
         })
         LOGGER.info("[ManagedIntegratedBoot] '{}' pinned for next server start", rootPath)
     }

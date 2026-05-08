@@ -6,8 +6,10 @@ import com.breadmoirai.redstonespecs.event.SubTickPhaseEvents
 import com.breadmoirai.redstonespecs.item.SpecMarkerTool
 import com.breadmoirai.redstonespecs.item.UndoStack
 import com.breadmoirai.redstonespecs.managed.ManagedCommand
+import com.breadmoirai.redstonespecs.managed.ManagedDatapackWriter
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
 import com.breadmoirai.redstonespecs.managed.ManagedServerContext
+import net.minecraft.world.level.storage.LevelResource
 import com.breadmoirai.redstonespecs.network.registerNetworking
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.api.ModInitializer
@@ -36,10 +38,18 @@ class Redstonespecs : ModInitializer {
         ServerLifecycleEvents.SERVER_STARTING.register { server ->
             val cfg = SharedSettings.managedRootPath
             if (cfg.isNotBlank() && ManagedServerContext.get(server) == null) {
-                ManagedServerContext.set(
-                    server,
-                    ManagedServerContext(ManagedRoot(Path.of(cfg).toAbsolutePath())),
-                )
+                val rootPath = Path.of(cfg).toAbsolutePath()
+                val root = ManagedRoot(rootPath)
+                ManagedServerContext.set(server, ManagedServerContext(root))
+                // Write per-folder dim datapack. Caveat: dedicated server has already begun
+                // level construction by SERVER_STARTING, so the dims become live on the *next*
+                // restart. Until then the fallback single-dim handles cells.
+                try {
+                    val saveDir = server.getWorldPath(LevelResource.ROOT)
+                    ManagedDatapackWriter.writeForRoot(root, saveDir)
+                } catch (e: Exception) {
+                    LOGGER.error("[Redstonespecs] managed datapack write failed: {}", e.message, e)
+                }
             }
         }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
