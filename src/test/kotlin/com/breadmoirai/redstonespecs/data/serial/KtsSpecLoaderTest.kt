@@ -26,7 +26,7 @@ class KtsSpecLoaderTest : FunSpec({
         extracted.lifespan shouldBe 6
     }
 
-    test("loadRedstoneSpec parses a spec with entries") {
+    test("loadRedstoneSpec parses a minimal spec") {
         val source = KtsSpecEmitter.emit(
             redstoneSpec("with-entries") {
                 bounds(3, 3, 3)

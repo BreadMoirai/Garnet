@@ -73,17 +73,21 @@ object KtsSpecLoader {
         // The class declared inside the .kts (e.g. `class FooSpec : RedstoneTestSpec(...)`)
         // appears as a declared nested class on the script object's Class.
         val rv = eval.returnValue
-        if (rv is ResultValue.Error) throw rv.error
+        when (rv) {
+            is ResultValue.Error -> throw rv.error
+            is ResultValue.NotEvaluated -> error("$name: script was not evaluated")
+            else -> { /* continue */ }
+        }
         val scriptInstance = rv.scriptInstance
-            ?: error("$name: script produced no instance (returnValue=${rv::class.simpleName})")
+            ?: error("$name: script produced no instance (returnValue=$rv)")
 
-        val specClass = scriptInstance.javaClass.declaredClasses
-            .firstOrNull { Spec::class.java.isAssignableFrom(it) }
-            ?: error(
-                "$name: no Spec subclass declared in script. " +
-                    "Expected `class XSpec : RedstoneTestSpec(...)`. " +
-                    "Declared classes: ${scriptInstance.javaClass.declaredClasses.map { it.simpleName }}"
-            )
-        return specClass.kotlin as KClass<out Spec>
+        val specClasses = scriptInstance.javaClass.declaredClasses
+            .filter { Spec::class.java.isAssignableFrom(it) }
+        return when (specClasses.size) {
+            0 -> error("$name: no Spec class declared in script (expected `class XSpec : RedstoneTestSpec(...)`)")
+            1 -> specClasses.single().kotlin as KClass<out Spec>
+            else -> error("$name: expected exactly 1 Spec subclass, found ${specClasses.size}: " +
+                "${specClasses.map { it.simpleName }}")
+        }
     }
 }

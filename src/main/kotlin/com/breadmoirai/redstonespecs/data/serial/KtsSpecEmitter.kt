@@ -10,6 +10,18 @@ import com.squareup.kotlinpoet.CodeBlock
 
 object KtsSpecEmitter {
 
+    /**
+     * Emits a `.spec.kts`-compatible source string that declares a [RedstoneTestSpec] subclass
+     * wrapping the given [spec]. The emitted class:
+     *  - calls [SpecLiteralCapture.record] in its init body so editor consumers can extract
+     *    the literal by instantiating the class without running tests;
+     *  - declares a single Kotest `test(spec.id) { runRedstoneSpec(literal, originPos, level) }`
+     *    body that the engine launches via Plan D's EngineDrivenRun.
+     *
+     * The literal is emitted twice — once for the capture, once for the runRedstoneSpec
+     * call — because both call sites need a literal value, not a reference. The duplicate
+     * text is acceptable: this output is generated, not hand-edited.
+     */
     fun emit(spec: RedstoneSpec): String {
         val className = classNameFor(spec.id)
         val out = CodeBlock.builder()

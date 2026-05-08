@@ -11,6 +11,8 @@ import kotlin.reflect.KClass
  * `test(...)` block runs. [captureFrom] then instantiates the class to fire the record
  * call without running test bodies, and returns the captured value.
  */
+// Public visibility intentional: .spec.kts scripts call SpecLiteralCapture.record(...) at runtime,
+// and `internal` is module-scoped which may not hold across the scripting host's classloader.
 object SpecLiteralCapture {
     private val capture = ThreadLocal<RedstoneSpec?>()
 
