@@ -19,7 +19,7 @@ cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26
 Use `*Classes` aggregate tasks rather than `compile*Kotlin` so that Java
 sources, resource processing, and KSP-generated sources all run.
 
-## Why four source sets?
+## Why five source sets?
 
 `build.gradle.kts` enables Loom's split-environment layout:
 
@@ -31,12 +31,16 @@ loom {
             sourceSet("main")
             sourceSet("client")
         }
+        register("redstonespecs-clienttest") {
+            sourceSet("clientTest")
+        }
     }
 }
 ```
 
-Fabric API's `configureTests` creates the server-side gametest source set;
-`clientTest` is wired manually (see [gametest-sourceset-split-wiring.md](gametest-sourceset-split-wiring.md)):
+Fabric API's `configureTests` creates the server-side `gametest` source set;
+`clientTest` is created manually and given its own Loom run config (see
+[Loom run config for clientTest](#loom-run-config-for-clienttest) below):
 
 ```kotlin
 fabricApi {
@@ -44,7 +48,7 @@ fabricApi {
         createSourceSet = true
         modId = "redstonespecs-gametest"
         enableGameTests = true
-        enableClientGameTests = false   // client side is wired manually
+        enableClientGameTests = false   // we own the client-test run config
         eula = true
     }
 }
@@ -88,11 +92,44 @@ cmd.exe /c "gradlew.bat :26.1:runGameTest"     # server-side @GameTest harness
 cmd.exe /c "gradlew.bat :26.1:runClientTest"   # FabricClientGameTest harness
 ```
 
-The `runGameTest` and `runClientTest` JavaExec tasks are configured with
-log4j JVM args in `build.gradle.kts` to surface the `redstonespecs` logger at
-DEBUG. `runClientTest` is registered manually (loom no longer auto-creates
-`runClientGameTest` since `enableClientGameTests = false`); see
-[gametest-sourceset-split-wiring.md](gametest-sourceset-split-wiring.md).
+Both `runGameTest` and `runClientTest` are Loom-managed JavaExec tasks with
+log4j JVM args set in `build.gradle.kts` to surface the `redstonespecs`
+logger at DEBUG. `runGameTest` comes from Fabric API's `configureTests`;
+`runClientTest` is registered via `loom.runs.register("clientTest") { ... }`
+(see below).
+
+## Loom run config for clientTest
+
+Because `enableClientGameTests = false`, Loom doesn't auto-create a
+client-gametest task. We register one ourselves through Loom's `runs` DSL,
+which sets up Knot/app classloader separation correctly (a hand-rolled
+`JavaExec` puts the mod classpath on the system loader and breaks Mixin
+plugin loading):
+
+```kotlin
+val clientTestSourceSet = sourceSets.create("clientTest")
+
+loom {
+    mods {
+        register("redstonespecs-clienttest") {
+            sourceSet(clientTestSourceSet)
+        }
+    }
+    runs {
+        register("clientTest") {
+            client()
+            source(clientTestSourceSet)
+            property("fabric.client.gametest", "true")
+            // log4j + Java 25 native-access flags
+        }
+    }
+}
+```
+
+This produces a `runClientTest` Gradle task that launches a real Minecraft
+client on the `clientTest` sourceset's classpath, with the
+`fabric-client-gametest` entrypoint registered via
+`src/clientTest/resources/fabric.mod.json`.
 
 ## See also
 
