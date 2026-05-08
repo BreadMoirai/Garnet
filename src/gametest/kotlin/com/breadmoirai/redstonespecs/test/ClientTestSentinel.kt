@@ -20,6 +20,11 @@ class ClientTestSentinel : FabricClientGameTest {
             val result = launchKotest(
                 sourceSet = "clientTest",
                 reportsDir = Path.of("build/reports/redstonespecs/clientTest"),
+                specs = listOf(
+                    RunRedstoneSpecSmokeTest::class,
+                    RunnerBlockEngineE2ETest::class,
+                    DiagnosticRecordingE2ETest::class,
+                ),
             )
             if (result.failed > 0) {
                 logger.error(result.summary())

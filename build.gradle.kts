@@ -33,47 +33,39 @@ loom {
     }
 }
 
-sourceSets {
-    create("clientTest") {
-        compileClasspath += sourceSets["main"].output +
-            sourceSets["client"].output +
-            sourceSets["client"].compileClasspath
-        runtimeClasspath += sourceSets["main"].output +
-            sourceSets["client"].output +
-            sourceSets["client"].runtimeClasspath
-    }
-}
-
-loom {
-    mods.register("redstonespecs-clienttest") {
-        sourceSet("clientTest")
-    }
-}
-
-configurations {
-    named("clientTestImplementation") {
-        extendsFrom(configurations["clientImplementation"])
-    }
-    named("clientTestCompileOnly") {
-        extendsFrom(configurations["clientCompileOnly"])
-    }
-    named("clientTestRuntimeOnly") {
-        extendsFrom(configurations["clientRuntimeOnly"])
-    }
-}
-
 fabricApi {
     configureTests {
         createSourceSet = true
         modId = "redstonespecs-gametest"
         enableGameTests = true
-        enableClientGameTests = false
+        enableClientGameTests = true
         eula = true
     }
 }
 
-// Loom creates the `gametest` source set during project evaluation; nothing extra to wire
-// since gametest now picks up Kotest via main's `implementation` classpath transitively.
+// Loom creates the `gametest` source set during project evaluation; the same source set
+// hosts both server (`runGameTest`) and client (`runClientGameTest`) test code, since
+// `enableClientGameTests = true` reuses `gametest` rather than creating a separate one.
+// Wire client-only deps so `gametest` can compile against client APIs (Minecraft, EditBox,
+// FabricClientGameTest, etc.).
+configurations {
+    named("gametestImplementation") {
+        extendsFrom(configurations["clientImplementation"])
+    }
+    named("gametestCompileOnly") {
+        extendsFrom(configurations["clientCompileOnly"])
+    }
+    named("gametestRuntimeOnly") {
+        extendsFrom(configurations["clientRuntimeOnly"])
+    }
+}
+
+afterEvaluate {
+    sourceSets.named("gametest") {
+        compileClasspath += sourceSets["client"].output
+        runtimeClasspath += sourceSets["client"].output
+    }
+}
 
 repositories {
     maven("https://maven.gegy.dev") {
@@ -127,7 +119,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("org.mockito:mockito-core:5.14.2")
 
-    "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
+    "gametestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 }
 
 tasks {
@@ -186,43 +178,25 @@ tasks {
         jvmArgs(
             "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
             "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+            "--sun-misc-unsafe-memory-access=allow",
+            "--enable-native-access=ALL-UNNAMED",
         )
     }
 
-    register<JavaExec>("runClientTest") {
-        group = "fabric"
-        description = "Runs FabricClientGameTest flows from the clientTest sourceset."
-
-        val clientTestSrc = sourceSets["clientTest"]
-        classpath = clientTestSrc.runtimeClasspath
-        mainClass.set("net.fabricmc.devlaunchinjector.Main")
-        // loom sets workingDir to the version subproject dir; projectDirectory IS versions/26.1 for :26.1:
-        workingDir = project.layout.projectDirectory.asFile
-
-        val launchCfg = project.layout.projectDirectory
-            .dir(".gradle/loom-cache")
-            .file("launch.cfg")
-            .asFile
-        val testResources = clientTestSrc.resources.srcDirs.first()
-
-        jvmArgumentProviders.add(CommandLineArgumentProvider {
-            listOf(
-                "-Dfabric.dli.config=${launchCfg.absolutePath}",
-                "-Dfabric.dli.env=client",
-                "-Dfabric.client.gametest",
-                "-Dfabric.client.gametest.testModResourcesPath=${testResources.absolutePath}",
-                "-Dfabric.dli.main=net.fabricmc.loader.impl.launch.knot.KnotClient",
-                "--sun-misc-unsafe-memory-access=allow",
-                "--enable-native-access=ALL-UNNAMED",
-            )
-        })
-
+    named<JavaExec>("runClientGameTest") {
         jvmArgs(
             "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
             "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+            "--sun-misc-unsafe-memory-access=allow",
+            "--enable-native-access=ALL-UNNAMED",
         )
+    }
 
-        dependsOn("clientTestClasses", "generateDLIConfig")
+    // Backwards-compatible alias for the previous hand-rolled task name.
+    register("runClientTest") {
+        group = "fabric"
+        description = "Alias for runClientGameTest (kept for muscle memory)."
+        dependsOn("runClientGameTest")
     }
 
 }
