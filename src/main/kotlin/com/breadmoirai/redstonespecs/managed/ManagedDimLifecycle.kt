@@ -158,6 +158,7 @@ object ManagedDimLifecycle {
         level.setBlock(anchorPos, anchorBlock.defaultBlockState(), 2)
         val be = level.getBlockEntity(anchorPos) as? SpecBlockEntity
         be?.setSpec(spec)
+        be?.managedSourcePath = folder.resolve(filename)
 
         // Snapshot the cell volume after placement.
         val snapshot = StructureTemplate()

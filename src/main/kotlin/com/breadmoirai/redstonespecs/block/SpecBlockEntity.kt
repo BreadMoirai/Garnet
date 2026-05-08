@@ -56,6 +56,10 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     private var stateRecorder: StateRecorder? = null
     val isRecording: Boolean get() = stateRecorder != null
 
+    /** Set by ManagedDimLifecycle when placing this BE in a managed cell. Null otherwise.
+     *  Not persisted to NBT — managed dims rebuild from disk every session. */
+    @JvmField var managedSourcePath: java.nio.file.Path? = null
+
     fun startRecording(): Boolean {
         val s = spec ?: run { LOGGER.debug("[startRecording] no spec at {}", blockPos); return false }
         if (s.id.isBlank()) { LOGGER.debug("[startRecording] blank id at {}", blockPos); return false }
