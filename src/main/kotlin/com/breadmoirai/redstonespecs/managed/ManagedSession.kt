@@ -31,10 +31,13 @@ class ManagedSession(
     val regionOrigin: BlockPos,           // assigned by ManagedDimRegistry
     val loaded: MutableMap<String, LoadedSpec>, // by spec id
 ) {
-    /** Absolute world origin for a given spec's cell. */
+    /**
+     * Absolute world origin for a given spec's cell. `cell.origin` Y is already absolute
+     * (GridLayout uses `yBase` directly); only X/Z are region-relative.
+     */
     fun absoluteCellOrigin(specId: String): BlockPos? =
         loaded[specId]?.cell?.origin?.let { rel ->
-            BlockPos(regionOrigin.x + rel.x, regionOrigin.y + rel.y, regionOrigin.z + rel.z)
+            BlockPos(regionOrigin.x + rel.x, rel.y, regionOrigin.z + rel.z)
         }
 
     fun cellByOrigin(): Map<BlockPos, String> =
