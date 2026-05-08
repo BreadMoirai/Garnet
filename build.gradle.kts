@@ -154,6 +154,8 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("dev.kensa:kensa-framework-junit:0.5.10")
+    testImplementation("dev.kensa:kensa-assertions-kotest:0.5.10")
     testImplementation(sourceSets["testBridge"].output)
 
     // Kotlin coroutines (also pulled transitively via fabric-language-kotlin, but declare explicitly)
@@ -209,6 +211,12 @@ tasks {
 
     test {
         useJUnitPlatform()
+        // Kensa autoregisters via ServiceLoader; point it at a per-source-set output dir
+        // so reports don't collide with the gametest/clientTest sentinels' outputs.
+        systemProperty(
+            "kensa.report.dir",
+            layout.buildDirectory.dir("reports/redstonespecs/test/kensa").get().asFile.absolutePath,
+        )
         jvmArgs(
             "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
             "-Dlog4j2.logger.redstonespecs.level=DEBUG",
