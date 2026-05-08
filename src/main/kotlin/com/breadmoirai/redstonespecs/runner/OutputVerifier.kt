@@ -80,48 +80,4 @@ object OutputVerifier {
         val actual = describeStateForCondition(condition, state)
         return TickCheck(simTime, label, expected, actual, pass)
     }
-
-    private fun evaluateConditionOnState(condition: StateCondition, state: BlockState): Boolean = when (condition) {
-        is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state) }
-        is StateCondition.Any -> condition.conditions.any { evaluateConditionOnState(it, state) }
-        is StateCondition.Not -> !evaluateConditionOnState(condition.condition, state)
-        is StateCondition.BlockType -> {
-            val actualId = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.block)
-            actualId == condition.blockId
-        }
-        is StateCondition.BoolProperty -> {
-            val prop = state.block.stateDefinition.getProperty(condition.name)
-                as? net.minecraft.world.level.block.state.properties.BooleanProperty ?: return false
-            state.getValue(prop) == condition.value
-        }
-        is StateCondition.IntProperty -> {
-            val prop = state.block.stateDefinition.getProperty(condition.name)
-                as? net.minecraft.world.level.block.state.properties.IntegerProperty ?: return false
-            state.getValue(prop) == condition.value
-        }
-        is StateCondition.EnumProperty -> blockStatePropertyStr(state, condition.name) == condition.value
-        is StateCondition.ContainerContents,
-        is StateCondition.IntRange -> false
-    }
-
-    private fun describeCondition(condition: StateCondition): String = when (condition) {
-        is StateCondition.BoolProperty -> "${condition.name}=${condition.value}"
-        is StateCondition.IntProperty -> "${condition.name}=${condition.value}"
-        is StateCondition.EnumProperty -> "${condition.name}=${condition.value}"
-        is StateCondition.BlockType -> "block=${condition.blockId}"
-        is StateCondition.All -> condition.conditions.joinToString(",") { describeCondition(it) }
-        is StateCondition.Any -> condition.conditions.joinToString("|") { describeCondition(it) }
-        is StateCondition.Not -> "!${describeCondition(condition.condition)}"
-        is StateCondition.ContainerContents -> "container"
-        is StateCondition.IntRange -> "${condition.name}=${condition.min}..${condition.max}"
-    }
-
-    private fun describeStateForCondition(condition: StateCondition, state: BlockState): String = when (condition) {
-        is StateCondition.BoolProperty -> blockStatePropertyStr(state, condition.name) ?: "missing"
-        is StateCondition.IntProperty -> blockStatePropertyStr(state, condition.name) ?: "missing"
-        is StateCondition.EnumProperty -> blockStatePropertyStr(state, condition.name) ?: "missing"
-        is StateCondition.BlockType ->
-            net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.block).toString()
-        else -> "(complex)"
-    }
 }
