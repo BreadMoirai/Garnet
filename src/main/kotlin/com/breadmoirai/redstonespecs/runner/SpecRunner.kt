@@ -22,6 +22,8 @@ class SpecRunner(
     private val snapshot: SpecSnapshot,
 ) {
     private var ticksElapsed = -1
+    var isComplete: Boolean = false
+        private set
 
     fun start() {
         LOGGER.debug("[SpecRunner#start] starting spec '{}'", spec.id)
@@ -38,6 +40,7 @@ class SpecRunner(
         if (ticksElapsed < 0) return false
         if (ticksElapsed >= spec.lifespan) {
             LOGGER.debug("[SpecRunner#onPhase] spec '{}' finished after {} ticks", spec.id, ticksElapsed)
+            isComplete = true
             return true
         }
         applyInputsAt(SimTime(ticksElapsed, phase))

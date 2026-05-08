@@ -17,6 +17,7 @@ object SpecRunnerCoordinator {
     private val runners = HashMap<SpecBlockEntity, SpecRunner>()
     private val snapshots = HashMap<SpecBlockEntity, SpecSnapshot>()
     private val stateRecorders = HashMap<SpecBlockEntity, StateRecorder>()
+    private val standaloneRunners = mutableListOf<SpecRunner>()
 
     fun startRun(be: SpecBlockEntity) {
         if (runners.containsKey(be)) return
@@ -38,6 +39,14 @@ object SpecRunnerCoordinator {
         runners[be] = runner
     }
 
+    fun registerStandalone(runner: SpecRunner) {
+        standaloneRunners += runner
+    }
+
+    fun unregisterStandalone(runner: SpecRunner) {
+        standaloneRunners -= runner
+    }
+
     fun resetSpec(be: SpecBlockEntity) {
         LOGGER.debug("[SpecRunnerCoordinator#resetSpec] resetting spec at {}", be.blockPos)
         stateRecorders.remove(be)?.let { StateRecorder.deactivate(it) }
@@ -56,11 +65,19 @@ object SpecRunnerCoordinator {
     }
 
     private fun tickRunners(level: ServerLevel, phase: Phase) {
+        // Existing BE-bound runners
         val completed = mutableListOf<SpecBlockEntity>()
         for ((be, runner) in runners) {
             if (be.level !== level) continue
             if (runner.onPhase(phase)) completed += be
         }
+        // Standalone (test-body driven) runners
+        val completedStandalone = mutableListOf<SpecRunner>()
+        for (runner in standaloneRunners) {
+            if (runner.level !== level) continue
+            if (runner.onPhase(phase)) completedStandalone += runner
+        }
+        standaloneRunners.removeAll(completedStandalone)
         for (be in completed) {
             runners.remove(be)
             finishRun(be)
