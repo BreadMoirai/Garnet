@@ -17,6 +17,8 @@ import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.breadmoirai.redstonespecs.runner.EntryMarker
 import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
 import com.breadmoirai.redstonespecs.runner.StateRecorder
+import com.breadmoirai.redstonespecs.runner.runRedstoneSpec
+import com.breadmoirai.redstonespecs.testing.core.McDispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -208,6 +210,33 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         setChangedAndSync()
     }
 
+    /**
+     * Launches [runRedstoneSpec] on the server thread using the BE's own coroutine scope.
+     *
+     * Returns false if a run is already in flight for this BE (debounce).
+     * On completion, updates [lastTestResult] and broadcasts the result.
+     */
+    fun startRun(dslSpec: com.breadmoirai.redstonespecs.dsl.RedstoneSpec, serverLevel: ServerLevel): Boolean {
+        if (!inFlightRuns.add(blockPos)) {
+            LOGGER.debug("[SpecBlockEntity#startRun] '{}' already running, ignoring", dslSpec.id)
+            return false
+        }
+        coroutineScope.launch(McDispatchers.Server) {
+            try {
+                LOGGER.info("[SpecBlockEntity#startRun] launching '{}' at {}", dslSpec.id, blockPos)
+                val recording = runRedstoneSpec(serverLevel, blockPos, dslSpec)
+                LOGGER.info("[SpecBlockEntity#startRun] '{}' PASSED", dslSpec.id)
+            } catch (e: AssertionError) {
+                LOGGER.warn("[SpecBlockEntity#startRun] '{}' FAILED: {}", dslSpec.id, e.message)
+            } catch (t: Throwable) {
+                LOGGER.error("[SpecBlockEntity#startRun] '{}' crashed unexpectedly", dslSpec.id, t)
+            } finally {
+                inFlightRuns.remove(blockPos)
+            }
+        }
+        return true
+    }
+
     fun transformTo(targetBlock: Block) {
         val lv = level ?: return
         if (lv.isClientSide) return
@@ -283,6 +312,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     companion object {
         private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
         private val registry = ConcurrentHashMap<Level, ConcurrentHashMap<BlockPos, SpecBlockEntity>>()
+        private val inFlightRuns = java.util.concurrent.ConcurrentHashMap.newKeySet<BlockPos>()
 
         private fun register(be: SpecBlockEntity) {
             val level = be.level ?: return

@@ -11,6 +11,7 @@ import com.breadmoirai.redstonespecs.managed.ManagedRoot
 import com.breadmoirai.redstonespecs.managed.ManagedServerContext
 import com.breadmoirai.redstonespecs.network.registerNetworking
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
+import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import com.breadmoirai.redstonespecs.managed.ManagedSession
@@ -31,6 +32,7 @@ class Redstonespecs : ModInitializer {
         LOGGER.debug("[Redstonespecs#onInitialize] initializing mod")
         ModRegistries.register()
         registerNetworking()
+        RedstoneTestLifecycle.register()
         registerAttackCallback()
         registerUseBlockCallback()
         SubTickPhaseEvents.PHASE.register { level, phase ->

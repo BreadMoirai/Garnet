@@ -69,13 +69,18 @@ fun registerNetworking() {
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#runSpec] originPos={}", payload.originPos)
             val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
-            val spec = be.spec ?: return@execute
+            val dataSpec = be.spec ?: return@execute
             val level = be.level as? ServerLevel ?: return@execute
             val dir = saveDir(context.server())
-            val structureId = spec.structure ?: spec.id
-            StructurePersistence.save(dir, structureId, level, be.blockPos, spec.bounds)
+            val structureId = dataSpec.structure ?: dataSpec.id
+            StructurePersistence.save(dir, structureId, level, be.blockPos, dataSpec.bounds)
             LOGGER.debug("[NetworkRegistry#runSpec] auto-saved structure '{}' before run", structureId)
-            SpecRunnerCoordinator.startRun(be)
+            val dslSpec = com.breadmoirai.redstonespecs.persistence.SpecPersistence.load(dir, dataSpec.id)
+            if (dslSpec == null) {
+                LOGGER.warn("[NetworkRegistry#runSpec] could not load dsl.RedstoneSpec for '{}' — aborting run", dataSpec.id)
+                return@execute
+            }
+            be.startRun(dslSpec, level)
         }
     }
 
