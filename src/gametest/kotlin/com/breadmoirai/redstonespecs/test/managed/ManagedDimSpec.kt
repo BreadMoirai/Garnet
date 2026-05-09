@@ -85,13 +85,27 @@ class ManagedDimSpec : RedstoneTestSpec({
 
             val results = onServer {
                 makeMockServerPlayer(this)
-                ManagedDimLifecycle.placeAll(this, ManagedRoot(tmp))
+                val root = ManagedRoot(tmp)
+                ManagedDimLifecycle.placeAll(this, root)
 
-                // Mutate spec a's cell volume by setting a block inside its bounds (offset
-                // by (1,1,1) so we're not on the placement floor, which may already be stone).
+                // The gametest world persists across runs, so the cell volume may contain
+                // leftover blocks from a prior test run. Clear both cells to air and
+                // re-place the folder so the snapshot baseline is deterministic.
                 val world = ManagedWorld.get(this).shouldNotBeNull()
                 val absA = world.absoluteCellOrigin(this, "set-b", "a").shouldNotBeNull()
+                val absB = world.absoluteCellOrigin(this, "set-b", "b").shouldNotBeNull()
                 val level = ManagedDimRegistry.of(this).managedLevel().shouldNotBeNull()
+                val air = Blocks.AIR.defaultBlockState()
+                for (pos in net.minecraft.core.BlockPos.betweenClosed(absA, absA.offset(2, 2, 2))) {
+                    level.setBlock(pos, air, 2)
+                }
+                for (pos in net.minecraft.core.BlockPos.betweenClosed(absB, absB.offset(1, 1, 1))) {
+                    level.setBlock(pos, air, 2)
+                }
+                ManagedDimLifecycle.placeFolder(this, root, "set-b")
+
+                // Now mutate spec a's cell volume by setting a block inside its bounds (offset
+                // by (1,1,1) so we're not on the placement floor).
                 level.setBlock(absA.offset(1, 1, 1), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
 
                 val r = ManagedDimLifecycle.saveFolder(this, "set-b")
