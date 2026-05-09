@@ -172,19 +172,23 @@ All payloads in `network/managed/`. Server-authoritative; clients propose. Same 
 
 **S2C:**
 
-- `ManagedTreeSnapshot(rootId, tree)` — serialized `ManagedFolderTree`.
-- `ManagedFolderLoaded(dimKey, layout, errors)` — load result + per-spec layout + per-file load errors.
-- `ManagedSaveReport(perSpec)` — save result per spec id.
-- `ManagedError(reason)` — generic error toast.
+- `ManagedTreeSnapshotS2C(leaves, intermediates, currentSubpath)` — serialized folder tree + the player's active subpath if any.
+- `ManagedFolderLoadedS2C(subpath, loadedSpecIds, parseErrors, layoutErrors)` — load result.
+- `ManagedSaveReportS2C(perSpec)` — save result, formatted strings per spec.
+- `ManagedErrorS2C(reason)` — generic error toast.
 
 ## 10. Entry Points
 
 ### Singleplayer (client)
 
 - A `ManagedRootListScreen` button is injected into `SelectWorldScreen` via mixin.
-- The screen lists known managed roots (stored in `config/redstonespecs/managed-roots.json`) with add/remove. Picking one boots an integrated server pinned to that root and with a stub overworld.
-- The save dir for this server is a fixed throwaway path (e.g. `<.minecraft>/redstonespecs-managed-session/<root-hash>/`); vanilla world data is discarded on close (the folder of specs is the only thing the user cares about persisting).
-- On join, the player is teleported immediately into `ManagedScreen` (folder browser) with the overworld backgrounded.
+- The screen lists known managed roots (stored at `<configDir>/redstonespecs/managed-roots.json`) with add/remove.
+- Picking a root calls `ManagedIntegratedBoot.boot(rootPath)`:
+  - Save name is `managed-<root-tail>-<8-hex-pathHash>` (path hash disambiguates roots with the same tail).
+  - If the save exists, `WorldOpenFlows.openWorld` reopens it; otherwise `WorldOpenFlows.createFreshLevel` creates it as a flat-void singleplayer world (`FlatLevelGeneratorPresets.THE_VOID`, creative, peaceful, allow-commands).
+  - `SERVER_STARTING` pins the `ManagedServerContext` for the root.
+  - `SERVER_STARTED` calls `ManagedDimLifecycle.placeAll(server, root)` — every leaf folder's specs land in their region.
+- Saves are **persistent** across sessions; user-placed scratch in the world persists between opens, while spec contents reload from disk on each open.
 
 ### Dedicated server
 
@@ -206,21 +210,16 @@ All payloads in `network/managed/`. Server-authoritative; clients propose. Same 
 
 **Unit (`src/test/kotlin/.../managed/`):**
 
-- `GridLayoutTest` — sort order, packing, row wrap, cell-origin math, spec-too-big exclusion.
-- `PathSanitizationTest` — char replacement, collision detection.
-- `PathTraversalGuardTest` — `..`, absolute, symlink-resolved subpaths all rejected unless `startsWith(root)`.
-- `ManagedFolderTreeTest` — scan against a `tmp` dir with leaf + intermediate folders.
+- `ManagedRootTest` — child resolution, empty-subpath returns root, parent-traversal rejected, absolute-subpath rejected, non-existent returns null, **symlink-escape** rejected, malformed-path (`InvalidPathException`) rejected.
+- `ManagedFolderTreeTest` — leaf/intermediate distinction, mixed folders, non-`.spec.kts` ignored, empty root.
+- `GridLayoutTest` — sort order, packing, row wrap, cell-origin math, spec-too-big exclusion, filename-tie spec-id tiebreak.
+- `ManagedRootsConfigTest` — JSON roundtrip, missing-file → empty list, parent-dir creation.
 
-**Gametest (`src/gametest/kotlin/.../managed/`):**
+**Gametest (`src/gametest/kotlin/.../managed/ManagedDimSpec.kt`):**
 
-- `ManagedDimLoadTest` — boot, register a transient root with two synthetic `.spec.kts` files, load the dim, assert structures placed at expected cell origins and runner blocks present.
-- `ManagedSaveBackTest` — modify blocks inside one spec's bounds and outside the other's bounds; trigger save; assert exactly the first file is rewritten and the second is byte-identical to before.
-- `ManagedNewSpecTest` — `NewManagedSpec("foo")` creates `<folder>/foo.spec.kts`, reloads, recorder block at next free cell, no runner.
-
-**Client gametest (`src/clientTest/kotlin/.../managed/`):**
-
-- `ManagedRootListScreenTest` — button injected on `SelectWorldScreen`; opens `ManagedRootListScreen`; add-root + open boots integrated server and lands on `ManagedScreen`.
-- `ManagedScreenLoadTest` — pick a folder, assert client teleported into the managed dim and at least one cell-corner label entity is rendered.
+- `load places cells in the managed dim and registers a session` — `placeAll` populates `ManagedWorld.perFolder` with two distinct cell origins.
+- `saveNow writes only specs whose cell volume changed` — modify a block in one spec's bounds; `saveFolder` reports `saved=true` for that spec only.
+- `ManagedNewSpec.create writes a stub spec.kts to the leaf folder` — file appears at `<folder>/<name>.spec.kts`.
 
 ## 13. File Layout
 
