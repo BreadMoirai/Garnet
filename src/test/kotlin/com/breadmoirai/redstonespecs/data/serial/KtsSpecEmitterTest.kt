@@ -1,16 +1,9 @@
 package com.breadmoirai.redstonespecs.data.serial
 
-import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.dsl.Phase
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.dsl.SimTime
-import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.dsl.StateCondition
 import com.breadmoirai.redstonespecs.data.dsl.redstoneSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 
 class KtsSpecEmitterTest : FunSpec({
@@ -38,26 +31,21 @@ class KtsSpecEmitterTest : FunSpec({
         KtsSpecEmitter.classNameFor("simple") shouldBe "SimpleSpec"
     }
 
-    test("emit then loadRedstoneSpec round-trips identity") {
-        val spec = RedstoneSpec(
-            id = "round_trip",
-            bounds = Vec3i(5, 4, 5),
-            lifespan = 40,
-            structure = "redstonespecs:rt",
-            entries = listOf(
-                SpecEntry(BlockPos(2, 0, 2), "lever", 0xFFFF4444.toInt(),
-                    EntryKind.INPUT, SimTime.START,
-                    StateCondition.BoolProperty("powered", true)),
-                SpecEntry(BlockPos(2, 0, 2), "lever", 0xFFFF4444.toInt(),
-                    EntryKind.INPUT, SimTime(10, Phase.START_OF_TICK),
-                    StateCondition.Not(StateCondition.BoolProperty("powered", true))),
-                SpecEntry(BlockPos(4, 0, 4), "lamp", -1,
-                    EntryKind.OUTPUT, SimTime(11, Phase.END_OF_TICK),
-                    StateCondition.BoolProperty("lit", true)),
-            ),
-        )
-        val source = KtsSpecEmitter.emit(spec)
+    test("new-dsl source round-trips meta fields via loadRedstoneSpec") {
+        // The new-DSL path: hand-authored source (as RecordingDslEmitter would emit),
+        // loaded back via KtsSpecLoader → dsl.RedstoneSpec. We verify the value-class
+        // meta fields (id, bounds, lifespan, structure); the lambda body is opaque.
+        val source = """
+            import com.breadmoirai.redstonespecs.dsl.*
+            import net.minecraft.core.Vec3i
+
+            redstoneSpec(id = "round_trip", bounds = Vec3i(5, 4, 5), lifespan = 40,
+                structure = "redstonespecs:rt") {}
+        """.trimIndent()
         val reloaded = KtsSpecLoader.loadRedstoneSpec(source, name = "round_trip.spec.kts")
-        reloaded shouldBe spec
+        reloaded.id shouldBe "round_trip"
+        reloaded.bounds shouldBe Vec3i(5, 4, 5)
+        reloaded.lifespan shouldBe 40
+        reloaded.structure shouldBe "redstonespecs:rt"
     }
 })

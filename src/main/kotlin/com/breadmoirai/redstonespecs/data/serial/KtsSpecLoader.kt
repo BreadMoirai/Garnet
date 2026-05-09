@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.data.serial
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import io.kotest.core.spec.Spec
 import java.nio.file.Path
 import kotlin.io.path.readText
@@ -17,7 +17,7 @@ import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 object KtsSpecLoader {
     private val host = BasicJvmScriptingHost()
     private val evalConfig = ScriptEvaluationConfiguration {
-        // Pin the script's runtime classloader to RedstoneSpec's loader so that
+        // Pin the script's runtime classloader to dsl.RedstoneSpec's loader so that
         // type identity is shared between host and script.
         jvm {
             baseClassLoader(RedstoneSpec::class.java.classLoader)
@@ -27,7 +27,7 @@ object KtsSpecLoader {
     /**
      * Evaluates a `.spec.kts` source and returns the declared [Spec] subclass.
      *
-     * The emitted form declares `class XSpec : RedstoneTestSpec(...)` as a nested class
+     * The old emitted form declares `class XSpec : RedstoneTestSpec(...)` as a nested class
      * of the script object. This function locates that class via reflection on the script
      * instance's declared nested classes.
      */
@@ -37,20 +37,33 @@ object KtsSpecLoader {
     }
 
     /**
-     * Evaluates a `.spec.kts` source and returns the inner [RedstoneSpec] literal.
-     * Used by the in-game editor to inspect the spec without running any tests.
+     * Evaluates a `.spec.kts` source and returns the [RedstoneSpec] value.
+     *
+     * New-style scripts (from [com.breadmoirai.redstonespecs.runner.RecordingDslEmitter])
+     * end with a `redstoneSpec(...) { ... }` expression whose return value is extracted
+     * directly from [ResultValue.Value].
      */
     fun loadRedstoneSpec(source: String, name: String = "spec.kts"): RedstoneSpec {
-        val klass = loadSpec(source, name)
-        return SpecLiteralCapture.captureFrom(klass)
-            ?: error("$name: could not extract RedstoneSpec literal from script (SpecLiteralCapture.record was never called)")
+        val eval = evalOrThrow(source, name)
+        val rv = eval.returnValue
+        when (rv) {
+            is ResultValue.Error -> throw rv.error
+            is ResultValue.NotEvaluated -> error("$name: script was not evaluated")
+            else -> { /* continue */ }
+        }
+        val value = (rv as? ResultValue.Value)?.value
+            ?: error("$name: script did not produce a RedstoneSpec value (got: $rv). " +
+                "Ensure the script ends with a `redstoneSpec(...) { ... }` expression.")
+        return value as? RedstoneSpec
+            ?: error("$name: script result is not a dsl.RedstoneSpec (got: ${value::class.qualifiedName}). " +
+                "Ensure the script ends with a `redstoneSpec(...) { ... }` expression from com.breadmoirai.redstonespecs.dsl.")
     }
 
     /** Loads a `.spec.kts` file and returns the declared [Spec] class. */
     fun loadFile(path: Path): KClass<out Spec> =
         loadSpec(path.readText(), name = path.fileName.toString())
 
-    /** Loads a `.spec.kts` file and returns its inner [RedstoneSpec] literal. */
+    /** Loads a `.spec.kts` file and returns its [RedstoneSpec] value. */
     fun loadFileAsRedstoneSpec(path: Path): RedstoneSpec =
         loadRedstoneSpec(path.readText(), name = path.fileName.toString())
 

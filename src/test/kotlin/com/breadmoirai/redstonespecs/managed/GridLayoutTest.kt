@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -16,7 +16,8 @@ class GridLayoutTest : FunSpec({
         bounds = bounds,
         lifespan = 20,
         structure = null,
-        entries = emptyList(),
+        strict = false,
+        block = {},
     )
 
     test("single spec lands at (0, yBase, 0)") {

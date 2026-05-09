@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs.managed
 
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtIo
@@ -34,7 +33,9 @@ object ManagedCellSaver {
         }
 
         return runCatching {
-            loaded.sourceFile.writeText(KtsSpecEmitter.emit(loaded.spec))
+            // TODO(Phase 5+): re-emit source file via new dsl path; old KtsSpecEmitter
+            // only supports data.RedstoneSpec, which is being removed. Source file is now
+            // the canonical record — written by RecordingDslEmitter at finalize time.
             val structureId = loaded.spec.structure ?: loaded.spec.id
             val structureFile = folderAbsolute.resolve("$structureId.nbt")
             NbtIo.writeCompressed(liveNbt, structureFile)

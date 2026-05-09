@@ -3,8 +3,8 @@ package com.breadmoirai.redstonespecs.managed
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
+import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.NbtAccounter
@@ -157,7 +157,7 @@ object ManagedDimLifecycle {
         }
         level.setBlock(anchorPos, anchorBlock.defaultBlockState(), 2)
         val be = level.getBlockEntity(anchorPos) as? SpecBlockEntity
-        be?.setSpec(spec)
+        // TODO(Task 16+): bind spec to block entity via new dsl.RedstoneSpec path
         be?.managedSourcePath = folder.resolve(filename)
 
         // Snapshot the cell volume after placement.

@@ -1,9 +1,9 @@
 package com.breadmoirai.redstonespecs.persistence
 
-import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.data.RedstoneSpec as DataRedstoneSpec
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
+import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.SpecFileInfo
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import org.slf4j.LoggerFactory
@@ -16,7 +16,7 @@ private const val EXT = ".spec.kts"
 
 object SpecPersistence {
 
-    fun save(saveDir: Path, spec: RedstoneSpec, recording: StateRecording? = null) {
+    fun save(saveDir: Path, spec: DataRedstoneSpec, recording: StateRecording? = null) {
         saveDir.createDirectories()
         val file = saveDir.resolve("${spec.id}$EXT")
         file.writeText(KtsSpecEmitter.emit(spec))
@@ -60,11 +60,13 @@ object SpecPersistence {
     fun listSpecsInfo(saveDir: Path): List<SpecFileInfo> {
         return listIds(saveDir).mapNotNull { id ->
             val spec = load(saveDir, id) ?: return@mapNotNull null
+            // New dsl.RedstoneSpec has no entry list (entries are closures, not data).
+            // Input/output counts are not available at load time in the new DSL.
             SpecFileInfo(
                 id = spec.id,
                 lifespan = spec.lifespan,
-                inputCount = spec.entries.count { it.kind == EntryKind.INPUT },
-                outputCount = spec.entries.count { it.kind == EntryKind.OUTPUT },
+                inputCount = 0,
+                outputCount = 0,
                 structure = spec.structure,
             )
         }

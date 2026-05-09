@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import java.nio.file.Path
 

@@ -209,7 +209,7 @@ fun registerNetworking() {
                 LOGGER.warn("[NetworkRegistry#loadFromFile] spec '{}' not found on disk", payload.specId)
                 return@execute
             }
-            be.setSpec(spec)
+            // TODO(Phase 5): bind spec to block entity via new dsl path (editor block being removed)
             LOGGER.debug("[NetworkRegistry#loadFromFile] loaded spec '{}' from disk", payload.specId)
 
             val structureId = spec.structure ?: spec.id
@@ -262,11 +262,11 @@ fun registerNetworking() {
             val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             if (level.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return@execute
             val dir = saveDir(context.server())
-            val loaded = SpecPersistence.load(dir, payload.specId) ?: run {
+            // TODO(Phase 5): bind spec to block entity via new dsl path (editor block being removed)
+            SpecPersistence.load(dir, payload.specId) ?: run {
                 LOGGER.warn("[NetworkRegistry#runnerLoadSpec] spec '{}' not found on disk", payload.specId)
                 return@execute
             }
-            be.setSpec(loaded)
             LOGGER.debug("[NetworkRegistry#runnerLoadSpec] loaded spec '{}' into runner at {}", payload.specId, payload.originPos)
         }
     }

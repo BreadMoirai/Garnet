@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.data.serial
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.ScriptCompilationConfiguration
 import kotlin.script.experimental.api.defaultImports
@@ -9,9 +9,8 @@ import kotlin.script.experimental.jvm.jvm
 
 object SpecScriptCompilationConfig : ScriptCompilationConfiguration({
     defaultImports(
-        "com.breadmoirai.redstonespecs.data.dsl.*",
-        "com.breadmoirai.redstonespecs.dsl.Phase",
-        "com.breadmoirai.redstonespecs.dsl.SimTime",
+        "com.breadmoirai.redstonespecs.dsl.*",
+        "net.minecraft.core.Vec3i",
         // Testing surface: lets .spec.kts name RedstoneTestSpec, runRedstoneSpec,
         // SpecLiteralCapture, and kotest matchers without explicit imports.
         "com.breadmoirai.redstonespecs.testing.RedstoneTestSpec",
@@ -23,7 +22,7 @@ object SpecScriptCompilationConfig : ScriptCompilationConfiguration({
         "io.kotest.matchers.shouldBe",
     )
     jvm {
-        // Anchor to RedstoneSpec's classloader so the script's RedstoneSpec
+        // Anchor to dsl.RedstoneSpec's classloader so the script's RedstoneSpec
         // identity matches the host's RedstoneSpec identity. With
         // dependenciesFromCurrentContext the test/run environment can pick
         // a different loader (mod jar vs. system) and the cast fails.

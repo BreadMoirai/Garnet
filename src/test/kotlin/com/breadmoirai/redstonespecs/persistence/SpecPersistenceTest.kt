@@ -2,7 +2,6 @@ package com.breadmoirai.redstonespecs.persistence
 
 import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.dsl.SimTime
-import com.breadmoirai.redstonespecs.data.dsl.redstoneSpec
 import com.breadmoirai.redstonespecs.runner.BlockStateChange
 import com.breadmoirai.redstonespecs.runner.PropertyDiff
 import com.breadmoirai.redstonespecs.runner.StateRecording
@@ -11,6 +10,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import net.minecraft.SharedConstants
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.Identifier
 import net.minecraft.server.Bootstrap
@@ -26,24 +26,29 @@ class SpecPersistenceTest : FunSpec({
         Bootstrap.bootStrap()
     }
 
-    test("save then load round-trips a spec via spec_kts") {
+    test("writeSpecKts then load round-trips a new-dsl spec") {
         val tmp = createTempDirectory("SpecPersistenceTest")
-        val spec = redstoneSpec("rt") {
-            bounds(3, 3, 3)
-            lifespan = 10
-            input(1, 0, 1, label = "in") { atStart { powered() } }
-            output(2, 0, 2, label = "out") { at(tick = 5) { lit() } }
-        }
-        SpecPersistence.save(tmp, spec)
+        // New-DSL path: write raw .spec.kts source, then load it back.
+        val source = """
+            import com.breadmoirai.redstonespecs.dsl.*
+            import net.minecraft.core.Vec3i
+
+            redstoneSpec(id = "rt", bounds = Vec3i(3, 3, 3), lifespan = 10) {}
+        """.trimIndent()
+        SpecPersistence.writeSpecKts(tmp, "rt", source)
         tmp.resolve("rt.spec.kts").exists() shouldBe true
 
         val loaded = SpecPersistence.load(tmp, "rt")
-        loaded shouldBe spec
+        loaded shouldNotBe null
+        loaded!!.id shouldBe "rt"
+        loaded.bounds shouldBe Vec3i(3, 3, 3)
+        loaded.lifespan shouldBe 10
     }
 
     test("save with recording writes sidecar and loadRecording returns it") {
         val tmp = createTempDirectory("SpecPersistenceTest-recording")
-        val spec = redstoneSpec("rec") {
+        // Legacy save (data.RedstoneSpec → KtsSpecEmitter) still writes the file.
+        val spec = com.breadmoirai.redstonespecs.data.dsl.redstoneSpec("rec") {
             bounds(3, 3, 3)
             lifespan = 5
         }
@@ -77,7 +82,7 @@ class SpecPersistenceTest : FunSpec({
 
     test("save without recording leaves no sidecar") {
         val tmp = createTempDirectory("SpecPersistenceTest-no-recording")
-        val spec = redstoneSpec("norec") {
+        val spec = com.breadmoirai.redstonespecs.data.dsl.redstoneSpec("norec") {
             bounds(3, 3, 3)
             lifespan = 5
         }
