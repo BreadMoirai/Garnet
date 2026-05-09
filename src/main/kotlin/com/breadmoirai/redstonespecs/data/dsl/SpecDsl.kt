@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.data.dsl
 
 import com.breadmoirai.redstonespecs.data.EntryKind
+import com.breadmoirai.redstonespecs.dsl.SpecDslMarker
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import net.minecraft.core.BlockPos

@@ -1,6 +1,8 @@
 package com.breadmoirai.redstonespecs.data.dsl
 
 import com.breadmoirai.redstonespecs.data.EntryKind
+import com.breadmoirai.redstonespecs.dsl.ConditionScope
+import com.breadmoirai.redstonespecs.dsl.SpecDslMarker
 import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
