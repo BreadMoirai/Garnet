@@ -33,10 +33,9 @@ Three pieces collaborate:
    open dropdown reference: `getOpenDropdown()` / `setOpenDropdown()`.
 2. **`DropdownButton.extractContents`** only renders the button face. It
    never draws the option list, regardless of `isOpen`.
-3. **The host's `extractRenderState`** (see `SpecEditorScreen`) checks for
-   an open dropdown and, if present, calls `graphics.nextStratum()` and then
-   `open.extractPopup(...)` on a fresh stratum where no scroll-area scissor
-   is active.
+3. **The host's `extractRenderState`** checks for an open dropdown and, if
+   present, calls `graphics.nextStratum()` and then `open.extractPopup(...)`
+   on a fresh stratum where no scroll-area scissor is active.
 
 ```kotlin
 override fun extractRenderState(graphics, mouseX, mouseY, partialTick) {
@@ -78,26 +77,18 @@ still reaches the widget underneath.
 `DropdownButton` accepts an optional `displayOverride: Component`. If set,
 the button face shows that text instead of the currently selected option's
 label. This is for **menu-mode** dropdowns — buttons that act as "pick an
-action" rather than "show current value". The "+ Add Row" button in
-`SpecEditorScreen.buildLayout` uses this: the dropdown's purpose is to pick
-which property to add, but the face should always read "+ Add Row" rather
-than the most-recently-picked property name.
+action" rather than "show current value". Any future screen that uses a
+dropdown as a command picker (rather than a current-value indicator) should
+set `displayOverride` so the button face stays constant.
 
 ## Alternative considered: CycleButton
 
 Vanilla's `CycleButton` avoids popups entirely (click cycles through values
-in place). It works fine for short option lists but fails for the
-`SpecEditorScreen` use cases:
+in place). It works fine for short option lists but fails when:
 
-- Adding a row needs a discoverable list of available property names, not a
-  cycle.
-- The phase dropdown lists 4–5 enum values; cycling forces the user to
-  click through every option to read them.
+- The list requires discoverability (user needs to read all options, not
+  cycle through them).
+- The option count makes cycling impractical (4–5+ enum values).
 
 The popup-stratum pattern was chosen as the lesser evil over either cycling
 or manually save/restoring the scissor stack inside every dropdown.
-
-## Files
-
-- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/DropdownButton.kt`
-- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecEditorScreen.kt`

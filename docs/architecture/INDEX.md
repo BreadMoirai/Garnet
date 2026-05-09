@@ -7,5 +7,5 @@ High-level system design, module boundaries, data flow, and the invariants that 
 ## Articles
 
 - [Module map](module-map.md) — Tour of the source tree, package responsibilities, dependency direction, and where to start reading for a given concern. Tags: modules, layout, dependencies, entry-points.
-- [The record → finalize → run → verify pipeline](recording-pipeline.md) — End-to-end flow of a spec from world capture to validation, with handoff types and per-stage invariants. Tags: pipeline, lifecycle, recording, finalization, runner, verification, dataflow.
+- [The record → emit → run → verify pipeline](recording-pipeline.md) — End-to-end flow of a spec from world capture to validation, with handoff types and per-stage invariants. Tags: pipeline, lifecycle, recording, finalization, runner, verification, dataflow.
 - [Managed redstone worlds](managed-redstone-worlds.md) — Void-dim workspace per folder via runtime datapack; deterministic grid; per-spec bounds save-back. Single-dim+region fallback for first-start / mid-session folders. Tags: managed-worlds, dimensions, grid, persistence, datapack.

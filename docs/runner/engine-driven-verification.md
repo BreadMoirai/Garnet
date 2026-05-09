@@ -1,68 +1,81 @@
 ---
-title: Engine-driven verification
+title: runRedstoneSpec — inline verification
 tags: [execution, kotest, verification]
-summary: How runRedstoneSpec drives SpecRunner from inside a Kotest test body and asserts via assertOutputsMatch.
+summary: How runRedstoneSpec drives the tick loop from inside a Kotest test body and asserts via inline shouldBe callbacks in the spec lambda.
 ---
 
-# Engine-driven verification
+# runRedstoneSpec — inline verification
 
-After the bridge work landed in Plans A–F (2026-05-07), verification is no longer a
-separate post-run step. Instead it runs inline, inside a Kotest test body, through
-standard assertion calls.
+Verification is not a separate post-run step. Assertions execute inline,
+inside the tick loop, through callbacks registered by the spec's `block`
+lambda. The spec *is* the test.
 
 ## How a run starts
 
-`SpecRunnerCoordinator.startRun` spawns a worker thread and hands off to
-`EngineDrivenRun.run`. That class owns the per-run lifecycle:
+`runRedstoneSpec(level, origin, spec)` is a suspend fun in `runner/runRedstoneSpec.kt`.
+It is called directly from a Kotest test body (or from the runner block's
+server coroutine). There is no coordinator singleton or per-run object —
+all state lives on the call stack.
 
-1. Registers the runner with the standalone-runner registry so Kotest callbacks can
-   reach it.
-2. Calls `SpecRunner.start` to prime the runner with the loaded spec and its bounds.
-3. Suspends on the server thread (via `McDispatchers.Server`) while `onPhase` advances
-   tick-by-tick through the spec's lifespan.
+1. Takes a `SpecSnapshot` of the region so it can be restored before and after.
+2. Restores the snapshot, activating a `StateRecorder` over the bounds.
+3. Invokes `spec.block` **once** with a `SpecRun` receiver. This call
+   populates two sorted callback maps:
+   - `SpecRun.inputActions` — indexed by `SimTime`; fire at `START_OF_TICK`.
+   - `SpecRun.assertions` — indexed by `SimTime`; fire at `END_OF_TICK`.
+4. Loops `0 until spec.lifespan` ticks: fires start-of-tick inputs, calls
+   `awaitTickEnd()`, fires end-of-tick assertions.
+5. If `spec.strict`, scans for unexpected change-ticks at declared output
+   positions.
+6. If any failures were collected, throws `AssertionError` with all messages
+   joined.
+7. Restores the snapshot, deactivates the recorder. Returns the `StateRecording`.
 
-Relevant paths:
-- `runner/SpecRunnerCoordinator.kt` — owns the registry; calls `EngineDrivenRun.run`.
-- `runner/EngineDrivenRun.kt` — the per-run object; drives `SpecRunner` and holds the
-  diagnostic `StateRecording`.
-
-## How the test body drives the runner
-
-`runRedstoneSpec` is the DSL entry point available inside any `RedstoneTestSpec` test
-body. It suspends until the run completes, then returns the finished `StateRecording`.
+## How the test body uses it
 
 ```kotlin
 test("comparator latches after 4 ticks") {
-    val recording = runRedstoneSpec(specId)
-    assertOutputsMatch(spec, recording)
-    // or hand-written:
-    recording.signalAt(BlockPos(4, 2, 1), tick = 4) shouldBe 15
+    runRedstoneSpec(level, origin, spec)
+    // throws AssertionError if the spec's output assertions failed
 }
 ```
 
-The test body runs on the Kotest dispatcher; `runRedstoneSpec` marshals the actual
-runner calls onto the MC server thread through `CoroutineDispatcherFactory`.
+The spec itself carries all assertions:
 
-## Verification
+```kotlin
+// inside the .spec.kts file
+redstoneSpec("comparator_latch") {
+    lifespan = 6
+    input(1, 1, 0) {
+        at(tick = 0) { press() }
+    }
+    output(4, 1, 2, label = "latch") {
+        at(tick = 4) { powered shouldBe true }
+    }
+}
+```
 
-`assertOutputsMatch(spec, recording)` is in `testing/RedstoneSpecAssertions.kt`. It
-walks every output entry in the spec and delegates to standard Kotest `shouldBe`
-assertions — so failures land at exact assertion granularity with Kotest's diff
-output, not as a single rollup message.
+`runRedstoneSpec` is the only public entry point. The test body never needs
+to call `assertOutputsMatch` separately — the lambda's `output { … }` blocks
+already contain all assertions.
 
-For tests that want finer control, any `signalAt` / `stateAt` call on the recording
-can be asserted directly with `shouldBe` or any Kotest matcher.
+## What replaced the old engine trio
 
-## What replaced OutputVerifier
-
-`OutputVerifier` (the old post-run validator) was removed. Its responsibilities split:
+The old `SpecRunnerCoordinator` / `EngineDrivenRun` / `SpecRunner` trio
+was replaced by a single suspend function and a lean `SpecRun` context object.
 
 | Old                                   | New                                              |
 |---------------------------------------|--------------------------------------------------|
-| Per-entry declared-check evaluation   | `assertOutputsMatch` in `RedstoneSpecAssertions` |
-| Unexpected-change detection           | Hand-written assertions or custom matchers       |
-| Post-run `VerificationResult` rollup  | Kotest `TestResult` with per-assertion failures  |
+| `SpecRunnerCoordinator.startRun`      | `runRedstoneSpec(level, origin, spec)`           |
+| `EngineDrivenRun.run`                 | Tick loop inside `runRedstoneSpec`               |
+| `SpecRunner.applyCondition`           | `InputScope` callbacks + `tryApplyAsPlayerInteraction` |
+| `assertOutputsMatch` / `OutputVerifier` | `OutputScope` callbacks inline in the tick loop  |
+| `RecordingFinalizer`                  | `RecordingDslEmitter` (emit stage, not run stage)|
 
-The "unexpected change" scan was not ported — the engine-driven path expects specs to
-declare what they care about; out-of-band changes are caught by keeping specs tight
-rather than by scanning every tick in every position.
+## strict mode
+
+If `RedstoneSpec.strict = true`, `runRedstoneSpec` additionally scans the
+replay recording for change-ticks at declared output positions that were
+**not** declared in the spec. Each unexpected change adds a `SpecFailure`
+entry. This replaces the old "unexpected change detection" that
+`OutputVerifier` performed.

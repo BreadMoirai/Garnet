@@ -7,12 +7,12 @@ summary: How the kotlin-scripting host loads .spec.kts files; why a custom host 
 # .spec.kts Script Host
 
 `RedstoneSpec` is authored as `.spec.kts` files in the world directory and
-loaded at runtime by `KtsSpecLoader` (in `data/serial/`). Files are evaluated
+loaded at runtime by `KtsSpecLoader` (in `persistence/`). Files are evaluated
 by a custom `BasicJvmScriptingHost` configured via `SpecScriptCompilationConfig`.
 
 ## Why a custom host (vs JSR-223)
 
-- Pre-imports the DSL (`com.breadmoirai.redstonespecs.data.dsl.*`) so script
+- Pre-imports the DSL (`com.breadmoirai.redstonespecs.dsl.*`) so script
   authors don't need import lines.
 - Better error reporting: diagnostics flow through `ResultWithDiagnostics`,
   not buried in `ScriptException`.

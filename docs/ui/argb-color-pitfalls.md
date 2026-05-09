@@ -29,13 +29,10 @@ The same applies to any `graphics.text(...)` / `graphics.fill(...)` call:
 written a transparent color.** When in doubt, `-1` for opaque white,
 `0xFF000000.toInt() or rgb` to put alpha onto a 24-bit RGB.
 
-## Pitfall 2: Working colors stored as 24-bit RGB
+## Pitfall 2: Colors stored as 24-bit RGB
 
-`SpecEditorScreen.workingColor` stores user-edited entry tint as a 24-bit
-value (`Int and 0xFFFFFF`). The hex EditBox parses six hex digits, masks
-off any high bits, and feeds it to `ColorSwatchWidget`.
-
-The swatch must add alpha back when drawing:
+Any widget or screen that stores a color as 24-bit RGB (`Int and 0xFFFFFF`)
+must add alpha back before passing to `fill()` / `text()`:
 
 ```kotlin
 override fun extractWidgetRenderState(graphics, mouseX, mouseY, partialTick) {
@@ -46,9 +43,9 @@ override fun extractWidgetRenderState(graphics, mouseX, mouseY, partialTick) {
 Without the `0xFF000000.toInt() or` step the fill is invisible — same root
 cause as pitfall 1 but for `fill()`.
 
-The 24-bit storage is intentional: spec entries serialize the color as RGB
-(alpha is meaningless for an entry tint). The alpha is a **rendering
-concern only**, applied at draw time.
+24-bit storage is appropriate when the alpha channel is meaningless for the
+stored value (e.g. a tint color where transparency is always opaque). The
+alpha is a **rendering concern only**, applied at draw time.
 
 ## Why `0xFF000000.toInt()`?
 
@@ -59,6 +56,5 @@ error.
 
 ## Files
 
-- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/ColorSwatchWidget.kt`
-- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/DropdownButton.kt`
-- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/IntStepper.kt`
+- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderScreen.kt`
+- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerScreen.kt`

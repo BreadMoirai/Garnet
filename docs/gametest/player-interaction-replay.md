@@ -6,18 +6,18 @@ summary: Why the runner dispatches button-style inputs through ButtonBlock.press
 
 # Replaying player-interaction inputs through the runner
 
-The runner replay (`SpecRunner.applyCondition`,
-`src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecRunner.kt`)
-has two paths for applying an input condition to a block:
+The runner replay (`tryApplyAsPlayerInteraction` in
+`src/main/kotlin/com/breadmoirai/redstonespecs/runner/PlayerInteractionDispatch.kt`)
+has two paths for applying an input block-state change:
 
-1. The **generic path** — flatten the condition into property pairs and
-   call `level.setBlock(pos, state, 3)`.
-2. The **player-interaction path** — `tryApplyAsPlayerInteraction(...)`,
-   which dispatches to a block-type-specific method that mirrors what a
-   player's click would do.
+1. The **generic path** — `level.setBlock(pos, target, 3)`.
+2. The **player-interaction path** — dispatch to a block-type-specific
+   method that mirrors what a player's click would do (e.g.
+   `ButtonBlock.press`).
 
-Gametests need to know which path their inputs take, because the two
-paths produce different downstream timing.
+`InputScope` callbacks (inside `input(x,y,z) { at(tick) { … } }`) call this
+function. Gametests need to know which path their inputs take, because the
+two paths produce different downstream timing.
 
 ## The button gotcha
 
@@ -68,11 +68,10 @@ When adding a new block type:
   game events.
 - Detect only the *meaningful transition* (e.g. button: `false→true`
   triggers press; `true→false` is left to the natural schedule).
-- Return `true` to skip the generic `setBlock` fall-through. Returning
-  `false` lets the generic path apply other modifications layered on
-  top.
+- The function falls through to `setBlock` when the block-specific path
+  is not taken — no explicit return value needed.
 
-Then add a gametest scenario whose `drive` uses `helper.useBlock` (or
+Then add a gametest scenario whose recording uses `helper.useBlock` (or
 the player-driven equivalent) so recording and replay traverse the
 same path.
 
@@ -82,10 +81,9 @@ Even with `ButtonBlock.press`, replay timing drifts ~1 tick from the
 original recording for player-driven circuits. The recording's press
 fires from gametest's `thenExecute` — which runs in
 `MinecraftServer.tick` *after* all level phases of that tick — while
-the runner applies `SimTime.START` inputs from `runner.start()`,
-called pre-tick during `SpecRunnerCoordinator.startRun`. Aligning the
-press phase exactly is non-trivial; relevant code paths are
-`MinecraftServer.tick` (gametest tick is last), `SubTickPhaseEvents`,
-and `SpecRunner.start`/`onPhase`. Until that's solved, scenarios
-should tolerate a 1-tick offset on player-driven edges if you write
-exact-time assertions, or use SIMPLE mode where this doesn't matter.
+the `runRedstoneSpec` tick loop fires `START_OF_TICK` inputs before
+`awaitTickEnd()`. Aligning the press phase exactly is non-trivial;
+relevant code paths are `MinecraftServer.tick` (gametest tick is last),
+`SubTickPhaseEvents`, and the `runRedstoneSpec` loop. Until that's
+solved, scenarios should tolerate a 1-tick offset on player-driven
+edges if you write exact-time assertions.

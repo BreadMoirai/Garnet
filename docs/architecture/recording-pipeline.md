@@ -1,21 +1,20 @@
 ---
-title: The record → finalize → run → verify pipeline
+title: The record → emit → run → verify pipeline
 tags: [pipeline, lifecycle, recording, finalization, runner, verification, dataflow]
 summary: End-to-end flow of a spec from world capture to validation, naming the handoff types and the invariants that hold at each boundary.
 ---
 
-# The record → finalize → run → verify pipeline
+# The record → emit → run → verify pipeline
 
 This is the system's spine. Every other concern (UI, persistence, networking) feeds in or out of one of the four stages below. Each stage is documented in detail elsewhere; this article exists to show how they compose.
 
 ```
-   world          recorder              finalizer            runner              assertions
+   world          recorder            dsl emitter           runner              assertions
     │                │                     │                   │                    │
-    │  StateRecorder │  StateRecording  → RedstoneSpec  →  SpecRunner       →  assertOutputsMatch
-    │   .start       │   (per-phase        (flat SpecEntry    .start                (Kotest
-    │   .onPhaseStart│    snapshots)       rows derived       .onPhase               shouldBe,
-    │                │                     from changes)      applies inputs,        inline in
-    │                │                                        samples outputs)       test body)
+    │  StateRecorder │  StateRecording  → .spec.kts  →  runRedstoneSpec  →  inline Kotest shouldBe
+    │   .start       │   (per-phase        (DSL source    (invokes spec        (failures thrown at
+    │   .onPhaseStart│    snapshots)        text derived   lambda, fires        end of run as
+    │                │                     from changes)  inputs, asserts)     AssertionError)
     └────────────────┴─── SpecBlockEntity (origin, bounds) ─────────────────────────┘
 ```
 
@@ -30,57 +29,52 @@ Per server tick, for each `Phase` of interest, the recorder samples block states
 - Coordinates are origin-relative (the BE's `originPos` is `(0,0,0)`; bounds are a `Vec3i` extent).
 - All inputs the user marked are present at their captured `SimTime`.
 
-## Stage 2 — Finalize (derive entries)
+## Stage 2 — Emit (derive DSL source)
 
-**Owner:** `runner/RecordingFinalizer.kt`. Pure function: `(baseSpec, recording) → RedstoneSpec?`.
+**Owner:** `runner/RecordingDslEmitter.kt`. Pure function: `(recording) → String` (`.spec.kts` source text).
 
-Walks the recording, diffs adjacent snapshots, and emits **flat `SpecEntry` rows** — one per change-tick at each I/O position:
-
-- For each input position with marker entries: emits one `START`-time entry capturing the initial state, then one entry per later change-tick.
-- For each output position: emits one entry per change-tick observed in the recording.
-
-`(pos, kind, label, color)` headers come from the base spec's marker entries — those provided by the user before recording. Marker times/conditions are discarded; everything is re-derived from the recording.
+Walks the recording, diffs adjacent snapshots, and emits `input(…) { … }` / `output(…) { … }` DSL blocks — one call-to `at(tick)` per change-tick at each I/O position.
 
 **Invariants leaving this stage:**
-- Every `entry.pos` lies inside `bounds` (enforced by `RedstoneSpec.init {}`).
-- Output entries within a `(pos, kind)` group are sorted by `SimTime`.
-- Bounds remain `Vec3i` size; entry positions are origin-local.
+- The emitted `.spec.kts` evaluates to a `RedstoneSpec` whose `block` lambda, when invoked by the runner, registers the same inputs and assertions as the recording observed.
+- Bounds remain `Vec3i` size; positions are origin-local in all emitted coordinates.
 
-This is the point where the in-flight `StateRecording` becomes a persistable `RedstoneSpec`. After finalize, the recording is no longer needed.
+This is the point where the in-flight `StateRecording` becomes a persistable `.spec.kts` file. After emit, the recording is no longer needed for replay.
 
 ## Stage 3 — Run (replay)
 
-**Owner:** `runner/SpecRunner.kt`, dispatched by `runner/SpecRunnerCoordinator.kt` via `runner/EngineDrivenRun.kt`.
+**Owner:** `runner/runRedstoneSpec.kt`.
 
-`runRedstoneSpec` in a Kotest test body suspends while `EngineDrivenRun.run` drives `SpecRunner` on the MC server thread. `SpecRunner` walks each `Phase` and:
-1. Applies any input `SpecEntry` whose `time` matches the current `SimTime`. Button-style inputs route through `ButtonBlock.press` via `tryApplyAsPlayerInteraction` (see [runner/player-interaction-dispatch.md](../runner/player-interaction-dispatch.md)) — raw `setBlock` would skip the depower scheduled tick.
-2. Samples block states and accumulates a fresh `StateRecording`.
+`runRedstoneSpec(level, origin, spec)` is a suspend fun that:
+1. Takes a `SpecSnapshot` of the region, then restores it so the run starts from a known state.
+2. Invokes `spec.block` once with a `SpecRun` receiver — this populates `inputActions` and `assertions` callback maps.
+3. Loops `0 until spec.lifespan` ticks, firing `START_OF_TICK` input callbacks then `awaitTickEnd()` then `END_OF_TICK` assertion callbacks.
+4. If `spec.strict`, scans for unexpected change-ticks at declared output positions and appends failures.
+5. If any failures were collected, throws `AssertionError`.
+
+Button-style inputs route through `ButtonBlock.press` via `tryApplyAsPlayerInteraction` (see [runner/player-interaction-dispatch.md](../runner/player-interaction-dispatch.md)) — raw `setBlock` would skip the depower scheduled tick.
 
 **Invariants leaving this stage:**
-- The runner-produced recording covers the same SimTime range as the original.
-- Determinism: a spec replayed twice produces the same recording, modulo MC-side scheduled-tick ordering.
+- Assertions fired inline: failures are Kotest `shouldBe` violations or explicit `AssertionError`s accumulated in `SpecRun.failures`.
+- Determinism: a spec replayed twice produces the same failure set, modulo MC-side scheduled-tick ordering.
 
 ## Stage 4 — Verify (assert)
 
-**Owner:** `testing/RedstoneSpecAssertions.kt`. Inline in the Kotest test body after `runRedstoneSpec` returns.
+Verification is **inline** in Stage 3 — there is no separate verify stage. Assertion callbacks registered by `output(…) { … }` blocks execute inside the tick loop. If `runRedstoneSpec` throws, the caller (runner block or gametest) sees it as a test failure.
 
-`assertOutputsMatch(spec, recording)` walks each output `SpecEntry` and calls Kotest `shouldBe` assertions against the recorded post-tick state. Failures surface at exact assertion granularity with Kotest's diff output.
-
-The previous `OutputVerifier` (post-run diff against a `VerificationResult` rollup) was removed; see [runner/engine-driven-verification.md](../runner/engine-driven-verification.md) for the full before/after mapping.
-
-**Output:** standard Kotest `TestResult` — consumed by the runner block's UI feedback and the HTML/JUnit reports.
+**Output:** `AssertionError` on failure, or a `StateRecording` of the replay on success — consumed by the runner block's UI feedback and the HTML/JUnit reports.
 
 ## Where each stage lives on disk and over the wire
 
 | Stage | In memory | On disk | Over the network |
 |---|---|---|---|
 | Record | `StateRecording` | _(transient)_ | _(server-only)_ |
-| Finalize | `RedstoneSpec` | `<id>.spec.kts` + `<id>.nbt` (see [persistence/spec-on-disk-format.md](../persistence/spec-on-disk-format.md)) | `SaveSpecEntryC2SPayload` for individual edits (encoded via `SpecJsonCodec`; deferred for retirement in Plan G) |
+| Emit | `String` (DSL text) → `RedstoneSpec` | `<id>.spec.kts` + `<id>.nbt` (see [persistence/spec-on-disk-format.md](../persistence/spec-on-disk-format.md)) | _(server-only save)_ |
 | Run | `StateRecording` (replay) | _(transient)_ | _(server-only)_ |
-| Verify | `TestResult` | _(transient)_ | _(displayed via S2C)_ |
+| Verify | `AssertionError` / `StateRecording` | _(transient)_ | _(displayed via S2C)_ |
 
 ## Common confusions
 
-- **The runner records too.** Stage 3 produces a fresh `StateRecording` even though the goal is verification. Stage 4 asserts against *that* recording — it does not re-sample the world directly.
-- **Finalize is pure.** It takes the recording in, returns a spec out. No I/O.
-- **A `SpecEntry` is one (time, condition) pair.** Multi-step input or output sequences are represented by *multiple* entries at the same `(pos, kind)` — there is no nested timeline list.
+- **The runner records too.** Stage 3 produces a fresh `StateRecording` even though the goal is verification — it returns this recording as the function result for optional diagnostics.
+- **Emit is pure.** It takes the recording in, returns DSL source text out. No I/O.
+- **The spec lambda runs once, not once per tick.** `spec.block` is invoked once before the tick loop to register callbacks. The callbacks themselves fire during the loop.

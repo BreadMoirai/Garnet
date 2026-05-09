@@ -1,17 +1,23 @@
 ---
-title: Player-Interaction Dispatch in SpecRunner
+title: Player-Interaction Dispatch
 tags: [execution, replay, mc-api, scheduling]
 summary: Why button input is replayed via ButtonBlock.press instead of raw setBlock, and where to extend for new input blocks.
 ---
 
 # Player-Interaction Dispatch
 
-`SpecRunner.applyCondition` has two paths for applying a recorded input condition to the world:
+`tryApplyAsPlayerInteraction` in `runner/PlayerInteractionDispatch.kt` applies
+a target `BlockState` to a position in two possible ways:
 
-1. **Block-type-specific dispatch** — `tryApplyAsPlayerInteraction(state, pos, mods)`. If it returns `true`, the runner returns early.
-2. **Generic fall-through** — flatten the condition into property mods, merge into the current `BlockState`, `level.setBlock(pos, state, 3)`.
+1. **Block-type-specific dispatch** — for `ButtonBlock`, routes through
+   `ButtonBlock.press` so the scheduled-tick side-effect fires correctly.
+2. **Generic fall-through** — `level.setBlock(pos, target, 3)` for all other
+   blocks.
 
 The specific path exists because some blocks have side effects beyond state mutation that the generic path skips. The motivating case is `ButtonBlock`.
+
+`InputScope` callbacks (inside `redstoneSpec { input(…) { … } }`) call
+`tryApplyAsPlayerInteraction` when applying a state change at a tick boundary.
 
 ## ButtonBlock — why setBlock isn't enough
 
@@ -31,25 +37,26 @@ Why this matters at replay time: recordings of player-driven circuits are produc
 
 Anything driven by the button's redstone signal between those two events runs off a different cadence than the recording — neighbor updates fire at different SimTimes, and downstream comparators/repeaters fall out of sync. The verifier then explodes with `unexpected change` failures even though the spec is logically correct.
 
-## Current dispatch (SpecRunner.kt:135)
+## Current dispatch (`runner/PlayerInteractionDispatch.kt`)
 
-```
+```kotlin
 if (block is ButtonBlock) {
-    val targetPowered = mods.firstOrNull { it.first == "powered" }?.second?.toBoolean() ?: return false
-    val currentPowered = state.getValue(BlockStateProperties.POWERED)
+    val targetPowered = if (target.hasProperty(BlockStateProperties.POWERED))
+        target.getValue(BlockStateProperties.POWERED) else return
+    val currentPowered = current.getValue(BlockStateProperties.POWERED)
     if (targetPowered && !currentPowered) {
-        block.press(state, level, pos, null)
-        return true
+        block.press(current, level, pos, null)
+        return
     }
 }
-return false
+if (target != current) level.setBlock(pos, target, 3)
 ```
 
 Notes on the current logic:
 
 - **Only the `false → true` transition is dispatched.** The `true → false` depower is left to the natural schedule. The recording's later "powered=false" entry will fire after the schedule has already run; both calls collapse into a no-op (state is already `powered=false`).
-- **Returns `false` when `mods` lacks `powered`.** Other property changes on a button (e.g. `face`, `facing`) are not player-interaction events — they fall through to the generic setBlock path.
-- **No fall-through after a successful press.** When `tryApplyAsPlayerInteraction` returns `true`, `applyCondition` returns immediately and never issues a setBlock. This is critical: a setBlock after `press` would re-stomp the state and could clobber the schedule depending on flags.
+- **Falls through when `target` lacks the `POWERED` property.** Other property changes on a button (e.g. `face`, `facing`) are not player-interaction events — they fall through to the generic `setBlock`.
+- **No double-setBlock after a successful press.** The function returns immediately after `press`; the final `setBlock` guard only fires when the button path was not taken.
 
 ## Extending for new blocks
 
@@ -62,8 +69,8 @@ Avoid driving `useWithoutItem` with a fake player unless necessary. Lever-style 
 
 ## Known residual drift
 
-Even with `ButtonBlock.press`, replay timing for the very first input drifts ~1 tick from the recording. The recording's press fires from gametest `thenExecute`, which runs in `MinecraftServer.tick` after all level phases. The runner applies `SimTime.START` inputs from `runner.start()`, called pre-tick during `SpecRunnerCoordinator.startRun`. Aligning them exactly requires running `start()` from a matching post-EOT hook; this is non-trivial and currently unresolved.
+Even with `ButtonBlock.press`, replay timing for the very first input can drift ~1 tick from the original recording depending on how the recording was produced. The `runRedstoneSpec` tick loop applies `START_OF_TICK` inputs at the beginning of each tick iteration, which may not align exactly with when `gametest thenExecute` fired during recording. Aligning them exactly requires carefully matching the `SimTime` anchor in the emitted DSL; this is a known limitation of the current emitter.
 
 ## Related
 
-- [`output-verifier-post-run.md`](output-verifier-post-run.md) — where unexpected-change diagnostics fire, which is the symptom path for this kind of drift.
+- [runRedstoneSpec — inline verification](engine-driven-verification.md) — how the tick loop fires the InputScope callbacks that call this function.

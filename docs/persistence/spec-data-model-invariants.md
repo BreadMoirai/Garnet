@@ -1,33 +1,43 @@
 ---
-title: Spec data model invariants
-tags: [data-model, design]
-summary: What RedstoneSpec / SpecEntry guarantee at construction time and what callers can rely on.
+title: Spec DSL invariants
+tags: [data-model, dsl, design]
+summary: What RedstoneSpec / SpecRun guarantee at construction time and what callers can rely on.
 ---
 
-# Spec data model invariants
+# Spec DSL invariants
 
 ## RedstoneSpec
-- `bounds: Vec3i` — every axis ≥ 1.
-- `lifespan: Int` — ticks; runner stops the run once `ticksElapsed >= lifespan`.
-- `structure: String?` — optional structure resource id; supplies initial block state at run start.
-- `entries: List<SpecEntry>` — flat list. May be empty.
-- For every `entry` in `entries`: `entry.pos` lies inside `bounds`
-  (`0 <= pos.{x,y,z} < bounds.{x,y,z}`).
 
-## SpecEntry
-- `pos`, `label`, `color`, `kind`, `time`, `condition` — all required.
-- No required relationship between entries — duplicate `(pos, kind, time)`
-  is allowed at construction time, but `RedstoneSpec.withEntryAddedOrUpdated`
-  treats `(pos, kind, time)` as the entry's identity for replace-vs-append.
+- `id: String` — stable identifier; used as the filename stem for `.spec.kts` and `.nbt`.
+- `bounds: Vec3i` — every axis ≥ 1 (enforced in `init {}`).
+- `lifespan: Int` — ticks ≥ 1; `runRedstoneSpec` loops `0 until lifespan`.
+- `structure: String?` — optional structure resource id; supplies initial block state at run start if set.
+- `strict: Boolean` — if true, `runRedstoneSpec` scans for unexpected change-ticks at declared output positions.
+- `block: SpecRun.() -> Unit` — the spec lambda. **This is the spec.** There is no flat entry list.
 
-## What's gone (post data-layer redesign)
+## SpecRun (execution context)
 
-- `SpecMode` (mode field on RedstoneSpec).
-- `BreakpointSpec` and `AutoSpec` sealed-class siblings.
-- The "exactly one `SimTime.START` entry per InputSpec" invariant.
-- `BoundingBox` — replaced by `Vec3i` size; positions are local.
-- The nested `entries: List<Pair<SimTime, StateCondition>>` per InputSpec/OutputSpec
-  — every (time, condition) is now its own SpecEntry row.
+Constructed once per run by `runRedstoneSpec`; passed as receiver to `spec.block`.
 
-Initial state for the circuit-under-test now comes from the structure file
-referenced by `RedstoneSpec.structure`, NOT from `SimTime.START` entries.
+- `inputActions: TreeMap<SimTime, List<() -> Unit>>` — callbacks scheduled by `input { at(tick) { … } }`.
+- `assertions: TreeMap<SimTime, List<() -> Unit>>` — callbacks scheduled by `output { at(tick) { … } }`.
+- `failures: MutableList<SpecFailure>` — collected by `OutputScope.reportFailure`; thrown as `AssertionError` at run end.
+- `outputDeclaredTicks: Map<BlockPos, Set<Int>>` — tracks which ticks each output position declared, for strict-mode scanning.
+
+## SimTime ordering
+
+`SimTime(tick, phase, order)` is `Comparable`: sorts by `tick` → `phase.ordinal` → `order`. Phase enum order is load-bearing:
+`START_OF_TICK < BLOCK_EVENTS < TILE_ENTITY_TICK < SCHEDULED_TICKS < RANDOM_TICKS < END_OF_TICK`.
+
+`SimTime.START = SimTime(-1, START_OF_TICK)` sorts before all real ticks.
+`SimTime.END = SimTime(Int.MAX_VALUE, END_OF_TICK)` sorts after all real ticks.
+
+## What's gone (post drop-data-layer refactor)
+
+- `SpecEntry` data class — replaced by the DSL lambda approach; inputs/outputs are callbacks, not rows.
+- `EntryKind.INPUT` / `OUTPUT` discriminator.
+- `TestResult` — replaced by `SpecRun.failures` + `AssertionError`.
+- `SpecMode`, `BreakpointSpec`, `AutoSpec` — removed.
+- `SpecJsonCodec` — removed; JSON is not used for spec storage or network sync.
+- `KtsSpecEmitter` / `RecordingFinalizer` — replaced by `RecordingDslEmitter`.
+- `RedstoneSpec.withEntryAddedOrUpdated` — no longer needed; the spec is a lambda, not a list.

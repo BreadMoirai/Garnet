@@ -13,7 +13,7 @@ The repo uses three separate source sets:
 - `src/test/` — Kotest unit specs, run on the JVM with no MC client or
   server. Bootstrap MC via `SharedConstants.tryDetectVersion()` +
   `Bootstrap.bootStrap()` when registries are needed
-  (`RecordingFinalizerTest` is the canonical example).
+  (`StateRecordingStorageTest` is the canonical example).
 - `src/gametest/` — Kotest specs driven by a single `@GameTest` sentinel
   that runs inside a dedicated MC server instance (`runGameTest`). Use the
   `awaitTicks`/`spawnStructure` primitives from the bridge.
@@ -33,35 +33,36 @@ keybinds, payload round-trips driven from the client — it belongs in
 
 ## Where the contracts actually live
 
-- **Unit (`src/test/`):** `SpecJsonCodecTest`, `SpecDslTest`,
-  `KtsSpecLoaderTest`, `KtsSpecEmitterTest`, `SpecPersistenceTest`,
-  `StateConditionTest`, `StateRecordingStorageTest`,
+- **Unit (`src/test/`):** `SpecDslTest`, `KtsSpecLoaderTest`,
+  `SpecPersistenceTest`, `StateConditionTest`, `StateRecordingStorageTest`,
   `StateRecordingViewTest`, `IntEditBoxLogicTest`, `SimTimeTest`. All
   pure data / algorithm checks; no level, no runner.
 - **Server gametest (`src/gametest/`):** `RedstonespecsGameTests` —
   currently a placeholder stub. These need a real level: only the live MC
   tick loop produces accurate scheduled-tick cadence, neighbor-update
-  ordering, and comparator/piston timing. Pending re-authoring against
-  the flat `SpecEntry` model using the Kotest bridge.
+  ordering, and comparator/piston timing. Author new tests using
+  `runRedstoneSpec` with the DSL lambda; see
+  [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
 - **Client gametest (`src/clientTest/`):** `RedstonespecsClientTests` —
-  also a placeholder stub at the moment. Pre-redesign this drove the full
-  recorder screen → marker tool → editor screen → runner block flow.
-  Runs via `runClientTest`.
+  also a placeholder stub at the moment. Runs via `runClientTest`;
+  exercises the full recorder screen → runner block flow.
 
-## Why finalizer logic is unit-tested but mode contracts are gametests
+## Why DSL/algorithm logic is unit-tested but circuit behaviour is gametested
 
-`RecordingFinalizerTest` proves the finalizer is correct *for any*
-`StateRecording`. But the recordings the finalizer will see in
-production come from MC's recording machinery, which depends on the
-tick loop and neighbor-update ordering. A unit test cannot validate
-"recording for circuit X under mode Y has shape Z" — only a gametest
-can produce a real recording for X.
+Unit tests exercise the DSL's callback-scheduling correctness with
+synthetic `SpecRun` instances — without a real MC tick loop. They can
+assert that `input(x,y,z) { at(tick=3) { … } }` registers exactly one
+callback at `SimTime(3, START_OF_TICK)`, for example.
+
+Circuit-level tests (does a comparator latch on tick 4?) require the live
+MC tick loop: scheduled-tick cadence, neighbor-update ordering, and
+piston timing cannot be replicated in a unit test.
 
 Conversely, gametests are slow (full MC boot, world creation, ticks).
-Asserting algebraic properties of finalizer output across many
-synthetic recordings would be wasteful and flaky in a gametest. Hence
-the split: unit-test the algorithm with synthetic inputs; gametest the
-real-world inputs against pinned expectations.
+Asserting algebraic properties of DSL scheduling or DSL-emitter output
+across many synthetic inputs would be wasteful and flaky in a gametest.
+Hence the split: unit-test the algorithm with synthetic inputs; gametest
+the real-world circuit behaviour.
 
 ## Practical guidance
 
@@ -88,4 +89,4 @@ default block state, properties) needs:
 
 Forgetting this surfaces as `NullPointerException` deep in registry
 lookup, not as a clean "registries not loaded" error. See
-`RecordingFinalizerTest` for the pattern.
+`StateRecordingStorageTest` for the pattern.
