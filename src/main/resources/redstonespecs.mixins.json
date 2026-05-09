@@ -4,6 +4,8 @@
   "package": "com.breadmoirai.redstonespecs.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
+    "ConnectionAccessor",
+    "ServerCommonPacketListenerImplAccessor",
     "ServerLevelSetBlockMixin",
     "ServerLevelPhaseMixin"
   ],

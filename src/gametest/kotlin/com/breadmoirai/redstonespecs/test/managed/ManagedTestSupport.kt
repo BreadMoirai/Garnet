@@ -1,5 +1,7 @@
 package com.breadmoirai.redstonespecs.test.managed
 
+import com.breadmoirai.redstonespecs.mixin.ConnectionAccessor
+import com.breadmoirai.redstonespecs.mixin.ServerCommonPacketListenerImplAccessor
 import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
 import com.mojang.authlib.GameProfile
 import io.netty.channel.embedded.EmbeddedChannel
@@ -74,29 +76,17 @@ fun clearCellVolume(level: ServerLevel, origin: BlockPos, size: Vec3i) {
 /**
  * Reads all [CustomPacketPayload]s sent to [player] since the last call.
  *
- * Accessor chain (both fields accessed via reflection due to visibility in MC 26.1):
- *   - `player.connection` — public field (`ServerGamePacketListenerImpl`)
- *   - `.connection` — protected field on `ServerCommonPacketListenerImpl` (`Connection`);
- *     Kotlin cannot access Java `protected` fields outside the class hierarchy, so reflection is used.
- *   - `.channel` — private field on `Connection` (`Channel`), also accessed via reflection.
- *
- * The [EmbeddedChannel] set up by [makeMockServerPlayer] captures all outbound
- * packets in its outbound queue; this function drains that queue.
+ * Walks the player's [EmbeddedChannel] outbound queue (set up by [makeMockServerPlayer])
+ * and unwraps each [ClientboundCustomPayloadPacket]. The chain
+ * `player.connection -> ServerCommonPacketListenerImpl.connection -> Connection.channel`
+ * crosses two non-public fields; access is granted via accessor mixins
+ * ([ServerCommonPacketListenerImplAccessor], [ConnectionAccessor]).
  */
-private val listenerConnectionField: java.lang.reflect.Field by lazy {
-    // `connection` is declared on ServerCommonPacketListenerImpl (the supertype), not on the impl class
-    val superClass = Class.forName("net.minecraft.server.network.ServerCommonPacketListenerImpl")
-    superClass.getDeclaredField("connection").also { it.isAccessible = true }
-}
-
-private val connectionChannelField: java.lang.reflect.Field by lazy {
-    Connection::class.java.getDeclaredField("channel").also { it.isAccessible = true }
-}
-
 fun drainPayloads(player: ServerPlayer): List<CustomPacketPayload> {
-    val gameListener = player.connection
-    val conn = listenerConnectionField.get(gameListener) as? Connection ?: return emptyList()
-    val ch = connectionChannelField.get(conn) as? EmbeddedChannel ?: return emptyList()
+    val listener = player.connection
+    val conn = (listener as ServerCommonPacketListenerImplAccessor).`redstonespecs$getConnection`()
+    val ch = (conn as ConnectionAccessor).`redstonespecs$getChannel`() as? EmbeddedChannel
+        ?: return emptyList()
     val out = mutableListOf<CustomPacketPayload>()
     while (true) {
         val msg = ch.readOutbound<Any>() ?: break
