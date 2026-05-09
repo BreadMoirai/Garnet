@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.data
 
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

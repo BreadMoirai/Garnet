@@ -5,7 +5,7 @@ import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.allEntries
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload

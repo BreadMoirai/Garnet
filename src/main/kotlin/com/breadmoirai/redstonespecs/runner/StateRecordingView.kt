@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.runner
 
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.level.block.state.BlockState

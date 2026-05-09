@@ -1,9 +1,9 @@
 package com.breadmoirai.redstonespecs.testing.runner
 
-import com.breadmoirai.redstonespecs.data.Phase
+import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.outputs
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import com.breadmoirai.redstonespecs.runner.StateRecordingView

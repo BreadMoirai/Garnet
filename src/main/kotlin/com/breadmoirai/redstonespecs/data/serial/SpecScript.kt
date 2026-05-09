@@ -10,8 +10,8 @@ import kotlin.script.experimental.jvm.jvm
 object SpecScriptCompilationConfig : ScriptCompilationConfiguration({
     defaultImports(
         "com.breadmoirai.redstonespecs.data.dsl.*",
-        "com.breadmoirai.redstonespecs.data.Phase",
-        "com.breadmoirai.redstonespecs.data.SimTime",
+        "com.breadmoirai.redstonespecs.dsl.Phase",
+        "com.breadmoirai.redstonespecs.dsl.SimTime",
         // Testing surface: lets .spec.kts name RedstoneTestSpec, runRedstoneSpec,
         // SpecLiteralCapture, and kotest matchers without explicit imports.
         "com.breadmoirai.redstonespecs.testing.RedstoneTestSpec",

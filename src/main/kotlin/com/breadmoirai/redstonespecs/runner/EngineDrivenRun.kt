@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.runner
 
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.TestResult
 import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter

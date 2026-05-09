@@ -2,8 +2,8 @@ package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload

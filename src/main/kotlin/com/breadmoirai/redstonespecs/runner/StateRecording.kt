@@ -7,8 +7,8 @@ import net.minecraft.resources.Identifier
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.level.block.state.properties.Property
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import java.util.UUID
 
 data class PropertyDiff(val name: String, val to: String)

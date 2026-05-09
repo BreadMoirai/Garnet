@@ -1,8 +1,8 @@
 package com.breadmoirai.redstonespecs.runner
 
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.TestResult
 import com.breadmoirai.redstonespecs.data.TickCheck
 import com.breadmoirai.redstonespecs.network.TestResultS2CPayload

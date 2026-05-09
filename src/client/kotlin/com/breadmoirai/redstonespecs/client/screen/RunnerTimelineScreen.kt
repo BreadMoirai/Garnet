@@ -2,8 +2,8 @@ package com.breadmoirai.redstonespecs.client.screen
 
 import com.breadmoirai.redstonespecs.client.state.ClientRunnerState
 import com.breadmoirai.redstonespecs.client.widget.TimelineSliderWidget
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import com.breadmoirai.redstonespecs.runner.StateRecordingView
 import net.minecraft.client.gui.components.ScrollableLayout

@@ -1,8 +1,8 @@
 package com.breadmoirai.redstonespecs.data.dsl
 
 import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.StateCondition
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

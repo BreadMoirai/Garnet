@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.data
 
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import net.minecraft.core.BlockPos
 
 data class SpecEntry(

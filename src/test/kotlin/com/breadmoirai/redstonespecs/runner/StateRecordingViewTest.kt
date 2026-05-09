@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.runner
 
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.SharedConstants

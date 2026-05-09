@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.mixin;
 
-import com.breadmoirai.redstonespecs.data.Phase;
+import com.breadmoirai.redstonespecs.dsl.Phase;
 import com.breadmoirai.redstonespecs.event.SubTickPhaseEvents;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;

@@ -1,9 +1,9 @@
 package com.breadmoirai.redstonespecs.runner
 
 import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.data.Phase
+import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.StateCondition
 import com.breadmoirai.redstonespecs.data.allEntries

@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.data
 
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import com.breadmoirai.redstonespecs.runner.stateRecordingFromNbt
 import com.breadmoirai.redstonespecs.runner.toNbt

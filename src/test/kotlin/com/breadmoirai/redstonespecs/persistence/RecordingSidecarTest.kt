@@ -1,7 +1,7 @@
 package com.breadmoirai.redstonespecs.persistence
 
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.Phase
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.runner.BlockStateChange
 import com.breadmoirai.redstonespecs.runner.PropertyDiff
 import com.breadmoirai.redstonespecs.runner.StateRecording

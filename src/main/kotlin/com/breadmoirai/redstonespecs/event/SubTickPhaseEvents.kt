@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.event
 
-import com.breadmoirai.redstonespecs.data.Phase
+import com.breadmoirai.redstonespecs.dsl.Phase
 import net.fabricmc.fabric.api.event.Event
 import net.fabricmc.fabric.api.event.EventFactory
 import net.minecraft.server.level.ServerLevel

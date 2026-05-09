@@ -2,7 +2,7 @@ package com.breadmoirai.redstonespecs.data.serial
 
 import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.SimTime
+import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.data.StateCondition
 import com.mojang.serialization.Codec
