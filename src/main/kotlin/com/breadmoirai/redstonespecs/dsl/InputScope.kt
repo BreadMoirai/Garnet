@@ -36,9 +36,12 @@ class InputScope internal constructor(
     private fun scheduleAt(time: SimTime, block: InputAction.() -> Unit) {
         val absPos = run.origin.offset(pos)
         run.scheduleInput(time) {
-            val current = run.level.getBlockState(absPos)
+            val level = checkNotNull(run.level) {
+                "SpecRun.level is null — did you use specRunForTest() outside a scheduler-only unit test?"
+            }
+            val current = level.getBlockState(absPos)
             val target = InputAction(current).apply(block).resolve()
-            tryApplyAsPlayerInteraction(run.level, absPos, current, target)
+            tryApplyAsPlayerInteraction(level, absPos, current, target)
         }
     }
 }

@@ -19,12 +19,21 @@ data class SpecFailure(val label: String, val time: SimTime, val message: String
  * `level` and `origin` are intentionally `internal` — the DSL methods only
  * need to register callbacks; per-tick application happens through the
  * runner, which has the same references.
+ *
+ * ### Nullability of `level` / `recordingView`
+ * Both fields are nullable so that [specRunForTest] can construct a
+ * scheduler-only instance without a real [ServerLevel]. The runner always
+ * passes non-null values; callbacks that access these fields will
+ * `checkNotNull` at the call site (in [InputScope] / [OutputScope]) if ever
+ * invoked without a level — making accidental level access loudly obvious
+ * rather than silently incorrect.  This is a minimal internal change: all
+ * public API and runner call-sites are unaffected.
  */
 @SpecDslMarker
 class SpecRun internal constructor(
-    internal val level: ServerLevel,
+    internal val level: ServerLevel?,
     internal val origin: BlockPos,
-    internal val recordingView: () -> StateRecordingViewLike,
+    internal val recordingView: (() -> StateRecordingViewLike)?,
 ) {
     internal val inputActions: TreeMap<SimTime, MutableList<() -> Unit>> = TreeMap()
     internal val assertions: TreeMap<SimTime, MutableList<() -> Unit>> = TreeMap()
@@ -65,6 +74,22 @@ class SpecRun internal constructor(
         failures.add(failure)
     }
 }
+
+/**
+ * Test-only factory that constructs a [SpecRun] without a real [ServerLevel].
+ *
+ * The returned instance is suitable for unit tests that exercise only the
+ * scheduler bookkeeping (populating [SpecRun.inputActions] /
+ * [SpecRun.assertions]). Any attempt to actually *invoke* a registered
+ * callback — which would touch [level] or [recordingView] — will hit a
+ * `checkNotNull` in [InputScope] / [OutputScope] and throw immediately,
+ * making accidental level access obvious.
+ */
+internal fun specRunForTest(): SpecRun = SpecRun(
+    level = null,
+    origin = BlockPos.ZERO,
+    recordingView = null,
+)
 
 /**
  * Trim adapter so [SpecRun] doesn't take a hard dependency on the runner

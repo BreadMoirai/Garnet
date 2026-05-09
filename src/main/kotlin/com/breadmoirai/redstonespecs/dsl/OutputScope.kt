@@ -39,7 +39,10 @@ class OutputScope internal constructor(
         if (declaredTick != null) run.declareOutputTick(pos, declaredTick)
 
         run.scheduleAssertion(time) {
-            val view = run.recordingView()
+            val recordingView = checkNotNull(run.recordingView) {
+                "SpecRun.recordingView is null — did you use specRunForTest() outside a scheduler-only unit test?"
+            }
+            val view = recordingView()
             val state = view.stateAt(absPos, anchorTime(time))
             if (!evaluateConditionOnState(condition, state)) {
                 val expected = describeCondition(condition)
