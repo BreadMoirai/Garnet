@@ -6,6 +6,7 @@ import com.breadmoirai.redstonespecs.event.SubTickPhaseEvents
 import com.breadmoirai.redstonespecs.item.SpecMarkerTool
 import com.breadmoirai.redstonespecs.item.UndoStack
 import com.breadmoirai.redstonespecs.managed.ManagedCommand
+import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
 import com.breadmoirai.redstonespecs.managed.ManagedServerContext
 import com.breadmoirai.redstonespecs.network.registerNetworking
@@ -40,6 +41,15 @@ class Redstonespecs : ModInitializer {
                 val root = ManagedRoot(rootPath)
                 ManagedServerContext.set(server, ManagedServerContext(root))
             }
+        }
+        ServerLifecycleEvents.SERVER_STARTED.register { server ->
+            // Dedicated-server / pre-pinned path: if a managed context was pinned (by config or
+            // by ManagedIntegratedBoot's own SERVER_STARTING listener), materialize specs once
+            // the server is ready. Integrated boot has its own one-shot listener, but it is a
+            // no-op here because that listener also pins the same root and runs placeAll the
+            // same way; this listener is the dedicated-server entry point.
+            val ctx = ManagedServerContext.get(server) ?: return@register
+            ManagedDimLifecycle.placeAll(server, ctx.root)
         }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             ManagedCommand.register(dispatcher)
