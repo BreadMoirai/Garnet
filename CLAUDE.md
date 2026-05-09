@@ -49,3 +49,4 @@ Don't save: code patterns the code itself shows, transient task state, recent-ch
 | [gametest/](docs/gametest/INDEX.md) | testing, fixtures, helpers, harness | Game-test infrastructure, test contexts, conventions for new tests |
 | [minecraft/](docs/minecraft/INDEX.md) | mc-api, mixins, versions, quirks | MC source patterns, mixin gotchas, render-state API, version-specific behavior |
 | [build/](docs/build/INDEX.md) | gradle, stonecutter, fabric, deps | Multi-version build setup, Stonecutter task paths, dependency choices |
+| [use-cases/](docs/use-cases/INDEX.md) | use-cases, scenarios, coverage, audit, test-matrix | User journeys decomposed into system interactions, with a per-journey test-coverage audit |
