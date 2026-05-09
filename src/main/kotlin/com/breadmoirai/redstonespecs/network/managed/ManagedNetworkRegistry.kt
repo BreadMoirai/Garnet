@@ -35,97 +35,88 @@ object ManagedNetworkRegistry {
         PayloadTypeRegistry.clientboundPlay().register(ManagedErrorS2C.TYPE, ManagedErrorS2C.STREAM_CODEC)
 
         ServerPlayNetworking.registerGlobalReceiver(ListManagedTreeC2S.TYPE) { _, ctx ->
-            ctx.server().execute { sendTree(ctx.server(), ctx.player()) }
+            ctx.server().execute { handleListTree(ctx.server(), ctx.player()) }
         }
-
-        // LoadManagedFolderC2S now means "teleport me to that folder's region" — placement is
-        // automatic at server start via ManagedDimLifecycle.placeAll.
         ServerPlayNetworking.registerGlobalReceiver(LoadManagedFolderC2S.TYPE) { payload, ctx ->
-            val player = ctx.player()
-            ctx.server().execute {
-                val root = rootFor(ctx.server()) ?: run {
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("managed-root not configured"))
-                    return@execute
-                }
-                if (root.resolveSubpath(payload.subpath) == null) {
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("subpath not found or escapes root: ${payload.subpath}"))
-                    return@execute
-                }
-                val ok = ManagedTeleport.toFolder(ctx.server(), player, payload.subpath)
-                if (!ok) {
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("folder not placed: ${payload.subpath}"))
-                    return@execute
-                }
-                val world = ManagedWorld.get(ctx.server())
-                val loadedIds = world?.perFolder?.get(payload.subpath)?.keys?.toList().orEmpty()
-                ServerPlayNetworking.send(player, ManagedFolderLoadedS2C(
-                    subpath = payload.subpath,
-                    loadedSpecIds = loadedIds,
-                    parseErrors = emptyList(),
-                    layoutErrors = emptyList(),
-                ))
-            }
+            ctx.server().execute { handleLoadFolder(ctx.server(), ctx.player(), payload) }
         }
-
-        // UnloadManagedFolderC2S now just clears the player's UI focus; nothing is unloaded
-        // from the world. (saveAll is intentionally not called here — explicit save is the user's job.)
         ServerPlayNetworking.registerGlobalReceiver(UnloadManagedFolderC2S.TYPE) { _, ctx ->
-            val player = ctx.player()
-            ctx.server().execute {
-                ManagedSession.clear(player.uuid)
-                ServerPlayNetworking.send(player, ManagedSaveReportS2C(emptyList()))
-            }
+            ctx.server().execute { handleUnload(ctx.server(), ctx.player()) }
         }
-
-        // SaveNowC2S now saves everything dirty across all folders.
         ServerPlayNetworking.registerGlobalReceiver(SaveNowC2S.TYPE) { _, ctx ->
-            val player = ctx.player()
-            ctx.server().execute {
-                val results = ManagedDimLifecycle.saveAll(ctx.server())
-                ServerPlayNetworking.send(player, ManagedSaveReportS2C(results.map(::formatSaveResult)))
-            }
+            ctx.server().execute { handleSaveNow(ctx.server(), ctx.player()) }
         }
-
         ServerPlayNetworking.registerGlobalReceiver(NewManagedSpecC2S.TYPE) { payload, ctx ->
-            val player = ctx.player()
-            ctx.server().execute {
-                val activeSubpath = ManagedSession.get(player.uuid)?.activeSubpath ?: run {
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("no folder selected"))
-                    return@execute
-                }
-                val root = rootFor(ctx.server()) ?: run {
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("managed-root not configured"))
-                    return@execute
-                }
-                val world = ManagedWorld.get(ctx.server())
-                val folderAbsolute = world?.folderAbsoluteByPath?.get(activeSubpath)
-                    ?: root.resolveSubpath(activeSubpath)
-                    ?: run {
-                        ServerPlayNetworking.send(player, ManagedErrorS2C("active folder not resolvable: $activeSubpath"))
-                        return@execute
-                    }
-                try {
-                    ManagedNewSpec.create(folderAbsolute, payload.name)
-                } catch (e: Exception) {
-                    LOGGER.error("[managed/new-spec] create {}/{}: {}", activeSubpath, payload.name, e.message, e)
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("new-spec failed: ${e.message}"))
-                    return@execute
-                }
-                val report = try {
-                    ManagedDimLifecycle.placeFolder(ctx.server(), root, activeSubpath)
-                } catch (e: Exception) {
-                    LOGGER.error("[managed/new-spec] re-place {}: {}", activeSubpath, e.message, e)
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("re-place failed: ${e.message}"))
-                    return@execute
-                }
-                ServerPlayNetworking.send(player, ManagedFolderLoadedS2C(
-                    subpath = report.subpath,
-                    loadedSpecIds = report.loaded,
-                    parseErrors = report.parseErrors.map { "${it.filename}: ${it.message}" },
-                    layoutErrors = report.errors.map { "${it.specId} (${it.filename}): ${it.reason}" },
-                ))
-            }
+            ctx.server().execute { handleNewSpec(ctx.server(), ctx.player(), payload) }
         }
+    }
+
+    internal fun handleListTree(server: MinecraftServer, player: ServerPlayer) {
+        sendTree(server, player)
+    }
+
+    internal fun handleLoadFolder(server: MinecraftServer, player: ServerPlayer, payload: LoadManagedFolderC2S) {
+        val root = rootFor(server) ?: run {
+            ServerPlayNetworking.send(player, ManagedErrorS2C("managed-root not configured")); return
+        }
+        if (root.resolveSubpath(payload.subpath) == null) {
+            ServerPlayNetworking.send(player, ManagedErrorS2C("subpath not found or escapes root: ${payload.subpath}")); return
+        }
+        val ok = ManagedTeleport.toFolder(server, player, payload.subpath)
+        if (!ok) {
+            ServerPlayNetworking.send(player, ManagedErrorS2C("folder not placed: ${payload.subpath}")); return
+        }
+        val world = ManagedWorld.get(server)
+        val loadedIds = world?.perFolder?.get(payload.subpath)?.keys?.toList().orEmpty()
+        ServerPlayNetworking.send(player, ManagedFolderLoadedS2C(
+            subpath = payload.subpath,
+            loadedSpecIds = loadedIds,
+            parseErrors = emptyList(),
+            layoutErrors = emptyList(),
+        ))
+    }
+
+    internal fun handleUnload(server: MinecraftServer, player: ServerPlayer) {
+        ManagedSession.clear(player.uuid)
+        ServerPlayNetworking.send(player, ManagedSaveReportS2C(emptyList()))
+    }
+
+    internal fun handleSaveNow(server: MinecraftServer, player: ServerPlayer) {
+        val results = ManagedDimLifecycle.saveAll(server)
+        ServerPlayNetworking.send(player, ManagedSaveReportS2C(results.map(::formatSaveResult)))
+    }
+
+    internal fun handleNewSpec(server: MinecraftServer, player: ServerPlayer, payload: NewManagedSpecC2S) {
+        val activeSubpath = ManagedSession.get(player.uuid)?.activeSubpath ?: run {
+            ServerPlayNetworking.send(player, ManagedErrorS2C("no folder selected")); return
+        }
+        val root = rootFor(server) ?: run {
+            ServerPlayNetworking.send(player, ManagedErrorS2C("managed-root not configured")); return
+        }
+        val world = ManagedWorld.get(server)
+        val folderAbsolute = world?.folderAbsoluteByPath?.get(activeSubpath)
+            ?: root.resolveSubpath(activeSubpath)
+            ?: run {
+                ServerPlayNetworking.send(player, ManagedErrorS2C("active folder not resolvable: $activeSubpath")); return
+            }
+        try {
+            ManagedNewSpec.create(folderAbsolute, payload.name)
+        } catch (e: Exception) {
+            LOGGER.error("[managed/new-spec] create {}/{}: {}", activeSubpath, payload.name, e.message, e)
+            ServerPlayNetworking.send(player, ManagedErrorS2C("new-spec failed: ${e.message}")); return
+        }
+        val report = try {
+            ManagedDimLifecycle.placeFolder(server, root, activeSubpath)
+        } catch (e: Exception) {
+            LOGGER.error("[managed/new-spec] re-place {}: {}", activeSubpath, e.message, e)
+            ServerPlayNetworking.send(player, ManagedErrorS2C("re-place failed: ${e.message}")); return
+        }
+        ServerPlayNetworking.send(player, ManagedFolderLoadedS2C(
+            subpath = report.subpath,
+            loadedSpecIds = report.loaded,
+            parseErrors = report.parseErrors.map { "${it.filename}: ${it.message}" },
+            layoutErrors = report.errors.map { "${it.specId} (${it.filename}): ${it.reason}" },
+        ))
     }
 
     private fun sendTree(server: MinecraftServer, player: ServerPlayer) {
