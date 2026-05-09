@@ -11,7 +11,7 @@ A managed root is a folder of `.spec.kts` files projected into a runtime-generat
 
 ---
 
-### UC-MAN-01: Declare and persist a managed root
+### UC-MAN-01 — Declare and persist a managed root
 
 User registers a filesystem folder as a managed-spec root; that registration survives MC restarts.
 
@@ -23,7 +23,7 @@ User registers a filesystem folder as a managed-spec root; that registration sur
 
 ---
 
-### UC-MAN-02: Boot the managed singleplayer world
+### UC-MAN-02 — Boot the managed singleplayer world
 
 Opening a managed root from `ManagedRootListScreen` creates or reopens the dedicated singleplayer save for that root, then seeds it with the spec layout.
 
@@ -35,7 +35,7 @@ Opening a managed root from `ManagedRootListScreen` creates or reopens the dedic
 
 ---
 
-### UC-MAN-03: Scan the folder tree and assign regions
+### UC-MAN-03 — Scan the folder tree and assign regions
 
 On `placeAll`, the mod walks the managed root's directory tree, classifies folders as leaves or intermediates, and assigns each leaf a non-overlapping region in the overworld.
 
@@ -47,7 +47,7 @@ On `placeAll`, the mod walks the managed root's directory tree, classifies folde
 
 ---
 
-### UC-MAN-04: Lay out and place spec cells in the grid
+### UC-MAN-04 — Lay out and place spec cells in the grid
 
 Each leaf folder's specs are sorted, assigned to a row-major grid slot, and physically placed as structure NBT + anchor blocks in the overworld at the folder's region origin.
 
@@ -60,7 +60,7 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 
 ---
 
-### UC-MAN-05: Browse the folder tree in-game and teleport to a folder
+### UC-MAN-05 — Browse the folder tree in-game and teleport to a folder
 
 A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
 
@@ -72,7 +72,7 @@ A player selects a leaf folder from the in-game UI, which teleports them to that
 
 ---
 
-### UC-MAN-06: Create a new spec cell in the active folder
+### UC-MAN-06 — Create a new spec cell in the active folder
 
 A player names a new spec from the in-game UI; the server writes a stub `.spec.kts`, re-places the folder, and the new cell appears in the world.
 
@@ -84,7 +84,7 @@ A player names a new spec from the in-game UI; the server writes a stub `.spec.k
 
 ---
 
-### UC-MAN-07: Save edited cell blocks back to disk
+### UC-MAN-07 — Save edited cell blocks back to disk
 
 When the player has modified blocks inside a spec's cell AABB, the server detects the diff and overwrites the source `.spec.kts` structure file.
 
@@ -97,7 +97,7 @@ When the player has modified blocks inside a spec's cell AABB, the server detect
 
 ---
 
-### UC-MAN-08: Unload active folder and handle ungraceful session end
+### UC-MAN-08 — Unload active folder and handle ungraceful session end
 
 A player explicitly unloads their active folder focus, or the session is cleared when the player disconnects or the server stops.
 
