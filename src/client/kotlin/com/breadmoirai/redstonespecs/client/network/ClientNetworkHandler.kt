@@ -3,6 +3,7 @@ package com.breadmoirai.redstonespecs.client.network
 import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
 import com.breadmoirai.redstonespecs.client.screen.RecorderSetupScreen
+import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
 import com.breadmoirai.redstonespecs.client.screen.RunnerSpecPickerScreen
 import com.breadmoirai.redstonespecs.client.screen.RunnerTimelineScreen
 import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
@@ -112,6 +113,34 @@ fun registerClientNetworking() {
                 initialStructureId = payload.structureId,
                 initialState = payload.state,
             ))
+        }
+    }
+
+    ClientPlayNetworking.registerGlobalReceiver(OpenRunnerScreenS2C.TYPE) { payload, context ->
+        val mc = context.client()
+        mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#openRunnerScreen] originPos={} specPath={} specCount={}",
+                payload.originPos, payload.specPath, payload.specList.size)
+            val screen = RunnerScreen(
+                originPos = payload.originPos,
+                initialSpecPath = payload.specPath,
+                specList = payload.specList,
+                initialMeta = payload.meta,
+            )
+            RunnerScreen.active = screen
+            mc.setScreen(screen)
+        }
+    }
+
+    ClientPlayNetworking.registerGlobalReceiver(RunnerStatusS2C.TYPE) { payload, context ->
+        val mc = context.client()
+        mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#runnerStatus] originPos={} state={} summary={}",
+                payload.originPos, payload.state, payload.summary)
+            val active = RunnerScreen.active
+            if (active != null && active.originPos == payload.originPos) {
+                active.pushStatus(payload.state, payload.summary)
+            }
         }
     }
 }

@@ -4,7 +4,10 @@ import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
 import com.breadmoirai.redstonespecs.network.OpenRunnerPickerS2CPayload
+import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
 import com.breadmoirai.redstonespecs.network.OpenTimelineS2CPayload
+import com.breadmoirai.redstonespecs.network.RunnerMetaSnapshot
+import com.breadmoirai.redstonespecs.persistence.SpecDirectoryScan
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -42,14 +45,29 @@ class RedstoneSpecRunnerBlock(properties: Properties) : BaseEntityBlock(properti
                 return InteractionResult.SUCCESS
             }
 
-            if (be.spec == null) {
-                val saveDir = (level as ServerLevel).server.getWorldPath(LevelResource.ROOT)
-                    .resolve(SharedSettings.specSaveDir)
-                val files = SpecPersistence.listSpecsInfo(saveDir)
-                ServerPlayNetworking.send(serverPlayer, OpenRunnerPickerS2CPayload(be.blockPos, files))
-            } else {
-                ServerPlayNetworking.send(serverPlayer, OpenOverviewS2CPayload(be.blockPos, SpecBlockKind.RUNNER))
-            }
+            val saveDir = (level as ServerLevel).server.getWorldPath(LevelResource.ROOT)
+                .resolve(SharedSettings.specSaveDir)
+            val specList = SpecDirectoryScan.list(saveDir)
+
+            // Build meta from the current data spec if one is loaded (legacy path).
+            val currentSpec = be.spec
+            val meta: RunnerMetaSnapshot? = if (currentSpec != null) {
+                RunnerMetaSnapshot(
+                    id = currentSpec.id,
+                    boundsX = currentSpec.bounds.x,
+                    boundsY = currentSpec.bounds.y,
+                    boundsZ = currentSpec.bounds.z,
+                    lifespan = currentSpec.lifespan,
+                    structure = currentSpec.structure,
+                )
+            } else null
+
+            // Use the first available spec as the default selection, or empty string.
+            val currentSpecPath = specList.firstOrNull() ?: ""
+            ServerPlayNetworking.send(
+                serverPlayer,
+                OpenRunnerScreenS2C(be.blockPos, currentSpecPath, specList, meta)
+            )
         }
         return InteractionResult.SUCCESS
     }
