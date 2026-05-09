@@ -74,11 +74,7 @@ No new upward dependencies.
 
 **Region assignment.** Counter-based, in-memory, per-server. On first load of a new folder, `ManagedDimRegistry` assigns it `regionIndex = next++`; the region's origin is `(regionIndex * REGION_SPACING_X, Y_BASE, 0)` where `REGION_SPACING_X` is `cellSize.x * rowMax + cellGap * (rowMax + 1) + REGION_PAD` — guaranteed wider than any folder's grid plus a buffer. Resets on server restart (ephemeral).
 
-**Static registration.** Two JSON resources at server bootstrap:
-- `data/redstonespecs/dimension_type/managed_void.json` — the dim *type*.
-- `data/redstonespecs/dimension/managed.json` — the dim *instance* (LevelStem) referencing the type, with a flat-void generator.
-
-No runtime registration; the `ServerLevel` exists from server start. We just look it up via `server.getLevel(ManagedDimensions.MANAGED_LEVEL_KEY)`.
+**Static registration.** None. The canvas is the overworld of whichever singleplayer world the user opens. Folders within the loaded session occupy regions in the overworld, assigned by `ManagedDimRegistry` via counter on first load. No custom dim type or dim JSON is registered. `ManagedDimRegistry.managedLevel()` returns `server.overworld()` directly. The user is expected to create a flat-void singleplayer world (Superflat → preset "The Void"); other worlds work too, but cells overwrite terrain at their origin AABB on load.
 
 **Subpath-to-id sanitization** (kept): subpaths still sanitize for use in error messages and the `Map<BlockPos, spec-id>` cell map. No dim id collision check needed — there's only one dim.
 

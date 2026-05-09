@@ -66,20 +66,10 @@ object ManagedDimLifecycle {
             cellSize, cellGap, rowMax, yBase,
         )
 
-        // 3. Prefer per-folder dim (runtime datapack); fall back to single-dim + region.
+        // 3. Canvas is the overworld; folders map to regions via counter assignment.
         val registry = ManagedDimRegistry.of(server)
-        val perFolder = registry.perFolderLevel(subpath)
-        val level: ServerLevel
-        val regionOrigin: BlockPos
-        if (perFolder != null) {
-            level = perFolder
-            // Dedicated dim — no offset needed; placeCell math collapses to absolute coords.
-            regionOrigin = BlockPos(0, SharedSettings.managedGridYBase, 0)
-        } else {
-            level = registry.managedLevel()
-                ?: error("managed dim is not registered (data/redstonespecs/dimension/managed.json missing?)")
-            regionOrigin = registry.getOrAssignRegion(subpath)
-        }
+        val level = registry.managedLevel()
+        val regionOrigin = registry.getOrAssignRegion(subpath)
 
         // 4. Place each cell.
         val loadedSpecs = mutableMapOf<String, LoadedSpec>()
@@ -178,9 +168,7 @@ object ManagedDimLifecycle {
     fun saveNow(server: MinecraftServer, playerId: java.util.UUID): List<CellSaveResult> {
         val session = ManagedSession.get(playerId) ?: return emptyList()
         val registry = ManagedDimRegistry.of(server)
-        val level = registry.perFolderLevel(session.subpath)
-            ?: registry.managedLevel()
-            ?: return emptyList()
+        val level = registry.managedLevel()
         val results = mutableListOf<CellSaveResult>()
         val refreshed = mutableMapOf<String, LoadedSpec>()
         for ((id, loaded) in session.loaded) {

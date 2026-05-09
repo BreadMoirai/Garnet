@@ -12,11 +12,11 @@ private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 /**
  * One per `MinecraftServer`. Owns:
- *   1. Folder → region-origin assignment within the single managed dim. Counter-based,
+ *   1. Folder → region-origin assignment within the overworld canvas. Counter-based,
  *      in-memory, ephemeral (resets on server restart).
  *   2. Per-folder cell map: `Map<BlockPos, spec-id>` for cell-membership lookup.
  *
- * No dynamic level registration — the managed dim is statically registered via data-pack JSON.
+ * The managed canvas is the integrated server's overworld; no custom dim is registered.
  */
 class ManagedDimRegistry(private val server: MinecraftServer) {
     private data class Entry(
@@ -29,18 +29,8 @@ class ManagedDimRegistry(private val server: MinecraftServer) {
     private val bySubpath = ConcurrentHashMap<String, Entry>()
     private val nextRegionIndex = AtomicInteger(0)
 
-    /** Returns the static managed `ServerLevel`, or null if the server hasn't bootstrapped it. */
-    fun managedLevel(): ServerLevel? = server.getLevel(ManagedDimensions.MANAGED_LEVEL_KEY)
-
-    /**
-     * Returns the per-folder ServerLevel if the runtime datapack registered it; otherwise null.
-     * Caller falls back to `managedLevel()` + `getOrAssignRegion(subpath)` for the single-dim path.
-     */
-    fun perFolderLevel(subpath: String): ServerLevel? {
-        val sanitized = DimIdSanitizer.toPath(subpath)
-        val key = ManagedDimensions.levelKey(sanitized)
-        return server.getLevel(key)
-    }
+    /** The managed canvas is the server's overworld. */
+    fun managedLevel(): ServerLevel = server.overworld()
 
     /**
      * Returns the region origin for `subpath`, assigning a fresh region if this is the first time.
