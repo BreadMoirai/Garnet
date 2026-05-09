@@ -1,0 +1,115 @@
+---
+title: Managed worlds use-cases
+tags: [managed, dimensions, grid, datapack, use-cases]
+summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back.
+last_audited_commit: PENDING
+---
+
+# Managed worlds use-cases
+
+A managed root is a folder of `.spec.kts` files projected into a runtime-generated void dimension as a deterministic grid. Each spec gets a cell; edits in the cell save back to the spec file (see [architecture/managed-redstone-worlds.md](../architecture/managed-redstone-worlds.md)).
+
+---
+
+### UC-MAN-01: Declare and persist a managed root
+
+User registers a filesystem folder as a managed-spec root; that registration survives MC restarts.
+
+- **UC-MAN-01.a** The user opens `ManagedRootListScreen` (injected as a "Managed Specs…" button on `SelectWorldScreen` via `SelectWorldScreenMixin`) and types an absolute path into the `EditBox`.
+- **UC-MAN-01.b** Clicking "Add" appends the path to the in-memory list and immediately calls `ManagedRootsConfig.save(configPath, roots)`, writing a JSON array to `<MC-config-dir>/redstonespecs/managed-roots.json`.
+- **UC-MAN-01.c** On next client launch `ManagedRootsConfig.load(configPath)` re-reads the file; the root appears in the list without re-entry.
+- **UC-MAN-01.d** Clicking "X" beside a root removes it from the list and re-saves the config; the entry disappears immediately on `rebuildWidgets`.
+- **UC-MAN-01.e** `ManagedRoot` enforces that every path is absolute and rejects path-traversal attempts via `resolveSubpath`: a relative or escaping subpath returns `null` (symlink-defeat via `toRealPath` before `startsWith` check).
+
+---
+
+### UC-MAN-02: Boot the managed singleplayer world
+
+Opening a managed root from `ManagedRootListScreen` creates or reopens the dedicated singleplayer save for that root, then seeds it with the spec layout.
+
+- **UC-MAN-02.a** Clicking "Open" in `ManagedRootListScreen` calls `ManagedIntegratedBoot.boot(rootPath)`. `ManagedSaveNaming.saveName` derives `managed-<sanitized-tail>-<8-hex-sha1>` from the root's absolute path, so two roots with the same final component get different save names.
+- **UC-MAN-02.b** `ManagedIntegratedBoot.openOrCreateWorld` calls `Minecraft.levelSource.levelExists(saveName)`. If the save exists, `WorldOpenFlows.openWorld` reopens it; otherwise `WorldOpenFlows.createFreshLevel` creates a creative, peaceful, allow-commands, flat-void world (overworld replaced with `FlatLevelGeneratorPresets.THE_VOID` via `FlatLevelSource`).
+- **UC-MAN-02.c** A `SERVER_STARTING` listener (registered once by `ensureListenersRegistered`) picks up the `pendingRoot` `AtomicReference` and calls `ManagedServerContext.set(server, ManagedServerContext(root))`, pinning the active root for the server lifetime.
+- **UC-MAN-02.d** A `SERVER_STARTED` listener in the mod entrypoint reads `ManagedServerContext.get(server)` and, if present, calls `ManagedDimLifecycle.placeAll(server, root)` to lay out the full tree; any prior `ManagedWorld` for the same root is reused, or a new one is created and stored via `ManagedWorld.set`.
+- **UC-MAN-02.e** Re-opening the same root from a future session reopens the same persistent save; scratch blocks placed outside spec bounds between the previous close and this open are still present, because only cell AABB contents are re-placed from disk.
+
+---
+
+### UC-MAN-03: Scan the folder tree and assign regions
+
+On `placeAll`, the mod walks the managed root's directory tree, classifies folders as leaves or intermediates, and assigns each leaf a non-overlapping region in the overworld.
+
+- **UC-MAN-03.a** `ManagedFolderTree.scan(root)` walks the tree with `Files.walk`, collecting all directories that contain at least one `.spec.kts` file as `ManagedLeaf` entries and all directories that contain sub-directories as `intermediates`. Both collections are sorted by subpath for deterministic ordering.
+- **UC-MAN-03.b** `ManagedDimLifecycle.placeAll` iterates `tree.leaves.sortedBy { it.subpath }` and calls `placeFolderInto` for each leaf. Sorting guarantees that region-index assignment via `ManagedDimRegistry.getOrAssignRegion` is stable across server restarts (even though the registry is in-memory ephemeral).
+- **UC-MAN-03.c** `ManagedDimRegistry.getOrAssignRegion(subpath)` increments an `AtomicInteger` counter and computes `BlockPos(idx * regionWidth, managedGridYBase, 0)`. `regionWidth` is derived from `SharedSettings` (`cellSize.x * rowMax + cellGap * (rowMax + 1) + REGION_PAD=64`) so regions never collide regardless of how large a folder grid grows.
+- **UC-MAN-03.d** `managedLevel()` returns `server.overworld()` directly — no custom dimension type or datapack is registered; all managed grids coexist in the integrated server's overworld.
+- **UC-MAN-03.e** `ManagedDimRegistry` is a `WeakHashMap`-keyed singleton per `MinecraftServer`; `dispose(server)` is called on server stop to release the reference.
+
+---
+
+### UC-MAN-04: Lay out and place spec cells in the grid
+
+Each leaf folder's specs are sorted, assigned to a row-major grid slot, and physically placed as structure NBT + anchor blocks in the overworld at the folder's region origin.
+
+- **UC-MAN-04.a** `GridLayout.compute` accepts sorted `LayoutInput` entries (sorted case-insensitively by filename, then by `spec.id`) and places each into slot `(slotIndex % rowMax, slotIndex / rowMax)`. Origin is `BlockPos(sx*(cellSize.x+gap), yBase, sz*(cellSize.z+gap))` — all offsets are region-relative.
+- **UC-MAN-04.b** Any spec whose `bounds` exceeds `cellSize` on any axis is excluded with a `LayoutError`; it does not consume a slot and its error is reported in `LoadFolderReport.errors`.
+- **UC-MAN-04.c** `placeCell` reads `<spec.structure ?: spec.id>.nbt` beside the spec file. If the file exists it loads the `StructureTemplate` via `NbtIo.readCompressed` and calls `tpl.placeInWorld`. If it does not exist the cell is placed empty (new spec path).
+- **UC-MAN-04.d** An anchor block (`REDSTONE_SPEC_RUNNER_BLOCK` for existing structure, `REDSTONE_SPEC_RECORDER_BLOCK` for new) is placed at `absOrigin.offset(spec.bounds.x, 0, 0)` and its `SpecBlockEntity.managedSourcePath` is set to the spec file path. This binding is not persisted to NBT and is reset on every `placeFolder`.
+- **UC-MAN-04.e** After placement, `StructureTemplate.fillFromWorld` captures the cell volume as `loadedSnapshot` and stores it in `LoadedSpec`. This snapshot is the dirty-diff baseline used by `ManagedCellSaver`.
+- **UC-MAN-04.f** `world.perFolder[subpath]` is replaced atomically (via `ConcurrentHashMap`) with the newly placed specs so that stale entries from a prior placement of the same subpath are not visible.
+
+---
+
+### UC-MAN-05: Browse the folder tree in-game and teleport to a folder
+
+A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
+
+- **UC-MAN-05.a** Opening `ManagedScreen` (via `/redstonespecs managed` or the world-list flow) immediately sends `ListManagedTreeC2S`. `ManagedNetworkRegistry.handleListTree` calls `ManagedFolderTree.scan(root)` on the server and replies with `ManagedTreeSnapshotS2C` carrying the leaf list (subpath + spec count), intermediate folders, and the player's current `activeSubpath`.
+- **UC-MAN-05.b** `ManagedClientNetworking` receives `ManagedTreeSnapshotS2C`. If `ManagedScreen` is open it calls `onTreeSnapshot` and `rebuildWidgets`; if no managed screen is open it constructs a new `ManagedScreen(payload)` and sets it as the current screen.
+- **UC-MAN-05.c** Clicking a leaf row sends `LoadManagedFolderC2S(subpath)`. `ManagedNetworkRegistry.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `ManagedTeleport.toFolder`, and sends `ManagedFolderLoadedS2C` with the spec-id list and any errors.
+- **UC-MAN-05.d** `ManagedTeleport.toFolder` looks up `ManagedDimRegistry.regionOriginOf(subpath)`, teleports the player to `(region.x+0.5, yBase+2, region.z+0.5)` in `managedLevel()`, and calls `ManagedSession.setActive(player.uuid, subpath)` so subsequent server actions (save, new-spec) scope to the right folder.
+- **UC-MAN-05.e** If the subpath's region has not been assigned (folder not yet placed), `toFolder` returns `false` and the server replies with `ManagedErrorS2C`; `ManagedScreen.onError` updates the status label.
+
+---
+
+### UC-MAN-06: Create a new spec cell in the active folder
+
+A player names a new spec from the in-game UI; the server writes a stub `.spec.kts`, re-places the folder, and the new cell appears in the world.
+
+- **UC-MAN-06.a** The player types a name into the `EditBox` in `ManagedScreen` (validated client-side for non-blank) and clicks "New Spec", sending `NewManagedSpecC2S(name)`.
+- **UC-MAN-06.b** `ManagedNetworkRegistry.handleNewSpec` reads `ManagedSession.get(player.uuid)?.activeSubpath`; if no folder is active it replies with `ManagedErrorS2C("no folder selected")`.
+- **UC-MAN-06.c** `ManagedNewSpec.create(folder, name)` enforces that `name` matches `[a-zA-Z0-9_-]+`, that the target file does not already exist, then writes a minimal stub via `RecordingDslEmitter.emitStub(name)`. Throws on any violation so the caller can catch and report.
+- **UC-MAN-06.d** After creating the stub, `handleNewSpec` calls `ManagedDimLifecycle.placeFolder(server, root, activeSubpath)` to re-scan and re-place the entire folder. The new file appears as an empty cell with a `REDSTONE_SPEC_RECORDER_BLOCK` anchor.
+- **UC-MAN-06.e** `ManagedFolderLoadedS2C` is sent back with the updated spec-id list and any parse/layout errors from the re-place.
+
+---
+
+### UC-MAN-07: Save edited cell blocks back to disk
+
+When the player has modified blocks inside a spec's cell AABB, the server detects the diff and overwrites the source `.spec.kts` structure file.
+
+- **UC-MAN-07.a** The player clicks "Save Now" in `ManagedScreen`, sending `SaveNowC2S`. `ManagedNetworkRegistry.handleSaveNow` calls `ManagedDimLifecycle.saveAll(server)`, which iterates every subpath in `ManagedWorld.perFolder` and calls `saveFolder`.
+- **UC-MAN-07.b** `saveFolder` resolves each spec's absolute cell origin via `ManagedWorld.absoluteCellOrigin` (adds `regionOrigin.x/z` to the region-relative `cell.origin.x/z`; Y from `cell.origin.y` is already absolute). It then passes `level`, `loaded`, and `absoluteCellOrigin` to `ManagedCellSaver.captureAndSaveIfDirty`.
+- **UC-MAN-07.c** `ManagedCellSaver` captures the live cell volume with `StructureTemplate.fillFromWorld`, serializes both live and baseline snapshots to `CompoundTag`, and returns `CellSaveResult(saved=false)` if the NBT is equal (no-op). Only a structural change in block data triggers the rewrite.
+- **UC-MAN-07.d** On a dirty diff, `NbtIo.writeCompressed(liveNbt, structureFile)` overwrites `<structureId>.nbt`. The `.spec.kts` source re-emission is deferred (noted in `ManagedCellSaver`); `RecordingDslEmitter` will handle it in a later phase.
+- **UC-MAN-07.e** After a successful save, `saveFolder` captures a fresh `StructureTemplate` and stores it as the new `loadedSnapshot` in `ManagedWorld.perFolder`, so subsequent saves have an accurate baseline.
+- **UC-MAN-07.f** `ManagedSaveReportS2C` is sent back to the player with per-spec `"specId|saved=true/false[|err=…]"` strings; `ManagedScreen.onSaveReport` updates the status label with the count of saved specs.
+
+---
+
+### UC-MAN-08: Unload active folder and handle ungraceful session end
+
+A player explicitly unloads their active folder focus, or the session is cleared when the player disconnects or the server stops.
+
+- **UC-MAN-08.a** The player clicks "Unload" in `ManagedScreen`, sending `UnloadManagedFolderC2S`. `ManagedNetworkRegistry.handleUnload` calls `ManagedSession.clear(player.uuid)` and replies with `ManagedSaveReportS2C(emptyList())`.
+- **UC-MAN-08.b** After unload, the player's `activeSubpath` is `null`; subsequent `handleNewSpec` and `handleSaveNow` calls that require a folder focus will receive `ManagedErrorS2C("no folder selected")`.
+- **UC-MAN-08.c** If a player disconnects without clicking Unload (ungraceful exit), `ManagedSession.clear(player.uuid)` must be called from the server-side player disconnect event. The `ManagedSession` map is a `ConcurrentHashMap` keyed by `UUID`; the player's slot is released so it does not linger after reconnect.
+- **UC-MAN-08.d** On server stop, `ManagedDimRegistry.dispose(server)` removes the `WeakHashMap` entry for the server; `ManagedWorld.clear(server)` and `ManagedServerContext.clear(server)` do the same, releasing all server-scoped state.
+- **UC-MAN-08.e** Spec cell blocks placed in the overworld persist in the singleplayer save across sessions. On next `placeAll`, `ManagedCellSaver`'s dirty-diff logic will re-capture the baseline snapshot from what is now on disk (re-read NBT) rather than an empty cell, so edits made in a previous session survive if the user did not save before disconnect.
+
+---
+
+## Coverage matrix
+
+| UC ID | Description | Test | Status |
+|---|---|---|---|
