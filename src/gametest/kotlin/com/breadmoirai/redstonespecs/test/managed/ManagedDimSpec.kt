@@ -5,25 +5,13 @@ import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
 import com.breadmoirai.redstonespecs.managed.ManagedDimRegistry
 import com.breadmoirai.redstonespecs.managed.ManagedNewSpec
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
-import com.breadmoirai.redstonespecs.managed.ManagedSession
 import com.breadmoirai.redstonespecs.managed.ManagedWorld
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
-import com.mojang.authlib.GameProfile
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import io.netty.channel.embedded.EmbeddedChannel
-import net.minecraft.network.Connection
-import net.minecraft.network.protocol.PacketFlow
-import net.minecraft.server.MinecraftServer
-import net.minecraft.server.level.ServerPlayer
-import net.minecraft.server.network.CommonListenerCookie
-import net.minecraft.world.level.GameType
 import net.minecraft.world.level.block.Blocks
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.UUID
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
@@ -40,8 +28,7 @@ import kotlin.io.path.writeText
 class ManagedDimSpec : RedstoneTestSpec({
 
     test("load places cells in the managed dim and registers a session") {
-        val tmp = Files.createTempDirectory("managed-load")
-        try {
+        withTempRoot("managed-load") { tmp ->
             val folder = tmp.resolve("set-a").also { it.createDirectories() }
             folder.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
             folder.resolve("b.spec.kts").writeText(RecordingDslEmitter.emitStub("b"))
@@ -65,14 +52,11 @@ class ManagedDimSpec : RedstoneTestSpec({
                 (cellA.origin != cellB.origin) shouldBe true
                 ManagedWorld.clear(this)
             }
-        } finally {
-            deleteRecursively(tmp)
         }
     }
 
     test("saveNow writes only specs whose cell volume changed") {
-        val tmp = Files.createTempDirectory("managed-save")
-        try {
+        withTempRoot("managed-save") { tmp ->
             val folder = tmp.resolve("set-b").also { it.createDirectories() }
             folder.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
             folder.resolve("b.spec.kts").writeText(RecordingDslEmitter.emitStub("b"))
@@ -110,14 +94,11 @@ class ManagedDimSpec : RedstoneTestSpec({
             val byId = results.associateBy { it.specId }
             byId.getValue("a").saved shouldBe true
             byId.getValue("b").saved shouldBe false
-        } finally {
-            deleteRecursively(tmp)
         }
     }
 
     test("ManagedNewSpec.create writes a stub spec.kts to the leaf folder") {
-        val tmp = Files.createTempDirectory("managed-new")
-        try {
+        withTempRoot("managed-new") { tmp ->
             val folder = tmp.resolve("empty-set").also { it.createDirectories() }
 
             onServer {
@@ -128,36 +109,6 @@ class ManagedDimSpec : RedstoneTestSpec({
 
             ManagedNewSpec.create(folder, "fresh")
             folder.resolve("fresh.spec.kts").exists() shouldBe true
-        } finally {
-            deleteRecursively(tmp)
         }
     }
 })
-
-/**
- * Builds a "mock" [ServerPlayer] in the server's overworld, mirroring vanilla
- * `GameTestHelper#makeMockServerPlayerInLevel`. Tied to a unique UUID so concurrent tests
- * don't collide on `ManagedSession`. The connection uses an [EmbeddedChannel] so packet
- * sends are no-ops (teleport packets fired during managed-dim load go nowhere safely).
- *
- * Must be called on the server thread.
- */
-private fun makeMockServerPlayer(server: MinecraftServer): ServerPlayer {
-    require(server.isSameThread) { "makeMockServerPlayer must be called on the server thread" }
-    val profile = GameProfile(UUID.randomUUID(), "test-managed-${UUID.randomUUID().toString().take(6)}")
-    val cookie = CommonListenerCookie.createInitial(profile, false)
-    val player = object : ServerPlayer(server, server.overworld(), cookie.gameProfile(), cookie.clientInformation()) {
-        override fun gameMode(): GameType = GameType.CREATIVE
-    }
-    val connection = Connection(PacketFlow.SERVERBOUND)
-    EmbeddedChannel(connection)
-    server.playerList.placeNewPlayer(connection, player, cookie)
-    return player
-}
-
-private fun deleteRecursively(path: Path) {
-    if (!path.exists()) return
-    Files.walk(path).use { stream ->
-        stream.sorted(Comparator.reverseOrder()).forEach { p -> runCatching { Files.delete(p) } }
-    }
-}
