@@ -11,8 +11,6 @@ import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import org.slf4j.LoggerFactory
@@ -34,12 +32,38 @@ data class LoadFolderReport(
 
 object ManagedDimLifecycle {
 
-    fun load(
+    /**
+     * Walks the tree under `root` and places every leaf folder. Region origins are assigned in
+     * subpath-sorted order so they're stable across server restarts (the registry's counter is
+     * in-memory ephemeral). Lazily creates the [ManagedWorld] for `server` if not already set.
+     */
+    fun placeAll(server: MinecraftServer, root: ManagedRoot): List<LoadFolderReport> {
+        val world = ManagedWorld.get(server)?.takeIf { it.root == root }
+            ?: ManagedWorld(root).also { ManagedWorld.set(server, it) }
+        val tree = ManagedFolderTree.scan(root)
+        val reports = mutableListOf<LoadFolderReport>()
+        for (leaf in tree.leaves.sortedBy { it.subpath }) {
+            reports.add(placeFolderInto(server, world, leaf.subpath))
+        }
+        return reports
+    }
+
+    /**
+     * Place a single folder. Used by [placeAll]. May also be called directly to re-place a folder
+     * after a `ManagedNewSpec.create` to materialize the new cell.
+     */
+    fun placeFolder(server: MinecraftServer, root: ManagedRoot, subpath: String): LoadFolderReport {
+        val world = ManagedWorld.get(server)?.takeIf { it.root == root }
+            ?: ManagedWorld(root).also { ManagedWorld.set(server, it) }
+        return placeFolderInto(server, world, subpath)
+    }
+
+    private fun placeFolderInto(
         server: MinecraftServer,
-        root: ManagedRoot,
+        world: ManagedWorld,
         subpath: String,
-        player: ServerPlayer,
     ): LoadFolderReport {
+        val root = world.root
         val folder = root.resolveSubpath(subpath)
             ?: error("subpath outside root: $subpath")
         require(folder.isDirectory()) { "not a directory: $folder" }
@@ -75,8 +99,6 @@ object ManagedDimLifecycle {
         val loadedSpecs = mutableMapOf<String, LoadedSpec>()
         for ((name, spec) in parsed) {
             val cell = layout.cells[spec.id] ?: continue  // excluded by oversize
-            // GridLayout's cell.origin.y already equals yBase, so use it directly for absolute Y;
-            // X/Z are slot-offsets relative to (0,0), so add regionOrigin.{x,z}.
             val absOrigin = BlockPos(
                 regionOrigin.x + cell.origin.x,
                 cell.origin.y,
@@ -94,31 +116,13 @@ object ManagedDimLifecycle {
         // 5. Update registry's cell map for this folder (origins are region-relative for lookup).
         registry.setCellsForFolder(subpath, layout.byOrigin)
 
-        // 6. Save the session and teleport.
-        val session = ManagedSession(
-            playerId = player.uuid,
-            root = root,
-            subpath = subpath,
-            folderAbsolute = folder,
-            regionOrigin = regionOrigin,
-            loaded = loadedSpecs,
-        )
-        ManagedSession.set(session)
-
-        val spawn = BlockPos(regionOrigin.x, yBase + 2, regionOrigin.z)
-        player.teleportTo(
-            level,
-            spawn.x + 0.5,
-            spawn.y.toDouble(),
-            spawn.z + 0.5,
-            emptySet<Relative>(),
-            player.yRot,
-            player.xRot,
-            true,
-        )
+        // 6. Register with the world (replace any prior entry for this subpath).
+        world.folderAbsoluteByPath[subpath] = folder
+        val perFolderMap = java.util.concurrent.ConcurrentHashMap<String, LoadedSpec>(loadedSpecs)
+        world.perFolder[subpath] = perFolderMap
 
         LOGGER.info(
-            "[ManagedDimLifecycle#load] loaded folder '{}' ({} specs, {} layout errors, {} parse errors)",
+            "[ManagedDimLifecycle#placeFolder] placed folder '{}' ({} specs, {} layout errors, {} parse errors)",
             subpath, loadedSpecs.size, layout.errors.size, parseErrors.size,
         )
 
@@ -165,32 +169,37 @@ object ManagedDimLifecycle {
         return snapshot
     }
 
-    fun saveNow(server: MinecraftServer, playerId: java.util.UUID): List<CellSaveResult> {
-        val session = ManagedSession.get(playerId) ?: return emptyList()
-        val registry = ManagedDimRegistry.of(server)
-        val level = registry.managedLevel()
+    /** Save dirty cells across ALL loaded folders in the world. */
+    fun saveAll(server: MinecraftServer): List<CellSaveResult> {
+        val world = ManagedWorld.get(server) ?: return emptyList()
+        val results = mutableListOf<CellSaveResult>()
+        for (subpath in world.perFolder.keys.toList()) {
+            results.addAll(saveFolder(server, subpath))
+        }
+        return results
+    }
+
+    /** Save dirty cells in a single folder. */
+    fun saveFolder(server: MinecraftServer, subpath: String): List<CellSaveResult> {
+        val world = ManagedWorld.get(server) ?: return emptyList()
+        val perFolder = world.perFolder[subpath] ?: return emptyList()
+        val folderAbsolute = world.folderAbsoluteByPath[subpath] ?: return emptyList()
+        val level = ManagedDimRegistry.of(server).managedLevel()
         val results = mutableListOf<CellSaveResult>()
         val refreshed = mutableMapOf<String, LoadedSpec>()
-        for ((id, loaded) in session.loaded) {
-            val abs = session.absoluteCellOrigin(id) ?: continue
-            val r = ManagedCellSaver.captureAndSaveIfDirty(level, loaded, abs, session.folderAbsolute)
+        for ((id, loaded) in perFolder) {
+            val abs = world.absoluteCellOrigin(server, subpath, id) ?: continue
+            val r = ManagedCellSaver.captureAndSaveIfDirty(level, loaded, abs, folderAbsolute)
             results.add(r)
             if (r.saved) {
-                // Refresh in-memory snapshot to the just-saved state.
                 val newSnap = StructureTemplate()
                 newSnap.fillFromWorld(level, abs, loaded.spec.bounds, false, emptyList())
                 refreshed[id] = loaded.copy(loadedSnapshot = newSnap)
             }
         }
         if (refreshed.isNotEmpty()) {
-            session.loaded.putAll(refreshed)
+            perFolder.putAll(refreshed)
         }
-        return results
-    }
-
-    fun unload(server: MinecraftServer, playerId: java.util.UUID, save: Boolean = true): List<CellSaveResult> {
-        val results = if (save) saveNow(server, playerId) else emptyList()
-        ManagedSession.clear(playerId)
         return results
     }
 }

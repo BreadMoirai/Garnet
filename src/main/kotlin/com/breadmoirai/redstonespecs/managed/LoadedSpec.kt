@@ -1,0 +1,18 @@
+package com.breadmoirai.redstonespecs.managed
+
+import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
+import java.nio.file.Path
+
+/**
+ * Per-spec state inside a loaded folder. `cell.origin` is *relative to (0,0,0)* — the absolute
+ * world position is `cell.origin + regionOrigin` (regionOrigin is owned by ManagedDimRegistry).
+ * `loadedSnapshot` is the blocks in the cell volume *immediately after placement*, used as the
+ * baseline for dirty-diff at save time.
+ */
+data class LoadedSpec(
+    val cell: ManagedCell,
+    val spec: RedstoneSpec,
+    val sourceFile: Path,
+    val loadedSnapshot: StructureTemplate,
+)

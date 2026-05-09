@@ -35,7 +35,7 @@ object ManagedCommand {
         }
 
         val tree = ManagedFolderTree.scan(root)
-        val current = ManagedSession.get(player.uuid)?.subpath
+        val current = ManagedSession.get(player.uuid)?.activeSubpath
         ServerPlayNetworking.send(player, ManagedTreeSnapshotS2C(
             leaves = tree.leaves.map { ManagedLeafEntry(it.subpath, it.specFiles.size) },
             intermediates = tree.intermediates.toList(),

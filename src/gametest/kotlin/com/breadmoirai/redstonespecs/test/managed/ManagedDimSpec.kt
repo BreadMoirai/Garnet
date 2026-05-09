@@ -7,6 +7,7 @@ import com.breadmoirai.redstonespecs.managed.ManagedDimRegistry
 import com.breadmoirai.redstonespecs.managed.ManagedNewSpec
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
 import com.breadmoirai.redstonespecs.managed.ManagedSession
+import com.breadmoirai.redstonespecs.managed.ManagedWorld
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import com.mojang.authlib.GameProfile
@@ -63,20 +64,20 @@ class ManagedDimSpec : RedstoneTestSpec({
                 ManagedDimRegistry.of(this).managedLevel()
                     .shouldNotBeNull() // managed dim must be registered (data-pack JSON)
                 val player = makeMockServerPlayer(this)
-                ManagedDimLifecycle.load(this, ManagedRoot(tmp), "set-a", player)
+                val reports = ManagedDimLifecycle.placeAll(this, ManagedRoot(tmp))
+                reports.single { it.subpath == "set-a" }
             }
 
             report.loaded.shouldContainAll(listOf("a", "b"))
 
             onServer {
-                val sessions = ManagedSession.all().filter { it.subpath == "set-a" }
-                sessions.size shouldBe 1
-                val session = sessions.single()
-                session.loaded.size shouldBe 2
-                val cellA = session.loaded.getValue("a").cell
-                val cellB = session.loaded.getValue("b").cell
+                val world = ManagedWorld.get(this).shouldNotBeNull()
+                val perFolder = world.perFolder["set-a"].shouldNotBeNull()
+                perFolder.size shouldBe 2
+                val cellA = perFolder.getValue("a").cell
+                val cellB = perFolder.getValue("b").cell
                 (cellA.origin != cellB.origin) shouldBe true
-                ManagedSession.clear(session.playerId)
+                ManagedWorld.clear(this)
             }
         } finally {
             deleteRecursively(tmp)
@@ -95,17 +96,17 @@ class ManagedDimSpec : RedstoneTestSpec({
             val mtimeB0 = Files.getLastModifiedTime(fileB)
 
             val results = onServer {
-                val player = makeMockServerPlayer(this)
-                ManagedDimLifecycle.load(this, ManagedRoot(tmp), "set-b", player)
+                makeMockServerPlayer(this)
+                ManagedDimLifecycle.placeAll(this, ManagedRoot(tmp))
 
                 // Mutate spec a's cell volume by setting a block at the absolute cell origin.
-                val session = ManagedSession.get(player.uuid).shouldNotBeNull()
-                val absA = session.absoluteCellOrigin("a").shouldNotBeNull()
+                val world = ManagedWorld.get(this).shouldNotBeNull()
+                val absA = world.absoluteCellOrigin(this, "set-b", "a").shouldNotBeNull()
                 val level = ManagedDimRegistry.of(this).managedLevel().shouldNotBeNull()
                 level.setBlock(absA, Blocks.STONE.defaultBlockState(), 2)
 
-                val r = ManagedDimLifecycle.saveNow(this, player.uuid)
-                ManagedSession.clear(player.uuid)
+                val r = ManagedDimLifecycle.saveFolder(this, "set-b")
+                ManagedWorld.clear(this)
                 r
             }
 
@@ -128,9 +129,9 @@ class ManagedDimSpec : RedstoneTestSpec({
             val folder = tmp.resolve("empty-set").also { it.createDirectories() }
 
             onServer {
-                val player = makeMockServerPlayer(this)
-                ManagedDimLifecycle.load(this, ManagedRoot(tmp), "empty-set", player)
-                ManagedSession.clear(player.uuid)
+                makeMockServerPlayer(this)
+                ManagedDimLifecycle.placeAll(this, ManagedRoot(tmp))
+                ManagedWorld.clear(this)
             }
 
             ManagedNewSpec.create(folder, "fresh")

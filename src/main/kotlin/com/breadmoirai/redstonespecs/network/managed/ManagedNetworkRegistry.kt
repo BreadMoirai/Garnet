@@ -14,6 +14,8 @@ private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 object ManagedNetworkRegistry {
 
     private fun rootFor(server: MinecraftServer): ManagedRoot? {
+        val world = ManagedWorld.get(server)
+        if (world != null) return world.root
         val ctx = ManagedServerContext.get(server)
         if (ctx != null) return ctx.root
         val cfg = SharedSettings.managedRootPath
@@ -36,6 +38,8 @@ object ManagedNetworkRegistry {
             ctx.server().execute { sendTree(ctx.server(), ctx.player()) }
         }
 
+        // LoadManagedFolderC2S now means "teleport me to that folder's region" — placement is
+        // automatic at server start via ManagedDimLifecycle.placeAll.
         ServerPlayNetworking.registerGlobalReceiver(LoadManagedFolderC2S.TYPE) { payload, ctx ->
             val player = ctx.player()
             ctx.server().execute {
@@ -47,37 +51,37 @@ object ManagedNetworkRegistry {
                     ServerPlayNetworking.send(player, ManagedErrorS2C("subpath not found or escapes root: ${payload.subpath}"))
                     return@execute
                 }
-                if (ManagedSession.get(player.uuid) != null) {
-                    ManagedDimLifecycle.unload(ctx.server(), player.uuid, save = true)
-                }
-                val report = try {
-                    ManagedDimLifecycle.load(ctx.server(), root, payload.subpath, player)
-                } catch (e: Exception) {
-                    LOGGER.error("[managed/load] {}: {}", payload.subpath, e.message, e)
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("load failed: ${e.message}"))
+                val ok = ManagedTeleport.toFolder(ctx.server(), player, payload.subpath)
+                if (!ok) {
+                    ServerPlayNetworking.send(player, ManagedErrorS2C("folder not placed: ${payload.subpath}"))
                     return@execute
                 }
+                val world = ManagedWorld.get(ctx.server())
+                val loadedIds = world?.perFolder?.get(payload.subpath)?.keys?.toList().orEmpty()
                 ServerPlayNetworking.send(player, ManagedFolderLoadedS2C(
-                    subpath = report.subpath,
-                    loadedSpecIds = report.loaded,
-                    parseErrors = report.parseErrors.map { "${it.filename}: ${it.message}" },
-                    layoutErrors = report.errors.map { "${it.specId} (${it.filename}): ${it.reason}" },
+                    subpath = payload.subpath,
+                    loadedSpecIds = loadedIds,
+                    parseErrors = emptyList(),
+                    layoutErrors = emptyList(),
                 ))
             }
         }
 
+        // UnloadManagedFolderC2S now just clears the player's UI focus; nothing is unloaded
+        // from the world. (saveAll is intentionally not called here — explicit save is the user's job.)
         ServerPlayNetworking.registerGlobalReceiver(UnloadManagedFolderC2S.TYPE) { _, ctx ->
             val player = ctx.player()
             ctx.server().execute {
-                val results = ManagedDimLifecycle.unload(ctx.server(), player.uuid, save = true)
-                ServerPlayNetworking.send(player, ManagedSaveReportS2C(results.map(::formatSaveResult)))
+                ManagedSession.clear(player.uuid)
+                ServerPlayNetworking.send(player, ManagedSaveReportS2C(emptyList()))
             }
         }
 
+        // SaveNowC2S now saves everything dirty across all folders.
         ServerPlayNetworking.registerGlobalReceiver(SaveNowC2S.TYPE) { _, ctx ->
             val player = ctx.player()
             ctx.server().execute {
-                val results = ManagedDimLifecycle.saveNow(ctx.server(), player.uuid)
+                val results = ManagedDimLifecycle.saveAll(ctx.server())
                 ServerPlayNetworking.send(player, ManagedSaveReportS2C(results.map(::formatSaveResult)))
             }
         }
@@ -85,19 +89,34 @@ object ManagedNetworkRegistry {
         ServerPlayNetworking.registerGlobalReceiver(NewManagedSpecC2S.TYPE) { payload, ctx ->
             val player = ctx.player()
             ctx.server().execute {
-                val session = ManagedSession.get(player.uuid) ?: run {
-                    ServerPlayNetworking.send(player, ManagedErrorS2C("no folder loaded"))
+                val activeSubpath = ManagedSession.get(player.uuid)?.activeSubpath ?: run {
+                    ServerPlayNetworking.send(player, ManagedErrorS2C("no folder selected"))
                     return@execute
                 }
-                val root = rootFor(ctx.server()) ?: return@execute
+                val root = rootFor(ctx.server()) ?: run {
+                    ServerPlayNetworking.send(player, ManagedErrorS2C("managed-root not configured"))
+                    return@execute
+                }
+                val world = ManagedWorld.get(ctx.server())
+                val folderAbsolute = world?.folderAbsoluteByPath?.get(activeSubpath)
+                    ?: root.resolveSubpath(activeSubpath)
+                    ?: run {
+                        ServerPlayNetworking.send(player, ManagedErrorS2C("active folder not resolvable: $activeSubpath"))
+                        return@execute
+                    }
                 try {
-                    ManagedNewSpec.create(session.folderAbsolute, payload.name)
+                    ManagedNewSpec.create(folderAbsolute, payload.name)
                 } catch (e: Exception) {
                     ServerPlayNetworking.send(player, ManagedErrorS2C("new-spec failed: ${e.message}"))
                     return@execute
                 }
-                ManagedDimLifecycle.unload(ctx.server(), player.uuid, save = true)
-                val report = ManagedDimLifecycle.load(ctx.server(), root, session.subpath, player)
+                val report = try {
+                    ManagedDimLifecycle.placeFolder(ctx.server(), root, activeSubpath)
+                } catch (e: Exception) {
+                    LOGGER.error("[managed/new-spec] re-place {}: {}", activeSubpath, e.message, e)
+                    ServerPlayNetworking.send(player, ManagedErrorS2C("re-place failed: ${e.message}"))
+                    return@execute
+                }
                 ServerPlayNetworking.send(player, ManagedFolderLoadedS2C(
                     subpath = report.subpath,
                     loadedSpecIds = report.loaded,
@@ -114,7 +133,7 @@ object ManagedNetworkRegistry {
             return
         }
         val tree = ManagedFolderTree.scan(root)
-        val current = ManagedSession.get(player.uuid)?.subpath
+        val current = ManagedSession.get(player.uuid)?.activeSubpath
         ServerPlayNetworking.send(player, ManagedTreeSnapshotS2C(
             leaves = tree.leaves.map { ManagedLeafEntry(it.subpath, it.specFiles.size) },
             intermediates = tree.intermediates.toList(),

@@ -1,53 +1,24 @@
 package com.breadmoirai.redstonespecs.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import net.minecraft.core.BlockPos
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
-import java.nio.file.Path
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Per-spec state inside a loaded folder. `cell.origin` is *relative to (0,0,0)* — the absolute
- * world position is `cell.origin + regionOrigin` (regionOrigin is owned by ManagedDimRegistry).
- * `loadedSnapshot` is the blocks in the cell volume *immediately after placement*, used as the
- * baseline for dirty-diff at save time.
+ * Per-player UI focus. The player's currently "active" folder for save / new-spec actions.
+ * The actual loaded-folder state lives in [ManagedWorld].
  */
-data class LoadedSpec(
-    val cell: ManagedCell,
-    val spec: RedstoneSpec,
-    val sourceFile: Path,
-    val loadedSnapshot: StructureTemplate,
-)
-
-/**
- * Per-player loaded-folder state. Single-player has at most one entry; dedicated server has one
- * per connected player who's opened a folder. Ephemeral — not persisted to disk.
- */
-class ManagedSession(
+data class ManagedSession(
     val playerId: UUID,
-    val root: ManagedRoot,
-    val subpath: String,
-    val folderAbsolute: Path,
-    val regionOrigin: BlockPos,           // assigned by ManagedDimRegistry
-    val loaded: MutableMap<String, LoadedSpec>, // by spec id
+    val activeSubpath: String?,   // null means "no folder selected"
 ) {
-    /**
-     * Absolute world origin for a given spec's cell. `cell.origin` Y is already absolute
-     * (GridLayout uses `yBase` directly); only X/Z are region-relative.
-     */
-    fun absoluteCellOrigin(specId: String): BlockPos? =
-        loaded[specId]?.cell?.origin?.let { rel ->
-            BlockPos(regionOrigin.x + rel.x, rel.y, regionOrigin.z + rel.z)
-        }
-
-    fun cellByOrigin(): Map<BlockPos, String> =
-        loaded.values.associate { it.cell.origin to it.cell.specId }
-
     companion object {
-        private val sessions = java.util.concurrent.ConcurrentHashMap<UUID, ManagedSession>()
+        private val sessions = ConcurrentHashMap<UUID, ManagedSession>()
 
         fun get(playerId: UUID): ManagedSession? = sessions[playerId]
         fun set(session: ManagedSession) { sessions[session.playerId] = session }
+        fun setActive(playerId: UUID, subpath: String?) {
+            sessions[playerId] = ManagedSession(playerId, subpath)
+        }
         fun clear(playerId: UUID) { sessions.remove(playerId) }
         fun all(): Collection<ManagedSession> = sessions.values
     }
