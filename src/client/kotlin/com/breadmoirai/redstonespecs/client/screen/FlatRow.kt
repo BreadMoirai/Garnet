@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.client.screen
 
-import com.breadmoirai.redstonespecs.data.StateCondition
+import com.breadmoirai.redstonespecs.dsl.StateCondition
 import net.minecraft.resources.Identifier
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.block.state.properties.IntegerProperty

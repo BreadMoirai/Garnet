@@ -1,5 +1,7 @@
 package com.breadmoirai.redstonespecs.data
 
+import com.breadmoirai.redstonespecs.dsl.DEFAULT_CONDITION
+import com.breadmoirai.redstonespecs.dsl.StateCondition
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.SharedConstants

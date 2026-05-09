@@ -5,7 +5,7 @@ import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.StateCondition
+import com.breadmoirai.redstonespecs.dsl.StateCondition
 import com.breadmoirai.redstonespecs.network.SaveSpecEntryC2SPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.gui.GuiGraphicsExtractor

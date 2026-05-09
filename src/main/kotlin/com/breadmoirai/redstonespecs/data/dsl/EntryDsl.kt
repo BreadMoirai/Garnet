@@ -4,7 +4,7 @@ import com.breadmoirai.redstonespecs.data.EntryKind
 import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.StateCondition
+import com.breadmoirai.redstonespecs.dsl.StateCondition
 import net.minecraft.core.BlockPos
 
 @SpecDslMarker

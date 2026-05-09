@@ -1,4 +1,4 @@
-package com.breadmoirai.redstonespecs.data
+package com.breadmoirai.redstonespecs.dsl
 
 import com.mojang.serialization.Codec
 import com.mojang.serialization.MapCodec

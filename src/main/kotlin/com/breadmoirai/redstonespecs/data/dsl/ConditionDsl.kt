@@ -1,6 +1,6 @@
 package com.breadmoirai.redstonespecs.data.dsl
 
-import com.breadmoirai.redstonespecs.data.StateCondition
+import com.breadmoirai.redstonespecs.dsl.StateCondition
 import net.minecraft.resources.Identifier
 
 @DslMarker
