@@ -1,8 +1,5 @@
 package com.breadmoirai.redstonespecs.persistence
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec as DataRedstoneSpec
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
 import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import org.slf4j.LoggerFactory
@@ -15,20 +12,8 @@ private const val EXT = ".spec.kts"
 
 object SpecPersistence {
 
-    fun save(saveDir: Path, spec: DataRedstoneSpec, recording: StateRecording? = null) {
-        saveDir.createDirectories()
-        val file = saveDir.resolve("${spec.id}$EXT")
-        file.writeText(KtsSpecEmitter.emit(spec))
-        if (recording != null) {
-            RecordingSidecar.save(saveDir, spec.id, recording)
-        }
-        LOGGER.debug("[SpecPersistence#save] saved spec '{}' to {} (recording={})",
-            spec.id, file, recording != null)
-    }
-
     /**
-     * Writes raw `.spec.kts` source text directly to disk, bypassing the
-     * [com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter] round-trip.
+     * Writes raw `.spec.kts` source text directly to disk.
      * Used by the recording finalize path via [com.breadmoirai.redstonespecs.runner.RecordingDslEmitter].
      */
     fun writeSpecKts(saveDir: Path, id: String, source: String) {

@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs.block
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -27,24 +26,13 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
         SpecBlockEntity(pos, state)
     override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
 
-    override fun onPlace(state: BlockState, level: Level, pos: BlockPos, oldState: BlockState, isMoving: Boolean) {
-        super.onPlace(state, level, pos, oldState, isMoving)
-        if (level.isClientSide) return
-        if (oldState.`is`(this)) return
-        val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return
-        if (be.spec != null) return
-        be.setSpec(RedstoneSpec.new("spec"))
-    }
-
     override fun setPlacedBy(level: Level, pos: BlockPos, state: BlockState, placer: LivingEntity?, stack: ItemStack) {
         super.setPlacedBy(level, pos, state, placer, stack)
         if (level.isClientSide) return
         val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return
         val player = placer as? ServerPlayer ?: return
         val playerId = player.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
-        val s = be.spec
-        if (s == null) be.setSpec(RedstoneSpec.new(playerId))
-        else if (s.id == "spec") be.setSpecId(playerId)
+        if (be.specId == "spec") be.setSpecId(playerId)
     }
 
     override fun useWithoutItem(
@@ -53,10 +41,9 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
             val serverPlayer = player as ServerPlayer
-            val spec = be.spec
-            val specId = spec?.id ?: ""
-            val outPath = spec?.id ?: ""
-            val structureId = spec?.structure ?: spec?.id ?: ""
+            val specId = be.specId
+            val outPath = be.specId
+            val structureId = be.specStructure ?: be.specId
             val recState = if (be.isRecording) "recording" else "idle"
             ServerPlayNetworking.send(serverPlayer, OpenRecorderScreenS2C(be.blockPos, specId, outPath, structureId, recState))
         }

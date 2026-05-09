@@ -1,13 +1,13 @@
 package com.breadmoirai.redstonespecs.item
 
-import com.breadmoirai.redstonespecs.data.SpecEntry
+import com.breadmoirai.redstonespecs.runner.EntryMarker
 import net.minecraft.core.BlockPos
 import java.util.UUID
 
 object UndoStack {
     private const val MAX_DEPTH = 20
 
-    data class UndoRecord(val originPos: BlockPos, val entry: SpecEntry)
+    data class UndoRecord(val originPos: BlockPos, val marker: EntryMarker)
 
     private val stacks = HashMap<UUID, ArrayDeque<UndoRecord>>()
 

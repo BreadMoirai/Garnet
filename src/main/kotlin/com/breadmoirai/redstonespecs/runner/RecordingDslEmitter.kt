@@ -264,6 +264,20 @@ object RecordingDslEmitter {
         return sb.toString()
     }
 
+    /**
+     * Emits a minimal stub `.spec.kts` source for a new spec with the given [id].
+     * Used by [com.breadmoirai.redstonespecs.managed.ManagedNewSpec.create] to initialize a file
+     * before the first recording.
+     */
+    fun emitStub(id: String): String {
+        val sb = StringBuilder()
+        sb.appendLine("import com.breadmoirai.redstonespecs.dsl.*")
+        sb.appendLine("import net.minecraft.core.Vec3i")
+        sb.appendLine()
+        sb.append("redstoneSpec(id = ${quoted(id)}, bounds = Vec3i(5, 5, 5), lifespan = 20) {}")
+        return sb.toString()
+    }
+
     private fun quoted(s: String): String = "\"${s.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
     private fun formatColor(c: Int): String = when (c) {

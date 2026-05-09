@@ -9,20 +9,6 @@ import org.slf4j.LoggerFactory
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 fun registerClientNetworking() {
-    ClientPlayNetworking.registerGlobalReceiver(TestResultS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            val r = payload.result
-            val color = if (r.pass) "§a" else "§c"
-            LOGGER.debug("[ClientNetworkHandler#testResult] originPos={} {}/{} passed", payload.originPos, r.passCount, r.checks.size)
-            mc.player?.sendSystemMessage(
-                net.minecraft.network.chat.Component.literal("${color}Spec '${r.specId}': ${r.passCount}/${r.checks.size} checks passed")
-            )
-            // Cache the latest result+recording for any future timeline scrubber screen.
-            com.breadmoirai.redstonespecs.client.state.ClientRunnerState.put(payload.originPos, payload.result)
-        }
-    }
-
     ClientPlayNetworking.registerGlobalReceiver(OverwritePromptS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {

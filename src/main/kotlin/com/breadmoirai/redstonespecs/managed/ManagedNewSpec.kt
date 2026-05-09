@@ -1,7 +1,6 @@
 package com.breadmoirai.redstonespecs.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
+import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -22,8 +21,9 @@ object ManagedNewSpec {
         }
         val file = folder.resolve("$name.spec.kts")
         require(!file.exists()) { "spec file already exists: $file" }
-        val stub = RedstoneSpec.new(name)
-        file.writeText(KtsSpecEmitter.emit(stub))
+        // Emit a minimal stub: empty spec with default bounds
+        val stub = RecordingDslEmitter.emitStub(name)
+        file.writeText(stub)
         LOGGER.info("[ManagedNewSpec] created stub '{}'", file)
         return file
     }

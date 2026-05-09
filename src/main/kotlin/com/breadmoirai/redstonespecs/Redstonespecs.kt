@@ -10,7 +10,6 @@ import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
 import com.breadmoirai.redstonespecs.managed.ManagedServerContext
 import com.breadmoirai.redstonespecs.network.registerNetworking
-import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
@@ -36,7 +35,7 @@ class Redstonespecs : ModInitializer {
         registerAttackCallback()
         registerUseBlockCallback()
         SubTickPhaseEvents.PHASE.register { level, phase ->
-            SpecRunnerCoordinator.onPhase(level, phase)
+            com.breadmoirai.redstonespecs.runner.StateRecorder.onPhaseForActiveRecorders(level, phase)
         }
         ServerLifecycleEvents.SERVER_STARTING.register { server ->
             val cfg = SharedSettings.managedRootPath
@@ -85,9 +84,9 @@ class Redstonespecs : ModInitializer {
 
             val be = SpecBlockEntity.findFor(world, pos) ?: return@register InteractionResult.PASS
             val relPos = pos.subtract(be.blockPos)
-            val removed = be.removeEntry(relPos)
+            val removed = be.removeMarker(relPos)
             if (removed != null) {
-                LOGGER.debug("[Redstonespecs#attackCallback] removed entry at {}", relPos)
+                LOGGER.debug("[Redstonespecs#attackCallback] removed marker at {}", relPos)
                 UndoStack.push(player.uuid, UndoStack.UndoRecord(be.blockPos, removed))
             }
 

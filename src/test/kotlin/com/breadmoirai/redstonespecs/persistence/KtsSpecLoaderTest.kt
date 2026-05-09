@@ -1,5 +1,6 @@
-package com.breadmoirai.redstonespecs.data.serial
+package com.breadmoirai.redstonespecs.persistence
 
+import com.breadmoirai.redstonespecs.persistence.KtsSpecLoader
 import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

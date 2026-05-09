@@ -45,13 +45,16 @@ class SpecPersistenceTest : FunSpec({
         loaded.lifespan shouldBe 10
     }
 
-    test("save with recording writes sidecar and loadRecording returns it") {
+    test("writeSpecKts with sidecar recording roundtrips") {
         val tmp = createTempDirectory("SpecPersistenceTest-recording")
-        // Legacy save (data.RedstoneSpec → KtsSpecEmitter) still writes the file.
-        val spec = com.breadmoirai.redstonespecs.data.dsl.redstoneSpec("rec") {
-            bounds(3, 3, 3)
-            lifespan = 5
-        }
+        val source = """
+            import com.breadmoirai.redstonespecs.dsl.*
+            import net.minecraft.core.Vec3i
+
+            redstoneSpec(id = "rec", bounds = Vec3i(3, 3, 3), lifespan = 5) {}
+        """.trimIndent()
+        SpecPersistence.writeSpecKts(tmp, "rec", source)
+
         val lever = BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:lever"))
         val unpowered = lever.defaultBlockState().setValue(LeverBlock.POWERED, false)
         val pos = BlockPos(0, 0, 0)
@@ -69,7 +72,7 @@ class SpecPersistenceTest : FunSpec({
             ),
         )
 
-        SpecPersistence.save(tmp, spec, recording)
+        RecordingSidecar.save(tmp, "rec", recording)
         tmp.resolve("rec.spec.kts").exists() shouldBe true
         tmp.resolve("rec.recording.nbt").exists() shouldBe true
 
@@ -80,13 +83,9 @@ class SpecPersistenceTest : FunSpec({
         loaded.changes.size shouldBe recording.changes.size
     }
 
-    test("save without recording leaves no sidecar") {
+    test("no sidecar without explicit save") {
         val tmp = createTempDirectory("SpecPersistenceTest-no-recording")
-        val spec = com.breadmoirai.redstonespecs.data.dsl.redstoneSpec("norec") {
-            bounds(3, 3, 3)
-            lifespan = 5
-        }
-        SpecPersistence.save(tmp, spec)
+        SpecPersistence.writeSpecKts(tmp, "norec", "import com.breadmoirai.redstonespecs.dsl.*\nredstoneSpec(id = \"norec\", lifespan = 5) {}")
         tmp.resolve("norec.recording.nbt").exists() shouldBe false
         SpecPersistence.loadRecording(tmp, "norec") shouldBe null
     }

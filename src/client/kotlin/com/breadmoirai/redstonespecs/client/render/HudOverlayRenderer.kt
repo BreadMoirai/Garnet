@@ -6,8 +6,7 @@ import com.breadmoirai.redstonespecs.client.FaceHit
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
 import com.breadmoirai.redstonespecs.client.findHoveredFace
-import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.data.SpecEntry
+import com.breadmoirai.redstonespecs.runner.EntryMarker
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
@@ -46,20 +45,19 @@ fun registerHudOverlay() {
             // Check if hit block belongs to a spec origin's bounds
             val ownerBe = SpecBlockEntity.findFor(level, hitPos)
             if (ownerBe != null) {
-                val spec = ownerBe.spec ?: return@HudElement
                 val relPos = hitPos.subtract(ownerBe.blockPos)
-                val entry = spec.entries.firstOrNull { it.pos == relPos }
+                val marker = ownerBe.specMarkers.firstOrNull { it.pos == relPos }
 
                 extractor.text(
                     font,
-                    net.minecraft.network.chat.Component.literal("§6${spec.id}"),
+                    net.minecraft.network.chat.Component.literal("§6${ownerBe.specId}"),
                     2, y, 0xFFFFFF,
                 )
-                if (entry != null) {
+                if (marker != null) {
                     extractor.text(
                         font,
                         net.minecraft.network.chat.Component.literal(
-                            "  §7${entryTypeName(entry)} §f${entry.label.ifEmpty { relPos.toString() }}"
+                            "  §7${markerTypeName(marker)} §f${marker.label.ifEmpty { relPos.toString() }}"
                         ),
                         2, y + 11, 0xFFFFFF,
                     )
@@ -70,10 +68,9 @@ fun registerHudOverlay() {
             // Check if looking directly at spec origin block
             val originBe = level.getBlockEntity(hitPos) as? SpecBlockEntity
             if (originBe != null) {
-                val spec = originBe.spec ?: return@HudElement
                 extractor.text(
                     font,
-                    net.minecraft.network.chat.Component.literal("§6${spec.id}"),
+                    net.minecraft.network.chat.Component.literal("§6${originBe.specId}"),
                     2, y, 0xFFFFFF,
                 )
             }
@@ -103,8 +100,7 @@ fun registerHudOverlay() {
             var bestFace: HoveredFace? = null
 
             for (be in SpecBlockEntity.allFor(level)) {
-                val spec = be.spec ?: continue
-                val b = spec.bounds
+                val b = be.specBounds
                 val bpX = be.blockPos.x.toDouble()
                 val bpY = be.blockPos.y.toDouble()
                 val bpZ = be.blockPos.z.toDouble()
@@ -123,12 +119,10 @@ fun registerHudOverlay() {
         } else {
             currentHoveredFace = null
         }
-
-        // Cycle keybindings removed (no more spec cases to cycle)
     }
 }
 
-private fun entryTypeName(entry: SpecEntry) = when (entry.kind) {
-    EntryKind.INPUT -> "Input"
-    EntryKind.OUTPUT -> "Output"
+private fun markerTypeName(marker: EntryMarker) = when (marker.kind) {
+    EntryMarker.Kind.INPUT -> "Input"
+    EntryMarker.Kind.OUTPUT -> "Output"
 }

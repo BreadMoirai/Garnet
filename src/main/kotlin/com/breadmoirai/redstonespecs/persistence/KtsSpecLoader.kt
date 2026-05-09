@@ -1,4 +1,4 @@
-package com.breadmoirai.redstonespecs.data.serial
+package com.breadmoirai.redstonespecs.persistence
 
 import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import io.kotest.core.spec.Spec

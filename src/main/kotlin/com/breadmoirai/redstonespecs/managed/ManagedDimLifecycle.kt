@@ -3,7 +3,7 @@ package com.breadmoirai.redstonespecs.managed
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
+import com.breadmoirai.redstonespecs.persistence.KtsSpecLoader
 import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.Registries

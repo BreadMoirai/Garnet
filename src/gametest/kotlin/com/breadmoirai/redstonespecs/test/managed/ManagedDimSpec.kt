@@ -1,8 +1,7 @@
 package com.breadmoirai.redstonespecs.test.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
 import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
+import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
 import com.breadmoirai.redstonespecs.managed.ManagedDimRegistry
 import com.breadmoirai.redstonespecs.managed.ManagedNewSpec
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
@@ -15,7 +14,6 @@ import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.netty.channel.embedded.EmbeddedChannel
-import net.minecraft.core.Vec3i
 import net.minecraft.network.Connection
 import net.minecraft.network.protocol.PacketFlow
 import net.minecraft.server.MinecraftServer
@@ -45,10 +43,8 @@ class ManagedDimSpec : RedstoneTestSpec({
         val tmp = Files.createTempDirectory("managed-load")
         try {
             val folder = tmp.resolve("set-a").also { it.createDirectories() }
-            val a = RedstoneSpec("a", Vec3i(3, 3, 3), 5, null, emptyList())
-            val b = RedstoneSpec("b", Vec3i(2, 2, 2), 5, null, emptyList())
-            folder.resolve("a.spec.kts").writeText(KtsSpecEmitter.emit(a))
-            folder.resolve("b.spec.kts").writeText(KtsSpecEmitter.emit(b))
+            folder.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
+            folder.resolve("b.spec.kts").writeText(RecordingDslEmitter.emitStub("b"))
 
             val report = onServer {
                 ManagedDimRegistry.of(this).managedLevel()
@@ -78,10 +74,8 @@ class ManagedDimSpec : RedstoneTestSpec({
         val tmp = Files.createTempDirectory("managed-save")
         try {
             val folder = tmp.resolve("set-b").also { it.createDirectories() }
-            val a = RedstoneSpec("a", Vec3i(3, 3, 3), 5, null, emptyList())
-            val b = RedstoneSpec("b", Vec3i(2, 2, 2), 5, null, emptyList())
-            folder.resolve("a.spec.kts").writeText(KtsSpecEmitter.emit(a))
-            folder.resolve("b.spec.kts").writeText(KtsSpecEmitter.emit(b))
+            folder.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
+            folder.resolve("b.spec.kts").writeText(RecordingDslEmitter.emitStub("b"))
 
             val results = onServer {
                 makeMockServerPlayer(this)

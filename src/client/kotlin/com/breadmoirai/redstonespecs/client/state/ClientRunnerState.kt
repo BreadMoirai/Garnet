@@ -1,22 +1,20 @@
 package com.breadmoirai.redstonespecs.client.state
 
-import com.breadmoirai.redstonespecs.data.TestResult
 import net.minecraft.core.BlockPos
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Client-side cache of the latest [TestResult] (with optional StateRecording attached)
- * per runner block. Populated by ClientNetworkHandler on TestResultS2CPayload receipt;
- * read by the timeline scrubber screen.
+ * Client-side cache of the latest run result summary per runner block.
+ * Populated by ClientNetworkHandler; read by the timeline scrubber screen.
  */
 object ClientRunnerState {
-    private val byRunner = ConcurrentHashMap<BlockPos, TestResult>()
+    private val summaryByRunner = ConcurrentHashMap<BlockPos, String>()
 
-    fun put(runnerPos: BlockPos, result: TestResult) {
-        byRunner[runnerPos] = result
+    fun put(runnerPos: BlockPos, summary: String) {
+        summaryByRunner[runnerPos] = summary
     }
 
-    fun get(runnerPos: BlockPos): TestResult? = byRunner[runnerPos]
+    fun get(runnerPos: BlockPos): String? = summaryByRunner[runnerPos]
 
-    fun clear(runnerPos: BlockPos) { byRunner.remove(runnerPos) }
+    fun clear(runnerPos: BlockPos) { summaryByRunner.remove(runnerPos) }
 }

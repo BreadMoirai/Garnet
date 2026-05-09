@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs.network
 
-import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
@@ -8,7 +7,6 @@ import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.persistence.SpecDirectoryScan
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.breadmoirai.redstonespecs.persistence.StructurePersistence
-import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import com.breadmoirai.redstonespecs.runner.SpecSnapshot
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -24,7 +22,6 @@ private fun saveDir(server: net.minecraft.server.MinecraftServer): java.nio.file
 
 fun registerNetworking() {
     // S2C registrations
-    PayloadTypeRegistry.clientboundPlay().register(TestResultS2CPayload.TYPE, TestResultS2CPayload.STREAM_CODEC)
     PayloadTypeRegistry.clientboundPlay().register(OverwritePromptS2CPayload.TYPE, OverwritePromptS2CPayload.STREAM_CODEC)
 
     // C2S registrations
@@ -47,15 +44,14 @@ fun registerNetworking() {
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#runSpec] originPos={}", payload.originPos)
             val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
-            val dataSpec = be.spec ?: return@execute
             val level = be.level as? ServerLevel ?: return@execute
             val dir = saveDir(context.server())
-            val structureId = dataSpec.structure ?: dataSpec.id
-            StructurePersistence.save(dir, structureId, level, be.blockPos, dataSpec.bounds)
+            val structureId = be.specStructure ?: be.specId
+            StructurePersistence.save(dir, structureId, level, be.blockPos, be.specBounds)
             LOGGER.debug("[NetworkRegistry#runSpec] auto-saved structure '{}' before run", structureId)
-            val dslSpec = com.breadmoirai.redstonespecs.persistence.SpecPersistence.load(dir, dataSpec.id)
+            val dslSpec = SpecPersistence.load(dir, be.specId)
             if (dslSpec == null) {
-                LOGGER.warn("[NetworkRegistry#runSpec] could not load dsl.RedstoneSpec for '{}' — aborting run", dataSpec.id)
+                LOGGER.warn("[NetworkRegistry#runSpec] could not load dsl.RedstoneSpec for '{}' — aborting run", be.specId)
                 return@execute
             }
             be.startRun(dslSpec, level)
@@ -65,8 +61,7 @@ fun registerNetworking() {
     ServerPlayNetworking.registerGlobalReceiver(ResetSpecC2SPayload.TYPE) { payload, context ->
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#resetSpec] originPos={}", payload.originPos)
-            val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
-            SpecRunnerCoordinator.resetSpec(be)
+            // No-op: engine-driven path has no coordinator to reset.
         }
     }
 
@@ -81,13 +76,12 @@ fun registerNetworking() {
     ServerPlayNetworking.registerGlobalReceiver(OverwriteDecisionC2SPayload.TYPE) { payload, context ->
         context.server().execute {
             val be = context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
-            val spec = be.spec ?: return@execute
-            val structureId = spec.structure ?: spec.id
+            val structureId = be.specStructure ?: be.specId
             val level = be.level as? ServerLevel ?: return@execute
             val dir = saveDir(context.server())
             if (payload.overwrite) {
-                StructurePersistence.clearBounds(level, be.blockPos, spec.bounds)
-                StructurePersistence.load(dir, structureId, level, be.blockPos, spec.bounds)
+                StructurePersistence.clearBounds(level, be.blockPos, be.specBounds)
+                StructurePersistence.load(dir, structureId, level, be.blockPos, be.specBounds)
                 LOGGER.debug("[NetworkRegistry#overwriteDecision] cleared and placed structure '{}'", structureId)
             } else {
                 LOGGER.debug("[NetworkRegistry#overwriteDecision] user skipped structure load")
@@ -100,11 +94,10 @@ fun registerNetworking() {
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#setRecorderConfig] originPos={} specId={}", payload.originPos, payload.specId)
             val level = context.player().level()
-            val be = level.getBlockEntity(payload.originPos) as? com.breadmoirai.redstonespecs.block.SpecBlockEntity ?: return@execute
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return@execute
             if (payload.specId.isNotBlank()) be.setSpecId(payload.specId)
             if (payload.structureId.isNotBlank()) be.setStructure(payload.structureId)
-            // outPath is stored as structure for now (v2.0 BE doesn't have a dedicated outPath field yet)
         }
     }
 
@@ -112,16 +105,12 @@ fun registerNetworking() {
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#recorderCommand] originPos={} cmd={}", payload.originPos, payload.cmd)
             val level = context.player().level()
-            val be = level.getBlockEntity(payload.originPos) as? com.breadmoirai.redstonespecs.block.SpecBlockEntity ?: return@execute
+            val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return@execute
             when (payload.cmd) {
                 RecorderCmd.START -> be.startRecording()
-                RecorderCmd.STOP -> {
-                    be.stopRecordingAndFinalize()
-                }
-                RecorderCmd.DISCARD -> {
-                    be.discardForRerecord()
-                }
+                RecorderCmd.STOP -> be.stopRecordingAndFinalize()
+                RecorderCmd.DISCARD -> be.discardForRerecord()
             }
         }
     }
@@ -134,7 +123,6 @@ fun registerNetworking() {
             val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             if (level.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return@execute
             val dir = saveDir(context.server())
-            // Derive spec id from filename (strip ".spec.kts" suffix).
             val specId = payload.specPath.removeSuffix(".spec.kts")
             val dslSpec = SpecPersistence.load(dir, specId)
             val meta: RunnerMetaSnapshot? = if (dslSpec != null) {
@@ -162,49 +150,36 @@ fun registerNetworking() {
         val player = context.player()
         context.server().execute {
             LOGGER.debug("[NetworkRegistry#runnerCommand] originPos={} cmd={}", payload.originPos, payload.cmd)
-            // context.player() is always called on the server thread — level() is always ServerLevel here.
-            @Suppress("UNNECESSARY_SAFE_CALL")
             val serverLevel = player.level() as ServerLevel
             val be = serverLevel.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute
             if (serverLevel.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return@execute
             val dir = saveDir(context.server())
 
-            // Determine currently configured spec id from the BE's data spec (legacy) or
-            // from context. For now derive from the data spec if present.
-            val dataSpec = be.spec
             when (payload.cmd) {
                 RunnerCmd.PLACE_STRUCTURE -> {
-                    if (dataSpec != null) {
-                        val structureId = dataSpec.structure ?: dataSpec.id
-                        StructurePersistence.load(dir, structureId, serverLevel, payload.originPos, dataSpec.bounds)
+                    if (be.isConfigured) {
+                        val structureId = be.specStructure ?: be.specId
+                        StructurePersistence.load(dir, structureId, serverLevel, payload.originPos, be.specBounds)
                         LOGGER.debug("[NetworkRegistry#runnerCommand] PLACE_STRUCTURE placed '{}'", structureId)
                         ServerPlayNetworking.send(
                             player,
                             RunnerStatusS2C(payload.originPos, RunnerState.IDLE, "Structure placed: $structureId")
                         )
                     } else {
-                        LOGGER.warn("[NetworkRegistry#runnerCommand] PLACE_STRUCTURE: no spec loaded at {}", payload.originPos)
+                        LOGGER.warn("[NetworkRegistry#runnerCommand] PLACE_STRUCTURE: BE not configured at {}", payload.originPos)
                         ServerPlayNetworking.send(
                             player,
-                            RunnerStatusS2C(payload.originPos, RunnerState.IDLE, "No spec loaded")
+                            RunnerStatusS2C(payload.originPos, RunnerState.IDLE, "No spec configured")
                         )
                     }
                 }
                 RunnerCmd.RUN -> {
-                    if (dataSpec == null) {
-                        LOGGER.warn("[NetworkRegistry#runnerCommand] RUN: no spec loaded at {}", payload.originPos)
-                        ServerPlayNetworking.send(
-                            player,
-                            RunnerStatusS2C(payload.originPos, RunnerState.FAIL, "No spec loaded")
-                        )
-                        return@execute
-                    }
-                    val dslSpec = SpecPersistence.load(dir, dataSpec.id)
+                    val dslSpec = SpecPersistence.load(dir, be.specId)
                     if (dslSpec == null) {
-                        LOGGER.warn("[NetworkRegistry#runnerCommand] RUN: dsl spec '{}' not found", dataSpec.id)
+                        LOGGER.warn("[NetworkRegistry#runnerCommand] RUN: dsl spec '{}' not found", be.specId)
                         ServerPlayNetworking.send(
                             player,
-                            RunnerStatusS2C(payload.originPos, RunnerState.FAIL, "Spec file not found: ${dataSpec.id}")
+                            RunnerStatusS2C(payload.originPos, RunnerState.FAIL, "Spec file not found: ${be.specId}")
                         )
                         return@execute
                     }
@@ -212,8 +187,6 @@ fun registerNetworking() {
                         player,
                         RunnerStatusS2C(payload.originPos, RunnerState.RUNNING, "Running…")
                     )
-                    // startRun launches coroutine; result is currently not propagated back here.
-                    // A follow-up task can wire the completion callback to push RunnerStatusS2C.
                     val launched = be.startRun(dslSpec, serverLevel)
                     if (!launched) {
                         ServerPlayNetworking.send(
@@ -223,8 +196,8 @@ fun registerNetworking() {
                     }
                 }
                 RunnerCmd.RESTORE -> {
-                    if (dataSpec != null) {
-                        val snapshot = SpecSnapshot.capture(serverLevel, payload.originPos, dataSpec.bounds)
+                    if (be.isConfigured) {
+                        val snapshot = SpecSnapshot.capture(serverLevel, payload.originPos, be.specBounds)
                         snapshot.restore(serverLevel)
                         LOGGER.debug("[NetworkRegistry#runnerCommand] RESTORE applied snapshot at {}", payload.originPos)
                         ServerPlayNetworking.send(
@@ -232,10 +205,10 @@ fun registerNetworking() {
                             RunnerStatusS2C(payload.originPos, RunnerState.IDLE, "Snapshot restored")
                         )
                     } else {
-                        LOGGER.warn("[NetworkRegistry#runnerCommand] RESTORE: no spec loaded at {}", payload.originPos)
+                        LOGGER.warn("[NetworkRegistry#runnerCommand] RESTORE: BE not configured at {}", payload.originPos)
                         ServerPlayNetworking.send(
                             player,
-                            RunnerStatusS2C(payload.originPos, RunnerState.IDLE, "No spec loaded")
+                            RunnerStatusS2C(payload.originPos, RunnerState.IDLE, "No spec configured")
                         )
                     }
                 }

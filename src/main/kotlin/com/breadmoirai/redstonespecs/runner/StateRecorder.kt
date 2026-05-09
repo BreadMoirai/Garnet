@@ -57,7 +57,7 @@ class StateRecorder(
 
     /**
      * Converts a world position to a position relative to the recorder's origin block —
-     * the same coordinate space used by [com.breadmoirai.redstonespecs.data.SpecEntry.pos].
+     * the same coordinate space used by [com.breadmoirai.redstonespecs.runner.EntryMarker.pos].
      */
     fun worldToOriginRelative(worldPos: BlockPos): BlockPos = BlockPos(
         worldPos.x - originPos.x,
@@ -104,6 +104,18 @@ class StateRecorder(
         @JvmStatic
         fun deactivate(recorder: StateRecorder) {
             activeRecorders.remove(recorder)
+        }
+
+        /**
+         * Dispatches phase-start events to all active recorders.
+         * Called from [com.breadmoirai.redstonespecs.Redstonespecs] on each sub-tick phase.
+         */
+        @JvmStatic
+        fun onPhaseForActiveRecorders(level: net.minecraft.server.level.ServerLevel, phase: Phase) {
+            for (recorder in activeRecorders) {
+                if (phase == Phase.START_OF_TICK) recorder.onTickStart()
+                recorder.onPhaseStart(phase)
+            }
         }
 
         @JvmStatic

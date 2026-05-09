@@ -4,8 +4,7 @@ import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.HoveredFace
 import com.breadmoirai.redstonespecs.client.currentHoveredFace
-import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.allEntries
+import com.breadmoirai.redstonespecs.runner.EntryMarker
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.Minecraft
@@ -29,7 +28,7 @@ fun registerBoundsRenderer() {
 
 class RedstoneSpecRenderState : BlockEntityRenderState() {
     var bounds: Vec3i? = null
-    var activeEntries: List<SpecEntry> = emptyList()
+    var activeEntries: List<EntryMarker> = emptyList()
     var hoveredFace: HoveredFace? = null
 }
 
@@ -46,9 +45,9 @@ class SpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
         crumbling: ModelFeatureRenderer.CrumblingOverlay?,
     ) {
         super.extractRenderState(entity, state, partialTick, cameraPos, crumbling)
-        state.bounds = entity.spec?.bounds
+        state.bounds = entity.specBounds
         state.hoveredFace = if (entity.blockPos == currentHoveredFace?.originPos) currentHoveredFace else null
-        state.activeEntries = entity.spec?.allEntries ?: emptyList()
+        state.activeEntries = entity.specMarkers
     }
 
     override fun submit(
@@ -87,7 +86,7 @@ class SpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
 
     override fun getViewDistance(): Int = 256
 
-    private fun entryColor(entry: SpecEntry): Int = entry.color
+    private fun entryColor(entry: EntryMarker): Int = entry.color
 
     private fun unpackColor(color: Int): Triple<Float, Float, Float> = Triple(
         ((color shr 16) and 0xFF) / 255f,

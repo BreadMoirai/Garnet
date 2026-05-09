@@ -1,22 +1,13 @@
 package com.breadmoirai.redstonespecs.item
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.dsl.SimTime
-import com.breadmoirai.redstonespecs.data.allEntries
-import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.dsl.captureBlockStateProps
-import com.breadmoirai.redstonespecs.dsl.propsToCondition
+import com.breadmoirai.redstonespecs.runner.EntryMarker
 import net.minecraft.core.BlockPos
-import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.level.Level
-import net.minecraft.world.level.block.state.BlockState
 import org.slf4j.LoggerFactory
 
 internal fun nextLabel(blockName: String, existing: Set<String>): String {
@@ -39,17 +30,12 @@ private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(properties) {
 
-    abstract fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry
-
-    protected fun defaultLabel(initState: BlockState, spec: RedstoneSpec): String {
-        val blockName = BuiltInRegistries.BLOCK.getKey(initState.block).path
-        return nextLabel(blockName, spec.allEntries.map { it.label }.toSet())
-    }
+    abstract fun createMarker(relPos: BlockPos, be: SpecBlockEntity): EntryMarker
 
     override fun useOn(context: UseOnContext): InteractionResult {
         val level: Level = context.level
         val hitPos: BlockPos = context.clickedPos
-        val player = context.player ?: return InteractionResult.PASS
+        context.player ?: return InteractionResult.PASS
 
         val be = SpecBlockEntity.findFor(level, hitPos) ?: return InteractionResult.PASS
 
@@ -58,18 +44,13 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
         }
 
         if (!level.isClientSide) {
-            val spec = be.spec ?: return InteractionResult.PASS
             val relPos = hitPos.subtract(be.blockPos)
-            val hitState = level.getBlockState(hitPos)
-            val isRecorder = be.blockState.block is RedstoneSpecRecorderBlock
-            val initProps = if (isRecorder) emptyMap() else captureBlockStateProps(hitState)
-
-            val existing = spec.entries.any { it.pos == relPos }
+            val existing = be.specMarkers.any { it.pos == relPos }
             if (!existing) {
-                LOGGER.debug("[SpecMarkerTool#useOn] placing {} entry at {}", javaClass.simpleName, relPos)
-                be.addOrUpdateEntry(createEntry(relPos, initProps, hitState, spec))
+                LOGGER.debug("[SpecMarkerTool#useOn] placing {} marker at {}", javaClass.simpleName, relPos)
+                be.addOrUpdateMarker(createMarker(relPos, be))
             } else {
-                LOGGER.debug("[SpecMarkerTool#useOn] entry already exists at {}", relPos)
+                LOGGER.debug("[SpecMarkerTool#useOn] marker already exists at {}", relPos)
             }
         }
 
@@ -78,25 +59,21 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
 }
 
 class InputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        SpecEntry(
+    override fun createMarker(relPos: BlockPos, be: SpecBlockEntity): EntryMarker =
+        EntryMarker(
             pos = relPos,
-            label = defaultLabel(initState, spec),
+            label = nextLabel("input", be.specMarkers.map { it.label }.toSet()),
             color = 0xFF4488FF.toInt(),
-            kind = EntryKind.INPUT,
-            time = SimTime.START,
-            condition = propsToCondition(initProps, initState),
+            kind = EntryMarker.Kind.INPUT,
         )
 }
 
 class OutputSpecMarkerItem(properties: Properties = Properties()) : SpecMarkerTool(properties) {
-    override fun createEntry(relPos: BlockPos, initProps: Map<String, String>, initState: BlockState, spec: RedstoneSpec): SpecEntry =
-        SpecEntry(
+    override fun createMarker(relPos: BlockPos, be: SpecBlockEntity): EntryMarker =
+        EntryMarker(
             pos = relPos,
-            label = defaultLabel(initState, spec),
+            label = nextLabel("output", be.specMarkers.map { it.label }.toSet()),
             color = 0xFFFF8800.toInt(),
-            kind = EntryKind.OUTPUT,
-            time = SimTime.START,
-            condition = propsToCondition(initProps, initState),
+            kind = EntryMarker.Kind.OUTPUT,
         )
 }

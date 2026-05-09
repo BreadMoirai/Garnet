@@ -39,16 +39,16 @@ class RedstoneSpecRunnerBlock(properties: Properties) : BaseEntityBlock(properti
                 .resolve(SharedSettings.specSaveDir)
             val specList = SpecDirectoryScan.list(saveDir)
 
-            // Build meta from the current data spec if one is loaded (legacy path).
-            val currentSpec = be.spec
-            val meta: RunnerMetaSnapshot? = if (currentSpec != null) {
+            // Build meta from the BE's configured spec id (loads from disk if available).
+            val dslSpec = if (be.isConfigured) SpecPersistence.load(saveDir, be.specId) else null
+            val meta: RunnerMetaSnapshot? = if (dslSpec != null) {
                 RunnerMetaSnapshot(
-                    id = currentSpec.id,
-                    boundsX = currentSpec.bounds.x,
-                    boundsY = currentSpec.bounds.y,
-                    boundsZ = currentSpec.bounds.z,
-                    lifespan = currentSpec.lifespan,
-                    structure = currentSpec.structure,
+                    id = dslSpec.id,
+                    boundsX = dslSpec.bounds.x,
+                    boundsY = dslSpec.bounds.y,
+                    boundsZ = dslSpec.bounds.z,
+                    lifespan = dslSpec.lifespan,
+                    structure = dslSpec.structure,
                 )
             } else null
 

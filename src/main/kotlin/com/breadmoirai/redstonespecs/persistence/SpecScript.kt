@@ -1,4 +1,4 @@
-package com.breadmoirai.redstonespecs.data.serial
+package com.breadmoirai.redstonespecs.persistence
 
 import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
 import kotlin.script.experimental.annotations.KotlinScript
@@ -12,10 +12,9 @@ object SpecScriptCompilationConfig : ScriptCompilationConfiguration({
         "com.breadmoirai.redstonespecs.dsl.*",
         "net.minecraft.core.Vec3i",
         // Testing surface: lets .spec.kts name RedstoneTestSpec, runRedstoneSpec,
-        // SpecLiteralCapture, and kotest matchers without explicit imports.
+        // and kotest matchers without explicit imports.
         "com.breadmoirai.redstonespecs.testing.RedstoneTestSpec",
         "com.breadmoirai.redstonespecs.testing.runner.runRedstoneSpec",
-        "com.breadmoirai.redstonespecs.data.serial.SpecLiteralCapture",
         "com.breadmoirai.redstonespecs.testing.server.awaitTicks",
         "com.breadmoirai.redstonespecs.testing.server.awaitTickEnd",
         "com.breadmoirai.redstonespecs.testing.server.spawnStructure",

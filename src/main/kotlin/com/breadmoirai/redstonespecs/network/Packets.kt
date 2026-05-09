@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs.network
 
-import com.breadmoirai.redstonespecs.data.TestResult
 import io.netty.buffer.ByteBuf
 import net.minecraft.core.BlockPos
 import net.minecraft.network.codec.ByteBufCodecs
@@ -9,23 +8,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.Identifier
 
 // === S2C ===
-
-data class TestResultS2CPayload(
-    val originPos: BlockPos,
-    val result: TestResult,
-) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<TestResultS2CPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "test_result")
-        )
-        val STREAM_CODEC: StreamCodec<ByteBuf, TestResultS2CPayload> = StreamCodec.composite(
-            BlockPos.STREAM_CODEC, TestResultS2CPayload::originPos,
-            ByteBufCodecs.fromCodec(TestResult.CODEC), TestResultS2CPayload::result,
-            ::TestResultS2CPayload,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
 
 // Server asks: non-air blocks in bounds — overwrite?
 data class OverwritePromptS2CPayload(val originPos: BlockPos, val specId: String) : CustomPacketPayload {

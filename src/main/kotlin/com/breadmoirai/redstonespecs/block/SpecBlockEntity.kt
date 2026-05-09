@@ -2,17 +2,6 @@ package com.breadmoirai.redstonespecs.block
 
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.data.EntryKind
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.RedstoneSpecEmitter
-import com.breadmoirai.redstonespecs.data.RedstoneSpecEmitter.Companion.emitter
-import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.data.TestResult
-import com.breadmoirai.redstonespecs.data.allEntries
-import com.breadmoirai.redstonespecs.data.inputs
-import com.breadmoirai.redstonespecs.data.outputs
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
-import com.breadmoirai.redstonespecs.data.serial.SpecJsonCodec
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
 import com.breadmoirai.redstonespecs.runner.EntryMarker
 import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
@@ -24,12 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.io.path.writeText
 import net.minecraft.core.BlockPos
 import net.minecraft.core.HolderLookup
+import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.game.ClientGamePacketListener
@@ -45,18 +32,26 @@ import net.minecraft.world.level.storage.ValueOutput
 import org.slf4j.LoggerFactory
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.io.path.writeText
 
 class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     BlockEntity(ModRegistries.SPEC_BLOCK_ENTITY_TYPE, pos, state) {
 
-    private var specEmitter: RedstoneSpecEmitter? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var collectorJob: Job? = null
 
-    val spec: RedstoneSpec? get() = specEmitter?.value
-
-    var lastTestResult: TestResult? = null
+    // Spec config: plain strings + bounds, no data.RedstoneSpec dependency.
+    var specId: String = "spec"
         private set
+    var specBounds: Vec3i = Vec3i(5, 5, 5)
+        private set
+    var specStructure: String? = null
+        private set
+    var specMarkers: List<EntryMarker> = emptyList()
+        private set
+
+    /** Convenience: true if id is non-blank and bounds are positive. */
+    val isConfigured: Boolean
+        get() = specId.isNotBlank() && specBounds.x >= 1 && specBounds.y >= 1 && specBounds.z >= 1
 
     private var stateRecorder: StateRecorder? = null
     val isRecording: Boolean get() = stateRecorder != null
@@ -65,18 +60,52 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
      *  Not persisted to NBT — managed dims rebuild from disk every session. */
     @JvmField var managedSourcePath: java.nio.file.Path? = null
 
+    // ── Spec config setters ───────────────────────────────────────────────────
+
+    fun setSpecId(id: String) {
+        specId = id
+        setChangedAndSync()
+    }
+
+    fun setSpecBounds(bounds: Vec3i) {
+        specBounds = bounds
+        setChangedAndSync()
+    }
+
+    fun setStructure(structure: String?) {
+        specStructure = structure
+        setChangedAndSync()
+    }
+
+    fun setSpecMarkers(markers: List<EntryMarker>) {
+        specMarkers = markers
+        setChangedAndSync()
+    }
+
+    fun addOrUpdateMarker(marker: EntryMarker) {
+        val others = specMarkers.filter { !(it.pos == marker.pos && it.kind == marker.kind) }
+        specMarkers = others + marker
+        setChangedAndSync()
+    }
+
+    fun removeMarker(pos: BlockPos): EntryMarker? {
+        val removed = specMarkers.firstOrNull { it.pos == pos } ?: return null
+        specMarkers = specMarkers.filter { it.pos != pos }
+        setChangedAndSync()
+        return removed
+    }
+
+    // ── Recording ─────────────────────────────────────────────────────────────
+
     fun startRecording(): Boolean {
-        val s = spec ?: run { LOGGER.debug("[startRecording] no spec at {}", blockPos); return false }
-        if (s.id.isBlank()) { LOGGER.debug("[startRecording] blank id at {}", blockPos); return false }
-        if (s.inputs.isEmpty()) { LOGGER.debug("[startRecording] no inputs at {}", blockPos); return false }
-        if (s.outputs.isEmpty()) { LOGGER.debug("[startRecording] no outputs at {}", blockPos); return false }
-        val b = s.bounds
+        if (specId.isBlank()) { LOGGER.debug("[startRecording] blank id at {}", blockPos); return false }
+        val b = specBounds
         if (b.x < 1 || b.y < 1 || b.z < 1) {
             LOGGER.debug("[startRecording] empty bounds {} at {}", b, blockPos); return false
         }
         val lv = level as? ServerLevel ?: run { LOGGER.debug("[startRecording] not ServerLevel at {}", blockPos); return false }
         if (stateRecorder != null) { LOGGER.debug("[startRecording] already recording at {}", blockPos); return false }
-        LOGGER.info("[startRecording] starting at {} (id={}, bounds={})", blockPos, s.id, b)
+        LOGGER.info("[startRecording] starting at {} (id={}, bounds={})", blockPos, specId, b)
         val recorder = StateRecorder.forSpec(UUID.randomUUID(), blockPos, b)
         recorder.start(lv, blockPos, b)
         StateRecorder.activate(recorder)
@@ -90,44 +119,31 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         StateRecorder.deactivate(rec)
         val recording = rec.toRecording()
         stateRecorder = null
-        val s = spec
-        if (s != null) {
-            val markers = s.allEntries
-                .map { e ->
-                    EntryMarker(
-                        pos = e.pos,
-                        label = e.label,
-                        color = e.color,
-                        kind = when (e.kind) {
-                            EntryKind.INPUT  -> EntryMarker.Kind.INPUT
-                            EntryKind.OUTPUT -> EntryMarker.Kind.OUTPUT
-                        },
-                    )
-                }
-                .distinctBy { it.pos to it.kind }
-            if (markers.isNotEmpty()) {
-                val source = RecordingDslEmitter.emit(
-                    id = s.id,
-                    bounds = s.bounds,
-                    lifespan = 20,
-                    structure = s.structure,
-                    strict = false,
-                    markers = markers,
-                    recording = recording,
-                )
-                val serverLevel = level as? ServerLevel
-                if (serverLevel != null) {
-                    val src = managedSourcePath
-                    coroutineScope.launch(Dispatchers.IO) {
-                        if (src != null) {
-                            src.writeText(source)
-                            LOGGER.debug("[finalize] managed: wrote recording result to {}", src)
-                        } else {
-                            val saveDir = serverLevel.server
-                                .getWorldPath(LevelResource.ROOT)
-                                .resolve(SharedSettings.specSaveDir)
-                            SpecPersistence.writeSpecKts(saveDir, s.id, source)
-                        }
+
+        val markers = specMarkers
+            .distinctBy { it.pos to it.kind }
+        if (markers.isNotEmpty()) {
+            val source = RecordingDslEmitter.emit(
+                id = specId,
+                bounds = specBounds,
+                lifespan = 20,
+                structure = specStructure,
+                strict = false,
+                markers = markers,
+                recording = recording,
+            )
+            val serverLevel = level as? ServerLevel
+            if (serverLevel != null) {
+                val src = managedSourcePath
+                coroutineScope.launch(Dispatchers.IO) {
+                    if (src != null) {
+                        src.writeText(source)
+                        LOGGER.debug("[finalize] managed: wrote recording result to {}", src)
+                    } else {
+                        val saveDir = serverLevel.server
+                            .getWorldPath(LevelResource.ROOT)
+                            .resolve(SharedSettings.specSaveDir)
+                        SpecPersistence.writeSpecKts(saveDir, specId, source)
                     }
                 }
             }
@@ -136,85 +152,21 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         return true
     }
 
-    fun setSpec(newSpec: RedstoneSpec) {
-        LOGGER.debug("[SpecBlockEntity#setSpec] setting spec '{}' at {}", newSpec.id, blockPos)
-        val e = specEmitter
-        if (e == null) {
-            specEmitter = newSpec.emitter()
-            tryStartCollecting()
-            triggerSave(newSpec)
-        } else {
-            e.updateFrom(newSpec)
-        }
-        setChangedAndSync()
-    }
-
-    fun setSpecId(id: String) {
-        val e = specEmitter ?: return
-        e.id = id
-        setChangedAndSync()
-    }
-
-    fun setLifespan(lifespan: Int) {
-        val e = specEmitter ?: return
-        e.lifespan = lifespan
-        setChangedAndSync()
-    }
-
-    fun setStructure(structure: String?) {
-        val e = specEmitter ?: return
-        e.structure = structure
-        setChangedAndSync()
-    }
-
-    fun setLastTestResult(result: TestResult) {
-        lastTestResult = result
-        setChangedAndSync()
-    }
-
-    fun addOrUpdateEntry(entry: SpecEntry) {
-        LOGGER.debug("[SpecBlockEntity#addOrUpdateEntry] pos={} kind={}", entry.pos, entry.kind)
-        val e = specEmitter ?: return
-        e.updateFrom(e.value.withEntryAddedOrUpdated(entry))
-        setChangedAndSync()
-    }
-
-    fun removeEntry(pos: BlockPos): SpecEntry? {
-        LOGGER.debug("[SpecBlockEntity#removeEntry] pos={}", pos)
-        val e = specEmitter ?: return null
-        val s = e.value
-        val removed = s.entries.firstOrNull { it.pos == pos } ?: return null
-        e.updateFrom(s.withEntriesRemoved(pos))
-        setChangedAndSync()
-        return removed
-    }
-
     /**
-     * Wipes everything on the spec EXCEPT id, bounds, and per-(pos,kind) marker headers.
-     * Marker entries collapse to one placeholder per (pos, kind). Used by Editor → Recorder Discard.
+     * Resets the spec markers to placeholders (one per pos/kind) for re-recording.
      */
     fun discardForRerecord() {
-        val s = spec ?: return
-        // Keep one marker entry per (pos, kind) — first occurrence wins for label/color.
-        val seen = HashSet<Pair<BlockPos, EntryKind>>()
-        val markers = s.allEntries.filter { e ->
+        val seen = HashSet<Pair<BlockPos, EntryMarker.Kind>>()
+        specMarkers = specMarkers.filter { e ->
             val key = e.pos to e.kind
             seen.add(key)
         }
-        val cleared = RedstoneSpec.new(s.id).copy(
-            bounds = s.bounds,
-            entries = markers,
-        )
-        setSpec(cleared)
-        lastTestResult = null
         setChangedAndSync()
     }
 
     /**
      * Launches [runRedstoneSpec] on the server thread using the BE's own coroutine scope.
-     *
      * Returns false if a run is already in flight for this BE (debounce).
-     * On completion, updates [lastTestResult] and broadcasts the result.
      */
     fun startRun(dslSpec: com.breadmoirai.redstonespecs.dsl.RedstoneSpec, serverLevel: ServerLevel): Boolean {
         if (!inFlightRuns.add(blockPos)) {
@@ -224,7 +176,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         coroutineScope.launch(McDispatchers.Server) {
             try {
                 LOGGER.info("[SpecBlockEntity#startRun] launching '{}' at {}", dslSpec.id, blockPos)
-                val recording = runRedstoneSpec(serverLevel, blockPos, dslSpec)
+                runRedstoneSpec(serverLevel, blockPos, dslSpec)
                 LOGGER.info("[SpecBlockEntity#startRun] '{}' PASSED", dslSpec.id)
             } catch (e: AssertionError) {
                 LOGGER.warn("[SpecBlockEntity#startRun] '{}' FAILED: {}", dslSpec.id, e.message)
@@ -240,68 +192,25 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     fun transformTo(targetBlock: Block) {
         val lv = level ?: return
         if (lv.isClientSide) return
-        val carriedSpec = spec
         val newState = targetBlock.defaultBlockState()
         lv.setBlock(blockPos, newState, 3)
-        if (carriedSpec != null) {
-            val newBe = lv.getBlockEntity(blockPos) as? SpecBlockEntity ?: return
-            newBe.setSpec(carriedSpec)
-        }
+        val newBe = lv.getBlockEntity(blockPos) as? SpecBlockEntity ?: return
+        newBe.specId = specId
+        newBe.specBounds = specBounds
+        newBe.specStructure = specStructure
+        newBe.specMarkers = specMarkers
+        newBe.setChangedAndSync()
     }
 
     override fun setLevel(level: Level) {
         super.setLevel(level)
         register(this)
-        tryStartCollecting()
     }
 
     override fun setRemoved() {
         super.setRemoved()
         coroutineScope.cancel()
         level?.let { registry[it]?.remove(blockPos) }
-    }
-
-    private fun tryStartCollecting() {
-        val e = specEmitter ?: return
-        val lv = level ?: return
-        collectorJob?.cancel()
-        collectorJob = coroutineScope.launch {
-            e.drop(1).collect { spec ->
-                val serverLevel = lv as? ServerLevel ?: return@collect
-                val src = managedSourcePath
-                if (src != null) {
-                    withContext(Dispatchers.IO) {
-                        src.writeText(KtsSpecEmitter.emit(spec))
-                    }
-                    LOGGER.debug("[finalize] managed: wrote back to {}", src)
-                } else {
-                    val saveDir = serverLevel.server
-                        .getWorldPath(LevelResource.ROOT)
-                        .resolve(SharedSettings.specSaveDir)
-                    withContext(Dispatchers.IO) {
-                        SpecPersistence.save(saveDir, spec)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun triggerSave(spec: RedstoneSpec) {
-        val serverLevel = level as? ServerLevel ?: return
-        val src = managedSourcePath
-        if (src != null) {
-            coroutineScope.launch(Dispatchers.IO) {
-                src.writeText(KtsSpecEmitter.emit(spec))
-                LOGGER.debug("[finalize] managed: wrote back to {}", src)
-            }
-        } else {
-            val saveDir = serverLevel.server
-                .getWorldPath(LevelResource.ROOT)
-                .resolve(SharedSettings.specSaveDir)
-            coroutineScope.launch(Dispatchers.IO) {
-                SpecPersistence.save(saveDir, spec)
-            }
-        }
     }
 
     private fun setChangedAndSync() {
@@ -321,8 +230,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
 
         fun findFor(level: Level, worldPos: BlockPos): SpecBlockEntity? =
             registry[level]?.values?.find { be ->
-                val s = be.spec ?: return@find false
-                val b = s.bounds
+                val b = be.specBounds
                 val o = be.blockPos
                 (worldPos.x - o.x) in 0 until b.x &&
                 (worldPos.y - o.y) in 0 until b.y &&
@@ -336,19 +244,22 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     override fun saveAdditional(output: ValueOutput) {
         LOGGER.debug("[SpecBlockEntity#saveAdditional] saving at {}", blockPos)
         super.saveAdditional(output)
-        spec?.let { output.store("spec", SpecJsonCodec.SPEC, it) }
-        lastTestResult?.let { output.store("last_test_result", TestResult.CODEC, it) }
+        output.store("spec_id", com.mojang.serialization.Codec.STRING, specId)
+        output.store("spec_bounds_x", com.mojang.serialization.Codec.INT, specBounds.x)
+        output.store("spec_bounds_y", com.mojang.serialization.Codec.INT, specBounds.y)
+        output.store("spec_bounds_z", com.mojang.serialization.Codec.INT, specBounds.z)
+        specStructure?.let { output.store("spec_structure", com.mojang.serialization.Codec.STRING, it) }
     }
 
     override fun loadAdditional(input: ValueInput) {
         super.loadAdditional(input)
-        val loaded = input.read("spec", SpecJsonCodec.SPEC).orElse(null)
-        lastTestResult = input.read("last_test_result", TestResult.CODEC).orElse(null)
-        LOGGER.debug("[SpecBlockEntity#loadAdditional] loaded at {} spec='{}'", blockPos, loaded?.id)
-        if (loaded == null) return
-        collectorJob?.cancel()
-        specEmitter = loaded.emitter()
-        if (level != null) tryStartCollecting()
+        specId = input.read("spec_id", com.mojang.serialization.Codec.STRING).orElse("spec")
+        val bx = input.read("spec_bounds_x", com.mojang.serialization.Codec.INT).orElse(5)
+        val by = input.read("spec_bounds_y", com.mojang.serialization.Codec.INT).orElse(5)
+        val bz = input.read("spec_bounds_z", com.mojang.serialization.Codec.INT).orElse(5)
+        specBounds = Vec3i(bx, by, bz)
+        specStructure = input.read("spec_structure", com.mojang.serialization.Codec.STRING).orElse(null)
+        LOGGER.debug("[SpecBlockEntity#loadAdditional] loaded at {} specId='{}'", blockPos, specId)
     }
 
     override fun getUpdateTag(registries: HolderLookup.Provider): CompoundTag =
@@ -356,12 +267,4 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
 
     override fun getUpdatePacket(): Packet<ClientGamePacketListener> =
         ClientboundBlockEntityDataPacket.create(this)
-}
-
-private fun RedstoneSpecEmitter.updateFrom(spec: RedstoneSpec) {
-    id = spec.id
-    bounds = spec.bounds
-    lifespan = spec.lifespan
-    structure = spec.structure
-    entries = spec.entries
 }
