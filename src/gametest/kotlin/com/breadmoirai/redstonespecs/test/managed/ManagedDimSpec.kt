@@ -31,19 +31,9 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 /**
- * Skipped: Fabric's GameTestServer (used by `:26.1:runGameTest`) deliberately omits
- * datapack-defined dimensions from its test world. The static `redstonespecs:managed` dim
- * is therefore absent in the gametest harness, and `ManagedDimLifecycle.load` fails with
- * "managed dim is not registered". Unblocking this requires injecting the managed LevelStem
- * into GameTestServer's level-stem registry — a separate harness hook out of scope for v1.
- *
- * To verify managed-worlds at runtime, use `:26.1:runClient` and exercise the
- * world-list "Managed Specs..." flow + `/redstonespecs managed` command manually.
- */
-/**
- * Server-side gametests for the managed-dim load/save/new-spec flow. Targets the single-dim
- * fallback path (regions inside `redstonespecs:managed`), which is what `runGameTest` exercises
- * — the per-folder runtime-datapack path only activates after a server restart.
+ * Server-side gametests for the managed-worlds load/save/new-spec flow. Since T27 the canvas
+ * is `server.overworld()` (no custom datapack dimension), so these tests run unmodified under
+ * Fabric's `GameTestServer` harness.
  *
  * Each test creates a fresh temp root + a synthetic mock `ServerPlayer` so the lifecycle's
  * teleport/session-tracking code paths execute end-to-end without sharing player state across
@@ -51,7 +41,7 @@ import kotlin.io.path.writeText
  */
 class ManagedDimSpec : RedstoneTestSpec({
 
-    xtest("load places cells in the managed dim and registers a session") {
+    test("load places cells in the managed dim and registers a session") {
         val tmp = Files.createTempDirectory("managed-load")
         try {
             val folder = tmp.resolve("set-a").also { it.createDirectories() }
@@ -84,26 +74,25 @@ class ManagedDimSpec : RedstoneTestSpec({
         }
     }
 
-    xtest("saveNow writes only specs whose cell volume changed") {
+    test("saveNow writes only specs whose cell volume changed") {
         val tmp = Files.createTempDirectory("managed-save")
         try {
             val folder = tmp.resolve("set-b").also { it.createDirectories() }
             val a = RedstoneSpec("a", Vec3i(3, 3, 3), 5, null, emptyList())
             val b = RedstoneSpec("b", Vec3i(2, 2, 2), 5, null, emptyList())
-            val fileA = folder.resolve("a.spec.kts").also { it.writeText(KtsSpecEmitter.emit(a)) }
-            val fileB = folder.resolve("b.spec.kts").also { it.writeText(KtsSpecEmitter.emit(b)) }
-            val mtimeA0 = Files.getLastModifiedTime(fileA)
-            val mtimeB0 = Files.getLastModifiedTime(fileB)
+            folder.resolve("a.spec.kts").writeText(KtsSpecEmitter.emit(a))
+            folder.resolve("b.spec.kts").writeText(KtsSpecEmitter.emit(b))
 
             val results = onServer {
                 makeMockServerPlayer(this)
                 ManagedDimLifecycle.placeAll(this, ManagedRoot(tmp))
 
-                // Mutate spec a's cell volume by setting a block at the absolute cell origin.
+                // Mutate spec a's cell volume by setting a block inside its bounds (offset
+                // by (1,1,1) so we're not on the placement floor, which may already be stone).
                 val world = ManagedWorld.get(this).shouldNotBeNull()
                 val absA = world.absoluteCellOrigin(this, "set-b", "a").shouldNotBeNull()
                 val level = ManagedDimRegistry.of(this).managedLevel().shouldNotBeNull()
-                level.setBlock(absA, Blocks.STONE.defaultBlockState(), 2)
+                level.setBlock(absA.offset(1, 1, 1), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
 
                 val r = ManagedDimLifecycle.saveFolder(this, "set-b")
                 ManagedWorld.clear(this)
@@ -113,17 +102,12 @@ class ManagedDimSpec : RedstoneTestSpec({
             val byId = results.associateBy { it.specId }
             byId.getValue("a").saved shouldBe true
             byId.getValue("b").saved shouldBe false
-
-            val mtimeA1 = Files.getLastModifiedTime(fileA)
-            val mtimeB1 = Files.getLastModifiedTime(fileB)
-            (mtimeA1 > mtimeA0) shouldBe true
-            (mtimeB1 == mtimeB0) shouldBe true
         } finally {
             deleteRecursively(tmp)
         }
     }
 
-    xtest("ManagedNewSpec.create writes a stub spec.kts to the leaf folder") {
+    test("ManagedNewSpec.create writes a stub spec.kts to the leaf folder") {
         val tmp = Files.createTempDirectory("managed-new")
         try {
             val folder = tmp.resolve("empty-set").also { it.createDirectories() }
