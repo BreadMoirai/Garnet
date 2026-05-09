@@ -82,31 +82,30 @@ No new upward dependencies.
 
 ## 5. Lifecycle
 
-### Load (`ManagedDimLifecycle.load(server, root, subpath)`)
+### Place all (`ManagedDimLifecycle.placeAll(server, root)`)
+
+Invoked once on `SERVER_STARTED`. Walks every leaf folder under `root` and calls `placeFolder` for each.
+
+### Place folder (`ManagedDimLifecycle.placeFolder(server, root, subpath)`)
+
+The canvas is `server.overworld()` — no dim registration, no forced spawn ticket (overworld spawn chunks are always loaded).
 
 1. Resolve folder; refuse if intermediate (no direct `.spec.kts`).
-2. Parse every `.spec.kts` via `KtsSpecLoader`. Failures collected as per-file `ManagedError` entries; survivors continue.
+2. Parse every `.spec.kts` via `KtsSpecLoader`. Failures collected as per-file `ParseError` entries; survivors continue.
 3. Compute `GridLayout` (Section 7). Specs with `bounds.size > cellSize` are excluded with an error.
-4. Register the dim if new; obtain `ServerLevel`. Add a forced spawn ticket at cell `(0, 0)` so the entry area is always loaded.
-5. For each surviving spec:
-   - Place its structure (if any) at `cellOrigin` via existing `StructurePersistence`.
-   - For an existing spec (has structure), place a **runner** block at `cellOrigin + (bounds.size.x, 0, 0) + (1, 0, 0)` (just past the +X face of the bounds, on the floor), bound to spec id.
-   - For a new spec (no structure yet), place a **recorder** block at `cellOrigin`, bound to spec id and source path.
-   - Place a cell-corner label (text-display entity) at `cellOrigin + (0, bounds.size.y + 1, 0)` showing the filename.
+4. Get the region origin via `ManagedDimRegistry.getOrAssignRegion(subpath)` (counter-based, in-memory).
+5. For each surviving spec, compute `absOrigin = regionOrigin + cell.origin` and place:
+   - Its structure (if any) at `absOrigin` via existing `StructurePersistence`.
+   - For an existing spec (has structure), a **runner** block bound to spec id and source path.
+   - For a new spec (no structure yet), a **recorder** block bound to spec id and source path.
 6. Take an in-memory snapshot of each cell's bounds region (the "loaded snapshot") for later dirty-diff.
-7. Teleport the requesting player to the dim spawn (cell `(0, 0)` origin, +y a few blocks).
+7. Register loaded specs in `ManagedWorld.perFolder[subpath]`.
 
-### Unload (`ManagedDimLifecycle.unload(server, key)`)
+Player teleport is **not** part of placement. `ManagedTeleport.toFolder(server, player, subpath)` is invoked separately by the GUI when the user picks a folder.
 
-Triggered by: GUI folder-swap, GUI "Save & close", world close, server stop.
+### Save (`ManagedDimLifecycle.saveAll(server)` / `saveFolder(server, subpath)`)
 
-1. For every spec in the dim, run `ManagedCellSaver.captureAndSaveIfDirty`.
-2. Discard the level (no MC-level save). Forced spawn ticket released.
-3. Keep the `ResourceKey<Level>` registered for the session.
-
-### Save now (on-demand)
-
-Same per-spec save step as unload, but the dim stays open. After a successful save, the in-memory snapshot for that spec is refreshed so subsequent dirty checks compare against the just-saved state.
+Walks loaded folders (or one folder) and runs `ManagedCellSaver.captureAndSaveIfDirty` per spec. The world stays open between sessions because saves are persistent (singleplayer save dir = `managed-<root-tail>-<hash>`).
 
 ## 6. Save Semantics
 
@@ -157,9 +156,7 @@ Unchanged specs touch nothing on disk (so git stays clean).
 
 **Bounds rendering.** No physical marker blocks. The spec's bounds AABB is rendered client-side as a wireframe overlay when the player is near, reusing the existing recorder bounds overlay. Keeps the cell clean of metadata blocks that would muddle save scans.
 
-**Cell-corner label.** A text-display entity at `cellOrigin + (0, max(bounds.size.y, 1) + 1, 0)` showing the filename. Sits outside the spec's bounds AABB (the `+ 1` ensures separation from the bounds top face), so excluded from save scans automatically. For a new spec with empty bounds (`size = (0,0,0)`), the `max(..., 1)` fallback keeps the label visible above the recorder block.
-
-**Auto-bind in managed dims.** Recorder/runner/editor block entities placed inside a managed dim consult `ManagedDimRegistry`'s `Map<BlockPos, spec-id>` and auto-bind to the cell's spec on load (instead of needing manual binding).
+**BE binding.** `placeFolder` calls `setSpec` and `managedSourcePath` on each recorder/runner BE directly — there is no cell-map lookup or registry indirection. Save scan = the spec's bounds AABB; nothing else needs to be excluded.
 
 ## 9. Network Protocol
 
@@ -167,7 +164,7 @@ All payloads in `network/managed/`. Server-authoritative; clients propose. Same 
 
 **C2S:**
 
-- `ListManagedTree(rootId)` — request a fresh tree snapshot.
+- `ListManagedTree()` — request a fresh tree snapshot for the server-pinned root.
 - `LoadManagedFolder(subpath)` — load a leaf folder, unloading the current one if any.
 - `UnloadManagedFolder()` — explicit unload (returns player to overworld).
 - `SaveNow()` — save dirty cells in the current loaded folder.
@@ -203,7 +200,6 @@ All payloads in `network/managed/`. Server-authoritative; clients propose. Same 
 | Bounds exceed `cellSize` | Spec excluded; GUI shows required `cellSize`. |
 | Path traversal (subpath escapes root) | `ManagedError`; load aborts. |
 | Filesystem write failure | Spec stays dirty; `ManagedSaveReport` flags; original file untouched. |
-| Sanitization collision (two subpaths → same dim id) | Second load fails with `ManagedError("dim id collision")`. |
 | Folder vanished between scan and load | `ManagedError("folder missing")`. |
 
 ## 12. Testing
@@ -234,22 +230,34 @@ src/main/kotlin/com/breadmoirai/redstonespecs/managed/
   ManagedFolderTree.kt
   GridLayout.kt
   ManagedCell.kt
+  LoadedSpec.kt
+  ManagedWorld.kt
+  ManagedSession.kt
+  ManagedTeleport.kt
   ManagedDimRegistry.kt
   ManagedDimLifecycle.kt
   ManagedCellSaver.kt
-  ManagedVoidChunkGenerator.kt
-  ManagedDimensionType.kt
+  ManagedNewSpec.kt
+  ManagedRootsConfig.kt
+  ManagedSaveNaming.kt
+  ManagedServerContext.kt
+  ManagedCommand.kt
+
 src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/
   ManagedPackets.kt
-src/client/kotlin/com/breadmoirai/redstonespecs/managed/screen/
+  ManagedNetworkRegistry.kt
+
+src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/
   ManagedScreen.kt
   ManagedRootListScreen.kt
-  ManagedFolderTreeWidget.kt
-src/client/kotlin/com/breadmoirai/redstonespecs/mixin/
-  SelectWorldScreenMixin.kt   (injects the "Managed Specs..." button)
+  ManagedClientNetworking.kt
+  ManagedIntegratedBoot.kt
+
+src/client/java/com/breadmoirai/redstonespecs/mixin/client/
+  SelectWorldScreenMixin.java
 ```
 
-Existing files extended (small touches): `SharedSettings.kt` (new fields), `Redstonespecs.kt` (registry wiring), `SpecBlockEntity.kt` (auto-bind in managed dim), `RecordingFinalizer.kt` (write-back-to-source path).
+Existing files extended (small touches): `SharedSettings.kt` (new fields), `Redstonespecs.kt` (registry wiring + DISCONNECT cleanup), `SpecBlockEntity.kt` (managed source-path field), `RecordingFinalizer.kt` (write-back-to-source path).
 
 ## 14. Open Questions (resolve during planning)
 
