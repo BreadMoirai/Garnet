@@ -54,6 +54,15 @@ fun registerNetworking() {
     PayloadTypeRegistry.serverboundPlay().register(StartRecordingC2SPayload.TYPE, StartRecordingC2SPayload.STREAM_CODEC)
     PayloadTypeRegistry.serverboundPlay().register(StopRecordingC2SPayload.TYPE, StopRecordingC2SPayload.STREAM_CODEC)
 
+    // v2.0: Slim recorder / runner packets
+    PayloadTypeRegistry.serverboundPlay().register(SetRecorderConfigC2S.TYPE, SetRecorderConfigC2S.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(RecorderCommandC2S.TYPE, RecorderCommandC2S.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(SetRunnerConfigC2S.TYPE, SetRunnerConfigC2S.STREAM_CODEC)
+    PayloadTypeRegistry.serverboundPlay().register(RunnerCommandC2S.TYPE, RunnerCommandC2S.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(OpenRecorderScreenS2C.TYPE, OpenRecorderScreenS2C.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(OpenRunnerScreenS2C.TYPE, OpenRunnerScreenS2C.STREAM_CODEC)
+    PayloadTypeRegistry.clientboundPlay().register(RunnerStatusS2C.TYPE, RunnerStatusS2C.STREAM_CODEC)
+
     // C2S handlers
     ServerPlayNetworking.registerGlobalReceiver(UndoC2SPayload.TYPE) { _, context ->
         val player = context.player()
@@ -295,6 +304,31 @@ fun registerNetworking() {
             if (be.stopRecordingAndFinalize()) {
                 be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
             }
+        }
+    }
+
+    // v2.0: Slim recorder / runner C2S handlers (Tasks 19 + 20 wire the real logic)
+    ServerPlayNetworking.registerGlobalReceiver(SetRecorderConfigC2S.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.info("TODO: handle SetRecorderConfigC2S originPos={} specId={}", payload.originPos, payload.specId)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(RecorderCommandC2S.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.info("TODO: handle RecorderCommandC2S originPos={} cmd={}", payload.originPos, payload.cmd)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(SetRunnerConfigC2S.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.info("TODO: handle SetRunnerConfigC2S originPos={} specPath={}", payload.originPos, payload.specPath)
+        }
+    }
+
+    ServerPlayNetworking.registerGlobalReceiver(RunnerCommandC2S.TYPE) { payload, context ->
+        context.server().execute {
+            LOGGER.info("TODO: handle RunnerCommandC2S originPos={} cmd={}", payload.originPos, payload.cmd)
         }
     }
 
