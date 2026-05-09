@@ -2,7 +2,7 @@
 title: Managed worlds use-cases
 tags: [managed, dimensions, grid, datapack, use-cases]
 summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back.
-last_audited_commit: PENDING
+last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 ---
 
 # Managed worlds use-cases
@@ -113,3 +113,53 @@ A player explicitly unloads their active folder focus, or the session is cleared
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
+| UC-MAN-01 | Declare and persist a managed root | `ManagedRootsConfigTest."save then load roundtrips a list of paths"` | **GAP-PARTIAL** |
+| UC-MAN-01.a | User types path into `EditBox` in `ManagedRootListScreen` | — | **GAP** |
+| UC-MAN-01.b | "Add" appends path and calls `ManagedRootsConfig.save` writing JSON | `ManagedRootsConfigTest."save then load roundtrips a list of paths"`, `ManagedRootsConfigTest."save creates parent directories if needed"` | covered |
+| UC-MAN-01.c | On next launch `ManagedRootsConfig.load` re-reads file | `ManagedRootsConfigTest."save then load roundtrips a list of paths"`, `ManagedRootsConfigTest."load returns empty when file missing"` | covered |
+| UC-MAN-01.d | "X" removes entry and re-saves; entry disappears on `rebuildWidgets` | — | **GAP** |
+| UC-MAN-01.e | `ManagedRoot.resolveSubpath` rejects relative and escaping subpaths | `ManagedRootTest."resolveSubpath rejects parent traversal"`, `ManagedRootTest."resolveSubpath rejects absolute subpath"`, `ManagedRootTest."resolveSubpath rejects symlink that escapes root"` | covered |
+| UC-MAN-02 | Boot the managed singleplayer world | — | **GAP** |
+| UC-MAN-02.a | `ManagedIntegratedBoot.boot` derives save name via `ManagedSaveNaming.saveName` | `ManagedSaveNamingTest."preserves alphanumeric tail and appends 8-hex hash"`, `ManagedSaveNamingTest."same tail at different absolute paths produce different hashes"` | **GAP-PARTIAL** |
+| UC-MAN-02.b | `openOrCreateWorld` reopens or creates fresh void world | — | **GAP** |
+| UC-MAN-02.c | `SERVER_STARTING` listener picks up `pendingRoot` and calls `ManagedServerContext.set` | — | **GAP** |
+| UC-MAN-02.d | `SERVER_STARTED` listener calls `ManagedDimLifecycle.placeAll` if context present | `ManagedDimSpec."load places cells in the managed dim and registers a session"` | **GAP-PARTIAL** |
+| UC-MAN-02.e | Re-opening same root reuses persistent save; scratch blocks outside bounds preserved | — | **GAP** |
+| UC-MAN-03 | Scan the folder tree and assign regions | `ManagedFolderTreeTest."leaf folder with one .spec.kts is reported as a leaf"` | **GAP-PARTIAL** |
+| UC-MAN-03.a | `ManagedFolderTree.scan` walks tree, collects leaves and intermediates, sorted | `ManagedFolderTreeTest."leaf folder with one .spec.kts is reported as a leaf"`, `ManagedFolderTreeTest."intermediate folder containing only a subfolder is in intermediates; deeper leaf in leaves"` | covered |
+| UC-MAN-03.b | `placeAll` iterates `leaves.sortedBy { it.subpath }` for deterministic order | `ManagedDimSpec."placeAll handles nested leaf folders with distinct region origins"` | **GAP-PARTIAL** |
+| UC-MAN-03.c | `ManagedDimRegistry.getOrAssignRegion` computes non-colliding region origins | `ManagedDimRegistryTest."getOrAssignRegion is idempotent for the same subpath"`, `ManagedDimRegistryTest."distinct subpaths get distinct origins"`, `ManagedDimRegistryTest."region width matches cellSize.x * rowMax + gap*(rowMax+1) + REGION_PAD"` | covered |
+| UC-MAN-03.d | `managedLevel()` returns `server.overworld()` | `ManagedDimSpec."load places cells in the managed dim and registers a session"` | covered |
+| UC-MAN-03.e | `ManagedDimRegistry` keyed by `MinecraftServer`; `dispose` called on server stop | `ManagedDimRegistryTest."regionOriginOf returns null for unassigned subpath"` | **GAP-PARTIAL** |
+| UC-MAN-04 | Lay out and place spec cells in the grid | `ManagedDimSpec."load places cells in the managed dim and registers a session"` | **GAP-PARTIAL** |
+| UC-MAN-04.a | `GridLayout.compute` places specs row-major at derived origins | `GridLayoutTest."single spec lands at (0, yBase, 0)"`, `GridLayoutTest."row wraps at rowMax"`, `GridLayoutTest."sort is filename-case-insensitive"` | covered |
+| UC-MAN-04.b | Oversized spec excluded with `LayoutError` and does not consume a slot | `GridLayoutTest."oversized spec excluded with error"` | covered |
+| UC-MAN-04.c | `placeCell` reads `.nbt` beside spec file and calls `tpl.placeInWorld` | `ManagedDimSpec."load places cells in the managed dim and registers a session"` | **GAP-PARTIAL** |
+| UC-MAN-04.d | Anchor block placed; `SpecBlockEntity.managedSourcePath` set and not persisted to NBT | `ManagedDimSpec."load places cells in the managed dim and registers a session"` | **GAP-PARTIAL** |
+| UC-MAN-04.e | `StructureTemplate.fillFromWorld` captures cell volume as `loadedSnapshot` | `ManagedCellSaverSpec."no mutation -> not saved"` | **GAP-PARTIAL** |
+| UC-MAN-04.f | `world.perFolder[subpath]` replaced atomically via `ConcurrentHashMap` | `ManagedDimSpec."re-place after adding a new spec keeps region origin and includes new spec"` | **GAP-PARTIAL** |
+| UC-MAN-05 | Browse folder tree in-game and teleport to a folder | `ManagedNetworkRegistrySpec."handleListTree sends snapshot matching ManagedFolderTree.scan"` | **GAP-PARTIAL** |
+| UC-MAN-05.a | `ListManagedTreeC2S` triggers scan and `ManagedTreeSnapshotS2C` reply | `ManagedNetworkRegistrySpec."handleListTree sends snapshot matching ManagedFolderTree.scan"` | covered |
+| UC-MAN-05.b | `ManagedClientNetworking` receives snapshot and opens or updates `ManagedScreen` | — | **GAP** |
+| UC-MAN-05.c | `LoadManagedFolderC2S` triggers path-traversal guard, teleport, and `ManagedFolderLoadedS2C` reply | `ManagedNetworkRegistrySpec."handleLoadFolder rejects path traversal with ManagedErrorS2C"`, `ManagedNetworkRegistrySpec."handleLoadFolder happy path sends ManagedFolderLoadedS2C and sets session"` | covered |
+| UC-MAN-05.d | `ManagedTeleport.toFolder` teleports player and calls `ManagedSession.setActive` | `ManagedTeleportSpec."toFolder teleports player to region and sets active subpath"` | covered |
+| UC-MAN-05.e | Unknown subpath: `toFolder` returns `false`, server replies with `ManagedErrorS2C` | `ManagedTeleportSpec."toFolder returns false for unknown subpath and does not change session"` | covered |
+| UC-MAN-06 | Create a new spec cell in the active folder | `ManagedNetworkRegistrySpec."handleNewSpec with active session creates file and sends ManagedFolderLoadedS2C"` | covered |
+| UC-MAN-06.a | Player sends `NewManagedSpecC2S(name)` after typing non-blank name | — | **GAP** |
+| UC-MAN-06.b | No active folder → `ManagedErrorS2C("no folder selected")` | `ManagedNetworkRegistrySpec."handleNewSpec without active session returns 'no folder selected'"` | covered |
+| UC-MAN-06.c | `ManagedNewSpec.create` validates name regex, non-duplicate, writes stub | `ManagedNewSpecTest."create writes <name>.spec.kts with stub content"`, `ManagedNewSpecTest."illegal characters in name throw"`, `ManagedNewSpecTest."file already exists throws"` | covered |
+| UC-MAN-06.d | `handleNewSpec` calls `placeFolder` to re-scan and re-place entire folder | `ManagedNetworkRegistrySpec."handleNewSpec with active session creates file and sends ManagedFolderLoadedS2C"`, `ManagedDimSpec."ManagedNewSpec.create writes a stub spec.kts to the leaf folder"` | covered |
+| UC-MAN-06.e | `ManagedFolderLoadedS2C` sent back with updated spec-id list and errors | `ManagedNetworkRegistrySpec."handleNewSpec with active session creates file and sends ManagedFolderLoadedS2C"` | covered |
+| UC-MAN-07 | Save edited cell blocks back to disk | `ManagedCellSaverSpec."mutation inside cell -> saved and .nbt written"` | covered |
+| UC-MAN-07.a | "Save Now" sends `SaveNowC2S`; `handleSaveNow` calls `saveAll` | `ManagedNetworkRegistrySpec."handleSaveNow returns formatted ManagedSaveReportS2C"` | covered |
+| UC-MAN-07.b | `saveFolder` resolves absolute cell origin and passes to `captureAndSaveIfDirty` | `ManagedDimSpec."saveNow writes only specs whose cell volume changed"` | covered |
+| UC-MAN-07.c | `ManagedCellSaver` returns `saved=false` when NBT is equal | `ManagedCellSaverSpec."no mutation -> not saved"`, `ManagedCellSaverSpec."mutation outside cell bounds -> not saved"` | covered |
+| UC-MAN-07.d | Dirty diff: `NbtIo.writeCompressed` overwrites `.nbt`; `.spec.kts` re-emission deferred | `ManagedCellSaverSpec."mutation inside cell -> saved and .nbt written"` | **GAP-PARTIAL** |
+| UC-MAN-07.e | After save, fresh snapshot stored as new `loadedSnapshot` baseline | `ManagedCellSaverSpec."snapshot refresh: second saveFolder after a save returns saved=false"` | covered |
+| UC-MAN-07.f | `ManagedSaveReportS2C` sent with per-spec result strings | `ManagedNetworkRegistrySpec."handleSaveNow returns formatted ManagedSaveReportS2C"` | covered |
+| UC-MAN-08 | Unload active folder and handle ungraceful session end | `ManagedNetworkRegistrySpec."handleUnload clears session and sends empty save report"` | **GAP-PARTIAL** |
+| UC-MAN-08.a | "Unload" sends `UnloadManagedFolderC2S`; `handleUnload` clears session and sends empty report | `ManagedNetworkRegistrySpec."handleUnload clears session and sends empty save report"` | covered |
+| UC-MAN-08.b | Post-unload `handleNewSpec`/`handleSaveNow` return `ManagedErrorS2C("no folder selected")` | `ManagedNetworkRegistrySpec."handleNewSpec without active session returns 'no folder selected'"` | **GAP-PARTIAL** |
+| UC-MAN-08.c | Ungraceful disconnect: `ManagedSession.clear` called from disconnect event | — | **GAP** |
+| UC-MAN-08.d | Server stop: `dispose` and `clear` calls release all server-scoped state | — | **GAP** |
+| UC-MAN-08.e | On next `placeAll`, dirty-diff re-captures baseline from on-disk NBT | — | **GAP** |

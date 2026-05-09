@@ -2,7 +2,7 @@
 title: Command-surface use-cases
 tags: [command, dispatch, use-cases]
 summary: `/redstonespecs managed` subcommand dispatcher and its observable effects.
-last_audited_commit: PENDING
+last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 ---
 
 # Command-surface use-cases
@@ -75,3 +75,23 @@ The mod exposes server-side subcommands under `/redstonespecs managed`. Each par
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
+| UC-CMD-01 | `/redstonespecs managed` opens managed-folder UI when root is available | `ManagedCommandSpec."/redstonespecs managed with context sends a ManagedTreeSnapshotS2C"` | covered |
+| UC-CMD-01.a | `ManagedCommand.open` tries context pin first | `ManagedCommandSpec."/redstonespecs managed with context sends a ManagedTreeSnapshotS2C"` | covered |
+| UC-CMD-01.b | Falls back to `SharedSettings.managedRootPath` if context pin is null | — | **GAP** |
+| UC-CMD-01.c | `ManagedFolderTree.scan` emits leaves and intermediates | `ManagedCommandSpec."/redstonespecs managed with context sends a ManagedTreeSnapshotS2C"` | covered |
+| UC-CMD-01.d | Player's `activeSubpath` embedded in snapshot; null if no prior session | — | **GAP** |
+| UC-CMD-01.e | `ServerPlayNetworking.send` delivers `ManagedTreeSnapshotS2C` to player | `ManagedCommandSpec."/redstonespecs managed with context sends a ManagedTreeSnapshotS2C"` | covered |
+| UC-CMD-01.f | Command returns `Command.SINGLE_SUCCESS` (integer > 0) | `ManagedCommandSpec."/redstonespecs managed with context sends a ManagedTreeSnapshotS2C"` | covered |
+| UC-CMD-02 | `/redstonespecs managed` rejects execution when no root configured | `ManagedCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
+| UC-CMD-02.a | Both resolution paths attempted; both null / blank | `ManagedCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
+| UC-CMD-02.b | Red error message sent to player's chat | `ManagedCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
+| UC-CMD-02.c | Returns `0` immediately; no scan or send logic executed | `ManagedCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
+| UC-CMD-03 | Root resolution follows priority chain: context pin → config string | `ManagedCommandSpec."/redstonespecs managed with context sends a ManagedTreeSnapshotS2C"`, `ManagedCommandSpec."/redstonespecs managed without root configured sends an error message"` | **GAP-PARTIAL** |
+| UC-CMD-03.a | Priority 1: `ManagedServerContext.get(server)?.root` wins when set | `ManagedCommandSpec."/redstonespecs managed with context sends a ManagedTreeSnapshotS2C"` | covered |
+| UC-CMD-03.b | Priority 2: `SharedSettings.managedRootPath` non-blank → constructs `ManagedRoot` | — | **GAP** |
+| UC-CMD-03.c | Priority 1 win means `SharedSettings.managedRootPath` never read | — | **GAP** |
+| UC-CMD-03.d | `ManagedRoot` enforces absolute path at construction; relative path throws | — | **GAP** |
+| UC-CMD-04 | Active session subpath embedded in every tree snapshot | — | **GAP** |
+| UC-CMD-04.a | `ManagedSession.get(player.uuid)` called after tree scan | `ManagedSessionTest."setActive upserts and overwrites prior session for same UUID"` | **GAP-PARTIAL** |
+| UC-CMD-04.b | `session?.activeSubpath` passed as `currentSubpath` in snapshot | — | **GAP** |
+| UC-CMD-04.c | `ManagedSession` is in-memory only; restart always yields `currentSubpath = null` | — | **GAP** |

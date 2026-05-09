@@ -2,7 +2,7 @@
 title: Gametest-harness use-cases
 tags: [gametest, harness, fixtures, kotest, use-cases]
 summary: Test infrastructure scenarios: spec registration, runRedstoneSpec dispatch, client-gametest fixtures, diagnostic recording.
-last_audited_commit: PENDING
+last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 ---
 
 # Gametest-harness use-cases
@@ -87,3 +87,27 @@ These UCs describe how author-written tests interact with the harness. They are 
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
+| UC-GT-01 | Register a new Kotest spec in the appropriate sentinel | `GametestSentinel.runAll`, `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
+| UC-GT-01.a | Author adds spec `KClass` to `GametestSentinel.runAll` specs list | `GametestSentinel.runAll` | **GAP-PARTIAL** |
+| UC-GT-01.b | Author adds spec `KClass` to `ClientTestSentinel.runKotestOnWorker` specs list | `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
+| UC-GT-01.c | `launchKotest` forwards explicit list to `TestEngineLauncher.withClasses`; classpath walker bypassed | — | **GAP** |
+| UC-GT-01.d | `RedstoneTestLifecycle.registerWithServer` called before any spec executes | `GametestSentinel.runAll`, `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
+| UC-GT-02 | Drive a spec body via `runRedstoneSpec` | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-GT-02.a | `RedstoneTestSpec` installs `CoroutineDispatcherFactory` wrapping body in `McDispatchers.Server + RecordingHolder()` | `RecordingHolderTest."holder set in outer scope is visible in nested suspend functions"` | **GAP-PARTIAL** |
+| UC-GT-02.b | `runRedstoneSpec` delegates to engine and stores recording in `RecordingHolder` | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-GT-02.c | `awaitTicks`/`awaitTickEnd` suspend until `serverTickEnd` emits; drain synchronous | `SmokeSpec."awaitTicks advances the server tick counter"`, `SuspendingTest."take(n).last() resolves after n emissions"` | covered |
+| UC-GT-02.d | Same-tick guarantee: `onServer { }` work between `awaitTicks` is atomic | `SmokeSpec."test body runs on the server thread"` | **GAP-PARTIAL** |
+| UC-GT-02.e | `RedstoneTestSpecContext.current()` throws outside `EngineDrivenRun` context | — | **GAP** |
+| UC-GT-03 | Use `SpecTestContext` for client-gametest UI assertions | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-GT-03.a | `SpecTestContext.createWorld` builds deterministic singleplayer world | `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
+| UC-GT-03.b | `rightClickBlock` dispatches via `useOn`/`useWithoutItem` bypassing game-mode interaction | — | **GAP** |
+| UC-GT-03.c | `waitForButton` polls before `clickButton` to avoid rebuild race | — | **GAP** |
+| UC-GT-03.d | `clickNthButton`/`clickNthCycleButtonByValue` select widget by occurrence index | — | **GAP** |
+| UC-GT-03.e | `fillEditBoxByWidth` sets value directly; `ValueResponder` fires synchronously | — | **GAP** |
+| UC-GT-03.f | `clickYaclButton`/`setYaclOption` reach YACL option tree directly | — | **GAP** |
+| UC-GT-04 | Capture diagnostic recordings on test failure | `DiagnosticRecorderListenerTest."snapshot is empty before any tests run"` | **GAP-PARTIAL** |
+| UC-GT-04.a | `launchKotest` constructs `ResultCollector` + `DiagnosticRecorderListener`; result is `collector.result.copy(recordings = …)` | — | **GAP** |
+| UC-GT-04.b | `DiagnosticRecorderListener.afterTest` reads `RecordingHolder` and stores non-null recording | `DiagnosticRecorderListenerTest."snapshot is empty before any tests run"` | **GAP-PARTIAL** |
+| UC-GT-04.c | `RecordingHolder` visible in `afterTest` because both body and hook share same `withContext` scope | `RecordingHolderTest."holder set in outer scope is visible in nested suspend functions"` | covered |
+| UC-GT-04.d | `ResultCollector` and `DiagnosticRecorderListener` are independent listeners with no shared state | — | **GAP** |
+| UC-GT-04.e | `diagListener.snapshot()` returns immutable copy via `toMap()` | `DiagnosticRecorderListenerTest."snapshot is empty before any tests run"` | **GAP-PARTIAL** |

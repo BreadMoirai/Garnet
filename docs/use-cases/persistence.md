@@ -2,7 +2,7 @@
 title: Persistence use-cases
 tags: [storage, kts, sidecar, scripting, use-cases]
 summary: Save and load `.spec.kts` + `.nbt` pairs; scan spec directories; handle sidecar drift.
-last_audited_commit: PENDING
+last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 ---
 
 # Persistence use-cases
@@ -134,10 +134,38 @@ The persistence layer turns in-memory specs into `.spec.kts` + `.nbt` file pairs
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
-| UC-PER-01 | Write `.spec.kts` + `.nbt` atomically | — | GAP |
-| UC-PER-02 | Load `.spec.kts` via scripting host | — | GAP |
-| UC-PER-03 | Scan spec directory | — | GAP |
-| UC-PER-04 | Refuse malformed/failing script | — | GAP |
-| UC-PER-05 | Round-trip: emit → write → load → equals | — | GAP |
-| UC-PER-06 | Capture and restore structure sidecar | — | GAP |
-| UC-PER-07 | Handle sidecar drift | — | GAP |
+| UC-PER-01 | Write `.spec.kts` + `.nbt` + recording sidecar after finalization | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | **GAP-PARTIAL** |
+| UC-PER-01.a | `SpecPersistence.writeSpecKts` creates dirs and writes file | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | covered |
+| UC-PER-01.b | `StructurePersistence.save` captures region and writes `.nbt` | — | **GAP** |
+| UC-PER-01.c | `RecordingSidecar.save` writes `.recording.nbt` for editor timeline | `RecordingSidecarTest."save then load yields an equivalent recording"`, `SpecPersistenceTest."writeSpecKts with sidecar recording roundtrips"` | covered |
+| UC-PER-01.d | Both files share the same `saveDir` and stem `id` | `SpecPersistenceTest."writeSpecKts with sidecar recording roundtrips"` | covered |
+| UC-PER-02 | Load `.spec.kts` via scripting host | `KtsSpecLoaderTest."loadRedstoneSpec returns a dsl.RedstoneSpec from new-style source"` | covered |
+| UC-PER-02.a | `KtsSpecLoader.evalOrThrow` feeds source to `BasicJvmScriptingHost.eval` | `KtsSpecLoaderTest."loadRedstoneSpec returns a dsl.RedstoneSpec from new-style source"` | covered |
+| UC-PER-02.b | `ResultWithDiagnostics.Failure` throws `IllegalStateException`; `SpecPersistence.load` returns `null` | `KtsSpecLoaderTest."loadRedstoneSpec surfaces compilation errors"` | **GAP-PARTIAL** |
+| UC-PER-02.c | Success casts `ResultValue.Value.value` to `RedstoneSpec` | `KtsSpecLoaderTest."loadRedstoneSpec returns a dsl.RedstoneSpec from new-style source"` | covered |
+| UC-PER-02.d | `SpecPersistence.load` wraps path in `runCatching` so broken script returns `null` | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | **GAP-PARTIAL** |
+| UC-PER-03 | Scan spec directory for available specs | `SpecDirectoryScanTest."lists only .spec.kts files, sorted"` | covered |
+| UC-PER-03.a | `SpecDirectoryScan.list` returns `emptyList()` when directory not found | `SpecDirectoryScanTest."returns empty list when directory does not exist"` | covered |
+| UC-PER-03.b | Only `.spec.kts` entries kept; stream closed in `use` block | `SpecDirectoryScanTest."lists only .spec.kts files, sorted"` | covered |
+| UC-PER-03.c | Results sorted lexicographically | `SpecDirectoryScanTest."lists only .spec.kts files, sorted"` | covered |
+| UC-PER-04 | Refuse malformed or evaluation-failing script | `KtsSpecLoaderTest."loadRedstoneSpec surfaces compilation errors"` | **GAP-PARTIAL** |
+| UC-PER-04.a | Compilation failure → `IllegalStateException` with joined diagnostics | `KtsSpecLoaderTest."loadRedstoneSpec surfaces compilation errors"` | covered |
+| UC-PER-04.b | Eval-time exception: `ResultValue.Error` → re-throw original throwable | — | **GAP** |
+| UC-PER-04.c | `ResultValue.NotEvaluated` → `error(...)` | — | **GAP** |
+| UC-PER-04.d | Last expression not a `RedstoneSpec` → error names actual type | — | **GAP** |
+| UC-PER-04.e | `SpecPersistence.load` wraps in `runCatching`, logs WARN, returns `null` | — | **GAP** |
+| UC-PER-05 | Round-trip: emit → write → load → equals | `KtsSpecLoaderRoundtripTest."new-dsl source roundtrips id, bounds, lifespan via loadRedstoneSpec"`, `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | covered |
+| UC-PER-05.a | `RecordingDslEmitter` converts in-memory spec to DSL source string | `RecordingDslEmitterTest."emits redstoneSpec header with correct metadata"` | **GAP-PARTIAL** |
+| UC-PER-05.b | `SpecPersistence.writeSpecKts` resolves path and writes text | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | covered |
+| UC-PER-05.c | `KtsSpecLoader.loadFileAsRedstoneSpec` re-evaluates file and returns `RedstoneSpec` | `KtsSpecLoaderRoundtripTest."new-dsl source roundtrips id, bounds, lifespan via loadRedstoneSpec"` | covered |
+| UC-PER-05.d | Loaded spec's `id`, `bounds`, `lifespan` match emitted values | `KtsSpecLoaderRoundtripTest."new-dsl source roundtrips id, bounds, lifespan via loadRedstoneSpec"` | covered |
+| UC-PER-06 | Capture and restore structure sidecar (`.nbt`) | — | **GAP** |
+| UC-PER-06.a | `StructurePersistence.save` builds template, serialises, writes NBT | — | **GAP** |
+| UC-PER-06.b | `StructurePersistence.load` reads NBT and places blocks with `placeInWorld` | — | **GAP** |
+| UC-PER-06.c | `StructurePersistence.hasChanges` returns `true` on absent file, read error, or byte diff | — | **GAP** |
+| UC-PER-06.d | `StructurePersistence.clearBounds` sets region to AIR before placement | — | **GAP** |
+| UC-PER-07 | Handle sidecar drift (script present, `.nbt` missing or stale) | — | **GAP** |
+| UC-PER-07.a | Missing `.nbt`: `StructurePersistence.load` logs WARN and returns without placing | — | **GAP** |
+| UC-PER-07.b | Unreadable `.nbt`: `IOException` caught and logged at ERROR | — | **GAP** |
+| UC-PER-07.c | `hasChanges` returns `true` on absent file, read error, or byte mismatch | — | **GAP** |
+| UC-PER-07.d | `RecordingSidecar.load` returns `null` when sidecar absent | `RecordingSidecarTest."load returns null when sidecar absent"`, `SpecPersistenceTest."no sidecar without explicit save"` | covered |

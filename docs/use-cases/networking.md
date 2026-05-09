@@ -2,7 +2,7 @@
 title: Networking use-cases
 tags: [payloads, sync, authority, use-cases]
 summary: C2S/S2C payloads, server-authority enforcement, origin-pos lookup, confirmation handshakes.
-last_audited_commit: PENDING
+last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 ---
 
 # Networking use-cases
@@ -105,3 +105,29 @@ These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`ne
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
+| UC-NET-01 | Client requests recorder screen state from server | — | **GAP** |
+| UC-NET-01.a | Server resolves BE and builds `OpenRecorderScreenS2C` payload | — | **GAP** |
+| UC-NET-01.b | `ClientNetworkHandler` registers `OpenRecorderScreenS2C.TYPE` receiver | — | **GAP** |
+| UC-NET-01.c | Handler instantiates `RecorderScreen` with `originPos` and calls `mc.setScreen` | — | **GAP** |
+| UC-NET-01.d | Server is initiator of screen open; no C2S packet starts the flow | — | **GAP** |
+| UC-NET-02 | Server validates `originPos` and rejects stale or missing block entities | — | **GAP** |
+| UC-NET-02.a | Every C2S handler wraps body in `context.server().execute { … }` | — | **GAP** |
+| UC-NET-02.b | `as? SpecBlockEntity ?: return@execute` canonical guard on null BE | `ManagedNetworkRegistrySpec."handleLoadFolder rejects path traversal with ManagedErrorS2C"` | **GAP-PARTIAL** |
+| UC-NET-02.c | Block-kind re-validation for recorder vs runner commands | — | **GAP** |
+| UC-NET-02.d | Stale reference is silent no-op; client receives no acknowledgment | — | **GAP** |
+| UC-NET-03 | Server emits S2C confirmation after state-mutating runner command | — | **GAP** |
+| UC-NET-03.a | `PLACE_STRUCTURE`: places structure NBT and sends `RunnerStatusS2C(IDLE, …)` | — | **GAP** |
+| UC-NET-03.b | `RUN` pre-launch: immediately sends `RUNNING` then starts run | — | **GAP** |
+| UC-NET-03.c | `RUN` already in flight: sends `RUNNING, "Already running"` | — | **GAP** |
+| UC-NET-03.d | `RESTORE`: snapshots region, restores, sends `IDLE, "Snapshot restored"` | — | **GAP** |
+| UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and calls `pushStatus` only when `originPos` matches | — | **GAP** |
+| UC-NET-04 | Overwrite-prompt confirmation handshake | — | **GAP** |
+| UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | — | **GAP** |
+| UC-NET-04.b | `OverwriteDecisionC2SPayload` handler performs `originPos` guard before acting | — | **GAP** |
+| UC-NET-04.c | `overwrite = true`: `clearBounds` then `StructurePersistence.load` on server thread | — | **GAP** |
+| UC-NET-04.d | Player disconnect before decision: structure neither cleared nor placed | — | **GAP** |
+| UC-NET-05 | Server rejects unauthorized or misrouted C2S commands | — | **GAP** |
+| UC-NET-05.a | `RecorderCommandC2S` handler checks block-kind and returns early on mismatch | — | **GAP** |
+| UC-NET-05.b | `RunnerCommandC2S` handler checks block-kind and returns early on mismatch | — | **GAP** |
+| UC-NET-05.c | Shared BE type makes block-kind check the sole enforcement boundary | — | **GAP** |
+| UC-NET-05.d | No permission or ownership check beyond block-kind guard | — | **GAP** |

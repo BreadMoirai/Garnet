@@ -2,7 +2,7 @@
 title: Running use-cases
 tags: [runner, replay, verification, ui, use-cases]
 summary: Player or author runs a saved spec via the runner block; verification surfaces in the UI.
-last_audited_commit: PENDING
+last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 ---
 
 # Running use-cases
@@ -107,3 +107,33 @@ The running journey: a saved `.spec.kts` is loaded by the runner block, the spec
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
+| UC-RUN-01 | Open runner block and select a spec to load | — | **GAP** |
+| UC-RUN-01.a | `useWithoutItem` resolves save dir and calls `SpecDirectoryScan.list` | — | **GAP** |
+| UC-RUN-01.b | If configured, `SpecPersistence.load` builds `RunnerMetaSnapshot` | — | **GAP** |
+| UC-RUN-01.c | `ServerPlayNetworking.send` dispatches `OpenRunnerScreenS2C` to player | — | **GAP** |
+| UC-RUN-01.d | Client opens `RunnerScreen` with metadata panel or `"(no spec loaded)"` | — | **GAP** |
+| UC-RUN-01.e | Cycling picker sends `SetRunnerConfigC2S`; server responds with refreshed `OpenRunnerScreenS2C` | — | **GAP** |
+| UC-RUN-02 | Execute a single replay run | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-RUN-02.a | `SpecSnapshot.capture` snapshots block region before run | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-RUN-02.b | `StateRecorder.forSpec` + `activate` + `snapshot.restore` sets up run context | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-RUN-02.c | `spec.block` invoked once to register closures; no world interaction occurs | `SpecRunSchedulerTest."input scope schedules at START_OF_TICK; output at END_OF_TICK"` | covered |
+| UC-RUN-02.d | Tick loop fires `inputActions` at `START_OF_TICK` and `assertions` at `END_OF_TICK` | `SpecRunSchedulerTest."input scope schedules at START_OF_TICK; output at END_OF_TICK"` | **GAP-PARTIAL** |
+| UC-RUN-02.e | `scanForUnexpectedChanges` appends `SpecFailure` for undeclared change-ticks when `strict = true` | — | **GAP** |
+| UC-RUN-02.f | `finally` block deactivates recorder and restores snapshot regardless of outcome | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-RUN-03 | Replay button input via player-interaction dispatch | — | **GAP** |
+| UC-RUN-03.a | `tryApplyAsPlayerInteraction` called with desired target state | — | **GAP** |
+| UC-RUN-03.b | `ButtonBlock.press` called for `POWERED=false → true` transition | — | **GAP** |
+| UC-RUN-03.c | Depower auto-handled by schedule; no explicit action taken for `true → false` | — | **GAP** |
+| UC-RUN-03.d | Non-`ButtonBlock` falls through to `level.setBlock` when `target != current` | — | **GAP** |
+| UC-RUN-04 | Observe verification result in RunnerScreen and timeline widget | — | **GAP** |
+| UC-RUN-04.a | `RunnerScreen.active?.pushStatus` updates status and calls `rebuildWidgets` | — | **GAP** |
+| UC-RUN-04.b | `ClientRunnerState.put` stores result keyed by runner position | — | **GAP** |
+| UC-RUN-04.c | `TimelineSliderWidget.applyValue` maps `[0,1]` to tick index via lifespan | — | **GAP** |
+| UC-RUN-04.d | `updateMessage` labels slider "Tick $tick / ${lifespan - 1}" | — | **GAP** |
+| UC-RUN-04.e | `RunnerScreen.updateMeta` replaces metadata panel without closing screen | — | **GAP** |
+| UC-RUN-05 | Handle verification failure and abort recovery | — | **GAP** |
+| UC-RUN-05.a | `SpecRun.reportFailure` appends to `failures` list without throwing immediately | — | **GAP** |
+| UC-RUN-05.b | After tick loop, non-empty `failures` triggers `AssertionError` with all messages | — | **GAP** |
+| UC-RUN-05.c | `finally` block unconditionally deactivates recorder and restores snapshot | `RunRedstoneSpecSmokeTest."runRedstoneSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
+| UC-RUN-05.d | Server handler catches `AssertionError` and sends `RunnerState.FAIL` packet | — | **GAP** |
+| UC-RUN-05.e | `StateRecordingStorage.save` not called on failure | — | **GAP** |
