@@ -51,11 +51,11 @@ object ManagedNetworkRegistry {
         }
     }
 
-    internal fun handleListTree(server: MinecraftServer, player: ServerPlayer) {
+    fun handleListTree(server: MinecraftServer, player: ServerPlayer) {
         sendTree(server, player)
     }
 
-    internal fun handleLoadFolder(server: MinecraftServer, player: ServerPlayer, payload: LoadManagedFolderC2S) {
+    fun handleLoadFolder(server: MinecraftServer, player: ServerPlayer, payload: LoadManagedFolderC2S) {
         val root = rootFor(server) ?: run {
             ServerPlayNetworking.send(player, ManagedErrorS2C("managed-root not configured")); return
         }
@@ -76,17 +76,17 @@ object ManagedNetworkRegistry {
         ))
     }
 
-    internal fun handleUnload(server: MinecraftServer, player: ServerPlayer) {
+    fun handleUnload(server: MinecraftServer, player: ServerPlayer) {
         ManagedSession.clear(player.uuid)
         ServerPlayNetworking.send(player, ManagedSaveReportS2C(emptyList()))
     }
 
-    internal fun handleSaveNow(server: MinecraftServer, player: ServerPlayer) {
+    fun handleSaveNow(server: MinecraftServer, player: ServerPlayer) {
         val results = ManagedDimLifecycle.saveAll(server)
         ServerPlayNetworking.send(player, ManagedSaveReportS2C(results.map(::formatSaveResult)))
     }
 
-    internal fun handleNewSpec(server: MinecraftServer, player: ServerPlayer, payload: NewManagedSpecC2S) {
+    fun handleNewSpec(server: MinecraftServer, player: ServerPlayer, payload: NewManagedSpecC2S) {
         val activeSubpath = ManagedSession.get(player.uuid)?.activeSubpath ?: run {
             ServerPlayNetworking.send(player, ManagedErrorS2C("no folder selected")); return
         }
