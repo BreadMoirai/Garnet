@@ -27,6 +27,18 @@ object SpecPersistence {
             spec.id, file, recording != null)
     }
 
+    /**
+     * Writes raw `.spec.kts` source text directly to disk, bypassing the
+     * [com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter] round-trip.
+     * Used by the recording finalize path via [com.breadmoirai.redstonespecs.runner.RecordingDslEmitter].
+     */
+    fun writeSpecKts(saveDir: Path, id: String, source: String) {
+        saveDir.createDirectories()
+        val file = saveDir.resolve("$id$EXT")
+        file.writeText(source)
+        LOGGER.debug("[SpecPersistence#writeSpecKts] wrote '{}' to {}", id, file)
+    }
+
     fun loadRecording(saveDir: Path, id: String): StateRecording? =
         RecordingSidecar.load(saveDir, id)
 

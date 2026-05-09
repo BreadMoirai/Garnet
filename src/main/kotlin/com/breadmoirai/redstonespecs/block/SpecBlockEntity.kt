@@ -14,7 +14,8 @@ import com.breadmoirai.redstonespecs.data.outputs
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
 import com.breadmoirai.redstonespecs.data.serial.SpecJsonCodec
 import com.breadmoirai.redstonespecs.persistence.SpecPersistence
-import com.breadmoirai.redstonespecs.runner.RecordingFinalizer
+import com.breadmoirai.redstonespecs.runner.EntryMarker
+import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
 import com.breadmoirai.redstonespecs.runner.StateRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,9 +90,44 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
         stateRecorder = null
         val s = spec
         if (s != null) {
-            val finalized = RecordingFinalizer.finalize(s, recording)
-            if (finalized != null) {
-                setSpec(finalized)
+            val markers = s.allEntries
+                .map { e ->
+                    EntryMarker(
+                        pos = e.pos,
+                        label = e.label,
+                        color = e.color,
+                        kind = when (e.kind) {
+                            EntryKind.INPUT  -> EntryMarker.Kind.INPUT
+                            EntryKind.OUTPUT -> EntryMarker.Kind.OUTPUT
+                        },
+                    )
+                }
+                .distinctBy { it.pos to it.kind }
+            if (markers.isNotEmpty()) {
+                val source = RecordingDslEmitter.emit(
+                    id = s.id,
+                    bounds = s.bounds,
+                    lifespan = 20,
+                    structure = s.structure,
+                    strict = false,
+                    markers = markers,
+                    recording = recording,
+                )
+                val serverLevel = level as? ServerLevel
+                if (serverLevel != null) {
+                    val src = managedSourcePath
+                    coroutineScope.launch(Dispatchers.IO) {
+                        if (src != null) {
+                            src.writeText(source)
+                            LOGGER.debug("[finalize] managed: wrote recording result to {}", src)
+                        } else {
+                            val saveDir = serverLevel.server
+                                .getWorldPath(LevelResource.ROOT)
+                                .resolve(SharedSettings.specSaveDir)
+                            SpecPersistence.writeSpecKts(saveDir, s.id, source)
+                        }
+                    }
+                }
             }
         }
         setChangedAndSync()
