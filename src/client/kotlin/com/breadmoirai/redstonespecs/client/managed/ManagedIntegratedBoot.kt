@@ -18,36 +18,40 @@ import net.minecraft.world.level.levelgen.presets.WorldPresets
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 object ManagedIntegratedBoot {
     /**
      * Boots an integrated server pinned to `rootPath`:
-     *  - Save name: `managed-<root-tail>` (see [ManagedSaveNaming]). If the save exists, opens
-     *    it; else creates a fresh flat-void singleplayer world with that name.
-     *  - On SERVER_STARTING: pins [ManagedServerContext].
-     *  - On SERVER_STARTED: calls [ManagedDimLifecycle.placeAll] to materialize every leaf
-     *    folder's specs into their assigned regions.
+     *  - Save name: `managed-<root-tail>-<hash>` (see [ManagedSaveNaming]). If the save exists,
+     *    opens it; else creates a fresh flat-void singleplayer world with that name.
+     *  - On SERVER_STARTING: pins [ManagedServerContext] from the pending root.
+     *  - On SERVER_STARTED: handled by the common listener in `Redstonespecs`, which calls
+     *    [ManagedDimLifecycle.placeAll] for whatever context was pinned.
      *
-     * Listeners use [AtomicBoolean] guards (Fabric's `Event<T>` has no `unregister`); stale
-     * listeners from prior `boot` calls become inert after their first effective invocation.
+     * The SERVER_STARTING listener is registered exactly once (Fabric's `Event<T>` has no
+     * `unregister`); subsequent `boot` calls just swap in a new pending root. The listener is
+     * a no-op when no root is pending.
      */
+    private val pendingRoot = AtomicReference<ManagedRoot?>()
+    private val initialized = AtomicBoolean(false)
+
+    private fun ensureListenersRegistered() {
+        if (!initialized.compareAndSet(false, true)) return
+        ServerLifecycleEvents.SERVER_STARTING.register(ServerLifecycleEvents.ServerStarting { server ->
+            val root = pendingRoot.getAndSet(null) ?: return@ServerStarting
+            ManagedServerContext.set(server, ManagedServerContext(root))
+            LOGGER.info("[ManagedIntegratedBoot] pinned root '{}' on SERVER_STARTING", root.path)
+        })
+    }
+
     fun boot(rootPath: Path) {
         require(rootPath.isAbsolute) { "rootPath must be absolute: $rootPath" }
         val root = ManagedRoot(rootPath)
-        val pendingContext = ManagedServerContext(root)
-        val pinnedFlag = AtomicBoolean(false)
-
-        ServerLifecycleEvents.SERVER_STARTING.register(ServerLifecycleEvents.ServerStarting { server ->
-            if (!pinnedFlag.compareAndSet(false, true)) return@ServerStarting
-            ManagedServerContext.set(server, pendingContext)
-            LOGGER.info("[ManagedIntegratedBoot] pinned root '{}' on SERVER_STARTING", rootPath)
-        })
-        // placeAll is run by the common SERVER_STARTED listener registered in `Redstonespecs`
-        // (it picks up whatever ManagedServerContext is pinned). Avoid registering another one
-        // here to prevent double-placement.
-
+        ensureListenersRegistered()
+        pendingRoot.set(root)
         val saveName = ManagedSaveNaming.saveName(rootPath)
         openOrCreateWorld(saveName)
     }
@@ -74,7 +78,7 @@ object ManagedIntegratedBoot {
         val exists = try {
             mc.levelSource.levelExists(saveName)
         } catch (e: Exception) {
-            LOGGER.warn("[ManagedIntegratedBoot] levelExists check failed for '{}': {}", saveName, e.message)
+            LOGGER.warn("[ManagedIntegratedBoot] levelExists check failed for '{}': {}", saveName, e.message, e)
             false
         }
 

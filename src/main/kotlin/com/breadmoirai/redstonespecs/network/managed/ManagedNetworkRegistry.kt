@@ -107,6 +107,7 @@ object ManagedNetworkRegistry {
                 try {
                     ManagedNewSpec.create(folderAbsolute, payload.name)
                 } catch (e: Exception) {
+                    LOGGER.error("[managed/new-spec] create {}/{}: {}", activeSubpath, payload.name, e.message, e)
                     ServerPlayNetworking.send(player, ManagedErrorS2C("new-spec failed: ${e.message}"))
                     return@execute
                 }

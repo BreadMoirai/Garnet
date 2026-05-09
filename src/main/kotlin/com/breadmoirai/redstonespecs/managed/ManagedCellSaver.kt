@@ -42,7 +42,7 @@ object ManagedCellSaver {
                 loaded.spec.id, loaded.sourceFile, structureFile)
             CellSaveResult(loaded.spec.id, saved = true)
         }.getOrElse { e ->
-            LOGGER.error("[ManagedCellSaver] failed to save '{}': {}", loaded.spec.id, e.message)
+            LOGGER.error("[ManagedCellSaver] failed to save '{}': {}", loaded.spec.id, e.message, e)
             CellSaveResult(loaded.spec.id, saved = false, error = e.message)
         }
     }

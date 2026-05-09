@@ -13,9 +13,11 @@ import com.breadmoirai.redstonespecs.network.registerNetworking
 import com.breadmoirai.redstonespecs.runner.SpecRunnerCoordinator
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
+import com.breadmoirai.redstonespecs.managed.ManagedSession
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback
 import net.fabricmc.fabric.api.event.player.UseBlockCallback
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.context.UseOnContext
 import org.slf4j.LoggerFactory
@@ -53,6 +55,9 @@ class Redstonespecs : ModInitializer {
         }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             ManagedCommand.register(dispatcher)
+        }
+        ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
+            ManagedSession.clear(handler.player.uuid)
         }
         LOGGER.debug("[Redstonespecs#onInitialize] initialization complete")
     }
