@@ -7,10 +7,10 @@ import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.outputs
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import com.breadmoirai.redstonespecs.runner.StateRecordingView
-import com.breadmoirai.redstonespecs.runner.anchorTime
-import com.breadmoirai.redstonespecs.runner.describeCondition
-import com.breadmoirai.redstonespecs.runner.describeStateForCondition
-import com.breadmoirai.redstonespecs.runner.evaluateConditionOnState
+import com.breadmoirai.redstonespecs.dsl.anchorTime
+import com.breadmoirai.redstonespecs.dsl.describeCondition
+import com.breadmoirai.redstonespecs.dsl.describeStateForCondition
+import com.breadmoirai.redstonespecs.dsl.evaluateConditionOnState
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.state.BlockState
 

@@ -9,8 +9,8 @@ import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.allEntries
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload
-import com.breadmoirai.redstonespecs.runner.captureBlockStateProps
-import com.breadmoirai.redstonespecs.runner.propsToCondition
+import com.breadmoirai.redstonespecs.dsl.captureBlockStateProps
+import com.breadmoirai.redstonespecs.dsl.propsToCondition
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries

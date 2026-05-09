@@ -7,6 +7,8 @@ import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.SpecEntry
 import com.breadmoirai.redstonespecs.dsl.StateCondition
 import com.breadmoirai.redstonespecs.data.allEntries
+import com.breadmoirai.redstonespecs.dsl.captureBlockStateProps
+import com.breadmoirai.redstonespecs.dsl.propsToCondition
 import net.minecraft.core.BlockPos
 
 object RecordingFinalizer {

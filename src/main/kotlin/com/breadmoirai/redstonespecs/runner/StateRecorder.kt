@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.runner
 
 import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.dsl.SimTime
+import com.breadmoirai.redstonespecs.dsl.captureBlockStateProps
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.core.registries.BuiltInRegistries

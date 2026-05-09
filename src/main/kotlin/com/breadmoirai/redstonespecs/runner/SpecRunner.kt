@@ -4,6 +4,7 @@ import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.dsl.StateCondition
+import com.breadmoirai.redstonespecs.dsl.evaluateCondition
 import com.breadmoirai.redstonespecs.data.inputs
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -123,7 +124,7 @@ class SpecRunner(
         property.getValue(valueStr).map { state.setValue(property, it) }.orElse(state)
 
     fun evaluateCondition(condition: StateCondition, worldPos: BlockPos): Boolean =
-        com.breadmoirai.redstonespecs.runner.evaluateCondition(condition, level, worldPos)
+        evaluateCondition(condition, level, worldPos)
 
     private fun worldPos(relPos: BlockPos) =
         BlockPos(originPos.x + relPos.x, originPos.y + relPos.y, originPos.z + relPos.z)
