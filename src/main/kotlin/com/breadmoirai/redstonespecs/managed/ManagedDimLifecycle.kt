@@ -113,10 +113,7 @@ object ManagedDimLifecycle {
             )
         }
 
-        // 5. Update registry's cell map for this folder (origins are region-relative for lookup).
-        registry.setCellsForFolder(subpath, layout.byOrigin)
-
-        // 6. Register with the world (replace any prior entry for this subpath).
+        // 5. Register with the world (replace any prior entry for this subpath).
         world.folderAbsoluteByPath[subpath] = folder
         val perFolderMap = java.util.concurrent.ConcurrentHashMap<String, LoadedSpec>(loadedSpecs)
         world.perFolder[subpath] = perFolderMap

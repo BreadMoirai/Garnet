@@ -11,10 +11,8 @@ import java.util.concurrent.atomic.AtomicInteger
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 /**
- * One per `MinecraftServer`. Owns:
- *   1. Folder → region-origin assignment within the overworld canvas. Counter-based,
- *      in-memory, ephemeral (resets on server restart).
- *   2. Per-folder cell map: `Map<BlockPos, spec-id>` for cell-membership lookup.
+ * One per `MinecraftServer`. Owns folder → region-origin assignment within the overworld
+ * canvas: counter-based, in-memory, ephemeral (resets on server restart).
  *
  * The managed canvas is the integrated server's overworld; no custom dim is registered.
  */
@@ -23,7 +21,6 @@ class ManagedDimRegistry(private val server: MinecraftServer) {
         val subpath: String,
         val regionIndex: Int,
         val regionOrigin: BlockPos,
-        val cellsByOrigin: MutableMap<BlockPos, String> = mutableMapOf(),
     )
 
     private val bySubpath = ConcurrentHashMap<String, Entry>()
@@ -46,16 +43,6 @@ class ManagedDimRegistry(private val server: MinecraftServer) {
         LOGGER.info("[ManagedDimRegistry] assigned region #{} at {} to '{}'", idx, origin, subpath)
         return origin
     }
-
-    fun setCellsForFolder(subpath: String, byOrigin: Map<BlockPos, String>) {
-        val e = bySubpath[subpath] ?: return
-        e.cellsByOrigin.clear()
-        e.cellsByOrigin.putAll(byOrigin)
-    }
-
-    /** Reverse lookup: cell origin → spec id within `subpath`'s region. */
-    fun specIdAt(subpath: String, cellOrigin: BlockPos): String? =
-        bySubpath[subpath]?.cellsByOrigin?.get(cellOrigin)
 
     fun regionOriginOf(subpath: String): BlockPos? = bySubpath[subpath]?.regionOrigin
 
