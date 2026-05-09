@@ -109,6 +109,7 @@ class SpecRunner(
         return false
     }
 
+
     private fun flattenToProperties(condition: StateCondition, out: MutableList<Pair<String, String>>) {
         when (condition) {
             is StateCondition.All -> condition.conditions.forEach { flattenToProperties(it, out) }
