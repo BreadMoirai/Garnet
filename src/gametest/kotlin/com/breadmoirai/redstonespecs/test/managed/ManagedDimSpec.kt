@@ -1,7 +1,6 @@
 package com.breadmoirai.redstonespecs.test.managed
 
 import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
-import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
 import com.breadmoirai.redstonespecs.managed.ManagedDimRegistry
 import com.breadmoirai.redstonespecs.managed.ManagedNewSpec
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
@@ -14,7 +13,6 @@ import io.kotest.matchers.shouldBe
 import net.minecraft.world.level.block.Blocks
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
-import kotlin.io.path.writeText
 
 /**
  * Server-side gametests for the managed-worlds load/save/new-spec flow. Since T27 the canvas
@@ -30,8 +28,8 @@ class ManagedDimSpec : RedstoneTestSpec({
     test("load places cells in the managed dim and registers a session") {
         withTempRoot("managed-load") { tmp ->
             val folder = tmp.resolve("set-a").also { it.createDirectories() }
-            folder.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
-            folder.resolve("b.spec.kts").writeText(RecordingDslEmitter.emitStub("b"))
+            writeStub(folder, "a")
+            writeStub(folder, "b")
 
             val report = onServer {
                 ManagedDimRegistry.of(this).managedLevel()
@@ -58,8 +56,8 @@ class ManagedDimSpec : RedstoneTestSpec({
     test("saveNow writes only specs whose cell volume changed") {
         withTempRoot("managed-save") { tmp ->
             val folder = tmp.resolve("set-b").also { it.createDirectories() }
-            folder.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
-            folder.resolve("b.spec.kts").writeText(RecordingDslEmitter.emitStub("b"))
+            writeStub(folder, "a")
+            writeStub(folder, "b")
 
             val results = onServer {
                 makeMockServerPlayer(this)

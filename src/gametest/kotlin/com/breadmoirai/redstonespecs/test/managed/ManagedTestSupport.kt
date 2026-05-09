@@ -19,6 +19,14 @@ import java.util.UUID
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
+/**
+ * Builds a "mock" [ServerPlayer] in the server's overworld, mirroring vanilla
+ * `GameTestHelper#makeMockServerPlayerInLevel`. Tied to a unique UUID so concurrent tests
+ * don't collide on `ManagedSession`. The connection uses an [EmbeddedChannel] so packet
+ * sends are no-ops.
+ *
+ * Must be called on the server thread.
+ */
 fun makeMockServerPlayer(server: MinecraftServer): ServerPlayer {
     require(server.isSameThread) { "makeMockServerPlayer must be called on the server thread" }
     val profile = GameProfile(UUID.randomUUID(), "test-managed-${UUID.randomUUID().toString().take(6)}")
@@ -52,6 +60,7 @@ fun writeStub(folder: Path, name: String) {
     folder.resolve("$name.spec.kts").writeText(RecordingDslEmitter.emitStub(name))
 }
 
+/** Sets every block in `[origin, origin+size)` to AIR. */
 fun clearCellVolume(level: ServerLevel, origin: BlockPos, size: Vec3i) {
     val air = Blocks.AIR.defaultBlockState()
     val end = origin.offset(size.x - 1, size.y - 1, size.z - 1)
