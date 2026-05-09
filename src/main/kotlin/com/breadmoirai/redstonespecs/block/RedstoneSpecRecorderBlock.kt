@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs.block
 
-import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
 import com.mojang.serialization.MapCodec
@@ -79,9 +78,7 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
         if (powered && !be.isRecording) {
             be.startRecording()
         } else if (!powered && be.isRecording) {
-            if (be.stopRecordingAndFinalize()) {
-                be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
-            }
+            be.stopRecordingAndFinalize()
         }
     }
 

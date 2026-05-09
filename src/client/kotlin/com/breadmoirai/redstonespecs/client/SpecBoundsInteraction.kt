@@ -1,7 +1,5 @@
 package com.breadmoirai.redstonespecs.client
 
-import com.breadmoirai.redstonespecs.network.NudgeSpecBoundsC2SPayload
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.core.BlockPos
 
 data class HoveredFace(val originPos: BlockPos, val axis: Int, val isMax: Boolean)
@@ -52,8 +50,7 @@ fun findHoveredFace(
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 fun handleCtrlScroll(yOffset: Double) {
-    val face = currentHoveredFace ?: return
-    val delta = if (yOffset > 0) 1 else -1
-    ClientPlayNetworking.send(NudgeSpecBoundsC2SPayload(face.originPos, face.axis, face.isMax, delta))
+    // Bounds nudge via scroll was tied to the editor block (removed in Task 22).
 }

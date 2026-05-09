@@ -8,13 +8,10 @@ import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.dsl.SimTime
 import com.breadmoirai.redstonespecs.data.allEntries
 import com.breadmoirai.redstonespecs.data.SpecEntry
-import com.breadmoirai.redstonespecs.network.OpenEditorS2CPayload
 import com.breadmoirai.redstonespecs.dsl.captureBlockStateProps
 import com.breadmoirai.redstonespecs.dsl.propsToCondition
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
-import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.context.UseOnContext
@@ -72,11 +69,7 @@ abstract class SpecMarkerTool(properties: Properties = Properties()) : Item(prop
                 LOGGER.debug("[SpecMarkerTool#useOn] placing {} entry at {}", javaClass.simpleName, relPos)
                 be.addOrUpdateEntry(createEntry(relPos, initProps, hitState, spec))
             } else {
-                LOGGER.debug("[SpecMarkerTool#useOn] opening editor for existing entry at {}", relPos)
-            }
-
-            if (!isRecorder) {
-                ServerPlayNetworking.send(player as ServerPlayer, OpenEditorS2CPayload(be.blockPos, relPos))
+                LOGGER.debug("[SpecMarkerTool#useOn] entry already exists at {}", relPos)
             }
         }
 

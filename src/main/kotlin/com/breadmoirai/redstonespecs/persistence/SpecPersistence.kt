@@ -4,7 +4,6 @@ import com.breadmoirai.redstonespecs.data.RedstoneSpec as DataRedstoneSpec
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
 import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
 import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
-import com.breadmoirai.redstonespecs.network.SpecFileInfo
 import com.breadmoirai.redstonespecs.runner.StateRecording
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -57,18 +56,4 @@ object SpecPersistence {
         }
     }
 
-    fun listSpecsInfo(saveDir: Path): List<SpecFileInfo> {
-        return listIds(saveDir).mapNotNull { id ->
-            val spec = load(saveDir, id) ?: return@mapNotNull null
-            // New dsl.RedstoneSpec has no entry list (entries are closures, not data).
-            // Input/output counts are not available at load time in the new DSL.
-            SpecFileInfo(
-                id = spec.id,
-                lifespan = spec.lifespan,
-                inputCount = 0,
-                outputCount = 0,
-                structure = spec.structure,
-            )
-        }
-    }
 }

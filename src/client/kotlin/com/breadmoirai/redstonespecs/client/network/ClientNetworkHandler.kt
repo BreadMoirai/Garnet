@@ -1,40 +1,14 @@
 package com.breadmoirai.redstonespecs.client.network
 
-import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
-import com.breadmoirai.redstonespecs.client.screen.RecorderSetupScreen
 import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
-import com.breadmoirai.redstonespecs.client.screen.RunnerSpecPickerScreen
-import com.breadmoirai.redstonespecs.client.screen.RunnerTimelineScreen
-import com.breadmoirai.redstonespecs.client.screen.SpecEditorScreen
-import com.breadmoirai.redstonespecs.client.screen.SpecFileBrowserScreen
-import com.breadmoirai.redstonespecs.client.screen.SpecOverviewScreen
 import com.breadmoirai.redstonespecs.network.*
-import it.unimi.dsi.fastutil.booleans.BooleanConsumer
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.minecraft.client.gui.screens.ConfirmScreen
-import net.minecraft.network.chat.Component
 import org.slf4j.LoggerFactory
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 fun registerClientNetworking() {
-    ClientPlayNetworking.registerGlobalReceiver(OpenOverviewS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openOverview] originPos={}", payload.originPos)
-            mc.setScreen(SpecOverviewScreen(payload.originPos, payload.kind))
-        }
-    }
-
-    ClientPlayNetworking.registerGlobalReceiver(OpenEditorS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openEditor] originPos={} entryRelPos={}", payload.originPos, payload.entryRelPos)
-            mc.setScreen(SpecEditorScreen(payload.originPos, payload.entryRelPos))
-        }
-    }
-
     ClientPlayNetworking.registerGlobalReceiver(TestResultS2CPayload.TYPE) { payload, context ->
         val mc = context.client()
         mc.execute {
@@ -42,13 +16,9 @@ fun registerClientNetworking() {
             val color = if (r.pass) "§a" else "§c"
             LOGGER.debug("[ClientNetworkHandler#testResult] originPos={} {}/{} passed", payload.originPos, r.passCount, r.checks.size)
             mc.player?.sendSystemMessage(
-                Component.literal("${color}Spec '${r.specId}': ${r.passCount}/${r.checks.size} checks passed")
+                net.minecraft.network.chat.Component.literal("${color}Spec '${r.specId}': ${r.passCount}/${r.checks.size} checks passed")
             )
-            val current = mc.screen
-            if (current is SpecOverviewScreen && current.originPos == payload.originPos) {
-                mc.setScreen(SpecOverviewScreen(payload.originPos, current.kind))
-            }
-            // Cache the latest result+recording for the timeline scrubber screen.
+            // Cache the latest result+recording for any future timeline scrubber screen.
             com.breadmoirai.redstonespecs.client.state.ClientRunnerState.put(payload.originPos, payload.result)
         }
     }
@@ -57,48 +27,16 @@ fun registerClientNetworking() {
         val mc = context.client()
         mc.execute {
             LOGGER.debug("[ClientNetworkHandler#overwritePrompt] specId={}", payload.specId)
-            mc.setScreen(ConfirmScreen(
-                BooleanConsumer { overwrite ->
+            mc.setScreen(net.minecraft.client.gui.screens.ConfirmScreen(
+                it.unimi.dsi.fastutil.booleans.BooleanConsumer { overwrite ->
                     mc.setScreen(null)
                     ClientPlayNetworking.send(OverwriteDecisionC2SPayload(payload.originPos, overwrite))
                 },
-                Component.literal("Blocks found inside bounds"),
-                Component.literal("Overwrite existing blocks with structure '${payload.specId}'?"),
-                Component.literal("Overwrite"),
-                Component.literal("Skip Structure"),
+                net.minecraft.network.chat.Component.literal("Blocks found inside bounds"),
+                net.minecraft.network.chat.Component.literal("Overwrite existing blocks with structure '${payload.specId}'?"),
+                net.minecraft.network.chat.Component.literal("Overwrite"),
+                net.minecraft.network.chat.Component.literal("Skip Structure"),
             ))
-        }
-    }
-
-    ClientPlayNetworking.registerGlobalReceiver(OpenFileBrowserS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openFileBrowser] originPos={} fileCount={}", payload.originPos, payload.files.size)
-            mc.setScreen(SpecFileBrowserScreen(payload.originPos, payload.files))
-        }
-    }
-
-    ClientPlayNetworking.registerGlobalReceiver(OpenRunnerPickerS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openRunnerPicker] originPos={} fileCount={}", payload.originPos, payload.files.size)
-            mc.setScreen(RunnerSpecPickerScreen(payload.originPos, payload.files))
-        }
-    }
-
-    ClientPlayNetworking.registerGlobalReceiver(OpenRecorderS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openRecorder] originPos={} isRecording={}", payload.originPos, payload.isRecording)
-            mc.setScreen(RecorderSetupScreen(payload.originPos, payload.isRecording))
-        }
-    }
-
-    ClientPlayNetworking.registerGlobalReceiver(OpenTimelineS2CPayload.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openTimeline] runnerPos={}", payload.runnerPos)
-            mc.setScreen(RunnerTimelineScreen(payload.runnerPos))
         }
     }
 

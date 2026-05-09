@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecEditorBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
@@ -29,9 +28,6 @@ object ModRegistries {
     val REDSTONE_SPEC_RUNNER_BLOCK: RedstoneSpecRunnerBlock = registerBlock(
         "redstone_spec_runner", ::RedstoneSpecRunnerBlock, sharedProps
     )
-    val REDSTONE_SPEC_EDITOR_BLOCK: RedstoneSpecEditorBlock = registerBlock(
-        "redstone_spec_editor", ::RedstoneSpecEditorBlock, sharedProps
-    )
     val REDSTONE_SPEC_RECORDER_BLOCK: RedstoneSpecRecorderBlock = registerBlock(
         "redstone_spec_recorder", ::RedstoneSpecRecorderBlock, sharedProps
     )
@@ -42,13 +38,11 @@ object ModRegistries {
         FabricBlockEntityTypeBuilder.create(
             ::SpecBlockEntity,
             REDSTONE_SPEC_RUNNER_BLOCK,
-            REDSTONE_SPEC_EDITOR_BLOCK,
             REDSTONE_SPEC_RECORDER_BLOCK,
         ).build(),
     )
 
     val REDSTONE_SPEC_RUNNER_ITEM: BlockItem = registerBlockItem("redstone_spec_runner", REDSTONE_SPEC_RUNNER_BLOCK)
-    val REDSTONE_SPEC_EDITOR_ITEM: BlockItem = registerBlockItem("redstone_spec_editor", REDSTONE_SPEC_EDITOR_BLOCK)
     val REDSTONE_SPEC_RECORDER_ITEM: BlockItem = registerBlockItem("redstone_spec_recorder", REDSTONE_SPEC_RECORDER_BLOCK)
 
     val INPUT_SPEC_MARKER: InputSpecMarkerItem = registerItem("input_spec_marker", ::InputSpecMarkerItem)

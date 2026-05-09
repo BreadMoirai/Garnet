@@ -27,7 +27,6 @@ private val keyCycleBackward = KeyMappingHelper.registerKeyMapping(
 
 private val specBlocks = setOf(
     ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK,
-    ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK,
     ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK,
 )
 
