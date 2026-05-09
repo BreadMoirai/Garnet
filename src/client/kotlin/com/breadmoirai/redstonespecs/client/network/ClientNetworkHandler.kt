@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.client.network
 
 import com.breadmoirai.redstonespecs.block.SpecBlockKind
+import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
 import com.breadmoirai.redstonespecs.client.screen.RecorderSetupScreen
 import com.breadmoirai.redstonespecs.client.screen.RunnerSpecPickerScreen
 import com.breadmoirai.redstonespecs.client.screen.RunnerTimelineScreen
@@ -97,6 +98,20 @@ fun registerClientNetworking() {
         mc.execute {
             LOGGER.debug("[ClientNetworkHandler#openTimeline] runnerPos={}", payload.runnerPos)
             mc.setScreen(RunnerTimelineScreen(payload.runnerPos))
+        }
+    }
+
+    ClientPlayNetworking.registerGlobalReceiver(OpenRecorderScreenS2C.TYPE) { payload, context ->
+        val mc = context.client()
+        mc.execute {
+            LOGGER.debug("[ClientNetworkHandler#openRecorderScreen] originPos={} state={}", payload.originPos, payload.state)
+            mc.setScreen(RecorderScreen(
+                originPos = payload.originPos,
+                initialSpecId = payload.specId,
+                initialOutPath = payload.outPath,
+                initialStructureId = payload.structureId,
+                initialState = payload.state,
+            ))
         }
     }
 }

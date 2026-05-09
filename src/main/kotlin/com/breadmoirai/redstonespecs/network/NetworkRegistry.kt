@@ -307,16 +307,36 @@ fun registerNetworking() {
         }
     }
 
-    // v2.0: Slim recorder / runner C2S handlers (Tasks 19 + 20 wire the real logic)
+    // v2.0: Slim recorder / runner C2S handlers
     ServerPlayNetworking.registerGlobalReceiver(SetRecorderConfigC2S.TYPE) { payload, context ->
         context.server().execute {
-            LOGGER.info("TODO: handle SetRecorderConfigC2S originPos={} specId={}", payload.originPos, payload.specId)
+            LOGGER.debug("[NetworkRegistry#setRecorderConfig] originPos={} specId={}", payload.originPos, payload.specId)
+            val level = context.player().level()
+            val be = level.getBlockEntity(payload.originPos) as? com.breadmoirai.redstonespecs.block.SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return@execute
+            if (payload.specId.isNotBlank()) be.setSpecId(payload.specId)
+            if (payload.structureId.isNotBlank()) be.setStructure(payload.structureId)
+            // outPath is stored as structure for now (v2.0 BE doesn't have a dedicated outPath field yet)
         }
     }
 
     ServerPlayNetworking.registerGlobalReceiver(RecorderCommandC2S.TYPE) { payload, context ->
         context.server().execute {
-            LOGGER.info("TODO: handle RecorderCommandC2S originPos={} cmd={}", payload.originPos, payload.cmd)
+            LOGGER.debug("[NetworkRegistry#recorderCommand] originPos={} cmd={}", payload.originPos, payload.cmd)
+            val level = context.player().level()
+            val be = level.getBlockEntity(payload.originPos) as? com.breadmoirai.redstonespecs.block.SpecBlockEntity ?: return@execute
+            if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return@execute
+            when (payload.cmd) {
+                RecorderCmd.START -> be.startRecording()
+                RecorderCmd.STOP -> {
+                    if (be.stopRecordingAndFinalize()) {
+                        be.transformTo(ModRegistries.REDSTONE_SPEC_EDITOR_BLOCK)
+                    }
+                }
+                RecorderCmd.DISCARD -> {
+                    be.discardForRerecord()
+                }
+            }
         }
     }
 

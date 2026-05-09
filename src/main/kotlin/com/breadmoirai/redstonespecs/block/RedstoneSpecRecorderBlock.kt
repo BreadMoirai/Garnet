@@ -3,6 +3,7 @@ package com.breadmoirai.redstonespecs.block
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.data.RedstoneSpec
 import com.breadmoirai.redstonespecs.network.OpenRecorderS2CPayload
+import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
@@ -53,7 +54,16 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
     ): InteractionResult {
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
-            ServerPlayNetworking.send(player as ServerPlayer, OpenRecorderS2CPayload(be.blockPos, be.isRecording))
+            val serverPlayer = player as ServerPlayer
+            // Legacy open packet (old RecorderSetupScreen — Task 21 will clean this up)
+            ServerPlayNetworking.send(serverPlayer, OpenRecorderS2CPayload(be.blockPos, be.isRecording))
+            // New slim recorder screen packet
+            val spec = be.spec
+            val specId = spec?.id ?: ""
+            val outPath = spec?.id ?: ""
+            val structureId = spec?.structure ?: spec?.id ?: ""
+            val recState = if (be.isRecording) "recording" else "idle"
+            ServerPlayNetworking.send(serverPlayer, OpenRecorderScreenS2C(be.blockPos, specId, outPath, structureId, recState))
         }
         return InteractionResult.SUCCESS
     }
