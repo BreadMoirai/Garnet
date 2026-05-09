@@ -3,7 +3,6 @@ package com.breadmoirai.redstonespecs.block
 import com.breadmoirai.redstonespecs.block.SpecBlockKind
 import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.network.OpenOverviewS2CPayload
-import com.breadmoirai.redstonespecs.network.OpenRunnerPickerS2CPayload
 import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
 import com.breadmoirai.redstonespecs.network.OpenTimelineS2CPayload
 import com.breadmoirai.redstonespecs.network.RunnerMetaSnapshot
