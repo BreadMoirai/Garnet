@@ -106,28 +106,36 @@ These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`ne
 | UC ID | Description | Test | Status |
 |---|---|---|---|
 | UC-NET-01 | Client requests recorder screen state from server | — | **GAP** |
-| UC-NET-01.a | Server resolves BE and builds `OpenRecorderScreenS2C` payload | — | **GAP** |
-| UC-NET-01.b | `ClientNetworkHandler` registers `OpenRecorderScreenS2C.TYPE` receiver | — | **GAP** |
-| UC-NET-01.c | Handler instantiates `RecorderScreen` with `originPos` and calls `mc.setScreen` | — | **GAP** |
-| UC-NET-01.d | Server is initiator of screen open; no C2S packet starts the flow | — | **GAP** |
-| UC-NET-02 | Server validates `originPos` and rejects stale or missing block entities | — | **GAP** |
-| UC-NET-02.a | Every C2S handler wraps body in `context.server().execute { … }` | — | **GAP** |
-| UC-NET-02.b | `as? SpecBlockEntity ?: return@execute` canonical guard on null BE | `ManagedNetworkRegistrySpec."handleLoadFolder rejects path traversal with ManagedErrorS2C"` | **GAP-PARTIAL** |
-| UC-NET-02.c | Block-kind re-validation for recorder vs runner commands | — | **GAP** |
-| UC-NET-02.d | Stale reference is silent no-op; client receives no acknowledgment | — | **GAP** |
-| UC-NET-03 | Server emits S2C confirmation after state-mutating runner command | — | **GAP** |
-| UC-NET-03.a | `PLACE_STRUCTURE`: places structure NBT and sends `RunnerStatusS2C(IDLE, …)` | — | **GAP** |
-| UC-NET-03.b | `RUN` pre-launch: immediately sends `RUNNING` then starts run | — | **GAP** |
-| UC-NET-03.c | `RUN` already in flight: sends `RUNNING, "Already running"` | — | **GAP** |
-| UC-NET-03.d | `RESTORE`: snapshots region, restores, sends `IDLE, "Snapshot restored"` | — | **GAP** |
-| UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and calls `pushStatus` only when `originPos` matches | — | **GAP** |
-| UC-NET-04 | Overwrite-prompt confirmation handshake | — | **GAP** |
-| UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | — | **GAP** |
-| UC-NET-04.b | `OverwriteDecisionC2SPayload` handler performs `originPos` guard before acting | — | **GAP** |
-| UC-NET-04.c | `overwrite = true`: `clearBounds` then `StructurePersistence.load` on server thread | — | **GAP** |
-| UC-NET-04.d | Player disconnect before decision: structure neither cleared nor placed | — | **GAP** |
-| UC-NET-05 | Server rejects unauthorized or misrouted C2S commands | — | **GAP** |
-| UC-NET-05.a | `RecorderCommandC2S` handler checks block-kind and returns early on mismatch | — | **GAP** |
-| UC-NET-05.b | `RunnerCommandC2S` handler checks block-kind and returns early on mismatch | — | **GAP** |
-| UC-NET-05.c | Shared BE type makes block-kind check the sole enforcement boundary | — | **GAP** |
-| UC-NET-05.d | No permission or ownership check beyond block-kind guard | — | **GAP** |
+| UC-NET-01.a | Server resolves BE and builds `OpenRecorderScreenS2C` payload | `RecorderRunnerNetworkRegistrySpec."UC-NET-01.a: server build of OpenRecorderScreenS2C carries BE fields"` | covered |
+| UC-NET-01.b | `ClientNetworkHandler` registers `OpenRecorderScreenS2C.TYPE` receiver | — | **GAP** ¹ |
+| UC-NET-01.c | Handler instantiates `RecorderScreen` with `originPos` and calls `mc.setScreen` | — | **GAP** ¹ |
+| UC-NET-01.d | Server is initiator of screen open; no C2S packet starts the flow | `RecorderRunnerNetworkRegistrySpec."UC-NET-01.a: server build of OpenRecorderScreenS2C carries BE fields"` (verified structurally inside .a) | covered |
+| UC-NET-02 | Server validates `originPos` and rejects stale or missing block entities | covered by .a–.d | covered |
+| UC-NET-02.a | Every C2S handler wraps body in `context.server().execute { … }` | covered structurally by all UC-NET tests in `RecorderRunnerNetworkRegistrySpec` | covered |
+| UC-NET-02.b | `as? SpecBlockEntity ?: return@execute` canonical guard on null BE | `RecorderRunnerNetworkRegistrySpec."UC-NET-02.b: handleRecorderCommand on null BE is a silent no-op"` | covered |
+| UC-NET-02.c | Block-kind re-validation for recorder vs runner commands | covered by `RecorderRunnerNetworkRegistrySpec."UC-NET-05.a: ..."`, `"UC-NET-05.b: ..."` | covered |
+| UC-NET-02.d | Stale reference is silent no-op; client receives no acknowledgment | `RecorderRunnerNetworkRegistrySpec."UC-NET-02.d: handleRunnerCommand on null BE sends no S2C ack"` | covered |
+| UC-NET-03 | Server emits S2C confirmation after state-mutating runner command | covered by .a–.d | covered |
+| UC-NET-03.a | `PLACE_STRUCTURE`: places structure NBT and sends `RunnerStatusS2C(IDLE, …)` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.a: PLACE_STRUCTURE configured sends RunnerStatusS2C(IDLE, 'Structure placed: ...'"` and `"UC-NET-03.a: PLACE_STRUCTURE not-configured sends RunnerStatusS2C(IDLE, 'No spec configured')"` | covered |
+| UC-NET-03.b | `RUN` pre-launch: immediately sends `RUNNING` then starts run | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.b: RUN with missing spec sends RunnerStatusS2C(FAIL, 'Spec file not found: ...'"` | **GAP-PARTIAL** ⁴ |
+| UC-NET-03.c | `RUN` already in flight: sends `RUNNING, "Already running"` | — | **GAP-PARTIAL** ⁴ |
+| UC-NET-03.d | `RESTORE`: snapshots region, restores, sends `IDLE, "Snapshot restored"` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.d: RESTORE configured sends RunnerStatusS2C(IDLE, 'Snapshot restored')"` and `"UC-NET-03.d: RESTORE not-configured sends RunnerStatusS2C(IDLE, 'No spec configured')"` | covered |
+| UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and calls `pushStatus` only when `originPos` matches | — | **GAP** ¹ |
+| UC-NET-04 | Overwrite-prompt confirmation handshake | covered by .b–.d | covered |
+| UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | — | **GAP** ³ |
+| UC-NET-04.b | `OverwriteDecisionC2SPayload` handler performs `originPos` guard before acting | `RecorderRunnerNetworkRegistrySpec."UC-NET-04.b: handleOverwriteDecision on null BE is a silent no-op"` | covered |
+| UC-NET-04.c | `overwrite = true`: `clearBounds` then `StructurePersistence.load` on server thread | `RecorderRunnerNetworkRegistrySpec."UC-NET-04.c: overwrite=true clears bounds and loads structure"` and `"UC-NET-04.c: overwrite=false leaves world unchanged and does not load structure"` | covered |
+| UC-NET-04.d | Player disconnect before decision: structure neither cleared nor placed | covered structurally by `"UC-NET-04.b: ..."` (handler not invoked → world unchanged) | covered |
+| UC-NET-05 | Server rejects unauthorized or misrouted C2S commands | covered by .a–.d | covered |
+| UC-NET-05.a | `RecorderCommandC2S` handler checks block-kind and returns early on mismatch | `RecorderRunnerNetworkRegistrySpec."UC-NET-05.a: RecorderCommand on a runner block is a silent no-op"` | covered |
+| UC-NET-05.b | `RunnerCommandC2S` handler checks block-kind and returns early on mismatch | `RecorderRunnerNetworkRegistrySpec."UC-NET-05.b: RunnerCommand on a recorder block is a silent no-op"` | covered |
+| UC-NET-05.c | Shared BE type makes block-kind check the sole enforcement boundary | covered by `"UC-NET-05.a: ..."` + `"UC-NET-05.b: ..."` together | covered |
+| UC-NET-05.d | No permission or ownership check beyond block-kind guard | `RecorderRunnerNetworkRegistrySpec."UC-NET-05.d: any player can issue commands to any reachable BE (no permission check)"` | covered |
+
+**Footnotes:**
+
+¹ Client receiver — deferred to a future client-gametest cycle (requires `ClientTestSentinel` plus a real client process).
+
+³ No `OverwritePromptS2C` producer exists in the recorder/runner registry today; only managed/structure load paths emit it. Coverage requires a producer to be wired in `NetworkRegistry` first.
+
+⁴ `RUN` happy-path and "Already running" are deferred: `SpecBlockEntity.startRun` launches an unbounded BE-scoped coroutine without a `RecordingHolder`, which hangs the Kotest gametest harness. Will be revisited when `handleRunnerCommand` is split or the spec engine gains a synchronous test entry point.
