@@ -15,6 +15,7 @@ import com.breadmoirai.redstonespecs.persistence.StructurePersistence
 import com.breadmoirai.redstonespecs.test.drainPayloads
 import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
 import com.breadmoirai.redstonespecs.test.placeRunnerBE
+import com.breadmoirai.redstonespecs.test.placeRecorderBE
 import com.breadmoirai.redstonespecs.test.managed.clearCellVolume
 import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
@@ -238,4 +239,62 @@ class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
     // UC-NET-04.d — Disconnect-before-decision: structurally verified by simply
     // *not* calling handleOverwriteDecision. World stays in pre-prompt state.
     // Asserted as part of UC-NET-04.b (no payload, no mutation when handler absent).
+
+    // UC-NET-05 — Server rejects unauthorized or misrouted C2S commands.
+
+    test("UC-NET-05.a: RecorderCommand on a runner block is a silent no-op") {
+        withTempRoot("net-uc05a") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                val level = this.overworld()
+                val pos = BlockPos(1300, 64, 1000)
+                val be = placeRunnerBE(level, pos, specId = "demo")
+                drainPayloads(player)
+
+                handleRecorderCommand(this, player, RecorderCommandC2S(pos, RecorderCmd.START))
+
+                drainPayloads(player).shouldBeEmpty()
+                // Recording must not have started — BE state is untouched.
+                be.isRecording shouldBe false
+            }
+        }
+    }
+
+    test("UC-NET-05.b: RunnerCommand on a recorder block is a silent no-op") {
+        withTempRoot("net-uc05b") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                val level = this.overworld()
+                val pos = BlockPos(1308, 64, 1000)
+                placeRecorderBE(level, pos, specId = "demo")
+                drainPayloads(player)
+
+                handleRunnerCommand(this, player, RunnerCommandC2S(pos, RunnerCmd.PLACE_STRUCTURE))
+
+                // No RunnerStatusS2C should be emitted on a recorder block.
+                drainPayloads(player).filterIsInstance<RunnerStatusS2C>().shouldBeEmpty()
+            }
+        }
+    }
+
+    test("UC-NET-05.d: any player can issue commands to any reachable BE (no permission check)") {
+        withTempRoot("net-uc05d") {
+            onServer {
+                val ownerLikePlayer = makeMockServerPlayer(this)
+                val otherPlayer = makeMockServerPlayer(this)
+                val level = this.overworld()
+                val pos = BlockPos(1316, 64, 1000)
+                placeRunnerBE(level, pos, specId = "demo")
+                drainPayloads(ownerLikePlayer)
+                drainPayloads(otherPlayer)
+
+                // A second, unrelated player issues RESTORE — succeeds without ownership check.
+                handleRunnerCommand(this, otherPlayer, RunnerCommandC2S(pos, RunnerCmd.RESTORE))
+
+                val status = drainPayloads(otherPlayer).filterIsInstance<RunnerStatusS2C>().single()
+                status.state shouldBe RunnerState.IDLE
+                status.summary shouldBe "Snapshot restored"
+            }
+        }
+    }
 })
