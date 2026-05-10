@@ -5,6 +5,7 @@ import com.breadmoirai.redstonespecs.test.managed.ManagedCommandSpec
 import com.breadmoirai.redstonespecs.test.managed.ManagedDimSpec
 import com.breadmoirai.redstonespecs.test.managed.ManagedNetworkRegistrySpec
 import com.breadmoirai.redstonespecs.test.managed.ManagedTeleportSpec
+import com.breadmoirai.redstonespecs.test.network.RecorderRunnerNetworkRegistrySpec
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
 import com.breadmoirai.redstonespecs.testing.launcher.launchKotest
 import net.fabricmc.fabric.api.gametest.v1.GameTest
@@ -47,6 +48,7 @@ class GametestSentinel {
                             ManagedTeleportSpec::class,
                             ManagedNetworkRegistrySpec::class,
                             ManagedCommandSpec::class,
+                            RecorderRunnerNetworkRegistrySpec::class,
                         ),
                     )
                 }
