@@ -5,6 +5,8 @@ import com.breadmoirai.redstonespecs.managed.ManagedDimRegistry
 import com.breadmoirai.redstonespecs.managed.ManagedNewSpec
 import com.breadmoirai.redstonespecs.managed.ManagedRoot
 import com.breadmoirai.redstonespecs.managed.ManagedWorld
+import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
+import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import io.kotest.matchers.collections.shouldContain
