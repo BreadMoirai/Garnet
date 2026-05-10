@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
-internal fun saveDir(server: MinecraftServer): java.nio.file.Path =
+fun saveDir(server: MinecraftServer): java.nio.file.Path =
     server.getWorldPath(LevelResource.ROOT)
         .resolve(SharedSettings.specSaveDir)
 
