@@ -2,7 +2,7 @@
 title: Networking use-cases
 tags: [payloads, sync, authority, use-cases]
 summary: C2S/S2C payloads, server-authority enforcement, origin-pos lookup, confirmation handshakes.
-last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
+last_audited_commit: bf531678959e38ac9db876a3f139f555c57bf92b
 ---
 
 # Networking use-cases
