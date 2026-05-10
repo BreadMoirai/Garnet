@@ -56,8 +56,12 @@ inline fun withTempRoot(prefix: String, block: (Path) -> Unit) {
 
 /**
  * Reads all [CustomPacketPayload]s sent to [player] since the last call.
+ *
  * Walks the player's [EmbeddedChannel] outbound queue (set up by [makeMockServerPlayer])
- * and unwraps each [ClientboundCustomPayloadPacket].
+ * and unwraps each [ClientboundCustomPayloadPacket]. The chain
+ * `player.connection -> ServerCommonPacketListenerImpl.connection -> Connection.channel`
+ * crosses two non-public fields; access is granted via accessor mixins
+ * ([ServerCommonPacketListenerImplAccessor], [ConnectionAccessor]).
  */
 fun drainPayloads(player: ServerPlayer): List<CustomPacketPayload> {
     val listener = player.connection
