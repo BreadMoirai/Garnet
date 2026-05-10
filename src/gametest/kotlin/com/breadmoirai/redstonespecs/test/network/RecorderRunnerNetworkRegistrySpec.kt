@@ -3,6 +3,9 @@ package com.breadmoirai.redstonespecs.test.network
 import com.breadmoirai.redstonespecs.network.handleRecorderCommand
 import com.breadmoirai.redstonespecs.network.RecorderCmd
 import com.breadmoirai.redstonespecs.network.RecorderCommandC2S
+import com.breadmoirai.redstonespecs.network.handleRunnerCommand
+import com.breadmoirai.redstonespecs.network.RunnerCmd
+import com.breadmoirai.redstonespecs.network.RunnerCommandC2S
 import com.breadmoirai.redstonespecs.test.drainPayloads
 import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
 import com.breadmoirai.redstonespecs.test.withTempRoot
@@ -21,13 +24,32 @@ import net.minecraft.core.BlockPos
  */
 class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
 
+    // UC-NET-02 — Server validates originPos and rejects stale or missing BEs.
+    // 02.a (server-thread wrap) is verified structurally: every test below invokes
+    //      handleX from inside `onServer { }`, which is exactly the contract the
+    //      `context.server().execute { … }` lambda enforces at the registration site.
+    // 02.c (block-kind re-validation) is covered by UC-NET-05.a and UC-NET-05.b.
+
     test("UC-NET-02.b: handleRecorderCommand on null BE is a silent no-op") {
-        withTempRoot("net-rr-scaffold") {
+        withTempRoot("net-uc02b") {
             onServer {
                 val player = makeMockServerPlayer(this)
                 drainPayloads(player)
 
                 handleRecorderCommand(this, player, RecorderCommandC2S(BlockPos(1000, 64, 1000), RecorderCmd.START))
+
+                drainPayloads(player).shouldBeEmpty()
+            }
+        }
+    }
+
+    test("UC-NET-02.d: handleRunnerCommand on null BE sends no S2C ack") {
+        withTempRoot("net-uc02d") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+
+                handleRunnerCommand(this, player, RunnerCommandC2S(BlockPos(1004, 64, 1000), RunnerCmd.PLACE_STRUCTURE))
 
                 drainPayloads(player).shouldBeEmpty()
             }
