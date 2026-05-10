@@ -53,7 +53,7 @@ class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
 
                 // Option B: call extracted helper openScreenFor(server, player, be)
                 val be = level.getBlockEntity(pos) as com.breadmoirai.redstonespecs.block.SpecBlockEntity
-                RedstoneSpecRecorderBlock.openScreenFor(this, player, be)
+                RedstoneSpecRecorderBlock.openScreenFor(player, be)
 
                 val packet = drainPayloads(player).filterIsInstance<OpenRecorderScreenS2C>().single()
                 packet.originPos shouldBe pos

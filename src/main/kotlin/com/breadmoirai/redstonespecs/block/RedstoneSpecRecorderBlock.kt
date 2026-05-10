@@ -4,7 +4,6 @@ import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
 import com.mojang.serialization.MapCodec
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
-import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.LivingEntity
@@ -42,7 +41,7 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
         if (!level.isClientSide) {
             val be = level.getBlockEntity(pos) as? SpecBlockEntity ?: return InteractionResult.PASS
             val serverPlayer = player as ServerPlayer
-            openScreenFor(level.server!!, serverPlayer, be)
+            openScreenFor(serverPlayer, be)
         }
         return InteractionResult.SUCCESS
     }
@@ -73,7 +72,7 @@ class RedstoneSpecRecorderBlock(properties: Properties) : BaseEntityBlock(proper
     companion object {
         val CODEC: MapCodec<RedstoneSpecRecorderBlock> = simpleCodec(::RedstoneSpecRecorderBlock)
 
-        fun openScreenFor(server: MinecraftServer, player: ServerPlayer, be: SpecBlockEntity) {
+        fun openScreenFor(player: ServerPlayer, be: SpecBlockEntity) {
             val specId = be.specId
             val outPath = be.specId
             val structureId = be.specStructure ?: be.specId
