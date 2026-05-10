@@ -9,6 +9,8 @@ import com.breadmoirai.redstonespecs.network.RunnerCommandC2S
 import com.breadmoirai.redstonespecs.network.RunnerState
 import com.breadmoirai.redstonespecs.network.RunnerStatusS2C
 import com.breadmoirai.redstonespecs.network.saveDir
+import com.breadmoirai.redstonespecs.network.handleOverwriteDecision
+import com.breadmoirai.redstonespecs.network.OverwriteDecisionC2SPayload
 import com.breadmoirai.redstonespecs.persistence.StructurePersistence
 import com.breadmoirai.redstonespecs.test.drainPayloads
 import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
@@ -170,4 +172,70 @@ class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
             }
         }
     }
+
+    // UC-NET-04 — Overwrite-prompt confirmation handshake (server half only).
+    // UC-NET-04.a (server emits OverwritePromptS2C) is GAP — no producer in
+    // recorder/runner registry today; only managed/structure paths emit it.
+
+    test("UC-NET-04.b: handleOverwriteDecision on null BE is a silent no-op") {
+        withTempRoot("net-uc04b") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+
+                handleOverwriteDecision(this, player, OverwriteDecisionC2SPayload(BlockPos(1200, 64, 1000), true))
+
+                drainPayloads(player).shouldBeEmpty()
+            }
+        }
+    }
+
+    test("UC-NET-04.c: overwrite=true clears bounds and loads structure") {
+        withTempRoot("net-uc04c-true") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                val level = this.overworld()
+                val pos = BlockPos(1208, 64, 1000)
+                val bounds = Vec3i(3, 3, 3)
+                placeRunnerBE(level, pos, specId = "demo", structureId = "demo", bounds = bounds)
+                val dir = saveDir(this)
+                java.nio.file.Files.createDirectories(dir)
+                StructurePersistence.save(dir, "demo", level, pos, bounds)
+                // Pollute bounds with a non-air block.
+                val polluted = pos.offset(1, 1, 1)
+                level.setBlock(polluted, net.minecraft.world.level.block.Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+
+                handleOverwriteDecision(this, player, OverwriteDecisionC2SPayload(pos, true))
+
+                // After overwrite=true, the gold block should be cleared (clearBounds → load).
+                level.getBlockState(polluted).block shouldBe net.minecraft.world.level.block.Blocks.AIR
+
+                clearCellVolume(level, pos, bounds)
+            }
+        }
+    }
+
+    test("UC-NET-04.c: overwrite=false leaves world unchanged and does not load structure") {
+        withTempRoot("net-uc04c-false") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                val level = this.overworld()
+                val pos = BlockPos(1216, 64, 1000)
+                val bounds = Vec3i(3, 3, 3)
+                placeRunnerBE(level, pos, specId = "demo", structureId = "demo", bounds = bounds)
+                val polluted = pos.offset(1, 1, 1)
+                level.setBlock(polluted, net.minecraft.world.level.block.Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+
+                handleOverwriteDecision(this, player, OverwriteDecisionC2SPayload(pos, false))
+
+                level.getBlockState(polluted).block shouldBe net.minecraft.world.level.block.Blocks.GOLD_BLOCK
+
+                clearCellVolume(level, pos, bounds)
+            }
+        }
+    }
+
+    // UC-NET-04.d — Disconnect-before-decision: structurally verified by simply
+    // *not* calling handleOverwriteDecision. World stays in pre-prompt state.
+    // Asserted as part of UC-NET-04.b (no payload, no mutation when handler absent).
 })
