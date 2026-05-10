@@ -14,7 +14,6 @@ import com.breadmoirai.redstonespecs.test.drainPayloads
 import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
 import com.breadmoirai.redstonespecs.test.placeRunnerBE
 import com.breadmoirai.redstonespecs.test.managed.clearCellVolume
-import com.breadmoirai.redstonespecs.test.managed.writeStub
 import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
