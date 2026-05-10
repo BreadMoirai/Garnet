@@ -1,6 +1,8 @@
 package com.breadmoirai.redstonespecs.test.network
 
+import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.network.handleRecorderCommand
+import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
 import com.breadmoirai.redstonespecs.network.RecorderCmd
 import com.breadmoirai.redstonespecs.network.RecorderCommandC2S
 import com.breadmoirai.redstonespecs.network.handleRunnerCommand
@@ -34,6 +36,32 @@ import net.minecraft.core.Vec3i
  * a future client-gametest cycle.
  */
 class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
+
+    // UC-NET-01 — Server-initiated recorder screen open.
+    // 01.b/c are client receiver rows, deferred to a future client-gametest cycle.
+    // 01.d (no C2S starts the flow) is verified structurally: this test sends no
+    //      C2S packet — the OpenRecorderScreenS2C is observed solely from the server path.
+
+    test("UC-NET-01.a: server build of OpenRecorderScreenS2C carries BE fields") {
+        withTempRoot("net-uc01a") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                val level = this.overworld()
+                val pos = BlockPos(1400, 64, 1000)
+                placeRecorderBE(level, pos, specId = "demo", structureId = "demo")
+                drainPayloads(player)
+
+                // Option B: call extracted helper openScreenFor(server, player, be)
+                val be = level.getBlockEntity(pos) as com.breadmoirai.redstonespecs.block.SpecBlockEntity
+                RedstoneSpecRecorderBlock.openScreenFor(this, player, be)
+
+                val packet = drainPayloads(player).filterIsInstance<OpenRecorderScreenS2C>().single()
+                packet.originPos shouldBe pos
+                packet.specId shouldBe "demo"
+                packet.structureId shouldBe "demo"
+            }
+        }
+    }
 
     // UC-NET-02 — Server validates originPos and rejects stale or missing BEs.
     // 02.a (server-thread wrap) is verified structurally: every test below invokes
