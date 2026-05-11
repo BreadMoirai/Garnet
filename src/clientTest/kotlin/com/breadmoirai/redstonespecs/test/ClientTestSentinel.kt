@@ -66,7 +66,10 @@ class ClientTestSentinel : FabricClientGameTest {
                 result = launchKotest(
                     sourceSet = "clientTest",
                     reportsDir = Path.of("build/reports/redstonespecs/clientTest"),
-                    specs = listOf(RunRedstoneSpecSmokeTest::class),
+                    specs = listOf(
+                        RunRedstoneSpecSmokeTest::class,
+                        ClientNetworkSpec::class,
+                    ),
                 )
             } catch (t: Throwable) {
                 failure = t
