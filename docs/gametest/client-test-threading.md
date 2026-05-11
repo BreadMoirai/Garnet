@@ -1,61 +1,66 @@
 ---
-title: Client-test threading and the one-screen-swap limit
+title: Client-test threading and the Fabric-test-thread pump
 tags: [testing, client-gametest, threading, harness]
-summary: Why a `clientTest` Kotest spec can drive at most one screen-open packet per `runClientTest` invocation.
+summary: Four-thread layering of `clientTest` specs, where to do each kind of work, and how the pump bridges Kotest worker threads to the Fabric test thread.
 ---
 
-# Client-test threading and the one-screen-swap limit
+# Client-test threading and the Fabric-test-thread pump
 
-`clientTest` specs run under a layered threading model whose constraints aren't obvious until you write a test that hits them. This article documents what is true and what doesn't work, so the next person doesn't spend two hours bisecting.
+`clientTest` specs run under a four-thread layering. Knowing which thread does what is essential for writing tests that don't deadlock or throw obscure `IllegalStateException`s.
 
 ## The threads in play
 
-- **Fabric test thread.** The thread `FabricClientGameTest.runTest` is invoked on. Methods like `ClientGameTestContext.waitTick`, `waitFor`, `waitForScreen`, and `TestSingleplayerContext.runOnServer` assert via `ThreadingImpl.checkOnGametestThread(...)` and throw `IllegalStateException` from any other thread.
+- **Fabric test thread.** The thread `FabricClientGameTest.runTest` is invoked on. Methods like `ClientGameTestContext.waitTick`, `waitFor`, `waitForScreen`, `takeScreenshot`, and `TestSingleplayerContext.runOnServer` assert via `ThreadingImpl.checkOnGametestThread(...)` and throw `IllegalStateException` from any other thread. To touch `Minecraft.getInstance()`, use `ctx.runOnClient` / `computeOnClient` from this thread; those internally hop to the render thread.
 - **Kotest worker thread.** `ClientTestSentinel.runKotestOnWorker` spawns a daemon (`redstonespecs-kotest-worker`) and runs `launchKotest` on it. The Fabric test thread loops on `context.waitTick()` until the worker signals done. This is the only way to drive client ticks while a Kotest spec executes — calling `launchKotest` synchronously from the Fabric test thread would block tick advancement and deadlock any suspending primitive.
-- **Server thread.** `RedstoneTestSpec` installs a `coroutineDispatcherFactory` that wraps every test body in `withContext(McDispatchers.Server + RecordingHolder())`. By the time test code runs, the coroutine is dispatched onto the integrated server thread (not the Kotest worker).
-- **Render thread.** Minecraft's main thread. Updates `Minecraft.getInstance().screen`; drains `mc.execute(...)` between render frames.
+- **Server thread.** The integrated server's main loop. `onServer { … }` (`withContext(McDispatchers.Server)`) hops the calling coroutine here.
+- **Render thread.** Minecraft's main thread. Owns `Minecraft.getInstance()`, the screen field, and any UI mutation. `ctx.runOnClient`/`computeOnClient` runs work here.
 
-## What this means for test code
+## Where test code runs by default
 
-Inside a `clientTest` `RedstoneTestSpec`:
+Two base classes; they dispatch test bodies differently.
 
-- You are on the **server thread**, not the worker, and not the Fabric test thread.
-- Server-side things work directly: `level.setBlock(...)`, `level.getBlockEntity(...)`, `ServerPlayNetworking.send(player, payload)` — call them without an `onServer { }` wrapper.
-- `ClientGameTestContext.waitForScreen` / `waitFor` / `waitTick` and `TestSingleplayerContext.runOnServer` **throw** — they assert the Fabric test thread.
-- `SpecTestContext.rightClickBlock` and any helper that internally calls `runOnServer` therefore also throws. Bypass with direct server-thread work.
-- To observe client-side state (e.g., `mc.screen`), poll the field directly with `Thread.sleep(50)` between checks. The Fabric test thread keeps ticking the client in the sentinel's loop, so polled fields eventually see updates from `mc.execute`.
+| Spec base | Default thread | Use for |
+|---|---|---|
+| `RedstoneTestSpec` | Server thread (via `withContext(McDispatchers.Server)`) | Gametest sourceset — `level.setBlock`, BE queries, `awaitTicks`, etc. |
+| `ClientSpec` | Kotest worker thread (no special dispatcher) | ClientTest sourceset — UI assertions, packet round-trips, screenshots. |
 
-The polling pattern lives in `ClientNetworkTestSupport.kt` as `waitForClientScreen(class, timeoutMs)`.
+A `RecordingHolder` is installed in both, so `runRedstoneSpec` works from either base.
 
-## The one-screen-swap limit
+`clientTest` specs should extend `ClientSpec`. `RedstoneTestSpec` in the clientTest sourceset puts test bodies on the server thread, which prevents the local network channel from pumping (you can't observe client-side screen state when you hold the server thread).
 
-When a test body sends an S2C packet via `ServerPlayNetworking.send(player, OpenXScreenS2C(...))`, the local network channel hands the packet to the client. The client-side receiver does `mc.execute { mc.setScreen(NewScreen(...)) }`. The render thread eventually drains the queue and the new screen appears.
+## Helpers for crossing threads
 
-This works the **first** time. After that, it doesn't.
+All in `src/clientTest/.../ClientNetworkTestSupport.kt`:
 
-Specifically: when a previous test left a non-null `mc.screen`, a subsequent test that sends an open-screen packet and polls for the new screen class will time out. `mc.screen` stays as the previous screen for the entire poll window (5+ seconds, far more than the ~50ms a successful swap takes).
+- `onServer { server -> … }` — hop to server thread, run work, return the result. Use for `level.setBlock`, `ServerPlayNetworking.send`, etc.
+- `onClient { mc -> … }` — hop to the render thread (via the Fabric test thread + `ctx.computeOnClient`), run work with a safe `Minecraft` reference, return the result. Use for ANY `Minecraft.getInstance()` access, including `mc.screen`, `mc.setScreen(…)`, and reads off screen fields.
+- `runOnClient { mc -> … }` — same as `onClient` but for `Unit`-returning actions.
+- `waitForClientScreen(class, timeoutMs)` — polls `mc.screen` via `onClient` until it matches, with a wall-clock deadline.
+- `closeClientScreen(timeoutMs)` — `mc.setScreen(null)` via `onClient`, then poll until cleared. End every screen-opening test with this — single-player pauses the integrated server when a screen is open, which tangles shutdown.
+- `takeClientScreenshot(name)` — `ctx.takeScreenshot(name)` via the pump. Returns the file path (under `versions/26.1/run/screenshots/`). Useful for proving UI state in tests and for debugging.
+- `sendOpenRecorderScreen` / `sendOpenRunnerScreen` / `sendRunnerStatus` / `sendOverwritePrompt` — synthetic `ServerPlayNetworking.send` from the server thread to the local player.
 
-The mechanism we believe is responsible: the local in-memory network channel needs both server- and client-side pumping to deliver. While the test body holds the server thread to poll, the server can't drain its half of the channel, so the open-screen packet never crosses to the client receiver. `mc.execute` therefore never gets enqueued, and the render thread has nothing to drain. Switching the poll to `withContext(Dispatchers.IO)` was tried and did not unblock it within a reasonable timeout — the underlying server-pump dependency persists past a single dispatcher hop, or it's something else entirely.
+## How the pump works
 
-## What works today
+`FabricTestThreadPump` is a `LinkedBlockingQueue<WorkItem>` that:
 
-- One screen-opening test per `ClientTestSentinel` invocation. `mc.screen` starts null; the first packet's `setScreen` lands; assertions pass.
-- Tests that don't open client screens — pure server-side flows, or assertions on packet outcomes that don't involve UI — are not affected.
+- Kotest-worker code adds to via `runOnTestThread`. The caller blocks on the item's `CompletableFuture` until it completes.
+- `ClientTestSentinel.runKotestOnWorker` drains between every `context.waitTick()` call, so queued work runs on the Fabric test thread at known tick boundaries.
 
-`ClientNetworkSpec` ships exactly one screen-opening test (UC-NET-01.c). Attempts to add UC-NET-03.e and UC-NET-04.a in the same spec stall on the swap; both rows stay GAP with a footnote in `docs/use-cases/networking.md`.
+The drain happens after each tick, which means any worker call to `onClient` adds ~50ms latency in the worst case (one tick wait). For tight polling loops, batch multiple operations into a single `runOnTestThread` closure when possible.
 
-## What would unblock multi-screen client coverage
+## Common pitfalls
 
-Two known options, neither implemented:
-
-1. **One `FabricClientGameTest` entrypoint per case.** Each case runs in its own world, with its own Kotest run, starting from a null `mc.screen`. Heavyweight: full client boot per case (~30s each).
-2. **Drive UI assertions from the Fabric test thread.** Keep server-side setup in the Kotest worker (or in a `withContext(McDispatchers.Server)`), but hand UI polling work back to the test thread via some coordination channel. Avoids re-booting the client, but requires either a custom `RedstoneTestSpec` variant or a different sentinel design.
-
-If you need multi-screen coverage soon, option 1 is the path of least surprise. If a third client-test feature lands, building option 2 is probably worth it.
+- **`Minecraft.getInstance()` from any thread other than render throws.** Fabric injects a check. The error message tells you to use `ctx.runOnClient`/`computeOnClient`; `onClient` wraps that. Never call `Minecraft.getInstance()` from a `ClientSpec` test body directly — always through `onClient`.
+- **Single-player pauses the integrated server when a screen is open.** Any non-null `mc.screen` triggers `Saving and pausing game…`. The server stops ticking; `context.waitTick()` on the Fabric test thread blocks. Always close screens at the end of each test with `closeClientScreen()`.
+- **`runOnServer` / `waitForScreen` / `waitTick` are Fabric-test-thread only.** Calling from the worker or server thread throws. Use the `onClient`/`onServer`/`waitForClientScreen` helpers instead.
+- **`computeOnClient` is `<T : Any>` in Java.** Kotlin's `onClient` boxes through a `Any?` holder to allow nullable returns (e.g., reading `mc.screen` which can be null).
 
 ## See also
 
-- `docs/gametest/kotest-bridge.md` — the `RedstoneTestSpec` dispatcher and `awaitTicks`/`onServer` cookbook (server-side).
-- `docs/gametest/spec-test-context.md` — fixture helpers and the quirks they paper over.
-- `src/clientTest/.../ClientTestSentinel.kt` — the worker-spawning loop.
-- `src/clientTest/.../ClientNetworkTestSupport.kt` — `waitForClientScreen` polling helper.
+- `docs/gametest/kotest-bridge.md` — the `RedstoneTestSpec` dispatcher and `awaitTicks`/`onServer` cookbook (server-side counterpart).
+- `docs/gametest/spec-test-context.md` — `SpecTestContext` helpers (note: those assert the Fabric test thread, so they're only legal inside `onClient`/`runOnClient` closures or via the pump).
+- `src/main/kotlin/.../testing/ClientSpec.kt` — base class.
+- `src/main/kotlin/.../testing/core/FabricTestThreadPump.kt` — the pump.
+- `src/clientTest/.../ClientNetworkTestSupport.kt` — `onClient`, `onServer` wrappers, send helpers, screenshot helper.
+- `src/clientTest/.../ClientNetworkSpec.kt` — example consumer covering UC-NET-01.c / UC-NET-03.e / UC-NET-04.a.

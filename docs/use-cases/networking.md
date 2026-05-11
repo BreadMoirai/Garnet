@@ -2,7 +2,7 @@
 title: Networking use-cases
 tags: [payloads, sync, authority, use-cases]
 summary: C2S/S2C payloads, server-authority enforcement, origin-pos lookup, confirmation handshakes.
-last_audited_commit: 084c6d0fd4fce884917dd2c243f8aa4309ad8937
+last_audited_commit: 62757fc1a7a3b7595e8e25800012ad412dd79935
 ---
 
 # Networking use-cases
@@ -120,9 +120,9 @@ These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`ne
 | UC-NET-03.b | `RUN` pre-launch: immediately sends `RUNNING` then starts run | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.b: RUN with missing spec sends RunnerStatusS2C(FAIL, 'Spec file not found: ...'"` | **GAP-PARTIAL** ⁴ |
 | UC-NET-03.c | `RUN` already in flight: sends `RUNNING, "Already running"` | — | **GAP-PARTIAL** ⁴ |
 | UC-NET-03.d | `RESTORE`: snapshots region, restores, sends `IDLE, "Snapshot restored"` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.d: RESTORE configured sends RunnerStatusS2C(IDLE, 'Snapshot restored')"` and `"UC-NET-03.d: RESTORE not-configured sends RunnerStatusS2C(IDLE, 'No spec configured')"` | covered |
-| UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and calls `pushStatus` only when `originPos` matches | — | **GAP** ⁶ |
+| UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and calls `pushStatus` only when `originPos` matches | `ClientNetworkSpec."UC-NET-03.e: RunnerStatusS2C only updates RunnerScreen.active when originPos matches"` | covered |
 | UC-NET-04 | Overwrite-prompt confirmation handshake | covered by .b–.d | covered |
-| UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | — | **GAP** ³ ⁶ |
+| UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | `ClientNetworkSpec."UC-NET-04.a: OverwritePromptS2C opens ConfirmScreen"` (screen-open half; screenshot in `versions/26.1/run/screenshots/`) | **GAP-PARTIAL** ⁵ |
 | UC-NET-04.b | `OverwriteDecisionC2SPayload` handler performs `originPos` guard before acting | `RecorderRunnerNetworkRegistrySpec."UC-NET-04.b: handleOverwriteDecision on null BE is a silent no-op"` | covered |
 | UC-NET-04.c | `overwrite = true`: `clearBounds` then `StructurePersistence.load` on server thread | `RecorderRunnerNetworkRegistrySpec."UC-NET-04.c: overwrite=true clears bounds and loads structure"` and `"UC-NET-04.c: overwrite=false leaves world unchanged and does not load structure"` | covered |
 | UC-NET-04.d | Player disconnect before decision: structure neither cleared nor placed | covered structurally by `"UC-NET-04.b: ..."` (handler not invoked → world unchanged) | covered |
@@ -138,4 +138,4 @@ These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`ne
 
 ⁴ `RUN` happy-path and "Already running" are deferred: `SpecBlockEntity.startRun` launches an unbounded BE-scoped coroutine without a `RecordingHolder`, which hangs the Kotest gametest harness. Will be revisited when `handleRunnerCommand` is split or the spec engine gains a synchronous test entry point.
 
-⁶ Multi-screen client tests are blocked by a harness limitation: `RedstoneTestSpec` dispatches test bodies onto the server thread under `withContext(McDispatchers.Server)`, but a test body that polls for a client-side screen swap while a previous screen is already open never observes the new screen — the server-side half of the local network channel can't pump while the test body holds the server thread. Only ONE screen-opening test per `ClientTestSentinel` run currently works (UC-NET-01.c). Resolving requires either a fresh `FabricClientGameTest` entrypoint per case (own world, own Kotest run) or driving UI assertions from the Fabric test thread instead of inside Kotest.
+<!-- footnote ⁶ retired: the harness limitation it described is fixed in 2026-05-10. ClientSpec now runs test bodies on the Kotest worker thread, FabricTestThreadPump bridges to the Fabric test thread for ctx.* calls, and onClient routes Minecraft access through ctx.computeOnClient. See docs/gametest/client-test-threading.md. -->
