@@ -19,6 +19,7 @@ import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
 import com.breadmoirai.redstonespecs.test.placeRunnerBE
 import com.breadmoirai.redstonespecs.test.placeRecorderBE
 import com.breadmoirai.redstonespecs.test.managed.clearCellVolume
+import com.breadmoirai.redstonespecs.test.managed.writeStub
 import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
@@ -161,6 +162,37 @@ class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
                 val status = drainPayloads(player).filterIsInstance<RunnerStatusS2C>().single()
                 status.state shouldBe RunnerState.FAIL
                 status.summary shouldBe "Spec file not found: no-such-spec"
+            }
+        }
+    }
+
+    test("UC-NET-03.b/c: RUN sends 'Running…' then 'Already running' when slot is in-flight") {
+        withTempRoot("net-uc03bc") {
+            onServer {
+                val player = makeMockServerPlayer(this)
+                val level = this.overworld()
+                val pos = BlockPos(1156, 64, 1000)
+                placeRunnerBE(level, pos, specId = "demo")
+                val dir = saveDir(this)
+                java.nio.file.Files.createDirectories(dir)
+                writeStub(dir, "demo")
+                val be = level.getBlockEntity(pos) as com.breadmoirai.redstonespecs.block.SpecBlockEntity
+                be.tryClaimRun()
+                drainPayloads(player)
+
+                try {
+                    handleRunnerCommand(this, player, RunnerCommandC2S(pos, RunnerCmd.RUN))
+
+                    val statuses = drainPayloads(player).filterIsInstance<RunnerStatusS2C>()
+                    statuses.size shouldBe 2
+                    statuses[0].state shouldBe RunnerState.RUNNING
+                    statuses[0].summary shouldBe "Running…"
+                    statuses[1].state shouldBe RunnerState.RUNNING
+                    statuses[1].summary shouldBe "Already running"
+                } finally {
+                    be.releaseRunClaim()
+                    java.nio.file.Files.deleteIfExists(dir.resolve("demo.spec.kts"))
+                }
             }
         }
     }
