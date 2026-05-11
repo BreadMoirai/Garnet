@@ -4,6 +4,7 @@
   "package": "com.breadmoirai.redstonespecs.mixin.client",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "ClientCommonPacketListenerImplAccessor",
     "ScrollWheelHandlerMixin",
     "SelectWorldScreenMixin"
   ],
