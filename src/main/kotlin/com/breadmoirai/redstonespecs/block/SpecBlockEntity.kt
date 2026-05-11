@@ -165,11 +165,24 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     }
 
     /**
+     * Atomically marks this BE as having a run in flight. Returns false if a run is
+     * already in flight for this BE. Public so gametest specs can force the
+     * "already running" branch of [startRun] without actually launching the engine.
+     */
+    fun tryClaimRun(): Boolean = inFlightRuns.add(blockPos)
+
+    /**
+     * Releases the in-flight claim. Test seam for gametest cleanup — production
+     * releases happen in the launched coroutine's finally block.
+     */
+    fun releaseRunClaim(): Boolean = inFlightRuns.remove(blockPos)
+
+    /**
      * Launches [runRedstoneSpec] on the server thread using the BE's own coroutine scope.
      * Returns false if a run is already in flight for this BE (debounce).
      */
     fun startRun(dslSpec: com.breadmoirai.redstonespecs.dsl.RedstoneSpec, serverLevel: ServerLevel): Boolean {
-        if (!inFlightRuns.add(blockPos)) {
+        if (!tryClaimRun()) {
             LOGGER.debug("[SpecBlockEntity#startRun] '{}' already running, ignoring", dslSpec.id)
             return false
         }
@@ -183,7 +196,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
             } catch (t: Throwable) {
                 LOGGER.error("[SpecBlockEntity#startRun] '{}' crashed unexpectedly", dslSpec.id, t)
             } finally {
-                inFlightRuns.remove(blockPos)
+                releaseRunClaim()
             }
         }
         return true
