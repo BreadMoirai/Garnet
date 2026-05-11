@@ -81,6 +81,31 @@ fun sendOverwritePrompt(payload: OverwritePromptS2CPayload) {
 }
 
 /**
+ * Reads all [CustomPacketPayload]s sent FROM the client TO the server since the
+ * last call. Mirrors [drainPayloads] for the inverse direction — useful for
+ * asserting C2S round-trips triggered by UI interactions (e.g. a ConfirmScreen
+ * button click that sends `OverwriteDecisionC2SPayload`).
+ *
+ * Returns an empty list if no client connection is active or if the channel
+ * isn't an [EmbeddedChannel] (single-player integrated mode may use a
+ * different channel type — see the spec's risk note).
+ */
+fun drainClientPayloads(): List<net.minecraft.network.protocol.common.custom.CustomPacketPayload> = onClient { mc ->
+    val listener = mc.connection ?: return@onClient emptyList()
+    val conn = (listener as com.breadmoirai.redstonespecs.mixin.client.ClientCommonPacketListenerImplAccessor)
+        .`redstonespecs$getConnection`()
+    val ch = (conn as com.breadmoirai.redstonespecs.mixin.ConnectionAccessor).`redstonespecs$getChannel`()
+        as? io.netty.channel.embedded.EmbeddedChannel
+        ?: return@onClient emptyList<net.minecraft.network.protocol.common.custom.CustomPacketPayload>()
+    val out = mutableListOf<net.minecraft.network.protocol.common.custom.CustomPacketPayload>()
+    while (true) {
+        val msg = ch.readOutbound<Any>() ?: break
+        if (msg is net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket) out.add(msg.payload())
+    }
+    out
+}
+
+/**
  * Hops to the render thread (via the Fabric test thread + `computeOnClient`) to
  * evaluate [action] with a safe `Minecraft` reference, and returns the result.
  *
