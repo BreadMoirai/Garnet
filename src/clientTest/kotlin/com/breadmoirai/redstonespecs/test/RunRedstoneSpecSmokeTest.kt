@@ -1,14 +1,14 @@
 package com.breadmoirai.redstonespecs.test
 
 import com.breadmoirai.redstonespecs.dsl.redstoneSpec
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
+import com.breadmoirai.redstonespecs.testing.ClientSpec
 import com.breadmoirai.redstonespecs.testing.core.McDispatchers
 import com.breadmoirai.redstonespecs.testing.runner.runRedstoneSpec
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 
-class RunRedstoneSpecSmokeTest : RedstoneTestSpec({
+class RunRedstoneSpecSmokeTest : ClientSpec({
     test("runRedstoneSpec completes for a trivial empty spec") {
         val spec = redstoneSpec(
             id = "smoke-empty",

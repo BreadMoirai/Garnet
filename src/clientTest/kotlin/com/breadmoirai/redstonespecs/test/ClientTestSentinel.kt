@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.test
 
 import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
+import com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
 import com.breadmoirai.redstonespecs.testing.core.WorldHolder
 import com.breadmoirai.redstonespecs.testing.launcher.LauncherResult
@@ -81,6 +82,7 @@ class ClientTestSentinel : FabricClientGameTest {
 
         while (!done.get()) {
             context.waitTick()
+            FabricTestThreadPump.drain(context)
         }
         worker.join()
 
