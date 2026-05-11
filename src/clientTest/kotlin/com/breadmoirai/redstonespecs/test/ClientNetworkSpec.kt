@@ -4,26 +4,26 @@ import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
-import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
-import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.core.McDispatchers
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 
 /**
  * Client-side coverage for `ClientNetworkHandler` receivers.
- * Covers UC-NET-01.b/c, UC-NET-03.e, and UC-NET-04.a (partial) from
- * `docs/use-cases/networking.md`. Server-side rows live in
- * `RecorderRunnerNetworkRegistrySpec` (gametest sourceset).
  *
- * Worker-thread caveat: Fabric's `ClientGameTestContext.waitForScreen` /
- * `waitFor` / `waitTick` assert being called from the test thread, but Kotest
- * runs on a worker. UI assertions use the worker-safe polling helpers in
- * `ClientNetworkTestSupport.kt` (`waitForClientScreen`, `closeClientScreen`,
- * `waitClientTicks`) which read `Minecraft.getInstance().screen` directly.
+ * Currently covers UC-NET-01.b/c only. UC-NET-03.e and UC-NET-04.a are not
+ * yet feasible in this harness — see `docs/use-cases/networking.md` footnote 6
+ * for the analysis. In short: `RedstoneTestSpec` dispatches test bodies onto
+ * the server thread; while a test body polls for a client-side screen update,
+ * the server-side half of the local network channel can't pump, so a second
+ * `mc.setScreen(...)` after an initial screen open doesn't observably swap
+ * within the poll window. Tests requiring more than one screen open per
+ * test-server run stall.
+ *
+ * Workaround for UC-NET-01.c: it's the only test in this spec, so `mc.screen`
+ * starts null when the test runs.
  */
 class ClientNetworkSpec : RedstoneTestSpec({
 
