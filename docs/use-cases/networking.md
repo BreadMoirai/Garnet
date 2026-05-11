@@ -117,12 +117,12 @@ These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`ne
 | UC-NET-02.d | Stale reference is silent no-op; client receives no acknowledgment | `RecorderRunnerNetworkRegistrySpec."UC-NET-02.d: handleRunnerCommand on null BE sends no S2C ack"` | covered |
 | UC-NET-03 | Server emits S2C confirmation after state-mutating runner command | covered by .a–.d | covered |
 | UC-NET-03.a | `PLACE_STRUCTURE`: places structure NBT and sends `RunnerStatusS2C(IDLE, …)` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.a: PLACE_STRUCTURE configured sends RunnerStatusS2C(IDLE, 'Structure placed: ...'"` and `"UC-NET-03.a: PLACE_STRUCTURE not-configured sends RunnerStatusS2C(IDLE, 'No spec configured')"` | covered |
-| UC-NET-03.b | `RUN` pre-launch: immediately sends `RUNNING` then starts run | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.b: RUN with missing spec sends RunnerStatusS2C(FAIL, 'Spec file not found: ...'"` | **GAP-PARTIAL** ⁴ |
-| UC-NET-03.c | `RUN` already in flight: sends `RUNNING, "Already running"` | — | **GAP-PARTIAL** ⁴ |
+| UC-NET-03.b | `RUN` pre-launch: immediately sends `RUNNING` then starts run | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.b: RUN with missing spec sends RunnerStatusS2C(FAIL, 'Spec file not found: ...'"`, `"UC-NET-03.b/c: RUN sends 'Running…' then 'Already running' when slot is in-flight"` | covered |
+| UC-NET-03.c | `RUN` already in flight: sends `RUNNING, "Already running"` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.b/c: RUN sends 'Running…' then 'Already running' when slot is in-flight"` | covered |
 | UC-NET-03.d | `RESTORE`: snapshots region, restores, sends `IDLE, "Snapshot restored"` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.d: RESTORE configured sends RunnerStatusS2C(IDLE, 'Snapshot restored')"` and `"UC-NET-03.d: RESTORE not-configured sends RunnerStatusS2C(IDLE, 'No spec configured')"` | covered |
 | UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and calls `pushStatus` only when `originPos` matches | `ClientNetworkSpec."UC-NET-03.e: RunnerStatusS2C only updates RunnerScreen.active when originPos matches"` | covered |
 | UC-NET-04 | Overwrite-prompt confirmation handshake | covered by .b–.d | covered |
-| UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | `ClientNetworkSpec."UC-NET-04.a: OverwritePromptS2C opens ConfirmScreen"` (screen-open half; screenshot in `versions/26.1/run/screenshots/`) | **GAP-PARTIAL** ⁵ |
+| UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | `ClientNetworkSpec."UC-NET-04.a: OverwritePromptS2C opens ConfirmScreen"`, `"UC-NET-04.a: clicking Overwrite sends OverwriteDecisionC2SPayload(true)"`, `"UC-NET-04.a: clicking Skip Structure sends OverwriteDecisionC2SPayload(false)"` | covered |
 | UC-NET-04.b | `OverwriteDecisionC2SPayload` handler performs `originPos` guard before acting | `RecorderRunnerNetworkRegistrySpec."UC-NET-04.b: handleOverwriteDecision on null BE is a silent no-op"` | covered |
 | UC-NET-04.c | `overwrite = true`: `clearBounds` then `StructurePersistence.load` on server thread | `RecorderRunnerNetworkRegistrySpec."UC-NET-04.c: overwrite=true clears bounds and loads structure"` and `"UC-NET-04.c: overwrite=false leaves world unchanged and does not load structure"` | covered |
 | UC-NET-04.d | Player disconnect before decision: structure neither cleared nor placed | covered structurally by `"UC-NET-04.b: ..."` (handler not invoked → world unchanged) | covered |
@@ -134,8 +134,10 @@ These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`ne
 
 **Footnotes:**
 
-³ No `OverwritePromptS2C` producer exists in the recorder/runner registry today; only managed/structure load paths emit it. Coverage requires a producer to be wired in `NetworkRegistry` first.
+³ No `OverwritePromptS2C` producer exists in the recorder/runner registry today; only managed/structure load paths emit it. UC-NET-04.a's tests send the payload synthetically.
 
-⁴ `RUN` happy-path and "Already running" are deferred: `SpecBlockEntity.startRun` launches an unbounded BE-scoped coroutine without a `RecordingHolder`, which hangs the Kotest gametest harness. Will be revisited when `handleRunnerCommand` is split or the spec engine gains a synchronous test entry point.
+<!-- footnote ⁴ retired 2026-05-11: tryClaimRun test seam on SpecBlockEntity unblocks UC-NET-03.b/c coverage. See docs/superpowers/specs/2026-05-11-networking-final-gaps-design.md -->
 
-<!-- footnote ⁶ retired: the harness limitation it described is fixed in 2026-05-10. ClientSpec now runs test bodies on the Kotest worker thread, FabricTestThreadPump bridges to the Fabric test thread for ctx.* calls, and onClient routes Minecraft access through ctx.computeOnClient. See docs/gametest/client-test-threading.md. -->
+<!-- footnote ⁵ retired 2026-05-11: drainClientPayloads via ClientCommonPacketListenerImplAccessor unblocks UC-NET-04.a click→send coverage. See docs/superpowers/specs/2026-05-11-networking-final-gaps-design.md -->
+
+<!-- footnote ⁶ retired 2026-05-10: ClientSpec + FabricTestThreadPump fix the multi-screen client test architecture. See docs/gametest/client-test-threading.md -->
