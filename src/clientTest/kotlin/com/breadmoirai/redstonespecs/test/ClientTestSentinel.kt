@@ -2,6 +2,7 @@ package com.breadmoirai.redstonespecs.test
 
 import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
+import com.breadmoirai.redstonespecs.testing.core.WorldHolder
 import com.breadmoirai.redstonespecs.testing.launcher.LauncherResult
 import com.breadmoirai.redstonespecs.testing.launcher.launchKotest
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
@@ -21,7 +22,8 @@ class ClientTestSentinel : FabricClientGameTest {
         // Construct a singleplayer world to fire SERVER_STARTED, which installs McDispatchers.
         // `use { }` closes the world before runTest returns — Fabric asserts no server is still
         // running when the test exits.
-        SpecTestContext.createWorld(context).use {
+        SpecTestContext.createWorld(context).use { world ->
+            WorldHolder.install(world)
             try {
                 val result = runKotestOnWorker(context)
                 if (result.failed > 0) {
@@ -30,6 +32,7 @@ class ClientTestSentinel : FabricClientGameTest {
                 }
                 logger.info(result.summary())
             } finally {
+                WorldHolder.clear()
                 ClientContextHolder.clear()
             }
         }
