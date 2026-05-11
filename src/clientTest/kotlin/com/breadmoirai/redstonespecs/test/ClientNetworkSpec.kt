@@ -6,12 +6,14 @@ import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
 import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
 import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
+import com.breadmoirai.redstonespecs.network.OverwriteDecisionC2SPayload
 import com.breadmoirai.redstonespecs.network.OverwritePromptS2CPayload
 import com.breadmoirai.redstonespecs.network.RunnerState
 import com.breadmoirai.redstonespecs.network.RunnerStatusS2C
 import com.breadmoirai.redstonespecs.testing.ClientSpec
 import com.breadmoirai.redstonespecs.testing.core.McDispatchers
 import com.breadmoirai.redstonespecs.testing.server.onServer
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -102,5 +104,43 @@ class ClientNetworkSpec : ClientSpec({
 
         takeClientScreenshot("uc-net-04a-confirm-screen")
         closeClientScreen()
+    }
+
+    test("UC-NET-04.a: clicking Overwrite sends OverwriteDecisionC2SPayload(true)") {
+        val pos = BlockPos(180, 64, 100)
+        drainClientPayloads()
+        sendOverwritePrompt(OverwritePromptS2CPayload(pos, "demo"))
+        waitForClientScreen(ConfirmScreen::class.java)
+
+        com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump.runOnTestThread { ctx ->
+            ctx.clickScreenButton("Overwrite")
+        }
+
+        val deadline = System.currentTimeMillis() + 5000
+        while (onClient { mc -> mc.screen } != null && System.currentTimeMillis() < deadline) Thread.sleep(50)
+
+        val decisions = drainClientPayloads().filterIsInstance<OverwriteDecisionC2SPayload>()
+        decisions shouldHaveSize 1
+        decisions[0].originPos shouldBe pos
+        decisions[0].overwrite shouldBe true
+    }
+
+    test("UC-NET-04.a: clicking Skip Structure sends OverwriteDecisionC2SPayload(false)") {
+        val pos = BlockPos(200, 64, 100)
+        drainClientPayloads()
+        sendOverwritePrompt(OverwritePromptS2CPayload(pos, "demo"))
+        waitForClientScreen(ConfirmScreen::class.java)
+
+        com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump.runOnTestThread { ctx ->
+            ctx.clickScreenButton("Skip Structure")
+        }
+
+        val deadline = System.currentTimeMillis() + 5000
+        while (onClient { mc -> mc.screen } != null && System.currentTimeMillis() < deadline) Thread.sleep(50)
+
+        val decisions = drainClientPayloads().filterIsInstance<OverwriteDecisionC2SPayload>()
+        decisions shouldHaveSize 1
+        decisions[0].originPos shouldBe pos
+        decisions[0].overwrite shouldBe false
     }
 })
