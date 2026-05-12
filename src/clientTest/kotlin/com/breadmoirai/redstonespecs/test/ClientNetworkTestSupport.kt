@@ -13,11 +13,11 @@ import java.util.concurrent.CountDownLatch
  * Synchronously sends an S2C payload to the integrated server's first overworld
  * player.
  *
- * `RedstoneTestSpec` dispatches test bodies onto the server thread via
- * `withContext(McDispatchers.Server)`, so by the time this helper runs we are
- * usually already on the server thread; in that case we call [action] inline.
- * If we somehow end up off-thread (e.g., a future spec that detaches), fall
- * back to `server.execute` + a latch.
+ * Hops to the server thread via `MinecraftServer.execute` and waits on a
+ * `CountDownLatch`. The `isSameThread` fast path is a safety net for callers
+ * that already happen to be on the server thread (e.g. a future
+ * `RedstoneTestSpec`-based caller); `ClientSpec` runs test bodies on
+ * `Dispatchers.Default`, so in normal use we always take the post-and-wait path.
  */
 private fun sendToLocalPlayer(action: (net.minecraft.server.MinecraftServer) -> Unit) {
     val server = McDispatchers.currentServer
