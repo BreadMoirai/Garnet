@@ -15,7 +15,7 @@ Fabric's client-gametest API supports two screenshot use cases. We currently use
 
 ## Capturing for diagnostics (today)
 
-`ClientNetworkTestSupport.kt` provides:
+`ClientTestSupport.kt` provides:
 
 ```kotlin
 fun takeClientScreenshot(name: String): java.nio.file.Path
@@ -100,5 +100,5 @@ The test fails and a diff image is saved alongside the original capture in `vers
 ## See also
 
 - `docs/gametest/client-test-threading.md` — pump and `onClient`/`runOnClient` mechanics.
-- `src/clientTest/.../ClientNetworkTestSupport.kt` — `takeClientScreenshot` implementation.
+- `src/clientTest/.../ClientTestSupport.kt` — `takeClientScreenshot` implementation.
 - Fabric API source: `net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotComparisonOptions`.

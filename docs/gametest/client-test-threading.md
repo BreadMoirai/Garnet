@@ -30,15 +30,23 @@ A `RecordingHolder` is installed in both, so `runRedstoneSpec` works from either
 
 ## Helpers for crossing threads
 
-All in `src/clientTest/.../ClientNetworkTestSupport.kt`:
+Split across two same-package files (no imports needed between them):
 
-- `onServer { server -> … }` — hop to server thread, run work, return the result. Use for `level.setBlock`, `ServerPlayNetworking.send`, etc.
-- `onClient { mc -> … }` — hop to the render thread (via the Fabric test thread + `ctx.computeOnClient`), run work with a safe `Minecraft` reference, return the result. Use for ANY `Minecraft.getInstance()` access, including `mc.screen`, `mc.setScreen(…)`, and reads off screen fields.
+**`src/clientTest/.../ClientTestSupport.kt`** — general helpers:
+
+- `onServer { server -> … }` — hop to server thread, run work, return the result. Use for `level.setBlock`, `ServerPlayNetworking.send`, etc. (Defined in the testing-core module's `Suspending.kt`; not in this file, but available in scope.)
+- `onClient { mc -> … }` — hop to the render thread (via the Fabric test thread + `ctx.runOnClient`), run work with a safe `Minecraft` reference, return the result. Use for ANY `Minecraft.getInstance()` access, including `mc.screen`, `mc.setScreen(…)`, and reads off screen fields. Nullable returns are routed through an `Any?` holder because Fabric's `computeOnClient` is typed `<T : Any>`.
 - `runOnClient { mc -> … }` — same as `onClient` but for `Unit`-returning actions.
 - `waitForClientScreen(class, timeoutMs)` — polls `mc.screen` via `onClient` until it matches, with a wall-clock deadline.
 - `closeClientScreen(timeoutMs)` — `mc.setScreen(null)` via `onClient`, then poll until cleared. End every screen-opening test with this — single-player pauses the integrated server when a screen is open, which tangles shutdown.
-- `takeClientScreenshot(name)` — `ctx.takeScreenshot(name)` via the pump. Returns the file path (under `versions/26.1/run/screenshots/`). Useful for proving UI state in tests and for debugging.
-- `sendOpenRecorderScreen` / `sendOpenRunnerScreen` / `sendRunnerStatus` / `sendOverwritePrompt` — synthetic `ServerPlayNetworking.send` from the server thread to the local player.
+- `takeClientScreenshot(name)` — `ctx.takeScreenshot(name)` via the pump. Returns the file path (under `versions/26.1/run/screenshots/`). Useful for proving UI state in tests and for debugging. See [screenshots-for-debug-and-regression.md](screenshots-for-debug-and-regression.md).
+- `waitClientTicks(ticks)` — sleeps the calling thread for ~`ticks * 50ms`; useful when waiting for render-thread tasks to drain.
+- `clientContext()` / `currentWorld()` — accessors for the active `ClientGameTestContext` / `TestSingleplayerContext` (both installed by `ClientTestSentinel`).
+
+**`src/clientTest/.../ClientNetworkTestSupport.kt`** — network-only helpers:
+
+- `sendOpenRecorderScreen` / `sendOpenRunnerScreen` / `sendRunnerStatus` / `sendOverwritePrompt` — synthetic `ServerPlayNetworking.send` to the local player.
+- `drainClientPayloads()` — reads outbound C2S `CustomPacketPayload`s captured by an idempotent `ChannelOutboundHandlerAdapter` installed into the integrated server's `LocalChannel` pipeline. Mirror of the server-side `drainPayloads(player)`.
 
 ## How the pump works
 
@@ -62,5 +70,6 @@ The drain happens after each tick, which means any worker call to `onClient` add
 - `docs/gametest/spec-test-context.md` — `SpecTestContext` helpers (note: those assert the Fabric test thread, so they're only legal inside `onClient`/`runOnClient` closures or via the pump).
 - `src/main/kotlin/.../testing/ClientSpec.kt` — base class.
 - `src/main/kotlin/.../testing/core/FabricTestThreadPump.kt` — the pump.
-- `src/clientTest/.../ClientNetworkTestSupport.kt` — `onClient`, `onServer` wrappers, send helpers, screenshot helper.
+- `src/clientTest/.../ClientTestSupport.kt` — general helpers (`onClient`, `runOnClient`, `waitForClientScreen`, `closeClientScreen`, `takeClientScreenshot`, `waitClientTicks`, `clientContext`, `currentWorld`).
+- `src/clientTest/.../ClientNetworkTestSupport.kt` — network helpers (`sendX` family + `drainClientPayloads`).
 - `src/clientTest/.../ClientNetworkSpec.kt` — example consumer covering UC-NET-01.c / UC-NET-03.e / UC-NET-04.a.
