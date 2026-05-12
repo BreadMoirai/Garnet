@@ -26,6 +26,19 @@ Project documentation lives in `docs/`. This file is the entry point: it indexes
 - **Register every new article** in the category's `INDEX.md` as: `- [Title](filename.md) — summary` plus its tags.
 - **Filename convention**: `kebab-case.md`, named after the topic (not the date or PR). No prefixes.
 
+## Keep docs in sync with code
+
+**After ANY source-code change, before claiming the task is complete, audit the docs.** This is a mandatory step — add it to the todo list at the start of any task that touches source code, and tick it off only when each sub-check has been done:
+
+1. **New behavior, file, or public API?** Add or extend a `docs/<category>/<topic>.md` article. Register it in the category's `INDEX.md`.
+2. **Renamed / moved / split a file?** Grep `docs/` for the old name and update every hit. `grep -rn "<OldName>" docs/` should return zero results that refer to the file's *old* role (existing-file mentions are fine).
+3. **Removed an API, file, or behavior?** Find any article that documented it and either delete the obsolete section or update it to point at the replacement. Do not leave a dangling reference.
+4. **Changed something a doc cites by file:line?** Either update the citation to the new location or convert it to a description that survives refactors.
+5. **Cross-references stay valid:** `INDEX.md` titles, "See also" sections, and inline `[link](path.md)` references must all resolve to a real article with matching summary text.
+6. **Superpowers `specs/` and `plans/` are historical artifacts.** Leave them as-is; treat them as commit-time snapshots, not living docs.
+
+Skip steps 1–5 only when the source change is purely internal (an unobservable refactor) AND no doc currently references the changed code. If unsure, default to checking.
+
 ## How to save learnings
 
 When you discover something non-obvious during development (an MC API quirk, a subtle invariant, a gotcha that cost time), capture it:
