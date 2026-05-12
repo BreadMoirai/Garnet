@@ -4,22 +4,10 @@ import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
 import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
 import com.breadmoirai.redstonespecs.network.OverwritePromptS2CPayload
 import com.breadmoirai.redstonespecs.network.RunnerStatusS2C
-import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
 import com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump
 import com.breadmoirai.redstonespecs.testing.core.McDispatchers
-import com.breadmoirai.redstonespecs.testing.core.WorldHolder
-import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
-import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import java.util.concurrent.CountDownLatch
-
-/** Active `ClientGameTestContext` installed by `ClientTestSentinel`. */
-@Suppress("UnstableApiUsage")
-fun clientContext(): ClientGameTestContext = ClientContextHolder.context
-
-/** Active `TestSingleplayerContext` installed by `ClientTestSentinel`. */
-@Suppress("UnstableApiUsage")
-fun currentWorld(): TestSingleplayerContext = WorldHolder.world
 
 /**
  * Synchronously sends an S2C payload to the integrated server's first overworld
@@ -146,86 +134,3 @@ fun drainClientPayloads(): List<net.minecraft.network.protocol.common.custom.Cus
     return snapshot
 }
 
-/**
- * Hops to the render thread (via the Fabric test thread + `computeOnClient`) to
- * evaluate [action] with a safe `Minecraft` reference, and returns the result.
- *
- * Fabric instruments `Minecraft.getInstance()` to throw if called from anywhere
- * other than the render thread. From a Kotest worker thread, route every
- * `Minecraft` field access through this helper.
- */
-/** Runs [action] on the render thread, ignoring any return value. */
-fun runOnClient(action: (net.minecraft.client.Minecraft) -> Unit) {
-    FabricTestThreadPump.runOnTestThread { ctx ->
-        ctx.runOnClient<RuntimeException> { mc -> action(mc) }
-    }
-}
-
-/**
- * Runs [action] on the render thread and returns its result. Routes nullable
- * returns through a holder because Fabric's `computeOnClient` is typed `<T : Any>`.
- */
-@Suppress("UNCHECKED_CAST")
-fun <T> onClient(action: (net.minecraft.client.Minecraft) -> T): T {
-    val holder = arrayOf<Any?>(null)
-    FabricTestThreadPump.runOnTestThread { ctx ->
-        ctx.runOnClient<RuntimeException> { mc -> holder[0] = action(mc) }
-    }
-    return holder[0] as T
-}
-
-/**
- * Polls the client's current screen until it is an instance of [screenClass], or
- * until [timeoutMs] elapses. Returns the live screen (which is only safe to inspect
- * via [onClient]).
- */
-fun waitForClientScreen(
-    screenClass: Class<out net.minecraft.client.gui.screens.Screen>,
-    timeoutMs: Long = 5000,
-) {
-    val deadline = System.currentTimeMillis() + timeoutMs
-    while (System.currentTimeMillis() < deadline) {
-        val matched = onClient { mc -> screenClass.isInstance(mc.screen) }
-        if (matched) return
-        Thread.sleep(50)
-    }
-    val current = onClient { mc -> mc.screen?.javaClass?.simpleName }
-    error("Timed out after ${timeoutMs}ms waiting for screen ${screenClass.simpleName}; current is ${current ?: "null"}")
-}
-
-/**
- * Closes the active screen by hopping to the render thread and calling
- * `mc.setScreen(null)`. Polls until the change is observed.
- */
-fun closeClientScreen(timeoutMs: Long = 5000) {
-    onClient { mc -> mc.setScreen(null) }
-    val deadline = System.currentTimeMillis() + timeoutMs
-    while (System.currentTimeMillis() < deadline) {
-        if (onClient { mc -> mc.screen } == null) return
-        Thread.sleep(50)
-    }
-    val current = onClient { mc -> mc.screen?.javaClass?.simpleName }
-    error("Timed out after ${timeoutMs}ms waiting for client screen to clear; current is $current")
-}
-
-/**
- * Takes a screenshot of the current client state by hopping to the Fabric test
- * thread (where `ctx.takeScreenshot` is legal). Returns the file path written.
- * Useful for diagnosing test-time UI state — store the path or open the file
- * after the test run.
- */
-fun takeClientScreenshot(name: String): java.nio.file.Path =
-    FabricTestThreadPump.runOnTestThread { ctx -> ctx.takeScreenshot(name) }
-
-/**
- * Worker-thread sleep that advances wall-clock; useful when we need the client to
- * process pending render-thread tasks (e.g., a `mc.execute`-posted screen update)
- * before checking state. Acts as a memory barrier so subsequent field reads see
- * recent writes.
- */
-fun waitClientTicks(ticks: Int) {
-    // Each MC tick is ~50ms; sleep n*50ms plus a small margin. The actual tick
-    // advancement is driven by the test thread's `context.waitTick()` loop in
-    // ClientTestSentinel; we just yield long enough for those ticks to land.
-    Thread.sleep(ticks * 50L + 50L)
-}
