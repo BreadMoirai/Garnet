@@ -12,12 +12,13 @@ import kotlinx.coroutines.withContext
 /**
  * Base class for Kotest specs in the `clientTest` source set.
  *
- * Test bodies run on the Kotest worker thread by default, not the server thread.
- * This is the key difference from [RedstoneTestSpec], which is server-thread-first
- * (correct for gametest, wrong for client tests):
+ * Test bodies run on `Dispatchers.Default` (a kotlinx-coroutines pool), not on
+ * the server thread. This is the key difference from [RedstoneTestSpec], which
+ * is server-thread-first (correct for gametest, wrong for client tests):
  *
- * - The worker thread can sleep freely without blocking server ticks or client
- *   ticks, so polling helpers like `waitForClientScreen` work without deadlock.
+ * - A worker-pool thread can sleep freely without blocking server ticks or
+ *   client ticks, so polling helpers like `waitForClientScreen` work without
+ *   deadlock.
  * - Server-side mutations hop explicitly via `onServer { … }`.
  * - Calls that already wrap themselves (e.g. `runRedstoneSpec`) switch threads
  *   internally — call them directly.
@@ -25,9 +26,9 @@ import kotlinx.coroutines.withContext
  * A `RecordingHolder` is installed in the coroutine context so `runRedstoneSpec`
  * can attach the recording on completion (same as `RedstoneTestSpec`).
  *
- * `ClientGameTestContext.waitForScreen` / `waitFor` / `waitTick` still assert the
- * Fabric test thread and will throw if called from a Kotest spec running on the
- * worker thread. Use the polling helpers in `ClientNetworkTestSupport.kt` instead.
+ * `ClientGameTestContext.waitForScreen` / `waitFor` / `waitTick` still assert
+ * the Fabric test thread and will throw if called from a `ClientSpec` test body.
+ * Use the polling helpers in `ClientTestSupport.kt` instead.
  */
 abstract class ClientSpec(body: ClientSpec.() -> Unit = {}) : FunSpec() {
     init {
