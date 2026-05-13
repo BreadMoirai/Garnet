@@ -93,4 +93,47 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             be.isRecording shouldBe false
         }
     }
+
+    test("UC-REC-04.a/c: startRecording succeeds and recorder appears in activeRecorders") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2020, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "uc04ac", bounds = Vec3i(3, 3, 3))
+
+            be.startRecording() shouldBe true
+            try {
+                be.isRecording shouldBe true
+                val active = StateRecorder.activeRecorders()
+                active.size shouldBe 1
+            } finally {
+                be.stopRecordingAndFinalize()
+            }
+        }
+    }
+
+    test("UC-REC-04.b: StateRecorder.start captures initial snapshot keyed by origin-relative BlockPos") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2030, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "uc04b", bounds = Vec3i(3, 3, 3))
+
+            // Place a stone block at world (2031, 64, 1000) -> origin-relative (1, 0, 0)
+            val markerWorld = BlockPos(2031, 64, 1000)
+            level.setBlock(markerWorld, Blocks.STONE.defaultBlockState(), 2)
+
+            be.startRecording() shouldBe true
+            try {
+                val recorder = be.javaClass.getDeclaredField("stateRecorder")
+                    .apply { isAccessible = true }
+                    .get(be) as StateRecorder
+                val snapshot = recorder.initialSnapshot
+                val rel = BlockPos(1, 0, 0)
+                val state = snapshot[rel]
+                state shouldNotBe null
+                state!!.block shouldBe Blocks.STONE
+            } finally {
+                be.stopRecordingAndFinalize()
+            }
+        }
+    }
 })
