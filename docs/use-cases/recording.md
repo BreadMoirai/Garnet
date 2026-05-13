@@ -2,7 +2,7 @@
 title: Recording use-cases
 tags: [recorder, capture, ui, dsl-emit, use-cases]
 summary: Author opens recorder block, marks inputs/outputs, captures redstone behavior, finalizes into a spec file.
-last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
+last_audited_commit: ea21a146594247dc908372ed72c848345c8fac13
 ---
 
 # Recording use-cases
@@ -134,28 +134,28 @@ The recording journey: an author places a recorder block, marks I/O positions, d
 | UC-REC-02 | Mark input and output positions with the spec marker tool | — | **GAP** |
 | UC-REC-02.a | `SpecMarkerTool.useOn` calls `SpecBlockEntity.findFor` to locate recorder | — | **GAP** |
 | UC-REC-02.b | Guard rejects markers on `RedstoneSpecRunnerBlock` | — | **GAP** |
-| UC-REC-02.c | `createMarker` constructs `EntryMarker` with auto-generated label and color | — | **GAP** |
+| UC-REC-02.c | `createMarker` constructs `EntryMarker` with auto-generated label and color | `RecordingLifecycleSpec."UC-REC-02.c: InputSpecMarkerItem.createMarker yields input_a then input_b with color 0xFF4488FF"`, `RecordingLifecycleSpec."UC-REC-02.c: OutputSpecMarkerItem.createMarker uses color 0xFFFF8800"` | covered |
 | UC-REC-02.d | `addOrUpdateMarker` replaces or appends and calls `setChangedAndSync` | — | **GAP** |
-| UC-REC-02.e | `UndoStack.push` records placed marker; `pop` + `removeMarker` reverses it | — | **GAP** |
+| UC-REC-02.e | `UndoStack.push` records placed marker; `pop` + `removeMarker` reverses it | `RecordingLifecycleSpec."UC-REC-02.e: UndoStack push then pop returns the marker; cap at 20 per UUID"` | **GAP-PARTIAL** |
 | UC-REC-03 | Configure bounds and spec metadata before starting a recording | — | **GAP** |
 | UC-REC-03.a | `sendSetConfig` fires on every keystroke and sends `SetRecorderConfigC2S` | — | **GAP** |
 | UC-REC-03.b | Server handler calls `setSpecId`, `setStructure`, `setSpecBounds` | — | **GAP** |
-| UC-REC-03.c | `isConfigured` guard prevents start with blank ID or zero-volume bounds | — | **GAP** |
-| UC-REC-04 | Start a recording session | — | **GAP** |
-| UC-REC-04.a | `startRecording` validates and calls `StateRecorder.forSpec` | — | **GAP** |
-| UC-REC-04.b | `StateRecorder.start` takes initial snapshot of region | — | **GAP** |
-| UC-REC-04.c | `StateRecorder.activate` adds recorder to global `activeRecorders` set | — | **GAP** |
+| UC-REC-03.c | `isConfigured` guard prevents start with blank ID or zero-volume bounds | `RecordingLifecycleSpec."UC-REC-03.c: isConfigured returns false for blank specId"`, `RecordingLifecycleSpec."UC-REC-03.c: isConfigured returns false when any bound dimension is zero"` | covered |
+| UC-REC-04 | Start a recording session | `RecordingLifecycleSpec."UC-REC-04.a/c: startRecording succeeds and recorder appears in activeRecorders"` | **GAP-PARTIAL** |
+| UC-REC-04.a | `startRecording` validates and calls `StateRecorder.forSpec` | `RecordingLifecycleSpec."UC-REC-04.a/c: startRecording succeeds and recorder appears in activeRecorders"` | covered |
+| UC-REC-04.b | `StateRecorder.start` takes initial snapshot of region | `RecordingLifecycleSpec."UC-REC-04.b: StateRecorder.start captures initial snapshot keyed by origin-relative BlockPos"` | covered |
+| UC-REC-04.c | `StateRecorder.activate` adds recorder to global `activeRecorders` set | `RecordingLifecycleSpec."UC-REC-04.a/c: startRecording succeeds and recorder appears in activeRecorders"` | covered |
 | UC-REC-04.d | `onPhaseForActiveRecorders` advances `currentTick`/`currentPhase` on each `SubTickPhaseEvent` | — | **GAP** |
 | UC-REC-04.e | `setChangedAndSync` called after activation so client reflects `"recording"` state | — | **GAP** |
 | UC-REC-05 | Finalize a recording into `.spec.kts` | `RecordingDslEmitterTest."emits redstoneSpec header with correct metadata"` | **GAP-PARTIAL** |
-| UC-REC-05.a | `stopRecordingAndFinalize` deactivates recorder and obtains `StateRecording` | — | **GAP** |
+| UC-REC-05.a | `stopRecordingAndFinalize` deactivates recorder and obtains `StateRecording` | `RecordingLifecycleSpec."UC-REC-05.a: stopRecordingAndFinalize deactivates recorder and clears stateRecorder"` | covered |
 | UC-REC-05.b | `specMarkers` de-duplicated before emit; empty list skips file write | `RecordingDslEmitterTest."returns empty spec body when recording has no I/O activity"` | covered |
 | UC-REC-05.c | `RecordingDslEmitter.emit` walks recording, computes I/O span, emits DSL blocks | `RecordingDslEmitterTest."emits input block for lever position"`, `RecordingDslEmitterTest."emits output block for redstone torch position with lit()"`, `RecordingDslEmitterTest."emits output block for comparator position with powered()"` | covered |
 | UC-REC-05.d | Empty I/O activity falls back to `buildEmptySpec` stub | `RecordingDslEmitterTest."returns empty spec body when recording has no I/O activity"` | covered |
-| UC-REC-05.e | DSL source written async via `SpecPersistence.writeSpecKts` or `managedSourcePath.writeText` | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | **GAP-PARTIAL** |
-| UC-REC-05.f | `setChangedAndSync` called after finalization so client sees `"idle"` | — | **GAP** |
-| UC-REC-06 | Recover from or discard a failed recording | — | **GAP** |
-| UC-REC-06.a | `DISCARD` handler deactivates recorder, sets `stateRecorder = null`, no file written | — | **GAP** |
-| UC-REC-06.b | `startRecording` returns `false` for blank ID / zero-volume bounds | — | **GAP** |
-| UC-REC-06.c | Empty marker list skips emit and write; block returns to `"idle"` silently | — | **GAP** |
-| UC-REC-06.d | `discardForRerecord` resets markers to de-duplicated placeholder set | — | **GAP** |
+| UC-REC-05.e | DSL source written async via `SpecPersistence.writeSpecKts` or `managedSourcePath.writeText` | `RecordingLifecycleSpec."UC-REC-05.e: stopRecordingAndFinalize with markers writes .spec.kts under SharedSettings.specSaveDir"`, `RecordingLifecycleSpec."UC-REC-05.e: managedSourcePath redirects write to that path instead of saveDir"`, `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | covered |
+| UC-REC-05.f | `setChangedAndSync` called after finalization so client sees `"idle"` | `RecordingLifecycleSpec."UC-REC-05.e: managedSourcePath redirects write to that path instead of saveDir"` | **GAP-PARTIAL** |
+| UC-REC-06 | Recover from or discard a failed recording | `RecordingLifecycleSpec."UC-REC-06.a: handleRecorderCommand(DISCARD) calls discardForRerecord (does not touch active recorder)"` | **GAP-PARTIAL** |
+| UC-REC-06.a | `DISCARD` handler delegates to `discardForRerecord`; markers collapsed, recorder untouched | `RecordingLifecycleSpec."UC-REC-06.a: handleRecorderCommand(DISCARD) calls discardForRerecord (does not touch active recorder)"` | covered |
+| UC-REC-06.b | `startRecording` returns `false` for blank ID / zero-volume bounds | `RecordingLifecycleSpec."UC-REC-06.b: startRecording returns false for blank specId"`, `RecordingLifecycleSpec."UC-REC-06.b: startRecording returns false for zero-volume bounds"` | covered |
+| UC-REC-06.c | Empty marker list skips emit and write; block returns to `"idle"` silently | `RecordingLifecycleSpec."UC-REC-06.c: stopRecordingAndFinalize with no markers writes no file but still clears recorder"` | covered |
+| UC-REC-06.d | `discardForRerecord` resets markers to de-duplicated placeholder set | `RecordingLifecycleSpec."UC-REC-06.d: discardForRerecord collapses duplicate (pos,kind) entries to one each"` | covered |
