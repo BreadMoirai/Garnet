@@ -276,4 +276,61 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             byKind[EntryMarker.Kind.OUTPUT]?.size shouldBe 1
         }
     }
+
+    test("UC-REC-02.c: InputSpecMarkerItem.createMarker yields input_a then input_b with color 0xFF4488FF") {
+        val be = SpecBlockEntity(
+            BlockPos.ZERO,
+            ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(),
+        )
+        val item = InputSpecMarkerItem()
+        val first = item.createMarker(BlockPos(1, 0, 0), be)
+        first.label shouldBe "input_a"
+        first.color shouldBe 0xFF4488FF.toInt()
+        first.kind shouldBe EntryMarker.Kind.INPUT
+
+        be.setSpecMarkers(listOf(first))
+        val second = item.createMarker(BlockPos(2, 0, 0), be)
+        second.label shouldBe "input_b"
+    }
+
+    test("UC-REC-02.c: OutputSpecMarkerItem.createMarker uses color 0xFFFF8800") {
+        val be = SpecBlockEntity(
+            BlockPos.ZERO,
+            ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(),
+        )
+        val marker = OutputSpecMarkerItem()
+            .createMarker(BlockPos(1, 0, 0), be)
+        marker.label shouldBe "output_a"
+        marker.color shouldBe 0xFFFF8800.toInt()
+        marker.kind shouldBe EntryMarker.Kind.OUTPUT
+    }
+
+    test("UC-REC-02.e: UndoStack push then pop returns the marker; cap at 20 per UUID") {
+        val uuid = UUID.randomUUID()
+        val origin = BlockPos(0, 64, 0)
+        val mk = { i: Int ->
+            UndoStack.UndoRecord(
+                originPos = origin,
+                marker = EntryMarker(
+                    pos = BlockPos(i, 0, 0),
+                    label = "input_$i",
+                    color = 0xFF4488FF.toInt(),
+                    kind = EntryMarker.Kind.INPUT,
+                ),
+            )
+        }
+        UndoStack.clear(uuid)
+
+        val r0 = mk(0)
+        UndoStack.push(uuid, r0)
+        UndoStack.pop(uuid) shouldBe r0
+
+        // Push 21; bottom must have been evicted -> popping 20 times yields entries 1..20 reversed.
+        for (i in 0..20) UndoStack.push(uuid, mk(i))
+        val popped = generateSequence { UndoStack.pop(uuid) }.toList()
+        popped.size shouldBe 20
+        // Newest first: 20, 19, ..., 1
+        popped.first().marker.pos.x shouldBe 20
+        popped.last().marker.pos.x shouldBe 1
+    }
 })
