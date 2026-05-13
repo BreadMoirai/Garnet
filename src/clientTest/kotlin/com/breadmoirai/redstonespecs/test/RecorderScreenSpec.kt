@@ -27,7 +27,35 @@ import net.minecraft.core.Vec3i
  * See docs/gametest/client-test-threading.md for the threading model.
  */
 class RecorderScreenSpec : ClientSpec({
-    // tests added in subsequent tasks
+
+    test("UC-REC-01.b/c: OpenRecorderScreenS2C opens RecorderScreen with EditBoxes pre-populated from BE") {
+        val pos = BlockPos(220, 64, 100)
+        val expectedSpecId = "uc-rec-01b-spec"
+        val expectedStructure = "uc-rec-01b-struct"
+
+        onServer {
+            val level = this.overworld()
+            val player = level.players().firstOrNull() ?: error("no overworld player")
+            level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
+            val be = level.getBlockEntity(pos) as SpecBlockEntity
+            be.setSpecId(expectedSpecId)
+            be.setStructure(expectedStructure)
+            be.setSpecBounds(Vec3i(3, 3, 3))
+            RedstoneSpecRecorderBlock.openScreenFor(player, be)
+        }
+
+        waitForClientScreen(RecorderScreen::class.java)
+        val (specIdVal, outPathVal, structIdVal) = onClient { mc ->
+            val s = mc.screen as RecorderScreen
+            Triple(s.editBoxValue("specIdBox"), s.editBoxValue("outPathBox"), s.editBoxValue("structureIdBox"))
+        }
+        specIdVal shouldBe expectedSpecId
+        // outPath is sourced from be.specId in RedstoneSpecRecorderBlock.openScreenFor — stable contract
+        outPathVal shouldBe expectedSpecId
+        structIdVal shouldBe expectedStructure
+
+        closeClientScreen()
+    }
 })
 
 private fun RecorderScreen.editBoxValue(fieldName: String): String {
