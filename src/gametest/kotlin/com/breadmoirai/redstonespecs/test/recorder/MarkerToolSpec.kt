@@ -30,5 +30,28 @@ import net.minecraft.world.phys.Vec3
  * intrusive-holder guard.
  */
 class MarkerToolSpec : RedstoneTestSpec({
-    // tests added in subsequent tasks
+
+    test("UC-REC-02.a: useOn outside any registered SpecBE bounds returns PASS and adds no marker") {
+        onServer {
+            val level = this.overworld()
+            val player = makeMockServerPlayer(level.server)
+            val hitPos = BlockPos(900, 64, 900)
+            val item = ModRegistries.INPUT_SPEC_MARKER
+            val ctx = buildUseOnContext(level, player, item, hitPos)
+            val result = item.useOn(ctx)
+            result shouldBe InteractionResult.PASS
+        }
+    }
 })
+
+private fun buildUseOnContext(
+    level: net.minecraft.world.level.Level,
+    player: net.minecraft.world.entity.player.Player,
+    item: net.minecraft.world.item.Item,
+    hitPos: BlockPos,
+): UseOnContext {
+    player.setItemInHand(InteractionHand.MAIN_HAND, item.defaultInstance)
+    val hitVec = Vec3.atCenterOf(hitPos)
+    val hit = BlockHitResult(hitVec, net.minecraft.core.Direction.UP, hitPos, false)
+    return UseOnContext(player, InteractionHand.MAIN_HAND, hit)
+}
