@@ -71,4 +71,26 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
         be.setSpecBounds(Vec3i(1, 1, 1))
         be.isConfigured shouldBe true
     }
+
+    test("UC-REC-06.b: startRecording returns false for blank specId") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2000, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "to-be-blanked")
+            be.setSpecId("")
+            be.startRecording() shouldBe false
+            be.isRecording shouldBe false
+        }
+    }
+
+    test("UC-REC-06.b: startRecording returns false for zero-volume bounds") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2010, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "ok")
+            be.setSpecBounds(Vec3i(0, 5, 5))
+            be.startRecording() shouldBe false
+            be.isRecording shouldBe false
+        }
+    }
 })
