@@ -60,6 +60,35 @@ class MarkerToolSpec : RedstoneTestSpec({
             be.specMarkers.shouldBeEmpty()
         }
     }
+
+    test("UC-REC-02.d: addOrUpdateMarker replaces same (pos,kind), appends new pos or kind") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(920, 64, 920)
+            val be = placeRecorderBE(level, pos, specId = "uc02d", bounds = Vec3i(3, 3, 3))
+            be.specMarkers.shouldBeEmpty()
+
+            val rel = BlockPos(1, 0, 0)
+            val a = EntryMarker(pos = rel, label = "input_a", color = 0xFF4488FF.toInt(), kind = EntryMarker.Kind.INPUT)
+            val aReplacement = EntryMarker(pos = rel, label = "input_a_v2", color = 0xFF4488FF.toInt(), kind = EntryMarker.Kind.INPUT)
+
+            be.addOrUpdateMarker(a)
+            be.specMarkers shouldHaveSize 1
+            be.specMarkers.single().label shouldBe "input_a"
+
+            be.addOrUpdateMarker(aReplacement)
+            be.specMarkers shouldHaveSize 1
+            be.specMarkers.single().label shouldBe "input_a_v2"
+
+            val samePosDifferentKind = EntryMarker(pos = rel, label = "output_a", color = 0xFFFF8800.toInt(), kind = EntryMarker.Kind.OUTPUT)
+            be.addOrUpdateMarker(samePosDifferentKind)
+            be.specMarkers shouldHaveSize 2
+
+            val differentPos = EntryMarker(pos = BlockPos(2, 0, 0), label = "input_b", color = 0xFF4488FF.toInt(), kind = EntryMarker.Kind.INPUT)
+            be.addOrUpdateMarker(differentPos)
+            be.specMarkers shouldHaveSize 3
+        }
+    }
 })
 
 private fun buildUseOnContext(
