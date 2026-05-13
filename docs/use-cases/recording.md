@@ -2,7 +2,7 @@
 title: Recording use-cases
 tags: [recorder, capture, ui, dsl-emit, use-cases]
 summary: Author opens recorder block, marks inputs/outputs, captures redstone behavior, finalizes into a spec file.
-last_audited_commit: ea21a146594247dc908372ed72c848345c8fac13
+last_audited_commit: 18c2cf676b5d934965513c6572e3d1bab4947d66
 ---
 
 # Recording use-cases
