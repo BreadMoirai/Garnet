@@ -126,8 +126,8 @@ The recording journey: an author places a recorder block, marks I/O positions, d
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
-| UC-REC-01 | Place recorder block and open its configuration screen | — | **GAP** |
-| UC-REC-01.a | `setPlacedBy` derives default spec ID from player name | — | **GAP** |
+| UC-REC-01 | Place recorder block and open its configuration screen | see sub-rows (`RecordingLifecycleSpec`, `RecorderScreenSpec`) | covered |
+| UC-REC-01.a | `setPlacedBy` derives default spec ID from player name | `RecordingLifecycleSpec."UC-REC-01.a: setPlacedBy derives default specId from placer's profile name when current id is the placeholder"`, `RecordingLifecycleSpec."UC-REC-01.a: setPlacedBy does NOT overwrite a non-placeholder specId"` | covered |
 | UC-REC-01.b | `useWithoutItem` reads BE fields and sends `OpenRecorderScreenS2C` | `RecorderScreenSpec."UC-REC-01.b/c: OpenRecorderScreenS2C opens RecorderScreen with EditBoxes pre-populated from BE"` | covered |
 | UC-REC-01.c | Client receives packet and opens `RecorderScreen` with pre-populated fields | `RecorderScreenSpec."UC-REC-01.b/c: OpenRecorderScreenS2C opens RecorderScreen with EditBoxes pre-populated from BE"` | covered |
 | UC-REC-01.d | Field edit fires `sendSetConfig` → `SetRecorderConfigC2S` on every keystroke | `RecorderScreenSpec."UC-REC-01.d / UC-REC-03.a: setting an EditBox value fires SetRecorderConfigC2S with current field values"` | covered |

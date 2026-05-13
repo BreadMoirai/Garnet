@@ -368,4 +368,40 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
         popped.first().marker.pos.x shouldBe 20
         popped.last().marker.pos.x shouldBe 1
     }
+
+    test("UC-REC-01.a: setPlacedBy derives default specId from placer's profile name when current id is the placeholder") {
+        onServer {
+            val level = this.overworld()
+            val player = makeMockServerPlayer(level.server)
+            val pos = BlockPos(2110, 64, 1000)
+            level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
+            val be = level.getBlockEntity(pos) as SpecBlockEntity
+            be.specId shouldBe "spec"  // sanity: BE created with placeholder
+
+            ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.setPlacedBy(
+                level, pos, level.getBlockState(pos), player, player.mainHandItem,
+            )
+
+            val expected = player.gameProfile.name.lowercase().replace(" ", "_") + "_spec"
+            be.specId shouldBe expected
+        }
+    }
+
+    test("UC-REC-01.a: setPlacedBy does NOT overwrite a non-placeholder specId") {
+        onServer {
+            val level = this.overworld()
+            val player = makeMockServerPlayer(level.server)
+            val pos = BlockPos(2120, 64, 1000)
+            level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
+            val be = level.getBlockEntity(pos) as SpecBlockEntity
+            be.setSpecId("already-set")
+            be.specId shouldBe "already-set"
+
+            ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.setPlacedBy(
+                level, pos, level.getBlockState(pos), player, player.mainHandItem,
+            )
+
+            be.specId shouldBe "already-set"  // guard preserves explicit id
+        }
+    }
 })
