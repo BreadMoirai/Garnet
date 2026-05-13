@@ -128,9 +128,9 @@ The recording journey: an author places a recorder block, marks I/O positions, d
 |---|---|---|---|
 | UC-REC-01 | Place recorder block and open its configuration screen | — | **GAP** |
 | UC-REC-01.a | `setPlacedBy` derives default spec ID from player name | — | **GAP** |
-| UC-REC-01.b | `useWithoutItem` reads BE fields and sends `OpenRecorderScreenS2C` | — | **GAP** |
-| UC-REC-01.c | Client receives packet and opens `RecorderScreen` with pre-populated fields | — | **GAP** |
-| UC-REC-01.d | Field edit fires `sendSetConfig` → `SetRecorderConfigC2S` on every keystroke | — | **GAP** |
+| UC-REC-01.b | `useWithoutItem` reads BE fields and sends `OpenRecorderScreenS2C` | `RecorderScreenSpec."UC-REC-01.b/c: OpenRecorderScreenS2C opens RecorderScreen with EditBoxes pre-populated from BE"` | covered |
+| UC-REC-01.c | Client receives packet and opens `RecorderScreen` with pre-populated fields | `RecorderScreenSpec."UC-REC-01.b/c: OpenRecorderScreenS2C opens RecorderScreen with EditBoxes pre-populated from BE"` | covered |
+| UC-REC-01.d | Field edit fires `sendSetConfig` → `SetRecorderConfigC2S` on every keystroke | `RecorderScreenSpec."UC-REC-01.d / UC-REC-03.a: setting an EditBox value fires SetRecorderConfigC2S with current field values"` | covered |
 | UC-REC-02 | Mark input and output positions with the spec marker tool | — | **GAP** |
 | UC-REC-02.a | `SpecMarkerTool.useOn` calls `SpecBlockEntity.findFor` to locate recorder | — | **GAP** |
 | UC-REC-02.b | Guard rejects markers on `RedstoneSpecRunnerBlock` | — | **GAP** |
@@ -138,7 +138,7 @@ The recording journey: an author places a recorder block, marks I/O positions, d
 | UC-REC-02.d | `addOrUpdateMarker` replaces or appends and calls `setChangedAndSync` | — | **GAP** |
 | UC-REC-02.e | `UndoStack.push` records placed marker; `pop` + `removeMarker` reverses it | `RecordingLifecycleSpec."UC-REC-02.e: UndoStack push then pop returns the marker; cap at 20 per UUID"` | **GAP-PARTIAL** |
 | UC-REC-03 | Configure bounds and spec metadata before starting a recording | — | **GAP** |
-| UC-REC-03.a | `sendSetConfig` fires on every keystroke and sends `SetRecorderConfigC2S` | — | **GAP** |
+| UC-REC-03.a | `sendSetConfig` fires on every keystroke and sends `SetRecorderConfigC2S` | `RecorderScreenSpec."UC-REC-01.d / UC-REC-03.a: setting an EditBox value fires SetRecorderConfigC2S with current field values"` | covered |
 | UC-REC-03.b | Server handler calls `setSpecId`, `setStructure`, `setSpecBounds` | — | **GAP** |
 | UC-REC-03.c | `isConfigured` guard prevents start with blank ID or zero-volume bounds | `RecordingLifecycleSpec."UC-REC-03.c: isConfigured returns false for blank specId"`, `RecordingLifecycleSpec."UC-REC-03.c: isConfigured returns false when any bound dimension is zero"` | covered |
 | UC-REC-04 | Start a recording session | `RecordingLifecycleSpec."UC-REC-04.a/c: startRecording succeeds and recorder appears in activeRecorders"` | **GAP-PARTIAL** |
