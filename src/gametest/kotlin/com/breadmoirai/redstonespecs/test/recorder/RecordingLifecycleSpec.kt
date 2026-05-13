@@ -225,4 +225,55 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
         delay(200)
         Files.exists(expectedPath) shouldBe false
     }
+
+    test("UC-REC-06.a: handleRecorderCommand(DISCARD) calls discardForRerecord (does not touch active recorder)") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2080, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "uc06a")
+            // Seed two markers with the same (pos, kind) so discard collapses them.
+            val marker = EntryMarker(
+                pos = BlockPos(1, 0, 0),
+                label = "input_a",
+                color = 0xFF4488FF.toInt(),
+                kind = EntryMarker.Kind.INPUT,
+            )
+            be.setSpecMarkers(listOf(marker, marker.copy(label = "input_b")))
+            be.specMarkers.size shouldBe 2
+
+            val player = makeMockServerPlayer(this)
+            handleRecorderCommand(
+                this, player,
+                RecorderCommandC2S(pos, RecorderCmd.DISCARD),
+            )
+
+            // Behavior of discardForRerecord: collapse duplicates by (pos, kind).
+            be.specMarkers.size shouldBe 1
+        }
+    }
+
+    test("UC-REC-06.d: discardForRerecord collapses duplicate (pos,kind) entries to one each") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2090, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "uc06d")
+            val rel = BlockPos(1, 0, 0)
+            val a = EntryMarker(
+                pos = rel, label = "input_a", color = 0,
+                kind = EntryMarker.Kind.INPUT,
+            )
+            val b = a.copy(label = "input_b")
+            val cOut = a.copy(
+                label = "output_a",
+                kind = EntryMarker.Kind.OUTPUT,
+            )
+            be.setSpecMarkers(listOf(a, b, cOut, cOut.copy(label = "output_b")))
+            be.discardForRerecord()
+            be.specMarkers.size shouldBe 2
+            // Exactly one INPUT and one OUTPUT remain at this (pos).
+            val byKind = be.specMarkers.groupBy { it.kind }
+            byKind[EntryMarker.Kind.INPUT]?.size shouldBe 1
+            byKind[EntryMarker.Kind.OUTPUT]?.size shouldBe 1
+        }
+    }
 })
