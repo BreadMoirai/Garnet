@@ -70,6 +70,7 @@ class ClientTestSentinel : FabricClientGameTest {
                     specs = listOf(
                         RunRedstoneSpecSmokeTest::class,
                         ClientNetworkSpec::class,
+                        RecorderScreenSpec::class,
                     ),
                 )
             } catch (t: Throwable) {
