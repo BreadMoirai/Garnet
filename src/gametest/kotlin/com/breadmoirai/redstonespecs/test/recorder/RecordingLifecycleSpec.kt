@@ -3,8 +3,6 @@ package com.breadmoirai.redstonespecs.test.recorder
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.item.InputSpecMarkerItem
-import com.breadmoirai.redstonespecs.item.OutputSpecMarkerItem
 import com.breadmoirai.redstonespecs.item.UndoStack
 import com.breadmoirai.redstonespecs.network.RecorderCmd
 import com.breadmoirai.redstonespecs.network.RecorderCommandC2S
@@ -282,7 +280,7 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             BlockPos.ZERO,
             ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(),
         )
-        val item = InputSpecMarkerItem()
+        val item = ModRegistries.INPUT_SPEC_MARKER
         val first = item.createMarker(BlockPos(1, 0, 0), be)
         first.label shouldBe "input_a"
         first.color shouldBe 0xFF4488FF.toInt()
@@ -298,7 +296,7 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             BlockPos.ZERO,
             ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(),
         )
-        val marker = OutputSpecMarkerItem()
+        val marker = ModRegistries.OUTPUT_SPEC_MARKER
             .createMarker(BlockPos(1, 0, 0), be)
         marker.label shouldBe "output_a"
         marker.color shouldBe 0xFFFF8800.toInt()
