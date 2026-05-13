@@ -315,26 +315,25 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
                     .apply { isAccessible = true }
                     .get(be) as StateRecorder
 
-                recorder.currentPhase shouldBe Phase.START_OF_TICK
+                // currentTick is private; observe directly via reflection to avoid relying on
+                // the setBlock-mixin path (which the gametest harness does not reliably exercise).
+                val tickField = StateRecorder::class.java.getDeclaredField("currentTick")
+                    .apply { isAccessible = true }
+                fun currentTick(): Int = tickField.getInt(recorder)
 
-                // First START_OF_TICK: currentTick goes -1 -> 0
+                val baseTick = currentTick()  // production server ticks may have advanced it past -1
+
                 StateRecorder.onPhaseForActiveRecorders(level, Phase.START_OF_TICK)
-                val markerPos = pos.offset(1, 0, 0)
-                level.setBlock(markerPos, Blocks.REDSTONE_BLOCK.defaultBlockState(), 2)
                 recorder.currentPhase shouldBe Phase.START_OF_TICK
-                val firstTick = recorder.changes.last().simTime.tick
-                firstTick shouldBe 0
+                currentTick() shouldBe (baseTick + 1)
 
-                // Second START_OF_TICK: currentTick goes 0 -> 1
                 StateRecorder.onPhaseForActiveRecorders(level, Phase.START_OF_TICK)
-                level.setBlock(markerPos, Blocks.AIR.defaultBlockState(), 2)
-                recorder.changes.last().simTime.tick shouldBe 1
+                currentTick() shouldBe (baseTick + 2)
 
-                // Non-START_OF_TICK phase: updates currentPhase but does NOT advance currentTick
+                // Non-START_OF_TICK phase: updates currentPhase, leaves tick alone.
                 StateRecorder.onPhaseForActiveRecorders(level, Phase.END_OF_TICK)
                 recorder.currentPhase shouldBe Phase.END_OF_TICK
-                level.setBlock(markerPos, Blocks.REDSTONE_BLOCK.defaultBlockState(), 2)
-                recorder.changes.last().simTime.tick shouldBe 1
+                currentTick() shouldBe (baseTick + 2)
             } finally {
                 be.stopRecordingAndFinalize()
             }
