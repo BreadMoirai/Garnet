@@ -151,4 +151,30 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             StateRecorder.activeRecorders().size shouldBe (activeBefore - 1)
         }
     }
+
+    test("UC-REC-05.e: stopRecordingAndFinalize with markers writes .spec.kts under SharedSettings.specSaveDir") {
+        val specId = "uc05e-savedir-${UUID.randomUUID().toString().take(6)}"
+        val expectedPath = onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2050, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = specId)
+            // Drop one input marker so the emit path runs.
+            be.addOrUpdateMarker(
+                EntryMarker(
+                    pos = BlockPos(1, 0, 0),
+                    label = "input_a",
+                    color = 0xFF4488FF.toInt(),
+                    kind = EntryMarker.Kind.INPUT,
+                )
+            )
+            be.startRecording() shouldBe true
+            be.stopRecordingAndFinalize() shouldBe true
+            this.getWorldPath(LevelResource.ROOT)
+                .resolve(SharedSettings.specSaveDir)
+                .resolve("$specId.spec.kts")
+        }
+        awaitFile(expectedPath)
+        // cleanup so the next gametest run starts clean
+        Files.deleteIfExists(expectedPath)
+    }
 })
