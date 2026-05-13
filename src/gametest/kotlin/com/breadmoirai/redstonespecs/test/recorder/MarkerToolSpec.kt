@@ -42,6 +42,24 @@ class MarkerToolSpec : RedstoneTestSpec({
             result shouldBe InteractionResult.PASS
         }
     }
+
+    test("UC-REC-02.b: useOn inside a runner block's bounds returns PASS and adds no marker") {
+        onServer {
+            val level = this.overworld()
+            val player = makeMockServerPlayer(level.server)
+            val pos = BlockPos(910, 64, 910)
+            val be = placeRunnerBE(level, pos, specId = "uc02b", bounds = Vec3i(3, 3, 3))
+            be.specMarkers.shouldBeEmpty()
+
+            val hitPos = pos.offset(1, 0, 1)
+            val item = ModRegistries.INPUT_SPEC_MARKER
+            val ctx = buildUseOnContext(level, player, item, hitPos)
+            val result = item.useOn(ctx)
+
+            result shouldBe InteractionResult.PASS
+            be.specMarkers.shouldBeEmpty()
+        }
+    }
 })
 
 private fun buildUseOnContext(
