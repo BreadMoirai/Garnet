@@ -7,6 +7,7 @@ import com.breadmoirai.redstonespecs.item.UndoStack
 import com.breadmoirai.redstonespecs.network.RecorderCmd
 import com.breadmoirai.redstonespecs.network.RecorderCommandC2S
 import com.breadmoirai.redstonespecs.network.handleRecorderCommand
+import com.breadmoirai.redstonespecs.dsl.Phase
 import com.breadmoirai.redstonespecs.runner.EntryMarker
 import com.breadmoirai.redstonespecs.runner.StateRecorder
 import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
@@ -40,7 +41,7 @@ private suspend fun awaitFile(path: Path, timeoutMs: Long = 2000) {
  * rows in `docs/use-cases/recording.md`. Test names embed the UC ID for traceability.
  *
  * Out of scope: client-screen rows (UC-REC-01.c/d, 03.a/b), marker-tool integration
- * rows (UC-REC-02.a/b/d), and the phase-event row (UC-REC-04.d). See the design doc
+ * rows (UC-REC-02.a/b/d). See the design doc
  * `docs/superpowers/specs/2026-05-12-recording-server-lifecycle-coverage-design.md`.
  */
 class RecordingLifecycleSpec : RedstoneTestSpec({
@@ -301,6 +302,43 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
         marker.label shouldBe "output_a"
         marker.color shouldBe 0xFFFF8800.toInt()
         marker.kind shouldBe EntryMarker.Kind.OUTPUT
+    }
+
+    test("UC-REC-04.d: onPhaseForActiveRecorders advances currentTick on START_OF_TICK and updates currentPhase") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2100, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "uc04d", bounds = Vec3i(3, 3, 3))
+            check(be.startRecording()) { "startRecording failed; check isConfigured" }
+            try {
+                val recorder = be.javaClass.getDeclaredField("stateRecorder")
+                    .apply { isAccessible = true }
+                    .get(be) as StateRecorder
+
+                recorder.currentPhase shouldBe Phase.START_OF_TICK
+
+                // First START_OF_TICK: currentTick goes -1 -> 0
+                StateRecorder.onPhaseForActiveRecorders(level, Phase.START_OF_TICK)
+                val markerPos = pos.offset(1, 0, 0)
+                level.setBlock(markerPos, Blocks.REDSTONE_BLOCK.defaultBlockState(), 2)
+                recorder.currentPhase shouldBe Phase.START_OF_TICK
+                val firstTick = recorder.changes.last().simTime.tick
+                firstTick shouldBe 0
+
+                // Second START_OF_TICK: currentTick goes 0 -> 1
+                StateRecorder.onPhaseForActiveRecorders(level, Phase.START_OF_TICK)
+                level.setBlock(markerPos, Blocks.AIR.defaultBlockState(), 2)
+                recorder.changes.last().simTime.tick shouldBe 1
+
+                // Non-START_OF_TICK phase: updates currentPhase but does NOT advance currentTick
+                StateRecorder.onPhaseForActiveRecorders(level, Phase.END_OF_TICK)
+                recorder.currentPhase shouldBe Phase.END_OF_TICK
+                level.setBlock(markerPos, Blocks.REDSTONE_BLOCK.defaultBlockState(), 2)
+                recorder.changes.last().simTime.tick shouldBe 1
+            } finally {
+                be.stopRecordingAndFinalize()
+            }
+        }
     }
 
     test("UC-REC-02.e: UndoStack push then pop returns the marker; cap at 20 per UUID") {
