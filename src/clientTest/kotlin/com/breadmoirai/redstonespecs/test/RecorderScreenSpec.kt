@@ -6,7 +6,6 @@ import com.breadmoirai.redstonespecs.block.SpecBlockEntity
 import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
 import com.breadmoirai.redstonespecs.network.SetRecorderConfigC2S
 import com.breadmoirai.redstonespecs.testing.ClientSpec
-import com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -53,6 +52,56 @@ class RecorderScreenSpec : ClientSpec({
         // outPath is sourced from be.specId in RedstoneSpecRecorderBlock.openScreenFor — stable contract
         outPathVal shouldBe expectedSpecId
         structIdVal shouldBe expectedStructure
+
+        closeClientScreen()
+    }
+
+    test("UC-REC-01.d / UC-REC-03.a: setting an EditBox value fires SetRecorderConfigC2S with current field values") {
+        val pos = BlockPos(240, 64, 100)
+        val initialSpecId = "uc01d-init"
+        val initialStructure = "uc01d-struct-init"
+
+        onServer {
+            val level = this.overworld()
+            val player = level.players().firstOrNull() ?: error("no overworld player")
+            level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
+            val be = level.getBlockEntity(pos) as SpecBlockEntity
+            be.setSpecId(initialSpecId)
+            be.setStructure(initialStructure)
+            be.setSpecBounds(Vec3i(3, 3, 3))
+            RedstoneSpecRecorderBlock.openScreenFor(player, be)
+        }
+
+        waitForClientScreen(RecorderScreen::class.java)
+        drainClientPayloads()
+
+        // Mutate specIdBox on the render thread — setValue fires the responder synchronously;
+        // do NOT call onChange manually. Use runOnClient to reach the render thread safely.
+        runOnClient { mc ->
+            val s = mc.screen as RecorderScreen
+            s.setEditBoxValue("specIdBox", "edited-id")
+        }
+
+        // Allow the payload to flush via the client networking pipeline.
+        waitClientTicks(2)
+
+        val first = drainClientPayloads().filterIsInstance<SetRecorderConfigC2S>()
+        first shouldHaveSize 1
+        first[0].originPos shouldBe pos
+        first[0].specId shouldBe "edited-id"
+        first[0].structureId shouldBe initialStructure
+
+        // Now mutate the structure field; the new payload carries the latest specId AND the new structureId.
+        runOnClient { mc ->
+            val s = mc.screen as RecorderScreen
+            s.setEditBoxValue("structureIdBox", "edited-struct")
+        }
+        waitClientTicks(2)
+
+        val second = drainClientPayloads().filterIsInstance<SetRecorderConfigC2S>()
+        second shouldHaveSize 1
+        second[0].specId shouldBe "edited-id"
+        second[0].structureId shouldBe "edited-struct"
 
         closeClientScreen()
     }
