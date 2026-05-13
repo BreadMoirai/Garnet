@@ -89,6 +89,67 @@ class MarkerToolSpec : RedstoneTestSpec({
             be.specMarkers shouldHaveSize 3
         }
     }
+
+    test("UC-REC-03.b: handleSetRecorderConfig applies non-blank specId and structureId to the BE") {
+        onServer {
+            val level = this.overworld()
+            val server = level.server
+            val player = makeMockServerPlayer(server)
+            val pos = BlockPos(930, 64, 930)
+            val be = placeRecorderBE(level, pos, specId = "initial", bounds = Vec3i(3, 3, 3))
+
+            handleSetRecorderConfig(
+                server,
+                player,
+                SetRecorderConfigC2S(
+                    originPos = pos,
+                    specId = "updated-spec",
+                    outPath = "ignored-by-handler",
+                    structureId = "updated-struct",
+                ),
+            )
+
+            be.specId shouldBe "updated-spec"
+            be.specStructure shouldBe "updated-struct"
+        }
+    }
+
+    test("UC-REC-03.b: handleSetRecorderConfig ignores blank specId / structureId") {
+        onServer {
+            val level = this.overworld()
+            val server = level.server
+            val player = makeMockServerPlayer(server)
+            val pos = BlockPos(940, 64, 930)
+            val be = placeRecorderBE(level, pos, specId = "keep-me", structureId = "keep-struct", bounds = Vec3i(3, 3, 3))
+
+            handleSetRecorderConfig(
+                server,
+                player,
+                SetRecorderConfigC2S(pos, specId = "", outPath = "", structureId = ""),
+            )
+
+            be.specId shouldBe "keep-me"
+            be.specStructure shouldBe "keep-struct"
+        }
+    }
+
+    test("UC-REC-03.b: handleSetRecorderConfig is a no-op when block at origin is not a recorder") {
+        onServer {
+            val level = this.overworld()
+            val server = level.server
+            val player = makeMockServerPlayer(server)
+            val pos = BlockPos(950, 64, 930)
+            val be = placeRunnerBE(level, pos, specId = "runner-keep", bounds = Vec3i(3, 3, 3))
+
+            handleSetRecorderConfig(
+                server,
+                player,
+                SetRecorderConfigC2S(pos, specId = "should-not-stick", outPath = "", structureId = "x"),
+            )
+
+            be.specId shouldBe "runner-keep"
+        }
+    }
 })
 
 private fun buildUseOnContext(
