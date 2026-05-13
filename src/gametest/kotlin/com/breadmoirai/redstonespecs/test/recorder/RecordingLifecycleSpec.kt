@@ -206,4 +206,23 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             text shouldContain "redstoneSpec"
         }
     }
+
+    test("UC-REC-06.c: stopRecordingAndFinalize with no markers writes no file but still clears recorder") {
+        val specId = "uc06c-empty-${UUID.randomUUID().toString().take(6)}"
+        val expectedPath = onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2070, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = specId)
+            // Intentionally no addOrUpdateMarker call.
+            be.startRecording() shouldBe true
+            be.stopRecordingAndFinalize() shouldBe true
+            be.isRecording shouldBe false
+            this.getWorldPath(LevelResource.ROOT)
+                .resolve(SharedSettings.specSaveDir)
+                .resolve("$specId.spec.kts")
+        }
+        // Give any (incorrect) async write a chance to land before asserting absence.
+        delay(200)
+        Files.exists(expectedPath) shouldBe false
+    }
 })
