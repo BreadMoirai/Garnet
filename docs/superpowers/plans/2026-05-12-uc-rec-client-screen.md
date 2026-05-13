@@ -82,7 +82,7 @@ This is required per `feedback_kotest_specs_must_be_registered` — autoscan is 
 
 - [ ] **Step 3: Verify it compiles**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:clientTestClasses"`
+Run: `cmd.exe /c "gradlew.bat :26.1:clientTestClasses"`
 Expected: BUILD SUCCESSFUL with no compilation errors. (Spec is empty; no test will run yet.)
 
 - [ ] **Step 4: Commit**
@@ -143,14 +143,14 @@ Note: the `outPath` assertion is intentionally permissive because `OpenRecorderS
 
 - [ ] **Step 2: Verify it compiles**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:clientTestClasses"`
+Run: `cmd.exe /c "gradlew.bat :26.1:clientTestClasses"`
 Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 3: Run the client tests**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:runClientGametest"`
+Run: `cmd.exe /c "gradlew.bat :26.1:runClientGametest"`
 
-(If task name differs, look it up: `cmd.exe /c "./gradlew.bat :26.1:tasks --all | grep -i ClientGametest"`. Per `feedback_kotest_test_filter`, do not use `--tests`; read the XML report at `build/reports/redstonespecs/clientTest/` after the run.)
+(If task name differs, look it up: `cmd.exe /c "gradlew.bat :26.1:tasks --all | grep -i ClientGametest"`. Per `feedback_kotest_test_filter`, do not use `--tests`; read the XML report at `build/reports/redstonespecs/clientTest/` after the run.)
 
 Expected: the test passes. If it fails on the `outPathVal` check, open `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderScreen.kt` and read `init()` to see what string the third EditBox is seeded with, then tighten the assertion.
 
@@ -226,12 +226,12 @@ Add this test directly below the test from Task 2, still inside the `ClientSpec(
 
 - [ ] **Step 2: Verify it compiles**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:clientTestClasses"`
+Run: `cmd.exe /c "gradlew.bat :26.1:clientTestClasses"`
 Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 3: Run the client tests**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:runClientGametest"` (or whichever task name your project uses for `clientTest`).
+Run: `cmd.exe /c "gradlew.bat :26.1:runClientGametest"` (or whichever task name your project uses for `clientTest`).
 
 Expected: both `RecorderScreenSpec` tests pass.
 
@@ -306,13 +306,13 @@ git commit -m "docs(use-cases): bump last_audited_commit after UC-REC-01/03.a co
 
 Run (per `feedback_build_command`):
 ```bash
-cmd.exe /c "./gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
+cmd.exe /c "gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
 ```
 Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 2: Run client tests one more time**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:runClientGametest"` (or your project's client-test launch task).
+Run: `cmd.exe /c "gradlew.bat :26.1:runClientGametest"` (or your project's client-test launch task).
 Expected: `RecorderScreenSpec`'s two tests pass; no regressions in `ClientNetworkSpec` or `RunRedstoneSpecSmokeTest`.
 
 - [ ] **Step 3: Verify the docs**

@@ -77,7 +77,7 @@ This is required per `feedback_kotest_specs_must_be_registered` — autoscan is 
 
 - [ ] **Step 4: Verify it compiles**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:gametestClasses"`
+Run: `cmd.exe /c "gradlew.bat :26.1:gametestClasses"`
 Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 5: Commit**
@@ -140,12 +140,12 @@ If the registry constant is named differently, look it up:
 
 - [ ] **Step 3: Verify it compiles**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:gametestClasses"`
+Run: `cmd.exe /c "gradlew.bat :26.1:gametestClasses"`
 Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 4: Run the gametest Kotest suite**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test"` (per `feedback_kotest_test_filter` — do not use `--tests`; read the XML report).
+Run: `cmd.exe /c "gradlew.bat :26.1:test"` (per `feedback_kotest_test_filter` — do not use `--tests`; read the XML report).
 
 Inspect: `build/test-results/test/TEST-com.breadmoirai.redstonespecs.test.recorder.MarkerToolSpec.xml` (path may vary; search `build/` for `MarkerToolSpec`).
 
@@ -193,8 +193,8 @@ Rationale: `findFor` returns the runner's `SpecBlockEntity` because the hit posi
 
 - [ ] **Step 2: Compile and run**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:gametestClasses"`
-Then: `cmd.exe /c "./gradlew.bat :26.1:test"`
+Run: `cmd.exe /c "gradlew.bat :26.1:gametestClasses"`
+Then: `cmd.exe /c "gradlew.bat :26.1:test"`
 Expected: this test passes alongside Task 2's.
 
 - [ ] **Step 3: Commit**
@@ -248,7 +248,7 @@ git commit -m "test(gametest): UC-REC-02.b — runner-block guard rejects marker
 
 - [ ] **Step 2: Compile and run**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:gametestClasses"` then `cmd.exe /c "./gradlew.bat :26.1:test"`
+Run: `cmd.exe /c "gradlew.bat :26.1:gametestClasses"` then `cmd.exe /c "gradlew.bat :26.1:test"`
 Expected: all three `MarkerToolSpec` tests pass.
 
 - [ ] **Step 3: Commit**
@@ -338,7 +338,7 @@ If `SpecBlockEntity` exposes `specId`/`specStructure` differently (e.g. as `getS
 
 - [ ] **Step 3: Compile and run**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:gametestClasses"` then `cmd.exe /c "./gradlew.bat :26.1:test"`
+Run: `cmd.exe /c "gradlew.bat :26.1:gametestClasses"` then `cmd.exe /c "gradlew.bat :26.1:test"`
 Expected: all three new 03.b tests pass.
 
 - [ ] **Step 4: Commit**
@@ -420,12 +420,12 @@ Notes:
 
 - [ ] **Step 4: Verify imports + compile**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:gametestClasses"`
+Run: `cmd.exe /c "gradlew.bat :26.1:gametestClasses"`
 Expected: BUILD SUCCESSFUL. If `Phase.PRE_RST` (or whatever you picked) doesn't exist, fix the enum value and retry.
 
 - [ ] **Step 5: Run the gametest suite**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test"`
+Run: `cmd.exe /c "gradlew.bat :26.1:test"`
 Expected: the new UC-REC-04.d test passes; all other `RecordingLifecycleSpec` tests still pass; no regressions in `MarkerToolSpec`.
 
 Common failure modes:
@@ -499,13 +499,13 @@ git commit -m "docs(use-cases): bump last_audited_commit after UC-REC gametest c
 
 Run (per `feedback_build_command`):
 ```bash
-cmd.exe /c "./gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
+cmd.exe /c "gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
 ```
 Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 2: Run the gametest Kotest suite**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test"`
+Run: `cmd.exe /c "gradlew.bat :26.1:test"`
 Read the JUnit XML report under `build/test-results/test/` for both `MarkerToolSpec` and `RecordingLifecycleSpec`. Confirm:
 - All 4 `MarkerToolSpec` tests pass (02.a, 02.b, 02.d, and the three 03.b tests).
 - The new UC-REC-04.d test passes in `RecordingLifecycleSpec`.
