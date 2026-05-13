@@ -136,4 +136,19 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             }
         }
     }
+
+    test("UC-REC-05.a: stopRecordingAndFinalize deactivates recorder and clears stateRecorder") {
+        onServer {
+            val level = this.overworld()
+            val pos = BlockPos(2040, 64, 1000)
+            val be = placeRecorderBE(level, pos, specId = "uc05a-no-markers")
+            // No markers added => no file write, but the deactivation path still runs.
+            be.startRecording() shouldBe true
+            val activeBefore = StateRecorder.activeRecorders().size
+
+            be.stopRecordingAndFinalize() shouldBe true
+            be.isRecording shouldBe false
+            StateRecorder.activeRecorders().size shouldBe (activeBefore - 1)
+        }
+    }
 })
