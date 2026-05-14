@@ -2,7 +2,7 @@
 title: Managed worlds use-cases
 tags: [managed, dimensions, grid, datapack, use-cases]
 summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back.
-last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
+last_audited_commit: 0be4b421ba1450599704ab89003fd59cf325d76f
 ---
 
 # Managed worlds use-cases
@@ -15,7 +15,7 @@ A managed root is a folder of `.spec.kts` files projected into a runtime-generat
 
 User registers a filesystem folder as a managed-spec root; that registration survives MC restarts.
 
-- **UC-MAN-01.a** The user opens `ManagedRootListScreen` (injected as a "Managed Specs…" button on `SelectWorldScreen` via `SelectWorldScreenMixin`) and types an absolute path into the `EditBox`.
+- **UC-MAN-01.a** The user opens `ManagedRootListScreen` (injected as a "Managed Specs…" button on `TitleScreen` via `TitleScreenMixin`) and types an absolute path into the `EditBox`.
 - **UC-MAN-01.b** Clicking "Add" appends the path to the in-memory list and immediately calls `ManagedRootsConfig.save(configPath, roots)`, writing a JSON array to `<MC-config-dir>/redstonespecs/managed-roots.json`.
 - **UC-MAN-01.c** On next client launch `ManagedRootsConfig.load(configPath)` re-reads the file; the root appears in the list without re-entry.
 - **UC-MAN-01.d** Clicking "X" beside a root removes it from the list and re-saves the config; the entry disappears immediately on `rebuildWidgets`.
@@ -114,8 +114,8 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC ID | Description | Test | Status |
 |---|---|---|---|
 | UC-MAN-01 | Declare and persist a managed root | `ManagedRootsConfigTest."save then load roundtrips a list of paths"` | **GAP-PARTIAL** |
-| UC-MAN-01.a | User types path into `EditBox` in `ManagedRootListScreen` | — | **GAP** |
-| UC-MAN-01.b | "Add" appends path and calls `ManagedRootsConfig.save` writing JSON | `ManagedRootsConfigTest."save then load roundtrips a list of paths"`, `ManagedRootsConfigTest."save creates parent directories if needed"` | covered |
+| UC-MAN-01.a | User types path into `EditBox` in `ManagedRootListScreen` | `ManagedEntryFlowSpec."UC-MAN-01.a: TitleScreen RedstoneIconButton opens ManagedRootListScreen"`, `ManagedEntryFlowSpec."UC-MAN-01.b: Add button persists path to config and renders 'Open: <path>' row"` | covered |
+| UC-MAN-01.b | "Add" appends path and calls `ManagedRootsConfig.save` writing JSON | `ManagedRootsConfigTest."save then load roundtrips a list of paths"`, `ManagedRootsConfigTest."save creates parent directories if needed"`, `ManagedEntryFlowSpec."UC-MAN-01.b: Add button persists path to config and renders 'Open: <path>' row"` | covered |
 | UC-MAN-01.c | On next launch `ManagedRootsConfig.load` re-reads file | `ManagedRootsConfigTest."save then load roundtrips a list of paths"`, `ManagedRootsConfigTest."load returns empty when file missing"` | covered |
 | UC-MAN-01.d | "X" removes entry and re-saves; entry disappears on `rebuildWidgets` | — | **GAP** |
 | UC-MAN-01.e | `ManagedRoot.resolveSubpath` rejects relative and escaping subpaths | `ManagedRootTest."resolveSubpath rejects parent traversal"`, `ManagedRootTest."resolveSubpath rejects absolute subpath"`, `ManagedRootTest."resolveSubpath rejects symlink that escapes root"` | covered |
@@ -140,12 +140,12 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC-MAN-04.f | `world.perFolder[subpath]` replaced atomically via `ConcurrentHashMap` | `ManagedDimSpec."re-place after adding a new spec keeps region origin and includes new spec"` | **GAP-PARTIAL** |
 | UC-MAN-05 | Browse folder tree in-game and teleport to a folder | `ManagedNetworkRegistrySpec."handleListTree sends snapshot matching ManagedFolderTree.scan"` | **GAP-PARTIAL** |
 | UC-MAN-05.a | `ListManagedTreeC2S` triggers scan and `ManagedTreeSnapshotS2C` reply | `ManagedNetworkRegistrySpec."handleListTree sends snapshot matching ManagedFolderTree.scan"` | covered |
-| UC-MAN-05.b | `ManagedClientNetworking` receives snapshot and opens or updates `ManagedScreen` | — | **GAP** |
+| UC-MAN-05.b | `ManagedClientNetworking` receives snapshot and opens or updates `ManagedScreen` | `ManagedEntryFlowSpec."/redstonespecs managed opens ManagedScreen client-side with the tree leaves"`, `ManagedEntryFlowSpec."UC-MAN-05.b: ManagedScreen shows \"Loading…\" placeholder before snapshot, clears after"` | covered |
 | UC-MAN-05.c | `LoadManagedFolderC2S` triggers path-traversal guard, teleport, and `ManagedFolderLoadedS2C` reply | `ManagedNetworkRegistrySpec."handleLoadFolder rejects path traversal with ManagedErrorS2C"`, `ManagedNetworkRegistrySpec."handleLoadFolder happy path sends ManagedFolderLoadedS2C and sets session"` | covered |
 | UC-MAN-05.d | `ManagedTeleport.toFolder` teleports player and calls `ManagedSession.setActive` | `ManagedTeleportSpec."toFolder teleports player to region and sets active subpath"` | covered |
 | UC-MAN-05.e | Unknown subpath: `toFolder` returns `false`, server replies with `ManagedErrorS2C` | `ManagedTeleportSpec."toFolder returns false for unknown subpath and does not change session"` | covered |
 | UC-MAN-06 | Create a new spec cell in the active folder | `ManagedNetworkRegistrySpec."handleNewSpec with active session creates file and sends ManagedFolderLoadedS2C"` | covered |
-| UC-MAN-06.a | Player sends `NewManagedSpecC2S(name)` after typing non-blank name | — | **GAP** |
+| UC-MAN-06.a | Player sends `NewManagedSpecC2S(name)` after typing non-blank name | `ManagedEntryFlowSpec."UC-MAN-06.a: typed spec name in EditBox survives an incoming ManagedTreeSnapshotS2C"`, `ManagedEntryFlowSpec."UC-MAN-06.a: clicking \"New Spec\" after typing creates the .spec.kts on disk"` | covered |
 | UC-MAN-06.b | No active folder → `ManagedErrorS2C("no folder selected")` | `ManagedNetworkRegistrySpec."handleNewSpec without active session returns 'no folder selected'"` | covered |
 | UC-MAN-06.c | `ManagedNewSpec.create` validates name regex, non-duplicate, writes stub | `ManagedNewSpecTest."create writes <name>.spec.kts with stub content"`, `ManagedNewSpecTest."illegal characters in name throw"`, `ManagedNewSpecTest."file already exists throws"` | covered |
 | UC-MAN-06.d | `handleNewSpec` calls `placeFolder` to re-scan and re-place entire folder | `ManagedNetworkRegistrySpec."handleNewSpec with active session creates file and sends ManagedFolderLoadedS2C"`, `ManagedDimSpec."ManagedNewSpec.create writes a stub spec.kts to the leaf folder"` | covered |

@@ -1,6 +1,5 @@
 package com.breadmoirai.redstonespecs.client.managed
 
-import com.breadmoirai.redstonespecs.network.managed.ListManagedTreeC2S
 import com.breadmoirai.redstonespecs.network.managed.LoadManagedFolderC2S
 import com.breadmoirai.redstonespecs.network.managed.ManagedErrorS2C
 import com.breadmoirai.redstonespecs.network.managed.ManagedFolderLoadedS2C
@@ -23,21 +22,22 @@ import net.minecraft.network.chat.Component
 
 /**
  * In-game folder browser for the managed-specs feature. Opens via /redstonespecs managed
- * (T22) or via the world-list "Managed Specs..." flow (T20). Sends C2S payloads; the screen
- * is updated by S2C handlers in `ManagedClientNetworking` (T19).
+ * (T22) or via the world-list "Managed Specs..." flow (T20). Both entry paths push a
+ * `ManagedTreeSnapshotS2C` from the server before the screen is constructed, so this
+ * screen does not request the tree itself; it is updated by S2C handlers in
+ * `ManagedClientNetworking` (T19) which call `onTreeSnapshot`/`onSaveReport`/`onError`.
  */
 class ManagedScreen(private var lastSnapshot: ManagedTreeSnapshotS2C? = null) :
     Screen(Component.literal("Managed Specs")) {
 
     private var newSpecName: String = ""
-    private var status: String = "Loading…"
+    private var status: String = ""
 
     override fun isPauseScreen() = false
     override fun isInGameUi() = true
 
     override fun init() {
         super.init()
-        ClientPlayNetworking.send(ListManagedTreeC2S())
 
         val outer = LinearLayout.vertical().spacing(4)
 
@@ -48,8 +48,11 @@ class ManagedScreen(private var lastSnapshot: ManagedTreeSnapshotS2C? = null) :
 
         // Folder list
         val listContent = LinearLayout.vertical().spacing(2)
-        val leaves = lastSnapshot?.leaves.orEmpty()
-        if (leaves.isEmpty()) {
+        val snap = lastSnapshot
+        val leaves = snap?.leaves.orEmpty()
+        if (snap == null) {
+            listContent.addChild(StringWidget(300, 18, Component.literal("Loading…"), font))
+        } else if (leaves.isEmpty()) {
             listContent.addChild(StringWidget(300, 18, Component.literal("(no folders)"), font))
         } else {
             leaves.forEach { leaf ->
@@ -70,6 +73,10 @@ class ManagedScreen(private var lastSnapshot: ManagedTreeSnapshotS2C? = null) :
         val newRow = LinearLayout.horizontal().spacing(4)
         val nameBox = EditBox(font, 200, 20, Component.literal("name"))
         nameBox.setMaxLength(64)
+        // Restore typed text from the prior rebuild *before* installing the responder.
+        // EditBox.setValue fires the responder synchronously in MC 26.1; doing this in the
+        // other order would clobber `newSpecName` with whatever the previous EditBox had.
+        nameBox.value = newSpecName
         nameBox.setResponder { newSpecName = it }
         newRow.addChild(nameBox)
         newRow.addChild(
