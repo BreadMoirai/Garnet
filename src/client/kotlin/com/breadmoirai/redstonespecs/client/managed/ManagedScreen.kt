@@ -105,8 +105,9 @@ class ManagedScreen(private var lastSnapshot: ManagedTreeSnapshotS2C? = null) :
         )
         outer.addChild(actionRow)
 
-        // Status line
-        outer.addChild(StringWidget(300, 12, Component.literal(status), font))
+        if (status.isNotEmpty()) {
+            outer.addChild(StringWidget(300, 12, Component.literal(status), font))
+        }
 
         outer.addChild(SpacerElement(0, 4))
 

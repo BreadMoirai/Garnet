@@ -189,7 +189,7 @@ class ManagedEntryFlowSpec : ClientSpec({
         runOnClient { mc -> mc.setScreen(null) }
     }
 
-    test("UC-MAN-06.a: typed spec name in EditBox survives an incoming ManagedTreeSnapshotS2C") {
+    test("UC-MAN-06.a (text survives snapshot): typed spec name in EditBox survives an incoming ManagedTreeSnapshotS2C") {
         val initial = ManagedTreeSnapshotS2C(
             leaves = listOf(ManagedLeafEntry("alpha", 1)),
             intermediates = emptyList(),
@@ -225,7 +225,7 @@ class ManagedEntryFlowSpec : ClientSpec({
         runOnClient { mc -> mc.setScreen(null) }
     }
 
-    test("UC-MAN-06.a: clicking \"New Spec\" after typing creates the .spec.kts on disk") {
+    test("UC-MAN-06.a (creates file): clicking \"New Spec\" after typing creates the .spec.kts on disk") {
         val tmp = Files.createTempDirectory("uc-man-06a-")
         val leaf = tmp.resolve("alpha").also { it.createDirectories() }
         leaf.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
