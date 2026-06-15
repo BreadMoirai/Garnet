@@ -18,7 +18,7 @@ import java.nio.file.Path
 
 /**
  * Client-side screen for managing the persistent list of managed-spec root paths. Opened
- * from the world-selection screen via `SelectWorldScreenMixin` ("Managed Specs..." button).
+ * from the main menu via `TitleScreenMixin` ("Managed Specs..." button).
  *
  * Reads/writes via [ManagedRootsConfig] under the MC config dir. Picking a root will (in
  * T21) boot the integrated server pinned to that root; for now we log + close.

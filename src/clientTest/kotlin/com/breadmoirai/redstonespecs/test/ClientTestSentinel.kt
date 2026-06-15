@@ -71,6 +71,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         RunRedstoneSpecSmokeTest::class,
                         ClientNetworkSpec::class,
                         RecorderScreenSpec::class,
+                        ManagedEntryFlowSpec::class,
                     ),
                 )
             } catch (t: Throwable) {

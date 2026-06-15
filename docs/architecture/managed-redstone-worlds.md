@@ -17,7 +17,7 @@ See `docs/superpowers/specs/2026-05-08-managed-redstone-worlds-design.md` for th
 ## Canvas: a mod-created flat-void singleplayer save
 
 The mod creates the singleplayer save itself, once per managed root. From the
-`SelectWorldScreen`, the user picks a managed root via `ManagedRootListScreen`;
+main menu, the user picks a managed root via `ManagedRootListScreen`;
 `ManagedIntegratedBoot.boot(rootPath)` then either re-opens the existing save for that root
 or creates a fresh flat-void singleplayer save (creative, peaceful, allow-commands) using
 `WorldOpenFlows.createFreshLevel` with `FlatLevelGeneratorPresets.THE_VOID`.
@@ -84,7 +84,8 @@ Client:
   tree-snapshot when none open).
 - `client/managed/ManagedIntegratedBoot` — creates/opens the `managed-<root>` save, pins
   context on `SERVER_STARTING`; `placeAll` runs on `SERVER_STARTED`.
-- `client/mixin/SelectWorldScreenMixin` (Java) — injects "Managed Specs…" button.
+- `client/mixin/TitleScreenMixin` (Java) — injects "Managed Specs…" button into the main
+  menu so it is reachable even with no singleplayer worlds.
 
 ## Where to start reading
 

@@ -48,10 +48,14 @@ data class ManagedTreeSnapshotS2C(
 
 // === C2S ===
 
-class ListManagedTreeC2S : CustomPacketPayload {
+class ListManagedTreeC2S private constructor() : CustomPacketPayload {
     companion object {
+        // StreamCodec.unit captures an instance by identity and rejects any other. Callers
+        // must therefore send INSTANCE rather than constructing fresh `ListManagedTreeC2S()` —
+        // doing so throws IllegalStateException "Can't encode A, expected B" on the encoder.
+        val INSTANCE = ListManagedTreeC2S()
         val TYPE = CustomPacketPayload.Type<ListManagedTreeC2S>(id("list_tree"))
-        val STREAM_CODEC: StreamCodec<ByteBuf, ListManagedTreeC2S> = StreamCodec.unit(ListManagedTreeC2S())
+        val STREAM_CODEC: StreamCodec<ByteBuf, ListManagedTreeC2S> = StreamCodec.unit(INSTANCE)
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
