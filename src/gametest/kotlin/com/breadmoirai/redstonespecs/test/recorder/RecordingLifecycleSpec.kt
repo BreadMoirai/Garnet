@@ -374,6 +374,11 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
             val level = this.overworld()
             val player = makeMockServerPlayer(level.server)
             val pos = BlockPos(2110, 64, 1000)
+            // The gametest world persists between runGameTest invocations. Clear the position
+            // first so setBlock is a real state change and a *fresh* BE (placeholder specId) is
+            // created; otherwise a recorder BE left here by a prior run would make setBlock a
+            // no-op and the stale specId (e.g. "<player>_spec") would fail the sanity check.
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2)
             level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
             val be = level.getBlockEntity(pos) as SpecBlockEntity
             be.specId shouldBe "spec"  // sanity: BE created with placeholder
