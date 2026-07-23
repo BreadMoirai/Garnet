@@ -5,6 +5,7 @@ import com.breadmoirai.redstonespecs.client.project.ProjectClientNetworking
 import com.breadmoirai.redstonespecs.client.network.registerClientNetworking
 import com.breadmoirai.redstonespecs.client.render.registerBoundsRenderer
 import com.breadmoirai.redstonespecs.client.render.registerHudOverlay
+import com.breadmoirai.redstonespecs.client.viewport.registerViewportToggle
 import net.fabricmc.api.ClientModInitializer
 import org.slf4j.LoggerFactory
 
@@ -19,6 +20,7 @@ class RedstonespecsClient : ClientModInitializer {
         registerClientNetworking()
         ProjectClientNetworking.register()
         registerHudOverlay()
+        registerViewportToggle()
         LOGGER.debug("[RedstonespecsClient#onInitializeClient] client initialization complete")
     }
 }

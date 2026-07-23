@@ -6,7 +6,8 @@
   "client": [
     "ClientCommonPacketListenerImplAccessor",
     "ScrollWheelHandlerMixin",
-    "TitleScreenMixin"
+    "TitleScreenMixin",
+    "WindowMixin"
   ],
   "injectors": {
     "defaultRequire": 1
