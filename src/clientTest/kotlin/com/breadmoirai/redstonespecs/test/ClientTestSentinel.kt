@@ -73,6 +73,8 @@ class ClientTestSentinel : FabricClientGameTest {
                         RecorderScreenSpec::class,
                         ProjectEntryFlowSpec::class,
                         ViewportCompositeSpec::class,
+                        ViewportPickingSpec::class,
+                        CursorFocusToggleSpec::class,
                     ),
                 )
             } catch (t: Throwable) {
