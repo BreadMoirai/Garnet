@@ -42,9 +42,7 @@ loaded folder maps to a distinct **region** in the overworld via counter-based a
   validates against `ProjectRoot.resolveSubpath` (path-traversal guard) and acts.
 - **`SpecBlockEntity.projectSourcePath`** binds a recorder/runner block in a project cell
   back to its source `.spec.kts`. NOT persisted to NBT — set directly on the BE during
-  `placeFolder` and reset on every re-place. (This field and `SharedSettings.projectGridYBase`
-  keep their `managed` prefix; only the symbols listed as renamed in the codebase were
-  touched.)
+  `placeFolder` and reset on every re-place.
 - **Cell-origin Y is absolute** (`yBase`); X/Z are region-relative.
 
 ## Components
