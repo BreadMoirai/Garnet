@@ -12,15 +12,12 @@ import java.nio.file.Path
  *
  * Owns the lifecycle of a [TextureTarget] we composite the shrunk world into
  * before presenting it into a sub-rect of the real surface. Kept intentionally
- * small: creation/resize and a transparent clear, both built on the MC 26.2
+ * small: creation/resize and a color clear, both built on the MC 26.2
  * GPU API ([RenderSystem.getDevice] + [com.mojang.blaze3d.systems.CommandEncoder]).
  */
 object CompositeTarget {
 
     private const val LABEL = "RedstoneSpecs composite"
-
-    /** Fully transparent black; sub-rect blits then draw over the cleared area. */
-    private const val TRANSPARENT_ARGB = 0x00000000
 
     /**
      * Return a [TextureTarget] sized `width` x `height`, reusing [existing] when it
@@ -37,14 +34,6 @@ object CompositeTarget {
         }
         existing?.destroyBuffers()
         return TextureTarget(LABEL, width, height, /* useDepth = */ true)
-    }
-
-    /**
-     * Clear [target]'s color to transparent (and depth to far, if present) so the
-     * next composite starts from a clean, edge-transparent slate.
-     */
-    fun clearTransparent(target: RenderTarget) {
-        clearColor(target, TRANSPARENT_ARGB)
     }
 
     /**
