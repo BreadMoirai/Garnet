@@ -53,8 +53,14 @@ object BlitUvPipeline {
      * Blit [from] into the sub-rect of [to] described by the normalized rectangle
      * `(x1,y1)`..`(x2,y2)`, where `(0,0)` is the top-left of the target and `(1,1)`
      * the bottom-right. The full source texture is sampled across the rect.
+     *
+     * [flipV] mirrors the source vertically. Pass `true` when [from] is a Blaze3D render-target
+     * color texture: those are stored bottom-up (row 0 = bottom), the same convention vanilla's
+     * `Screenshot` readback compensates for with `height - y - 1`. Sampling one with the default
+     * top-left UV mapping would present it upside-down. The default (`false`) keeps the plain
+     * top-left-origin mapping for ordinary textures (atlases, PNG-backed textures).
      */
-    fun blit(from: GpuTextureView, to: RenderTarget, x1: Float, y1: Float, x2: Float, y2: Float) {
+    fun blit(from: GpuTextureView, to: RenderTarget, x1: Float, y1: Float, x2: Float, y2: Float, flipV: Boolean = false) {
         // Normalized (top-left origin) -> NDC. X: [0,1] -> [-1,1]. Y is flipped
         // because NDC Y grows upward while our normalized Y grows downward.
         val ndcX1 = x1 * 2f - 1f
@@ -62,14 +68,19 @@ object BlitUvPipeline {
         val ndcTop = 1f - y1 * 2f
         val ndcBottom = 1f - y2 * 2f
 
+        // Source V at the top/bottom edges of the quad. Swapped when [flipV] so a bottom-up
+        // render-target texture samples upright.
+        val vTop = if (flipV) 1f else 0f
+        val vBottom = if (flipV) 0f else 1f
+
         val vertexData = ByteBuffer.allocateDirect(VERTEX_COUNT * VERTEX_STRIDE)
             .order(ByteOrder.nativeOrder())
-        // QUADS winding: TL, BL, BR, TR. UV (0,0) is the top-left of the source so
-        // the image is upright for standard top-left-origin textures.
-        putVertex(vertexData, ndcX1, ndcTop, 0f, 0f)
-        putVertex(vertexData, ndcX1, ndcBottom, 0f, 1f)
-        putVertex(vertexData, ndcX2, ndcBottom, 1f, 1f)
-        putVertex(vertexData, ndcX2, ndcTop, 1f, 0f)
+        // QUADS winding: TL, BL, BR, TR. UV (0,0) is the top-left of the source (for the
+        // un-flipped case) so the image is upright for standard top-left-origin textures.
+        putVertex(vertexData, ndcX1, ndcTop, 0f, vTop)
+        putVertex(vertexData, ndcX1, ndcBottom, 0f, vBottom)
+        putVertex(vertexData, ndcX2, ndcBottom, 1f, vBottom)
+        putVertex(vertexData, ndcX2, ndcTop, 1f, vTop)
         vertexData.flip()
 
         val target = requireNotNull(to.colorTextureView) { "Blit target has no color texture view" }

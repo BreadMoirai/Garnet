@@ -31,8 +31,36 @@ public interface WindowEventHandler {
 
 `Window.onFramebufferResize` calls `eventHandler.resizeGui()` when the real
 framebuffer size changes — so `resizeGui()` is the correct call for the mixin
-to invoke after changing the override, to make dependent render targets
-(`Minecraft.resize` → `mainRenderTarget.resize`) pick up the new size.
+to invoke after changing the override, to update gui-scale and re-layout the
+open screen.
+
+## `resizeGui()` alone does NOT resize the main render target — `isResized` gates it
+
+On 26.2, `Minecraft.resizeGui()` only recomputes gui-scale and calls
+`screen.resize(...)`; it does **not** touch `mainRenderTarget`. The main target
+is resized inside `GameRenderer.render`, which resizes to
+`windowRenderState.width/height` **only when `windowRenderState.isResized` is
+true** — and `extractWindow` copies that flag straight from
+`Window.isResized()`. A real OS resize sets `Window.isResized = true` itself
+(in `onFramebufferResize`), but a *programmatic* toggle of the shrink override
+does not. So on toggle, `getWidth()`/`getHeight()` start reporting the shrunk
+size but the game keeps rendering into the old-size target — the shrink never
+takes visual effect.
+
+`WindowMixin.updateScaledFramebuffer` therefore sets the shadowed
+`isResized = true` whenever the effective size changes, so the next
+`GameRenderer.render` resizes `mainRenderTarget` to the content size. (Verified
+by the composite proof: the game texture handed to the present mixin is exactly
+`contentWidth × contentHeight`.)
+
+## Tracking live OS resizes while active
+
+`WindowMixin` also `@Inject`s into `Window.onFramebufferResize` at the
+`WindowEventHandler.resizeGui()` invoke, calling
+`redstonespecs$updateScaledFramebuffer(false)` (no nested resize) so the
+override recomputes from the fresh real framebuffer size. Without it, an OS
+window resize while the effect is active would leave a stale override (the real
+size updates but `getWidth()` keeps returning the old content size).
 
 ## `getWidth()`/`getHeight()` return the *framebuffer* size, not the window size
 

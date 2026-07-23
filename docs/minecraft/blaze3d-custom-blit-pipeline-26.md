@@ -1,7 +1,7 @@
 ---
 title: Custom blit RenderPipeline on the 26.2 Blaze3D GPU API
 tags: [mc-api, render-state, gpu, blaze3d, versions, quirks]
-summary: How to build a RenderPipeline and record a RenderPass to blit a GpuTextureView into a sub-rect on MC 26.2, and the non-obvious traps (nullable getters, per-frame vertex buffer, shared quad index buffer, lazy shader compile).
+summary: How to build a RenderPipeline and record a RenderPass to blit a GpuTextureView into a sub-rect on MC 26.2, the non-obvious traps (nullable getters, per-frame vertex buffer, shared quad index buffer, lazy shader compile), the render-target Y-flip, and how to intercept the present blit to composite a centered sub-rect.
 ---
 
 # Custom blit RenderPipeline on the 26.2 Blaze3D GPU API
@@ -68,3 +68,75 @@ test hook) is overwritten by the next full frame render before it is presented, 
 screenshot taken afterward won't show it. Visual confirmation of a composited sub-rect
 requires intercepting the present blit itself (a mixin on the surface blit) — you cannot prove
 it by drawing into the main target from an ad-hoc hook.
+
+## Intercepting the present blit: `MinecraftPresentMixin`
+
+On 26.2 the present is **`Minecraft.renderFrame` → `this.mainRenderTarget.blitToScreen()`**,
+and `RenderTarget.blitToScreen()` internally calls
+`RenderSystem.getDevice().createCommandEncoder().presentTexture(colorTextureView)`. (The old
+Flashback-era `GpuSurface.blitFromTexture(CommandEncoder, GpuTextureView)` signature does **not**
+exist here — verify against the current sources before wrapping.) `presentTexture` *stretches*
+whatever texture it is handed to fill the whole window surface.
+
+`MinecraftPresentMixin` (`src/client/java/.../mixin/client/MinecraftPresentMixin.java`) puts a
+MixinExtras `@WrapOperation` on the `blitToScreen()` call:
+
+```java
+@WrapOperation(method = "renderFrame",
+    at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"))
+```
+
+When the viewport effect is off it just forwards `original.call(mainTarget)` — byte-for-byte
+vanilla. When on it: sizes a full-*real*-size `CompositeTarget`, clears it to an opaque edge
+color, blits the (shrunk) game texture into the centered content sub-rect, then presents the
+**composite** via `original.call(composite)`. Because the composite is the real window size,
+`presentTexture` maps it 1:1 and the content lands in its sub-rect with the reserved strips
+showing the fill color. Filling the whole composite with an opaque clear first (rather than
+transparent) means the reserved edges are solid for free — no separate edge-rect draw needed.
+
+`RenderTarget.blitToScreen()` is a concrete method on the base class and `mainRenderTarget` is
+typed `RenderTarget`, so the `@WrapOperation` receiver is `RenderTarget instance`;
+`original.call(anyRenderTarget)` presents *that* target's color view. `TextureTarget`'s color
+texture is created with usage mask `15` (includes `USAGE_RENDER_ATTACHMENT`, bit 8), which
+`presentTexture` requires — so presenting our composite passes its usage assertion.
+
+### MixinExtras is bundled, but not on the compile classpath by default
+
+`@WrapOperation`/`Operation` live in package `com.llamalad7.mixinextras.injector.wrapoperation`
+(one word — *not* `injector.wrap.WrapOperation` + `injector.wrap.operation.Operation`).
+fabric-loader ships MixinExtras at runtime, but to *compile* against it you must add it to the
+compile/AP classpath. For the `client` source set:
+
+```kotlin
+"clientCompileOnly"("io.github.llamalad7:mixinextras-fabric:0.5.3")
+"clientAnnotationProcessor"("io.github.llamalad7:mixinextras-fabric:0.5.3")
+```
+
+`compileOnly` (not `implementation`) avoids double-bundling; track the version fabric-loader
+already ships.
+
+## Render-target color textures are stored bottom-up — flip V when sampling one
+
+Blaze3D `RenderTarget` color textures are stored **bottom-up** (row 0 = bottom), the GL
+convention. Vanilla's own `Screenshot` readback compensates with `image.setPixelABGR(x, height
+- y - 1, ...)`. So sampling a render-target texture with a naive top-left UV mapping
+(`v=0` at the top) presents it **upside-down** — the first real spike screenshot showed the
+world vertically mirrored inside an otherwise correctly-placed sub-rect.
+
+`BlitUvPipeline.blit(..., flipV: Boolean = false)` handles this: pass `flipV = true` whenever
+`from` is a render-target color texture (as `MinecraftPresentMixin` does for the game texture).
+The default `false` keeps the plain top-left mapping for ordinary top-left-origin textures
+(atlases, PNG-backed). The destination rect (NDC positions) is unaffected — only the source
+`V` is mirrored, so placement stays correct and only the image un-flips.
+
+## Capturing the composite for visual proof
+
+The normal screenshot path (`Screenshot.grab`, Fabric's `ctx.takeScreenshot`) reads
+`mc.mainRenderTarget` — which is *upstream* of the present-time composite, so it can only ever
+show the shrunk world full-frame, never the centered composite. To get a PNG of the actual
+composited output, point the same vanilla readback at the composite target:
+`CompositeTarget.captureToPng(target, path)` calls `Screenshot.takeScreenshot(target) { image
+-> image.writeToFile(path) }`. The readback callback is asynchronous (a GPU download), so the
+caller must poll for the file to appear. `MinecraftPresentMixin` consumes a one-shot
+`ViewportState.compositeCaptureRequest` path so a client-test can request the dump for exactly
+the frame it wants.

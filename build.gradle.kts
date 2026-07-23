@@ -154,6 +154,13 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.14.2")
 
     "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
+
+    // MixinExtras (@WrapOperation etc.) is bundled inside fabric-loader at runtime, so it is only
+    // needed on the compile/annotation-processor classpath — hence compileOnly, not implementation,
+    // to avoid double-bundling. Version tracks the copy fabric-loader ships. Used by the client
+    // source set's viewport-composite present mixin.
+    "clientCompileOnly"("io.github.llamalad7:mixinextras-fabric:0.5.3")
+    "clientAnnotationProcessor"("io.github.llamalad7:mixinextras-fabric:0.5.3")
 }
 
 tasks {

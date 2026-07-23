@@ -36,6 +36,15 @@ object ViewportState {
     /** Real (un-overridden) framebuffer height, cached the same way as [realWidth]. */
     var realHeight: Int = 0
 
+    /**
+     * One-shot request to dump the next composited frame to this path (diagnostic / spike visual
+     * proof). The present mixin consumes it: when non-null after compositing a frame, it reads the
+     * composite target back to a PNG at this path and clears the field. `@Volatile` for cross-thread
+     * visibility between a test worker that sets it and the render thread that reads it.
+     */
+    @Volatile
+    var compositeCaptureRequest: java.nio.file.Path? = null
+
     /** Whether [WindowMixin][com.breadmoirai.redstonespecs.mixin.client.WindowMixin] should apply its override. */
     fun shouldModify(): Boolean = active
 

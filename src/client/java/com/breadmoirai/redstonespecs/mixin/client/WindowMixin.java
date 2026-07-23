@@ -50,6 +50,9 @@ public abstract class WindowMixin implements WindowViewportExt {
     private int guiScaledHeight;
 
     @Shadow
+    private boolean isResized;
+
+    @Shadow
     @Final
     private WindowEventHandler eventHandler;
 
@@ -88,8 +91,15 @@ public abstract class WindowMixin implements WindowViewportExt {
 
         int newWidth = this.redstonespecs$effectiveWidth();
         int newHeight = this.redstonespecs$effectiveHeight();
-        if (callResize && (newWidth != previousWidth || newHeight != previousHeight)) {
-            this.eventHandler.resizeGui();
+        if (newWidth != previousWidth || newHeight != previousHeight) {
+            // Mark the window resized so GameRenderer#extractWindow (which reads isResized()) resizes
+            // the main render target to the new effective size next frame. Without this a live toggle
+            // changes getWidth()/getHeight() but the game keeps rendering at the old target size, so
+            // the shrink never actually takes effect until a real OS window resize.
+            this.isResized = true;
+            if (callResize) {
+                this.eventHandler.resizeGui();
+            }
         }
     }
 
@@ -168,5 +178,22 @@ public abstract class WindowMixin implements WindowViewportExt {
         this.guiScale = scale;
         this.redstonespecs$applyGuiScale(scale);
         ci.cancel();
+    }
+
+    /**
+     * On a real OS window resize, {@code onFramebufferResize} has just written the new real size to
+     * {@link #framebufferWidth}/{@link #framebufferHeight} and is about to fire {@code resizeGui()}.
+     * Recompute the override from the fresh real size first (with {@code callResize=false} to avoid
+     * recursing into the resize we are already inside), so the shrink tracks the new window size
+     * instead of leaving a stale override. No-op when the effect is off.
+     */
+    @Inject(
+        method = "onFramebufferResize",
+        at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/WindowEventHandler;resizeGui()V")
+    )
+    private void redstonespecs$onFramebufferResize(long handle, int newWidth, int newHeight, CallbackInfo ci) {
+        if (ViewportState.INSTANCE.shouldModify()) {
+            this.redstonespecs$updateScaledFramebuffer(false);
+        }
     }
 }
