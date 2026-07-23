@@ -9,7 +9,7 @@ last_audited_commit: f97d72daa35ad4551c2591efc6ab88d657b17083
 
 Spec content never crosses the wire as JSON. Payloads carry origin-relative coordinates and rely on the server's `originPos` lookup as the single source of authority (see [persistence/network-payload-contract.md](../persistence/network-payload-contract.md)).
 
-These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`network/managed/*`) belong in [managed-worlds.md](managed-worlds.md).
+These UCs cover the recorder/runner C2S/S2C flow only. Project-dim payloads (`network/project/*`) belong in [redstone-project.md](redstone-project.md).
 
 ---
 
@@ -134,7 +134,7 @@ These UCs cover the recorder/runner C2S/S2C flow only. Managed-dim payloads (`ne
 
 **Footnotes:**
 
-³ No `OverwritePromptS2C` producer exists in the recorder/runner registry today; only managed/structure load paths emit it. UC-NET-04.a's tests send the payload synthetically.
+³ No `OverwritePromptS2C` producer exists in the recorder/runner registry today; only project/structure load paths emit it. UC-NET-04.a's tests send the payload synthetically.
 
 <!-- footnote ⁴ retired 2026-05-11: tryClaimRun test seam on SpecBlockEntity unblocks UC-NET-03.b/c coverage. See docs/superpowers/specs/2026-05-11-networking-final-gaps-design.md -->
 

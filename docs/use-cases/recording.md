@@ -89,14 +89,14 @@ The recording journey: an author places a recorder block, marks I/O positions, d
 **Actor:** Author (or a redstone signal)
 **Trigger:** Author clicks the "Stop & Emit" button in `RecorderScreen`, sending a `RecorderCommandC2S(RecorderCmd.STOP)` packet — or the redstone signal powering the block goes low (neighbor-changed event).
 **Preconditions:** `SpecBlockEntity.isRecording` is `true`; a `StateRecorder` is referenced by `stateRecorder`.
-**Outcome:** The in-memory `StateRecording` is converted to `.spec.kts` DSL source text by `RecordingDslEmitter.emit` and written to disk under `SharedSettings.specSaveDir` (or, in managed contexts, to `managedSourcePath`). `SpecBlockEntity.isRecording` becomes `false`.
+**Outcome:** The in-memory `StateRecording` is converted to `.spec.kts` DSL source text by `RecordingDslEmitter.emit` and written to disk under `SharedSettings.specSaveDir` (or, in project contexts, to `managedSourcePath`). `SpecBlockEntity.isRecording` becomes `false`.
 
 **System interactions:**
 - UC-REC-05.a — `SpecBlockEntity.stopRecordingAndFinalize` calls `StateRecorder.deactivate` to remove the recorder from `activeRecorders`, then calls `rec.toRecording()` to obtain an immutable `StateRecording` snapshot.
 - UC-REC-05.b — `specMarkers` is de-duplicated by `(pos, kind)` before being passed to `RecordingDslEmitter.emit`. If the de-duplicated list is empty, no file is written; the recording is silently discarded.
 - UC-REC-05.c — `RecordingDslEmitter.emit` walks the `StateRecording`, computes the I/O activity span via `ioActivitySpan`, and emits `input(…) { atStart { … } at(t) { … } }` / `output(…) { atStart { … } at(t) { … } }` DSL blocks. Input setters specialise `setPowered` / `setLit` for known boolean properties; output conditions specialise `powered()` / `lit()`. Unknown properties fall back to `setProp` / `prop`.
 - UC-REC-05.d — If no I/O block changed state during the recording span, `RecordingDslEmitter.emit` falls back to `buildEmptySpec`, producing a valid but body-less `redstoneSpec(…) {}` stub rather than an invalid file.
-- UC-REC-05.e — The resulting DSL source text is written asynchronously (via `Dispatchers.IO` coroutine on the `SpecBlockEntity`'s `coroutineScope`) using `SpecPersistence.writeSpecKts` for normal worlds, or directly via `managedSourcePath.writeText` for managed-dimension contexts.
+- UC-REC-05.e — The resulting DSL source text is written asynchronously (via `Dispatchers.IO` coroutine on the `SpecBlockEntity`'s `coroutineScope`) using `SpecPersistence.writeSpecKts` for normal worlds, or directly via `managedSourcePath.writeText` for project-dimension contexts.
 - UC-REC-05.f — `SpecBlockEntity.setChangedAndSync` is called after finalization so clients observe the transition back to `"idle"` state.
 
 **Invariants:** [architecture/recording-pipeline.md](../architecture/recording-pipeline.md), [persistence/spec-on-disk-format.md](../persistence/spec-on-disk-format.md)

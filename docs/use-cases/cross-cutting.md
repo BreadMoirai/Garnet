@@ -40,18 +40,18 @@ These UCs describe full end-to-end flows touching record, persist, network, run,
 
 ---
 
-### UC-X2X-03 — Hand-authored spec placed in managed root: grid projection, cell edit, save-back
+### UC-X2X-03 — Hand-authored spec placed in project root: grid projection, cell edit, save-back
 
 **Actor:** Author (filesystem + in-game)
-**Trigger:** Author drops a hand-written `.spec.kts` into a managed root folder, then opens the managed world to inspect and modify the cell.
-**Preconditions:** A managed root is registered in `ManagedRootsConfig`; the managed world can be booted; the new spec file passes scripting-host evaluation.
+**Trigger:** Author drops a hand-written `.spec.kts` into a project root folder, then opens the project world to inspect and modify the cell.
+**Preconditions:** A project root is registered in `ProjectRootsConfig`; the project world can be booted; the new spec file passes scripting-host evaluation.
 **Outcome:** The spec appears as a cell in the grid; the author edits block state inside the cell; saving back overwrites the original `.spec.kts` on disk; reloading the spec confirms the changes round-trip correctly.
 
 **References:**
 - UC-PER-02, UC-PER-04, UC-PER-05 — scripting-host loads the hand-authored file; malformed files are rejected; round-trip equality holds after save-back
-- UC-MAN-02, UC-MAN-03, UC-MAN-04 — managed world boots, folder tree scanned, cell placed in grid
+- UC-MAN-02, UC-MAN-03, UC-MAN-04 — project world boots, folder tree scanned, cell placed in grid
 - UC-MAN-07, UC-MAN-08 — cell edits saved back to disk; session ends cleanly
-- UC-CMD-01, UC-CMD-03 — `/redstonespecs managed` opens the folder UI; root resolved via priority chain
+- UC-CMD-01, UC-CMD-03 — `/redstonespecs project` opens the folder UI; root resolved via priority chain
 
 ---
 
@@ -91,6 +91,6 @@ These UCs describe full end-to-end flows touching record, persist, network, run,
 |---|---|---|---|
 | UC-X2X-01 | Singleplayer record → persist → restart → reload → verify pass | see UC-REC-04, UC-REC-05, UC-PER-01, UC-PER-02, UC-PER-05, UC-RUN-01, UC-RUN-02, UC-RUN-04 | see refs |
 | UC-X2X-02 | Dedicated-server record → client confirmation → server persist → second-client run | see UC-REC-04, UC-REC-05, UC-NET-01, UC-NET-03, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02, UC-RUN-04 | see refs |
-| UC-X2X-03 | Hand-authored spec → managed root → grid projection → cell edit → save-back | see UC-PER-02, UC-PER-04, UC-PER-05, UC-MAN-02, UC-MAN-03, UC-MAN-04, UC-MAN-07, UC-MAN-08, UC-CMD-01, UC-CMD-03 | see refs |
+| UC-X2X-03 | Hand-authored spec → project root → grid projection → cell edit → save-back | see UC-PER-02, UC-PER-04, UC-PER-05, UC-MAN-02, UC-MAN-03, UC-MAN-04, UC-MAN-07, UC-MAN-08, UC-CMD-01, UC-CMD-03 | see refs |
 | UC-X2X-04 | Kotest spec registered → harness drives runRedstoneSpec → diagnostic recording on failure | see UC-GT-01, UC-GT-02, UC-GT-04, UC-REC-05, UC-REC-06, UC-RUN-02, UC-RUN-05, UC-PER-02, UC-PER-05 | see refs |
 | UC-X2X-05 | Overwrite-prompt handshake guards re-recording an existing spec | see UC-REC-05, UC-NET-03, UC-NET-04, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02 | see refs |
