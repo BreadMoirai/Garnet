@@ -56,7 +56,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
     private var stateRecorder: StateRecorder? = null
     val isRecording: Boolean get() = stateRecorder != null
 
-    /** Set by ManagedDimLifecycle when placing this BE in a managed cell. Null otherwise.
+    /** Set by ProjectDimLifecycle when placing this BE in a managed cell. Null otherwise.
      *  Not persisted to NBT — managed dims rebuild from disk every session. */
     @JvmField var managedSourcePath: java.nio.file.Path? = null
 
@@ -138,7 +138,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
                 coroutineScope.launch(Dispatchers.IO) {
                     if (src != null) {
                         src.writeText(source)
-                        LOGGER.debug("[finalize] managed: wrote recording result to {}", src)
+                        LOGGER.debug("[finalize] project: wrote recording result to {}", src)
                     } else {
                         val saveDir = serverLevel.server
                             .getWorldPath(LevelResource.ROOT)

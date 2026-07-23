@@ -5,15 +5,15 @@ import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.event.SubTickPhaseEvents
 import com.breadmoirai.redstonespecs.item.SpecMarkerTool
 import com.breadmoirai.redstonespecs.item.UndoStack
-import com.breadmoirai.redstonespecs.managed.ManagedCommand
-import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
-import com.breadmoirai.redstonespecs.managed.ManagedRoot
-import com.breadmoirai.redstonespecs.managed.ManagedServerContext
+import com.breadmoirai.redstonespecs.project.ProjectCommand
+import com.breadmoirai.redstonespecs.project.ProjectDimLifecycle
+import com.breadmoirai.redstonespecs.project.ProjectRoot
+import com.breadmoirai.redstonespecs.project.ProjectServerContext
 import com.breadmoirai.redstonespecs.network.registerNetworking
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
-import com.breadmoirai.redstonespecs.managed.ManagedSession
+import com.breadmoirai.redstonespecs.project.ProjectSession
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback
 import net.fabricmc.fabric.api.event.player.UseBlockCallback
@@ -38,30 +38,30 @@ class Redstonespecs : ModInitializer {
             com.breadmoirai.redstonespecs.runner.StateRecorder.onPhaseForActiveRecorders(level, phase)
         }
         ServerLifecycleEvents.SERVER_STARTING.register { server ->
-            val cfg = SharedSettings.managedRootPath
-            if (cfg.isNotBlank() && ManagedServerContext.get(server) == null) {
+            val cfg = SharedSettings.projectRootPath
+            if (cfg.isNotBlank() && ProjectServerContext.get(server) == null) {
                 val rootPath = Path.of(cfg).toAbsolutePath()
-                val root = ManagedRoot(rootPath)
-                ManagedServerContext.set(server, ManagedServerContext(root))
+                val root = ProjectRoot(rootPath)
+                ProjectServerContext.set(server, ProjectServerContext(root))
             }
         }
         ServerLifecycleEvents.SERVER_STARTED.register { server ->
             // Dedicated-server / pre-pinned path: if a managed context was pinned (by config or
-            // by ManagedIntegratedBoot's own SERVER_STARTING listener), materialize specs once
+            // by ProjectIntegratedBoot's own SERVER_STARTING listener), materialize specs once
             // the server is ready. Integrated boot has its own one-shot listener, but it is a
             // no-op here because that listener also pins the same root and runs placeAll the
             // same way; this listener is the dedicated-server entry point.
-            val ctx = ManagedServerContext.get(server) ?: return@register
-            ManagedDimLifecycle.placeAll(server, ctx.root)
+            val ctx = ProjectServerContext.get(server) ?: return@register
+            ProjectDimLifecycle.placeAll(server, ctx.root)
         }
         ServerLifecycleEvents.SERVER_STOPPED.register { server ->
-            ManagedDimLifecycle.releaseServerState(server)
+            ProjectDimLifecycle.releaseServerState(server)
         }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-            ManagedCommand.register(dispatcher)
+            ProjectCommand.register(dispatcher)
         }
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
-            ManagedSession.clear(handler.player.uuid)
+            ProjectSession.clear(handler.player.uuid)
         }
         LOGGER.debug("[Redstonespecs#onInitialize] initialization complete")
     }

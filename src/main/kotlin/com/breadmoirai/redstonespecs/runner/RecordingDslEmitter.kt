@@ -266,7 +266,7 @@ object RecordingDslEmitter {
 
     /**
      * Emits a minimal stub `.spec.kts` source for a new spec with the given [id].
-     * Used by [com.breadmoirai.redstonespecs.managed.ManagedNewSpec.create] to initialize a file
+     * Used by [com.breadmoirai.redstonespecs.project.ProjectNewSpec.create] to initialize a file
      * before the first recording.
      */
     fun emitStub(id: String): String {

@@ -7,5 +7,5 @@ object SharedSettings {
     var managedCellGap: Int = 4
     var managedRowMax: Int = 8
     var managedGridYBase: Int = 64
-    var managedRootPath: String = ""
+    var projectRootPath: String = ""
 }

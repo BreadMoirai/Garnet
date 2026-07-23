@@ -8,7 +8,7 @@ import net.minecraft.resources.Identifier
 
 /**
  * Square icon-only button that paints a redstone-dust sprite over the standard button
- * background. Used for the title-screen "Managed Specs" entry point so the affordance
+ * background. Used for the title-screen "Project Specs" entry point so the affordance
  * matches the mod's identity at a glance.
  *
  * The icon is sourced from a GUI sprite (`redstonespecs:icon/redstone`) rather than from

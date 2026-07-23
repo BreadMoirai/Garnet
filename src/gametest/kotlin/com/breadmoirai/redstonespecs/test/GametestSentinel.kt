@@ -1,10 +1,10 @@
 package com.breadmoirai.redstonespecs.test
 
-import com.breadmoirai.redstonespecs.test.managed.ManagedCellSaverSpec
-import com.breadmoirai.redstonespecs.test.managed.ManagedCommandSpec
-import com.breadmoirai.redstonespecs.test.managed.ManagedDimSpec
-import com.breadmoirai.redstonespecs.test.managed.ManagedNetworkRegistrySpec
-import com.breadmoirai.redstonespecs.test.managed.ManagedTeleportSpec
+import com.breadmoirai.redstonespecs.test.project.ProjectCellSaverSpec
+import com.breadmoirai.redstonespecs.test.project.ProjectCommandSpec
+import com.breadmoirai.redstonespecs.test.project.ProjectDimSpec
+import com.breadmoirai.redstonespecs.test.project.ProjectNetworkRegistrySpec
+import com.breadmoirai.redstonespecs.test.project.ProjectTeleportSpec
 import com.breadmoirai.redstonespecs.test.network.RecorderRunnerNetworkRegistrySpec
 import com.breadmoirai.redstonespecs.test.recorder.MarkerToolSpec
 import com.breadmoirai.redstonespecs.test.recorder.RecordingLifecycleSpec
@@ -45,11 +45,11 @@ class GametestSentinel {
                         reportsDir = Path.of("build/reports/redstonespecs/gametest"),
                         specs = listOf(
                             SmokeSpec::class,
-                            ManagedDimSpec::class,
-                            ManagedCellSaverSpec::class,
-                            ManagedTeleportSpec::class,
-                            ManagedNetworkRegistrySpec::class,
-                            ManagedCommandSpec::class,
+                            ProjectDimSpec::class,
+                            ProjectCellSaverSpec::class,
+                            ProjectTeleportSpec::class,
+                            ProjectNetworkRegistrySpec::class,
+                            ProjectCommandSpec::class,
                             RecorderRunnerNetworkRegistrySpec::class,
                             RecordingLifecycleSpec::class,
                             MarkerToolSpec::class,

@@ -224,5 +224,5 @@ fun registerNetworking() {
         ctx.server().execute { handleRunnerCommand(ctx.server(), ctx.player(), payload) }
     }
 
-    com.breadmoirai.redstonespecs.network.managed.ManagedNetworkRegistry.register()
+    com.breadmoirai.redstonespecs.network.project.ProjectNetworkRegistry.register()
 }
