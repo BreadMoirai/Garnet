@@ -2,7 +2,7 @@
 title: Managed worlds use-cases
 tags: [managed, dimensions, grid, datapack, use-cases]
 summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back.
-last_audited_commit: 4421663af8eea7f611f5c3f75a2bee4af179926a
+last_audited_commit: b8a7b729cd6087f16289d96577c508e3eed44b0f
 ---
 
 # Managed worlds use-cases
