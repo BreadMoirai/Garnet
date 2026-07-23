@@ -1,16 +1,17 @@
 #version 330
 
-// RedstoneSpecs clean-room blit shader.
-// Straight texture copy of the bound source into the target sub-rect. Alpha is
-// preserved (no discard) so callers can decide blending via the pipeline's
-// ColorTargetState rather than in the shader.
+// RedstoneSpecs clean-room blit shader (fragment stage).
+// Straight copy of the bound source texture into the destination sub-rect. Alpha
+// is passed through (no discard) so the pipeline's ColorTargetState — not the
+// shader — decides how the result blends onto the target.
+// Sampler name InSampler matches the binding in BlitUvPipeline.
 
 uniform sampler2D InSampler;
 
-in vec2 texCoord;
+in vec2 v_uv;
 
 out vec4 fragColor;
 
 void main() {
-    fragColor = texture(InSampler, texCoord);
+    fragColor = texture(InSampler, v_uv);
 }
