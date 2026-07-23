@@ -104,7 +104,7 @@ A player explicitly unloads their active folder focus, or the session is cleared
 - **UC-MAN-08.a** The player clicks "Unload" in `ManagedScreen`, sending `UnloadManagedFolderC2S`. `ManagedNetworkRegistry.handleUnload` calls `ManagedSession.clear(player.uuid)` and replies with `ManagedSaveReportS2C(emptyList())`.
 - **UC-MAN-08.b** After unload, the player's `activeSubpath` is `null`; subsequent `handleNewSpec` and `handleSaveNow` calls that require a folder focus will receive `ManagedErrorS2C("no folder selected")`.
 - **UC-MAN-08.c** If a player disconnects without clicking Unload (ungraceful exit), `ManagedSession.clear(player.uuid)` must be called from the server-side player disconnect event. The `ManagedSession` map is a `ConcurrentHashMap` keyed by `UUID`; the player's slot is released so it does not linger after reconnect.
-- **UC-MAN-08.d** On server stop, `ManagedDimRegistry.dispose(server)` removes the `WeakHashMap` entry for the server; `ManagedWorld.clear(server)` and `ManagedServerContext.clear(server)` do the same, releasing all server-scoped state.
+- **UC-MAN-08.d** On server stop, a `SERVER_STOPPED` listener (registered in `Redstonespecs.onInitialize`) calls `ManagedDimLifecycle.releaseServerState(server)`, which invokes `ManagedDimRegistry.dispose(server)`, `ManagedWorld.clear(server)`, and `ManagedServerContext.clear(server)` — removing each `WeakHashMap` entry for the server and releasing all server-scoped state promptly rather than waiting for GC.
 - **UC-MAN-08.e** Spec cell blocks placed in the overworld persist in the singleplayer save across sessions. On next `placeAll`, `ManagedCellSaver`'s dirty-diff logic will re-capture the baseline snapshot from what is now on disk (re-read NBT) rather than an empty cell, so edits made in a previous session survive if the user did not save before disconnect.
 
 ---
@@ -161,5 +161,5 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC-MAN-08.a | "Unload" sends `UnloadManagedFolderC2S`; `handleUnload` clears session and sends empty report | `ManagedNetworkRegistrySpec."handleUnload clears session and sends empty save report"` | covered |
 | UC-MAN-08.b | Post-unload `handleNewSpec`/`handleSaveNow` return `ManagedErrorS2C("no folder selected")` | `ManagedNetworkRegistrySpec."handleNewSpec without active session returns 'no folder selected'"` | **GAP-PARTIAL** |
 | UC-MAN-08.c | Ungraceful disconnect: `ManagedSession.clear` called from disconnect event | `ManagedNetworkRegistrySpec."ungraceful disconnect clears the player's managed session"` | covered |
-| UC-MAN-08.d | Server stop: `dispose` and `clear` calls release all server-scoped state | — | **GAP** |
+| UC-MAN-08.d | Server stop: `dispose` and `clear` calls release all server-scoped state | `ManagedLifecycleReleaseTest."UC-MAN-08.d: releaseServerState disposes registry, world, and context"` | covered |
 | UC-MAN-08.e | On next `placeAll`, dirty-diff re-captures baseline from on-disk NBT | — | **GAP** |

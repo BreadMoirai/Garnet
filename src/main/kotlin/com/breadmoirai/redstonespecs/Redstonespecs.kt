@@ -54,6 +54,9 @@ class Redstonespecs : ModInitializer {
             val ctx = ManagedServerContext.get(server) ?: return@register
             ManagedDimLifecycle.placeAll(server, ctx.root)
         }
+        ServerLifecycleEvents.SERVER_STOPPED.register { server ->
+            ManagedDimLifecycle.releaseServerState(server)
+        }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             ManagedCommand.register(dispatcher)
         }
