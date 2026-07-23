@@ -111,6 +111,8 @@ Use `spawnStructure` per test for isolation. With sequential mode (the default: 
 
 **Call `awaitTicks` before the action when waiting for a specific number of ticks.** The `serverTickEnd` `SharedFlow` has `replay = 0` and `DROP_OLDEST` overflow. Emissions while no consumer is suspended are dropped. Start collecting (enter `awaitTicks`) before performing the action that triggers the ticks you need to observe.
 
+**The `runGameTest` world persists between invocations** (`versions/<v>/build/run/gameTest/world/`). Blocks and block entities a spec places at fixed coordinates survive to the *next* run. This bites any spec that places a block and then asserts on a *freshly-created* BE: `level.setBlock(pos, state)` is a no-op when `pos` already holds that exact `state`, so `getBlockEntity(pos)` returns the **stale** BE from the prior run with its old fields, not a new one. Force a fresh BE by clearing the position first — `level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2)` before placing — or by using a position no other run touches. (This is distinct from the flaky `setBlock`→recorder interaction; it is deterministic world carry-over.)
+
 ## Spec style
 
 The project standard is Kotest's `FunSpec`. `RedstoneTestSpec` extends `FunSpec`; unit tests in `src/test/` extend `FunSpec` directly. Use `context("group") { test("case") { ... } }` nesting when a logical group of cases shares setup or wants to be documented together. Other Kotest styles (`DescribeSpec`, `BehaviorSpec`, `StringSpec`) are not used to keep specs uniform across the codebase.
