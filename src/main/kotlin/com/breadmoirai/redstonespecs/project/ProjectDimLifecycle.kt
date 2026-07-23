@@ -81,10 +81,10 @@ object ProjectDimLifecycle {
         }
 
         // 2. Compute layout. GridLayout returns BlockPos with X/Z = slot offset and Y = yBase.
-        val cellSize = SharedSettings.managedCellSize
-        val cellGap = SharedSettings.managedCellGap
-        val rowMax = SharedSettings.managedRowMax
-        val yBase = SharedSettings.managedGridYBase
+        val cellSize = SharedSettings.projectCellSize
+        val cellGap = SharedSettings.projectCellGap
+        val rowMax = SharedSettings.projectRowMax
+        val yBase = SharedSettings.projectGridYBase
         val layout = GridLayout.compute(
             inputs = parsed.map { (name, s) -> LayoutInput(name, s) },
             cellSize, cellGap, rowMax, yBase,
@@ -92,7 +92,7 @@ object ProjectDimLifecycle {
 
         // 3. Canvas is the overworld; folders map to regions via counter assignment.
         val registry = ProjectDimRegistry.of(server)
-        val level = registry.managedLevel()
+        val level = registry.projectLevel()
         val regionOrigin = registry.getOrAssignRegion(subpath)
 
         // 4. Place each cell.
@@ -158,7 +158,7 @@ object ProjectDimLifecycle {
         level.setBlock(anchorPos, anchorBlock.defaultBlockState(), 2)
         val be = level.getBlockEntity(anchorPos) as? SpecBlockEntity
         // TODO(Task 16+): bind spec to block entity via new dsl.RedstoneSpec path
-        be?.managedSourcePath = folder.resolve(filename)
+        be?.projectSourcePath = folder.resolve(filename)
 
         // Snapshot the cell volume after placement.
         val snapshot = StructureTemplate()
@@ -194,7 +194,7 @@ object ProjectDimLifecycle {
         val world = ProjectWorld.get(server) ?: return emptyList()
         val perFolder = world.perFolder[subpath] ?: return emptyList()
         val folderAbsolute = world.folderAbsoluteByPath[subpath] ?: return emptyList()
-        val level = ProjectDimRegistry.of(server).managedLevel()
+        val level = ProjectDimRegistry.of(server).projectLevel()
         val results = mutableListOf<CellSaveResult>()
         val refreshed = mutableMapOf<String, LoadedSpec>()
         for ((id, loaded) in perFolder) {

@@ -34,9 +34,9 @@ class ProjectDimRegistryTest : FunSpec({
         val r = newRegistry()
         val a = r.getOrAssignRegion("a")  // index 0
         val b = r.getOrAssignRegion("b")  // index 1
-        val cs = SharedSettings.managedCellSize
-        val gap = SharedSettings.managedCellGap
-        val rowMax = SharedSettings.managedRowMax
+        val cs = SharedSettings.projectCellSize
+        val gap = SharedSettings.projectCellGap
+        val rowMax = SharedSettings.projectRowMax
         val expectedWidth = cs.x * rowMax + gap * (rowMax + 1) + ProjectDimRegistry.REGION_PAD
         (b.x - a.x) shouldBe expectedWidth
         b.z shouldBe a.z

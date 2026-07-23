@@ -40,9 +40,9 @@ loaded folder maps to a distinct **region** in the overworld via counter-based a
   Renaming a spec shuffles slots.
 - **Server-authoritative.** Same model as `network/Packets.kt`: clients propose, server
   validates against `ProjectRoot.resolveSubpath` (path-traversal guard) and acts.
-- **`SpecBlockEntity.managedSourcePath`** binds a recorder/runner block in a project cell
+- **`SpecBlockEntity.projectSourcePath`** binds a recorder/runner block in a project cell
   back to its source `.spec.kts`. NOT persisted to NBT — set directly on the BE during
-  `placeFolder` and reset on every re-place. (This field and `SharedSettings.managedGridYBase`
+  `placeFolder` and reset on every re-place. (This field and `SharedSettings.projectGridYBase`
   keep their `managed` prefix; only the symbols listed as renamed in the codebase were
   touched.)
 - **Cell-origin Y is absolute** (`yBase`); X/Z are region-relative.
@@ -64,7 +64,7 @@ Server state and lifecycle:
 - `LoadedSpec` — `(cell, spec, sourceFile, loadedSnapshot)`. Snapshot is the cell-volume
   template captured right after placement, used by the dirty diff.
 - `ProjectSession` — lightweight per-player active-folder pointer (`playerId, activeSubpath?`).
-- `ProjectDimRegistry` — per-server. `managedLevel()` returns `server.overworld()`;
+- `ProjectDimRegistry` — per-server. `projectLevel()` returns `server.overworld()`;
   `getOrAssignRegion(subpath)` assigns a region origin via counter on first placement.
 - `ProjectDimLifecycle` — `placeAll(server, root)`, `placeFolder(server, root, subpath)`,
   `saveAll(server)`, `saveFolder(server, subpath)`.

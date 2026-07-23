@@ -29,7 +29,7 @@ class ProjectCellSaverSpec : RedstoneTestSpec({
                 // Re-place to baseline the snapshot deterministically.
                 val world = ProjectWorld.get(this).shouldNotBeNull()
                 val abs = world.absoluteCellOrigin(this, "set", "a").shouldNotBeNull()
-                val level = ProjectDimRegistry.of(this).managedLevel()
+                val level = ProjectDimRegistry.of(this).projectLevel()
                 val bounds = world.perFolder["set"]!!["a"]!!.spec.bounds
                 clearCellVolume(level, abs, bounds)
                 ProjectDimLifecycle.placeFolder(this, root, "set")
@@ -54,7 +54,7 @@ class ProjectCellSaverSpec : RedstoneTestSpec({
                 ProjectDimLifecycle.placeAll(this, root)
                 val world = ProjectWorld.get(this).shouldNotBeNull()
                 val abs = world.absoluteCellOrigin(this, "set", "a").shouldNotBeNull()
-                val level = ProjectDimRegistry.of(this).managedLevel()
+                val level = ProjectDimRegistry.of(this).projectLevel()
                 val bounds = world.perFolder["set"]!!["a"]!!.spec.bounds
                 clearCellVolume(level, abs, bounds)
                 ProjectDimLifecycle.placeFolder(this, root, "set")
@@ -83,7 +83,7 @@ class ProjectCellSaverSpec : RedstoneTestSpec({
                 ProjectDimLifecycle.placeAll(this, root)
                 val world = ProjectWorld.get(this).shouldNotBeNull()
                 val abs = world.absoluteCellOrigin(this, "set", "a").shouldNotBeNull()
-                val level = ProjectDimRegistry.of(this).managedLevel()
+                val level = ProjectDimRegistry.of(this).projectLevel()
                 val bounds = world.perFolder["set"]!!["a"]!!.spec.bounds
                 clearCellVolume(level, abs, bounds)
                 ProjectDimLifecycle.placeFolder(this, root, "set")
@@ -110,7 +110,7 @@ class ProjectCellSaverSpec : RedstoneTestSpec({
                 ProjectDimLifecycle.placeAll(this, root)
                 val world = ProjectWorld.get(this).shouldNotBeNull()
                 val abs = world.absoluteCellOrigin(this, "set", "a").shouldNotBeNull()
-                val level = ProjectDimRegistry.of(this).managedLevel()
+                val level = ProjectDimRegistry.of(this).projectLevel()
                 val bounds = world.perFolder["set"]!!["a"]!!.spec.bounds
                 clearCellVolume(level, abs, bounds)
                 ProjectDimLifecycle.placeFolder(this, root, "set")

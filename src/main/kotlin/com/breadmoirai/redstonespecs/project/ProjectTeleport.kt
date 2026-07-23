@@ -14,8 +14,8 @@ object ProjectTeleport {
     fun toFolder(server: MinecraftServer, player: ServerPlayer, subpath: String): Boolean {
         val registry = ProjectDimRegistry.of(server)
         val region = registry.regionOriginOf(subpath) ?: return false
-        val level = registry.managedLevel()
-        val yBase = SharedSettings.managedGridYBase
+        val level = registry.projectLevel()
+        val yBase = SharedSettings.projectGridYBase
         player.teleportTo(
             level,
             region.x + 0.5, (yBase + 2).toDouble(), region.z + 0.5,

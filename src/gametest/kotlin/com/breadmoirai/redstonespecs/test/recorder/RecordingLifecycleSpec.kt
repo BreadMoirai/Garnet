@@ -177,14 +177,14 @@ class RecordingLifecycleSpec : RedstoneTestSpec({
         Files.deleteIfExists(expectedPath)
     }
 
-    test("UC-REC-05.e: managedSourcePath redirects write to that path instead of saveDir") {
+    test("UC-REC-05.e: projectSourcePath redirects write to that path instead of saveDir") {
         withTempRoot("rec-uc05e-managed") { tmp ->
             val target = tmp.resolve("uc05e-managed.spec.kts")
             onServer {
                 val level = this.overworld()
                 val pos = BlockPos(2060, 64, 1000)
                 val be = placeRecorderBE(level, pos, specId = "uc05e-managed")
-                be.managedSourcePath = target
+                be.projectSourcePath = target
                 be.addOrUpdateMarker(
                     EntryMarker(
                         pos = BlockPos(1, 0, 0),

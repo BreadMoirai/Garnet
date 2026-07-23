@@ -58,7 +58,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
 
     /** Set by ProjectDimLifecycle when placing this BE in a managed cell. Null otherwise.
      *  Not persisted to NBT — managed dims rebuild from disk every session. */
-    @JvmField var managedSourcePath: java.nio.file.Path? = null
+    @JvmField var projectSourcePath: java.nio.file.Path? = null
 
     // ── Spec config setters ───────────────────────────────────────────────────
 
@@ -134,7 +134,7 @@ class SpecBlockEntity(pos: BlockPos, state: BlockState) :
             )
             val serverLevel = level as? ServerLevel
             if (serverLevel != null) {
-                val src = managedSourcePath
+                val src = projectSourcePath
                 coroutineScope.launch(Dispatchers.IO) {
                     if (src != null) {
                         src.writeText(source)

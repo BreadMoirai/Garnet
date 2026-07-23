@@ -46,7 +46,7 @@ class ProjectTeleportSpec : RedstoneTestSpec({
 
                 (abs(player.x - (region.x + 0.5)) < 1e-6) shouldBe true
                 (abs(player.z - (region.z + 0.5)) < 1e-6) shouldBe true
-                player.y shouldBe (SharedSettings.managedGridYBase + 2).toDouble()
+                player.y shouldBe (SharedSettings.projectGridYBase + 2).toDouble()
                 ProjectSession.get(player.uuid)?.activeSubpath shouldBe "set"
 
                 ProjectSession.clear(player.uuid)

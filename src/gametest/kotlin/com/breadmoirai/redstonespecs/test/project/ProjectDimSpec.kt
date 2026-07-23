@@ -36,7 +36,7 @@ class ProjectDimSpec : RedstoneTestSpec({
             writeStub(folder, "b")
 
             val report = onServer {
-                ProjectDimRegistry.of(this).managedLevel()
+                ProjectDimRegistry.of(this).projectLevel()
                     .shouldNotBeNull() // managed dim must be registered (data-pack JSON)
                 val player = makeMockServerPlayer(this)
                 val reports = ProjectDimLifecycle.placeAll(this, ProjectRoot(tmp))
@@ -74,7 +74,7 @@ class ProjectDimSpec : RedstoneTestSpec({
                 val world = ProjectWorld.get(this).shouldNotBeNull()
                 val absA = world.absoluteCellOrigin(this, "set-b", "a").shouldNotBeNull()
                 val absB = world.absoluteCellOrigin(this, "set-b", "b").shouldNotBeNull()
-                val level = ProjectDimRegistry.of(this).managedLevel().shouldNotBeNull()
+                val level = ProjectDimRegistry.of(this).projectLevel().shouldNotBeNull()
                 val air = Blocks.AIR.defaultBlockState()
                 for (pos in net.minecraft.core.BlockPos.betweenClosed(absA, absA.offset(2, 2, 2))) {
                     level.setBlock(pos, air, 2)
@@ -218,7 +218,7 @@ class ProjectDimSpec : RedstoneTestSpec({
                 val root = ProjectRoot(tmp)
                 ProjectDimLifecycle.placeAll(this, root)
                 val world = ProjectWorld.get(this).shouldNotBeNull()
-                val level = ProjectDimRegistry.of(this).managedLevel()
+                val level = ProjectDimRegistry.of(this).projectLevel()
                 for (sub in listOf("set-a", "set-b")) {
                     val id = world.perFolder[sub]!!.keys.single()
                     val abs = world.absoluteCellOrigin(this, sub, id).shouldNotBeNull()

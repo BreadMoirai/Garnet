@@ -27,7 +27,7 @@ class ProjectDimRegistry(private val server: MinecraftServer) {
     private val nextRegionIndex = AtomicInteger(0)
 
     /** The managed canvas is the server's overworld. */
-    fun managedLevel(): ServerLevel = server.overworld()
+    fun projectLevel(): ServerLevel = server.overworld()
 
     /**
      * Returns the region origin for `subpath`, assigning a fresh region if this is the first time.
@@ -49,12 +49,12 @@ class ProjectDimRegistry(private val server: MinecraftServer) {
     private fun computeRegionOrigin(idx: Int): BlockPos {
         // Region span = cellSize.x * rowMax + cellGap * (rowMax + 1) + REGION_PAD
         // Match GridLayout's spacing (Task 3) so regions never collide with each other.
-        val cs = SharedSettings.managedCellSize
-        val gap = SharedSettings.managedCellGap
-        val rowMax = SharedSettings.managedRowMax
+        val cs = SharedSettings.projectCellSize
+        val gap = SharedSettings.projectCellGap
+        val rowMax = SharedSettings.projectRowMax
         val regionWidth = cs.x * rowMax + gap * (rowMax + 1) + REGION_PAD
         // Lay regions along +X. Y_BASE is the grid's Y; Z is 0.
-        return BlockPos(idx * regionWidth, SharedSettings.managedGridYBase, 0)
+        return BlockPos(idx * regionWidth, SharedSettings.projectGridYBase, 0)
     }
 
     companion object {
