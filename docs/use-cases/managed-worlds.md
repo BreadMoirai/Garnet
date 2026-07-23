@@ -160,6 +160,6 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC-MAN-08 | Unload active folder and handle ungraceful session end | `ManagedNetworkRegistrySpec."handleUnload clears session and sends empty save report"` | **GAP-PARTIAL** |
 | UC-MAN-08.a | "Unload" sends `UnloadManagedFolderC2S`; `handleUnload` clears session and sends empty report | `ManagedNetworkRegistrySpec."handleUnload clears session and sends empty save report"` | covered |
 | UC-MAN-08.b | Post-unload `handleNewSpec`/`handleSaveNow` return `ManagedErrorS2C("no folder selected")` | `ManagedNetworkRegistrySpec."handleNewSpec without active session returns 'no folder selected'"` | **GAP-PARTIAL** |
-| UC-MAN-08.c | Ungraceful disconnect: `ManagedSession.clear` called from disconnect event | — | **GAP** |
+| UC-MAN-08.c | Ungraceful disconnect: `ManagedSession.clear` called from disconnect event | `ManagedNetworkRegistrySpec."ungraceful disconnect clears the player's managed session"` | covered |
 | UC-MAN-08.d | Server stop: `dispose` and `clear` calls release all server-scoped state | — | **GAP** |
 | UC-MAN-08.e | On next `placeAll`, dirty-diff re-captures baseline from on-disk NBT | — | **GAP** |

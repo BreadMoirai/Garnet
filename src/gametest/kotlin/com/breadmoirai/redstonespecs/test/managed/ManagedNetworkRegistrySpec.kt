@@ -20,9 +20,11 @@ import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 
@@ -161,6 +163,21 @@ class ManagedNetworkRegistrySpec : RedstoneTestSpec({
                 val report = drainPayloads(player).filterIsInstance<ManagedSaveReportS2C>().single()
                 report.perSpec shouldBe emptyList()
             }
+        }
+    }
+
+    test("ungraceful disconnect clears the player's managed session") {
+        onServer {
+            val player = makeMockServerPlayer(this)
+            ManagedSession.setActive(player.uuid, "set")
+            ManagedSession.get(player.uuid)?.activeSubpath shouldBe "set"
+
+            // No Unload click: the player just drops. Fire the real server-side disconnect
+            // event and assert the mod's DISCONNECT listener released the session slot so it
+            // doesn't linger into a reconnect.
+            ServerPlayConnectionEvents.DISCONNECT.invoker().onPlayDisconnect(player.connection, this)
+
+            ManagedSession.get(player.uuid).shouldBeNull()
         }
     }
 
