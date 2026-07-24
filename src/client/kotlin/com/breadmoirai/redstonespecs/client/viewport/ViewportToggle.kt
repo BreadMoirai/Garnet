@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.client.viewport
 
+import com.breadmoirai.redstonespecs.client.ui.compose.ComposeOverlay
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.minecraft.client.KeyMapping
@@ -8,8 +9,15 @@ import net.minecraft.client.Minecraft
 // GLFW_KEY_V. `[`/`]` (91/93) are already used for spec-marker cycling; `\` (92) for cycle_backward.
 private const val GLFW_KEY_V = 86
 
+// GLFW_KEY_C — toggles the Compose-in-MC spike overlay (only visible while the viewport is active).
+private const val GLFW_KEY_C = 67
+
 private val keyToggleViewportShrink = KeyMappingHelper.registerKeyMapping(
     KeyMapping("key.redstonespecs.viewport_shrink_toggle", GLFW_KEY_V, KeyMapping.Category.MISC)
+)
+
+private val keyToggleComposeOverlay = KeyMappingHelper.registerKeyMapping(
+    KeyMapping("key.redstonespecs.compose_overlay_toggle", GLFW_KEY_C, KeyMapping.Category.MISC)
 )
 
 /**
@@ -25,6 +33,9 @@ fun registerViewportToggle() {
             // through an unchecked `Any` cast (mirrors Java's `(WindowExt)(Object)window` idiom).
             val windowExt = (mc.window as Any) as WindowViewportExt
             windowExt.`redstonespecs$updateScaledFramebuffer`(true)
+        }
+        while (keyToggleComposeOverlay.consumeClick()) {
+            ComposeOverlay.enabled = !ComposeOverlay.enabled
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.mixin.client;
 
+import com.breadmoirai.redstonespecs.client.ui.compose.ComposeOverlay;
 import com.breadmoirai.redstonespecs.client.viewport.BlitUvPipeline;
 import com.breadmoirai.redstonespecs.client.viewport.CompositeTarget;
 import com.breadmoirai.redstonespecs.client.viewport.ViewportState;
@@ -88,6 +89,15 @@ public abstract class MinecraftPresentMixin {
         // so it must be mirrored vertically to present upright — same flip vanilla's screenshot
         // readback applies. Without it the world renders upside-down in the sub-rect.
         BlitUvPipeline.INSTANCE.blit(gameTexture, composite, x1, y1, x2, y2, true);
+
+        // Compose-in-MC feasibility spike: after the world blit, draw the Skia/Compose panel into the
+        // reserved-left strip. Fully guarded inside ComposeOverlay (and again here) so any Skia/Skiko
+        // failure falls back to the plain solid-edge composite rather than breaking present.
+        try {
+            ComposeOverlay.INSTANCE.renderInto(composite, realWidth, realHeight);
+        } catch (Throwable composeFailure) {
+            // ComposeOverlay already logs+disables internally; this is a last-resort backstop.
+        }
 
         // Diagnostic: if a capture was requested, dump the just-composited frame to a PNG. This is
         // the only way to see the composite in an image, since the normal screenshot path captures

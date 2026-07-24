@@ -1,0 +1,16 @@
+classTweaker v1 official
+# Compose-in-MC feasibility spike (docs/ui/compose-in-mc-feasibility.md).
+#
+# ComposeSurface renders Skia into a Blaze3D TextureTarget's GL framebuffer, then blits the same
+# texture (as a GpuTextureView) via BlitUvPipeline. Getting the raw GL FBO id requires the GL-backend
+# classes, which Mojang ships package-private in com.mojang.blaze3d.opengl. Reflection-by-name fails
+# in dev (runtime uses intermediary method names), so we widen them here and let Loom handle the
+# remap. Client-only classes; only loaded when the client is running.
+accessible class com/mojang/blaze3d/opengl/GlDevice
+accessible method com/mojang/blaze3d/opengl/GlDevice directStateAccess ()Lcom/mojang/blaze3d/opengl/DirectStateAccess;
+# RenderSystem.getDevice() returns the GpuDevice facade; the real GlDevice is its private backend.
+accessible class com/mojang/blaze3d/systems/GpuDeviceBackend
+accessible field com/mojang/blaze3d/systems/GpuDevice backend Lcom/mojang/blaze3d/systems/GpuDeviceBackend;
+accessible class com/mojang/blaze3d/opengl/GlTexture
+accessible method com/mojang/blaze3d/opengl/GlTexture getFbo (Lcom/mojang/blaze3d/opengl/DirectStateAccess;Lcom/mojang/blaze3d/textures/GpuTexture;)I
+accessible class com/mojang/blaze3d/opengl/DirectStateAccess

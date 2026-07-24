@@ -28,6 +28,12 @@ java.toolchain.languageVersion.set(JavaLanguageVersion.of(requiredJava))
 val clientTestSourceSet = sourceSets.create("clientTest")
 
 loom {
+    // Widens the package-private com.mojang.blaze3d.opengl GL-backend classes the Compose-in-MC spike
+    // needs to fetch a raw GL framebuffer id (see redstonespecs.accesswidener + ComposeSurface.kt).
+    // rootProject.file: Stonecutter's per-version subproject shares the root `src/`, so resolve the
+    // widener against the repo root, not versions/<v>/.
+    accessWidenerPath.set(rootProject.file("src/main/resources/redstonespecs.classtweaker"))
+
     splitEnvironmentSourceSets()
 
     mods {
@@ -161,6 +167,16 @@ dependencies {
     // source set's viewport-composite present mixin.
     "clientCompileOnly"("io.github.llamalad7:mixinextras-fabric:0.5.3")
     "clientAnnotationProcessor"("io.github.llamalad7:mixinextras-fabric:0.5.3")
+
+    // === Compose-in-MC feasibility spike (docs/ui/compose-in-mc-feasibility.md) ==================
+    // Skiko is JetBrains' Skia binding; the `skiko-awt-runtime-<platform>` artifact bundles the
+    // desktop-GL Skia native for that platform. This project's dev/runtime host is Windows-x64
+    // (runClient(Test) launches via cmd.exe on Windows), MC 26.2 ships LWJGL 3.4.1 + JDK 25, and
+    // Skiko 0.150.1 is the desktop-GL build Compose Multiplatform 1.12.x targets. We take Skiko
+    // directly (not the Compose Gradle plugin) so the Skia-over-Blaze3D-GL coexistence — the actual
+    // spike risk — is proven without dragging in the @Composable compiler. If this platform detail
+    // ever needs to be cross-platform, switch to `org.jetbrains.skiko:skiko-awt` + per-OS runtime.
+    "clientImplementation"("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.1")
 }
 
 tasks {
