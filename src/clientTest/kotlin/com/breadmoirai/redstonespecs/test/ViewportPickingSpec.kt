@@ -12,6 +12,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.Vec3
 
 /**
  * Spike Task 4 / exit criterion (b): does `Minecraft.hitResult` block-picking remain correct
@@ -53,7 +54,7 @@ class ViewportPickingSpec : ClientSpec({
         runOnClient { mc -> mc.mouseHandler.releaseMouse() }
         waitClientTicks(1)
 
-        onServer {
+        val target: Vec3 = onServer {
             val level = overworld()
             val player = level.players().first()
             val basePos = player.blockPosition()
@@ -74,39 +75,41 @@ class ViewportPickingSpec : ClientSpec({
                 }
             }
 
-            player.teleportTo(
-                level,
-                basePos.x + 0.5, skyY.toDouble(), basePos.z + 0.5,
-                emptySet<Relative>(), 0.0f, 0.0f, true,
-            )
+            val tx = basePos.x + 0.5
+            val ty = skyY.toDouble()
+            val tz = basePos.z + 0.5
+            player.teleportTo(level, tx, ty, tz, emptySet<Relative>(), 0.0f, 0.0f, true)
             // Creative mode alone does not disable gravity (only the separate "flying" ability
             // does, which we haven't toggled) — without this the player free-falls out from
             // under the wall during the ticks we wait for network sync, causing the ray to
             // undershoot vertically. Not a picking bug; just test-setup physics.
             player.setNoGravity(true)
+            Vec3(tx, ty, tz)
         }
 
         // Let the client sync the teleport and the new blocks, and settle a raycast.
         waitClientTicks(6)
 
-        // Pin the client-side look rotation directly before each measurement. A server-side
-        // teleport sets the authoritative rotation, but MouseHandler may still have a queued
-        // accumulated-movement delta from earlier specs' input simulation (e.g. a screen close
-        // that re-grabs the mouse without an "ignore first move" reset — precisely the hazard
-        // Task 4 Step 2's focus keybind guards against). Re-asserting yaw=xRot=0 right before
-        // each read makes the two measurements comparable regardless of that unrelated drift.
-        fun pinRotationAndSettle() {
-            runOnClient { mc ->
-                mc.player?.setYRot(0.0f)
-                mc.player?.setXRot(0.0f)
-                mc.player?.setYHeadRot(0.0f)
+        // Re-teleport (position + rotation + velocity, authoritatively) right before each
+        // measurement. The two reads are ~10 ticks and a framebuffer resize apart; without a
+        // fresh teleport the client player drifts a block in Y between them (residual velocity /
+        // interpolation despite setNoGravity), so the two fixed-yaw/pitch raycasts graze
+        // different block rows — a test-isolation artifact, not a picking change. teleportTo
+        // encodes the exact position AND yaw=xRot=0 in one authoritative call, so both reads
+        // measure from an identical camera state.
+        suspend fun teleportAndSettle() {
+            onServer {
+                val level = overworld()
+                val p = level.players().first()
+                p.teleportTo(level, target.x, target.y, target.z, emptySet<Relative>(), 0.0f, 0.0f, true)
+                p.deltaMovement = Vec3.ZERO
             }
-            waitClientTicks(2)
+            waitClientTicks(3)
         }
 
         // -- Baseline: viewport shrink OFF (regression check: vanilla picking unaffected) --
         ViewportState.active.shouldBeFalse()
-        pinRotationAndSettle()
+        teleportAndSettle()
         val hitOff = onClient { mc -> mc.hitResult as? BlockHitResult }
         hitOff.shouldNotBeNull()
         val hitOffBlock = onClient { mc -> mc.level?.getBlockState(hitOff!!.blockPos)?.block }
@@ -120,7 +123,7 @@ class ViewportPickingSpec : ClientSpec({
         }
         waitClientTicks(10)
         ViewportState.active.shouldBeTrue()
-        pinRotationAndSettle()
+        teleportAndSettle()
 
         val hitOn = onClient { mc -> mc.hitResult as? BlockHitResult }
         hitOn.shouldNotBeNull()
