@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm")
+    kotlin("plugin.compose")
     id("com.google.devtools.ksp")
     id("net.fabricmc.fabric-loom")
     id("maven-publish")
@@ -108,6 +109,13 @@ afterEvaluate {
 }
 
 repositories {
+    // Compose Multiplatform transitive deps: androidx.* KMP artifacts live on Google's Maven, and
+    // pre-release Compose builds live in the JetBrains compose-dev space repo (the 1.12.0-beta line
+    // used here is on Central, but the dev repo is a safe fallback for its transitive graph).
+    google()
+    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") {
+        name = "Compose Dev"
+    }
     maven("https://maven.gegy.dev") {
         name = "Gegy"
     }
@@ -177,6 +185,24 @@ dependencies {
     // spike risk — is proven without dragging in the @Composable compiler. If this platform detail
     // ever needs to be cross-platform, switch to `org.jetbrains.skiko:skiko-awt` + per-OS runtime.
     "clientImplementation"("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.1")
+
+    // Compose Multiplatform runtime (Step 3): a REAL ComposeScene renders to a Skia canvas, replacing
+    // the plain-Skia proof panel. We pin 1.12.0-beta02 because its transitive skiko-awt is 0.150.1 —
+    // an EXACT match for the desktop-GL natives above (a mismatch risks a skiko version-guard failure
+    // or native ABI break). Coordinates use the explicit `-desktop` variant: without the Compose Gradle
+    // plugin there are no KMP target attributes to resolve the aggregator coords to the desktop artifact.
+    // material3 is deliberately omitted (its version diverged from the Compose BOM — only 1.12.0-alpha03
+    // exists, which would drag ui/foundation to alpha03 and a different skiko); the Button is built from
+    // foundation's clickable + hoverable + InteractionSource, which is pure Compose interaction plumbing.
+    //
+    // `runtime` goes on the BASE `implementation`, not `clientImplementation`: the Compose compiler
+    // plugin is applied project-wide and its VersionChecker fails ANY compilation (incl. `main`, `test`)
+    // that lacks the Compose runtime on its classpath, even ones with no @Composable. Putting the
+    // runtime on the base configuration (which every source set extends) satisfies the checker
+    // everywhere; only `ui`/`foundation` (actually used by the composables) stay client-scoped.
+    implementation("org.jetbrains.compose.runtime:runtime-desktop:1.12.0-beta02")
+    "clientImplementation"("org.jetbrains.compose.ui:ui-desktop:1.12.0-beta02")
+    "clientImplementation"("org.jetbrains.compose.foundation:foundation-desktop:1.12.0-beta02")
 }
 
 tasks {

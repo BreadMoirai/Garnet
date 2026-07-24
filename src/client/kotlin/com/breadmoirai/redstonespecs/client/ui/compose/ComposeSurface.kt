@@ -5,11 +5,10 @@ import com.mojang.blaze3d.opengl.GlTexture
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTextureView
+import androidx.compose.ui.geometry.Offset
 import org.jetbrains.skia.BackendRenderTarget
-import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.ColorSpace
 import org.jetbrains.skia.DirectContext
-import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Surface
 import org.jetbrains.skia.SurfaceColorFormat
 import org.jetbrains.skia.SurfaceOrigin
@@ -65,6 +64,7 @@ object ComposeSurface {
         private set
 
     private var nativeLoaded = false
+    private var loggedUpload = false
     private var directContext: DirectContext? = null
 
     private var target: TextureTarget? = null
@@ -72,6 +72,9 @@ object ComposeSurface {
     private var surface: Surface? = null
     private var surfaceWidth = 0
     private var surfaceHeight = 0
+
+    /** The real ComposeScene content (Step 3), recreated when the strip size changes. */
+    private var panel: ComposeScenePanel? = null
 
     /** Width (px) of the last surface we rendered — the reserved-left strip. Read by the overlay. */
     @Volatile
@@ -82,10 +85,6 @@ object ComposeSurface {
     @Volatile
     var lastHeight: Int = 0
         private set
-
-    private val fill = Paint().apply { color = 0xFF1B2433.toInt() }
-    private val accent = Paint().apply { color = 0xFF4CC2FF.toInt() }
-    private val stripe = Paint().apply { color = 0xFF243044.toInt() }
 
     private fun kill(reason: String, t: Throwable?) {
         disabled = true
@@ -159,8 +158,9 @@ object ComposeSurface {
      * [GpuTextureView] the caller should blit into the composite, or `null` if Compose is disabled or
      * anything failed this frame. Must be called on the render thread with MC's GL context current.
      *
-     * Step 2 of the spike draws a plain Skia panel (no Compose yet): a filled background plus accent
-     * bars, enough to prove Skia pixels reach the screen and MC survives the next frame.
+     * Step 3 composes a real [ComposeScenePanel] into an off-screen raster [org.jetbrains.skia.Image]
+     * (pure CPU, no GL), then draws that image onto the GL FBO — so the pixels reaching the screen are
+     * produced by actual Compose, not hand-rolled Skia geometry.
      */
     fun renderFrame(width: Int, height: Int): GpuTextureView? {
         if (disabled) return null
@@ -171,12 +171,29 @@ object ComposeSurface {
         return try {
             val ctx = ensureDirectContext() ?: return null
             val s = ensureSurface(ctx, width, height) ?: return null
+            val p = ensurePanel(width, height)
 
+            // Compose the frame on Compose's own raster surface (no GL), then upload the one image.
+            val image = p.render(System.nanoTime())
             saveGlState(saved)
-            drawPanel(s.canvas, width, height)
-            s.flush()
-            ctx.flush()
+            val unpack = saveAndResetUnpack()
+            try {
+                if (!loggedUpload) {
+                    loggedUpload = true
+                    logger.info(
+                        "[compose-spike] Compose image {}x{} -> FBO {}x{}; MC unpack row_len={} skip_px={}",
+                        image.width, image.height, width, height, unpack[1], unpack[2],
+                    )
+                }
+                s.canvas.clear(0xFF1B2433.toInt())
+                s.canvas.drawImage(image, 0f, 0f)
+                s.flush()
+                ctx.flush()
+            } finally {
+                image.close()
+            }
             ctx.resetAll()
+            restoreUnpack(unpack)
             restoreGlState(saved)
 
             lastWidth = width
@@ -188,22 +205,41 @@ object ComposeSurface {
                 restoreGlState(saved)
             } catch (_: Throwable) {
             }
-            kill("Skia render/coexistence failed", t)
+            kill("Compose/Skia render/coexistence failed", t)
             null
         }
     }
 
-    /** Plain-Skia proof content (Step 2): a solid panel with a couple of accent bars. */
-    private fun drawPanel(canvas: Canvas, width: Int, height: Int) {
-        val w = width.toFloat()
-        val h = height.toFloat()
-        canvas.clear(0xFF1B2433.toInt())
-        canvas.drawRect(0f, 0f, w, h, fill)
-        // A vertical stripe on the right edge of the panel, and a horizontal accent bar near the top,
-        // so the image unmistakably shows Skia geometry rather than a flat clear.
-        canvas.drawRect(w - 6f, 0f, w, h, stripe)
-        canvas.drawRect(16f, 24f, w - 16f, 44f, accent)
-        canvas.drawRect(16f, 60f, w - 16f, 68f, stripe)
+    private fun ensurePanel(width: Int, height: Int): ComposeScenePanel {
+        panel?.let { if (it.width == width && it.height == height) return it }
+        panel?.close()
+        val p = ComposeScenePanel(width, height)
+        panel = p
+        logger.info("[compose-spike] ComposeScene panel ({}x{}) created", width, height)
+        return p
+    }
+
+    // --- Input (Task 2): forward GLFW-derived pointer events into the live ComposeScene ------------
+    // Panel-local coords == strip-local screen coords (Compose draws top-down; the BOTTOM_LEFT surface
+    // + flipV blit presents it upright, so no Y flip is needed for hit-testing).
+
+    /** Panel-local centre of the demo button, or null if no panel yet. */
+    val buttonCenter: Offset? get() = panel?.buttonCenter
+
+    /** Compose-registered click count on the demo button (proof input reached Compose). */
+    val clickCount: Int get() = panel?.clickCount ?: 0
+
+    fun sendPointerMove(pos: Offset) = guardedPointer { panel?.pointerMove(pos) }
+    fun sendPointerPress(pos: Offset) = guardedPointer { panel?.pointerPress(pos) }
+    fun sendPointerRelease(pos: Offset) = guardedPointer { panel?.pointerRelease(pos) }
+
+    private inline fun guardedPointer(block: () -> Unit) {
+        if (disabled) return
+        try {
+            block()
+        } catch (t: Throwable) {
+            kill("ComposeScene pointer dispatch failed", t)
+        }
     }
 
     // --- GL-state snapshot/restore ---------------------------------------------------------------
@@ -243,10 +279,39 @@ object ComposeSurface {
         if (on == 1) GL11.glEnable(cap) else GL11.glDisable(cap)
     }
 
+    // --- GL pixel-store (unpack) snapshot/reset --------------------------------------------------
+    // Skia's drawImage uploads a CPU raster via glTexSubImage2D, which reads the pixel buffer using
+    // the current GL_UNPACK_* state. Blaze3D leaves GL_UNPACK_ROW_LENGTH / SKIP_PIXELS set from its
+    // own texture writes; inherited, they roll/shear Skia's upload (the horizontal wraparound the
+    // asymmetric Compose panel exposed — the old symmetric plain-Skia panel didn't upload anything,
+    // so never hit it). We reset these to their GL defaults around the draw and restore MC's values
+    // after, keeping GlStateManager's belief intact. Slots: 0 align,1 row_len,2 skip_px,3 skip_rows.
+
+    private fun saveAndResetUnpack(): IntArray {
+        val o = IntArray(4)
+        o[0] = GL11.glGetInteger(GL11.GL_UNPACK_ALIGNMENT)
+        o[1] = GL11.glGetInteger(GL11.GL_UNPACK_ROW_LENGTH)
+        o[2] = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_PIXELS)
+        o[3] = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_ROWS)
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0)
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0)
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0)
+        return o
+    }
+
+    private fun restoreUnpack(o: IntArray) {
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, o[0])
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, o[1])
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, o[2])
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, o[3])
+    }
+
     private fun releaseSurfaceOnly() {
         surface?.close(); surface = null
         backendRt?.close(); backendRt = null
         target?.destroyBuffers(); target = null
+        panel?.close(); panel = null
         surfaceWidth = 0; surfaceHeight = 0
     }
 
