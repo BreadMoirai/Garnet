@@ -41,7 +41,7 @@ object ProjectCommand {
             intermediates = tree.intermediates.toList(),
             currentSubpath = current,
         ))
-        // Client receiver opens ProjectScreen on receipt.
+        // Client receiver renders the project tree via the Compose dock Explorer panel.
         return Command.SINGLE_SUCCESS
     }
 }

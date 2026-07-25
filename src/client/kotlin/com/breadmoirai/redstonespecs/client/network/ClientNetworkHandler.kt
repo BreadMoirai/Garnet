@@ -1,7 +1,5 @@
 package com.breadmoirai.redstonespecs.client.network
 
-import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
-import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
 import com.breadmoirai.redstonespecs.network.*
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.slf4j.LoggerFactory
@@ -27,44 +25,20 @@ fun registerClientNetworking() {
     }
 
     ClientPlayNetworking.registerGlobalReceiver(OpenRecorderScreenS2C.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openRecorderScreen] originPos={} state={}", payload.originPos, payload.state)
-            mc.setScreen(RecorderScreen(
-                originPos = payload.originPos,
-                initialSpecId = payload.specId,
-                initialOutPath = payload.outPath,
-                initialStructureId = payload.structureId,
-                initialState = payload.state,
-            ))
+        context.client().execute {
+            LOGGER.info("[ClientNetworkHandler] recorder UI removed (returns as a panel in sub-project A/B); ignoring open for {}", payload.originPos)
         }
     }
 
     ClientPlayNetworking.registerGlobalReceiver(OpenRunnerScreenS2C.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#openRunnerScreen] originPos={} specPath={} specCount={}",
-                payload.originPos, payload.specPath, payload.specList.size)
-            val screen = RunnerScreen(
-                originPos = payload.originPos,
-                initialSpecPath = payload.specPath,
-                specList = payload.specList,
-                initialMeta = payload.meta,
-            )
-            RunnerScreen.active = screen
-            mc.setScreen(screen)
+        context.client().execute {
+            LOGGER.info("[ClientNetworkHandler] runner UI removed (returns as a panel in sub-project A/B); ignoring open for {}", payload.originPos)
         }
     }
 
     ClientPlayNetworking.registerGlobalReceiver(RunnerStatusS2C.TYPE) { payload, context ->
-        val mc = context.client()
-        mc.execute {
-            LOGGER.debug("[ClientNetworkHandler#runnerStatus] originPos={} state={} summary={}",
-                payload.originPos, payload.state, payload.summary)
-            val active = RunnerScreen.active
-            if (active != null && active.originPos == payload.originPos) {
-                active.pushStatus(payload.state, payload.summary)
-            }
+        context.client().execute {
+            LOGGER.debug("[ClientNetworkHandler] runner status (no UI): state={} summary={}", payload.state, payload.summary)
         }
     }
 }

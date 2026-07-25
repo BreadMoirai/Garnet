@@ -225,10 +225,6 @@ object ComposeSurface {
     // Scene-local coords == window-local screen coords (Compose draws top-down; the BOTTOM_LEFT surface
     // + flipV blit presents it upright, so no Y flip is needed for hit-testing).
 
-    // TODO(Task 7): remove — temporary no-op stand-ins so the retired ComposeOverlaySpec still compiles.
-    val buttonCenter: Offset? get() = null
-    val clickCount: Int get() = 0
-
     fun sendPointerMove(pos: Offset) = guardedInput { host?.pointerMove(pos) }
     fun sendPointerPress(pos: Offset) = guardedInput { host?.pointerPress(pos) }
     fun sendPointerRelease(pos: Offset) = guardedInput { host?.pointerRelease(pos) }

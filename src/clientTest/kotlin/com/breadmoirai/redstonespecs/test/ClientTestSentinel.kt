@@ -70,12 +70,9 @@ class ClientTestSentinel : FabricClientGameTest {
                     specs = listOf(
                         RunRedstoneSpecSmokeTest::class,
                         ClientNetworkSpec::class,
-                        RecorderScreenSpec::class,
-                        ProjectEntryFlowSpec::class,
                         ViewportCompositeSpec::class,
                         ViewportPickingSpec::class,
                         CursorFocusToggleSpec::class,
-                        ComposeOverlaySpec::class,
                         DockInsetsSpec::class,
                         DockRenderSpec::class,
                         DockInputSpec::class,

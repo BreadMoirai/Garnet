@@ -3,8 +3,6 @@ package com.breadmoirai.redstonespecs.test
 import com.breadmoirai.redstonespecs.ModRegistries
 import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
 import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
-import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
 import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
 import com.breadmoirai.redstonespecs.network.OverwriteDecisionC2SPayload
 import com.breadmoirai.redstonespecs.network.OverwritePromptS2CPayload
@@ -15,7 +13,6 @@ import com.breadmoirai.redstonespecs.testing.core.McDispatchers
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import net.minecraft.client.gui.screens.ConfirmScreen
 import net.minecraft.core.BlockPos
@@ -35,12 +32,14 @@ import net.minecraft.core.Vec3i
  */
 class ClientNetworkSpec : ClientSpec({
 
-    // UC-NET-01.c: server-emitted OpenRecorderScreenS2C opens RecorderScreen on the client
-    // with the correct originPos. The plan called for rightClickBlock to drive useWithoutItem
-    // end-to-end, but that helper asserts the Fabric test thread. Use openScreenFor instead —
-    // it's the public helper extracted from useWithoutItem in the server-side cycle and
-    // exercises the same ServerPlayNetworking.send path that the block triggers.
-    test("UC-NET-01.c: server build of OpenRecorderScreenS2C opens RecorderScreen with originPos") {
+    // UC-NET-01.c (post-Task-7): the recorder UI has been hard-cut — the client no longer owns
+    // a RecorderScreen. OpenRecorderScreenS2C is now handled as a logged no-op (recorder returns
+    // as a panel in sub-project A/B). Assert the receiver doesn't open any screen. The plan called
+    // for rightClickBlock to drive useWithoutItem end-to-end, but that helper asserts the Fabric
+    // test thread. Use openScreenFor instead — it's the public helper extracted from
+    // useWithoutItem in the server-side cycle and exercises the same ServerPlayNetworking.send
+    // path that the block triggers.
+    test("UC-NET-01.c: OpenRecorderScreenS2C is a no-op (recorder UI removed)") {
         val pos = BlockPos(120, 64, 100)
         onServer {
             val level = this.overworld()
@@ -53,41 +52,23 @@ class ClientNetworkSpec : ClientSpec({
             RedstoneSpecRecorderBlock.openScreenFor(player, be)
         }
 
-        waitForClientScreen(RecorderScreen::class.java)
-        val originPos = onClient { mc -> (mc.screen as RecorderScreen).originPos }
-        originPos shouldBe pos
-        closeClientScreen()
+        waitClientTicks(5)
+        onClient { mc -> mc.screen } shouldBe null
     }
 
-    // UC-NET-03.e: combined matching + mismatched origin in a single test so we reuse one
-    // RunnerScreen instance — opening a fresh RunnerScreen between sub-cases is wasteful
-    // and complicates polling.
-    test("UC-NET-03.e: RunnerStatusS2C only updates RunnerScreen.active when originPos matches") {
+    // UC-NET-03.e (post-Task-7): the runner UI has been hard-cut — RunnerScreen.active no longer
+    // exists. OpenRunnerScreenS2C and RunnerStatusS2C are now logged no-ops (runner returns as a
+    // panel in sub-project A/B). Assert neither receiver opens a screen.
+    test("UC-NET-03.e: OpenRunnerScreenS2C and RunnerStatusS2C are no-ops (runner UI removed)") {
         val activePos = BlockPos(140, 64, 100)
-        val otherPos = BlockPos(140, 64, 200)
 
-        RunnerScreen.active = null
         sendOpenRunnerScreen(OpenRunnerScreenS2C(activePos, "", emptyList(), null))
-
-        val openDeadline = System.currentTimeMillis() + 5000
-        while (RunnerScreen.active == null && System.currentTimeMillis() < openDeadline) Thread.sleep(50)
-        RunnerScreen.active shouldNotBe null
-        val initialText = RunnerScreen.active!!.statusText
-        val initialState = RunnerScreen.active!!.statusState
-
-        sendRunnerStatus(RunnerStatusS2C(otherPos, RunnerState.FAIL, "Should be ignored"))
         waitClientTicks(5)
-        RunnerScreen.active?.statusText shouldBe initialText
-        RunnerScreen.active?.statusState shouldBe initialState
+        onClient { mc -> mc.screen } shouldBe null
 
         sendRunnerStatus(RunnerStatusS2C(activePos, RunnerState.PASS, "All good"))
-        val updateDeadline = System.currentTimeMillis() + 5000
-        while (RunnerScreen.active?.statusText != "All good" && System.currentTimeMillis() < updateDeadline) Thread.sleep(50)
-        RunnerScreen.active?.statusText shouldBe "All good"
-        RunnerScreen.active?.statusState shouldBe RunnerState.PASS
-
-        RunnerScreen.active = null
-        closeClientScreen()
+        waitClientTicks(5)
+        onClient { mc -> mc.screen } shouldBe null
     }
 
     // UC-NET-04.a: receiver-opens-ConfirmScreen half. Click->send half of the handshake
