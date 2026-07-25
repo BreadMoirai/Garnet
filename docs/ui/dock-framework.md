@@ -50,6 +50,27 @@ these transparent pixels.)
   level (`Function2` vs `Function1`), but to avoid call-site overload ambiguity the horizontal one is
   named `SplitterX`. LEFT/RIGHT use `SplitterX`; BOTTOM uses the two-arg `Splitter` and reads `dy`.
 
+## First real panel: the Project Explorer (live-data pattern)
+
+`client/ide/ProjectExplorerPanel.kt` + `client/ide/ProjectTreeState.kt` are the first non-demo panel
+and the template future panels (debugger, timeline) should copy. The pattern:
+
+- **State is a `mutableStateOf`-backed singleton**, not the panel. `ProjectTreeState` holds
+  `snapshot: ProjectTreeSnapshotS2C?` and `status: String` as snapshot state with private setters,
+  mutated only by `onSnapshot/onFolderLoaded/onSaveReport/onError`. The networking layer
+  (`ProjectClientNetworking`, on the client thread via `ctx.client().execute {}`) calls those; the
+  panel `@Composable` reads `ProjectTreeState.snapshot` during composition and recomposes on change.
+  Keep the state object separate from the `Panel` so packet handlers never touch Compose internals.
+- **`explorerPanel(): Panel`** returns the tab (`Panel("redstonespecs.explorer", "Explorer") { … }`);
+  it is seeded once into `DockState.leftPanels` at client init (`RedstonespecsClient`). LEFT stays
+  hidden by default (Shift+1 reveals it).
+- **Clicks dispatch existing C2S packets**: a leaf row sends `LoadProjectFolderC2S(subpath)`, the
+  Refresh row sends `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh unit payload —
+  see `ProjectPackets`). The `currentSubpath` leaf is marked with a `●`.
+- **Scrolling a panel body** uses `Column(Modifier.verticalScroll(rememberScrollState()))` from
+  `androidx.compose.foundation` (not `LazyColumn`) — sufficient for the small tree and matching the
+  rest of the dock's foundation usage.
+
 ## `ImageComposeScene` input API (verified against 1.12.0-beta02)
 
 `sendPointerEvent(eventType, position, scrollDelta = Offset(...))` — the scroll delta parameter is

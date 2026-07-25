@@ -16,14 +16,14 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 **Actor:** Player (server-side command source)
 **Trigger:** A player executes `/redstonespecs project` on a server where a project root is available.
 **Preconditions:** Either `ProjectServerContext.get(server)` returns a non-null context pin, or `SharedSettings.projectRootPath` is a non-blank string that resolves to an absolute path; the command is registered via `ProjectCommand.register(dispatcher)`.
-**Outcome:** The server scans the root via `ProjectFolderTree.scan`, builds a `ProjectTreeSnapshotS2C` payload, and sends it to the requesting player. The client receiver opens `ProjectScreen` on receipt. The command returns `Command.SINGLE_SUCCESS`.
+**Outcome:** The server scans the root via `ProjectFolderTree.scan`, builds a `ProjectTreeSnapshotS2C` payload, and sends it to the requesting player. The client receiver feeds the snapshot into `ProjectTreeState` (the Compose Project Explorer's observable state); it no longer auto-opens `ProjectScreen`. The command returns `Command.SINGLE_SUCCESS`.
 
 **System interactions:**
 - UC-CMD-01.a — `ProjectCommand.open` calls `ProjectServerContext.get(server)` first; if non-null, its `root` field is used directly without reading `SharedSettings`.
 - UC-CMD-01.b — If the context pin is null but `SharedSettings.projectRootPath` is non-blank, `ProjectRoot(Path.of(rootCfg).toAbsolutePath())` is constructed as the fallback root.
 - UC-CMD-01.c — `ProjectFolderTree.scan(root)` walks the root directory recursively; every subdirectory containing `.spec.kts` files is emitted as a `ProjectLeaf`; subdirectories that themselves contain further subdirectories are added to the `intermediates` set.
 - UC-CMD-01.d — `ProjectSession.get(player.uuid)?.activeSubpath` is read to embed the player's current active folder in the snapshot; this value is `null` if the player has no prior session.
-- UC-CMD-01.e — `ServerPlayNetworking.send(player, ProjectTreeSnapshotS2C(leaves, intermediates, currentSubpath))` delivers the snapshot; the client-side receiver creates and displays `ProjectScreen`.
+- UC-CMD-01.e — `ServerPlayNetworking.send(player, ProjectTreeSnapshotS2C(leaves, intermediates, currentSubpath))` delivers the snapshot; the client-side receiver (`ProjectClientNetworking`) calls `ProjectTreeState.onSnapshot(payload)`, which the Compose Explorer renders.
 - UC-CMD-01.f — The return value is `Command.SINGLE_SUCCESS` (integer 1); Brigadier records a successful execution.
 
 ---
@@ -62,7 +62,7 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 **Actor:** Server
 **Trigger:** Any snapshot build during `/redstonespecs project` dispatch (UC-CMD-01) where the executing player has an existing `ProjectSession`.
 **Preconditions:** `ProjectSession.get(player.uuid)` returns a non-null session with a non-null `activeSubpath`; the root resolves and the scan succeeds.
-**Outcome:** `ProjectTreeSnapshotS2C.currentSubpath` carries the player's active subpath string. The client uses this to pre-select the folder in `ProjectScreen`. If no session exists the field is `null` and no folder is pre-selected.
+**Outcome:** `ProjectTreeSnapshotS2C.currentSubpath` carries the player's active subpath string. The Compose Explorer uses this to mark the active leaf (a `●` marker). If no session exists the field is `null` and no leaf is marked.
 
 **System interactions:**
 - UC-CMD-04.a — `ProjectSession.get(player.uuid)` is called after the tree scan; it reads from a `ConcurrentHashMap` keyed by `UUID`.

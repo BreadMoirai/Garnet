@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.test
 
+import com.breadmoirai.redstonespecs.client.ide.ProjectTreeState
 import com.breadmoirai.redstonespecs.client.project.ProjectRootListScreen
 import com.breadmoirai.redstonespecs.client.project.ProjectScreen
 import com.breadmoirai.redstonespecs.client.screen.RedstoneIconButton
@@ -122,9 +123,9 @@ class ProjectEntryFlowSpec : ClientSpec({
         }
     }
 
-    test("/redstonespecs managed opens ProjectScreen client-side with the tree leaves") {
+    test("/redstonespecs managed pushes the tree snapshot to the client ProjectTreeState") {
         val tmp = Files.createTempDirectory("uc-man-cmd-")
-        val leaf = tmp.resolve("alpha").also { it.createDirectories() }
+        val leaf = tmp.resolve("cmdleaf").also { it.createDirectories() }
         leaf.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
 
         try {
@@ -136,20 +137,19 @@ class ProjectEntryFlowSpec : ClientSpec({
                 dispatcher.execute("redstonespecs project", player.createCommandSourceStack())
             }
 
-            waitForClientScreen(ProjectScreen::class.java)
-
-            val leafSubpaths = onClient { mc ->
-                // ProjectScreen captures the snapshot internally; read its private lastSnapshot
-                // so we don't depend on the rendered widget layout. (Cross-sourceset reflection
-                // because the field is `private` and we don't want a test-only accessor on the
-                // production screen.)
-                val f = ProjectScreen::class.java.getDeclaredField("lastSnapshot").apply { isAccessible = true }
-                val snap = f.get(mc.screen) as com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
-                snap.leaves.map { it.subpath }
+            // Task 5: the snapshot no longer auto-opens ProjectScreen; ProjectClientNetworking now
+            // feeds the Compose-observable ProjectTreeState. Wait for the pushed snapshot to land on
+            // the client, then verify the leaves it carried.
+            var leafSubpaths: List<String> = emptyList()
+            val deadline = System.currentTimeMillis() + 5000
+            while (System.currentTimeMillis() < deadline) {
+                leafSubpaths = onClient { _ ->
+                    ProjectTreeState.snapshot?.leaves?.map { it.subpath } ?: emptyList()
+                }
+                if (leafSubpaths == listOf("cmdleaf")) break
+                waitClientTicks(1)
             }
-            leafSubpaths shouldBe listOf("alpha")
-
-            runOnClient { mc -> mc.setScreen(null) }
+            leafSubpaths shouldBe listOf("cmdleaf")
         } finally {
             onServer { ProjectServerContext.clear(this) }
             tmp.toFile().deleteRecursively()
@@ -243,6 +243,15 @@ class ProjectEntryFlowSpec : ClientSpec({
                 dispatcher.execute("redstonespecs project", player.createCommandSourceStack())
             }
 
+            // Task 5 removed ProjectScreen auto-open (networking now feeds ProjectTreeState).
+            // ProjectScreen still exists until Task 7, so open it explicitly from the pushed
+            // snapshot to exercise its "New Spec" button + server-side file creation.
+            val deadline = System.currentTimeMillis() + 5000
+            while (System.currentTimeMillis() < deadline &&
+                onClient { _ -> ProjectTreeState.snapshot?.leaves?.map { it.subpath } } != listOf("alpha")) {
+                waitClientTicks(1)
+            }
+            runOnClient { mc -> mc.setScreen(ProjectScreen(ProjectTreeState.snapshot)) }
             waitForClientScreen(ProjectScreen::class.java)
 
             runOnClient { mc ->

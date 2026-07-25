@@ -25,6 +25,9 @@ class RedstonespecsClient : ClientModInitializer {
         registerViewportToggle()
         registerCursorFocusToggle()
         registerDockKeybinds()
+        // Seed the Project Explorer into the LEFT dock (region stays hidden until Shift+1 reveals it).
+        com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState.leftPanels
+            .add(com.breadmoirai.redstonespecs.client.ide.explorerPanel())
         LOGGER.debug("[RedstonespecsClient#onInitializeClient] client initialization complete")
     }
 }

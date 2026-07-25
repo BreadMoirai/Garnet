@@ -78,10 +78,15 @@ Network:
   `network/Packets.kt`.
 
 Client:
-- `client/project/ProjectScreen` — folder browser GUI.
+- `client/project/ProjectScreen` — legacy folder browser GUI (scheduled for hard-cut once the
+  Compose Project Explorer replaces it; still constructable and used by tests until then).
+- `client/ide/ProjectExplorerPanel` + `client/ide/ProjectTreeState` — the Compose dock panel that
+  now renders the folder tree. `ProjectTreeState` is `mutableStateOf`-backed client state fed by the
+  S2C receivers; `explorerPanel()` returns the LEFT-dock `Panel`. Clicking a leaf sends
+  `LoadProjectFolderC2S`; the Refresh row sends `ListProjectTreeC2S`.
 - `client/project/ProjectRootListScreen` — world-list-screen popup; persisted root list.
-- `client/project/ProjectClientNetworking` — S2C receivers (also opens `ProjectScreen` on
-  tree-snapshot when none open).
+- `client/project/ProjectClientNetworking` — S2C receivers. They feed `ProjectTreeState`
+  (snapshot/folder-loaded/save-report/error); they no longer open `ProjectScreen`.
 - `client/project/ProjectIntegratedBoot` — creates/opens the `project-<root>` save, pins
   context on `SERVER_STARTING`; `placeAll` runs on `SERVER_STARTED`.
 - `client/mixin/TitleScreenMixin` (Java) — injects "Project Specs…" button into the main
@@ -97,7 +102,8 @@ Client:
 - *"What gets saved?"* → `ProjectCellSaver.captureAndSaveIfDirty`, called from
   `ProjectDimLifecycle.saveFolder`.
 - *"How are folders placed in the overworld?"* → `ProjectDimRegistry.getOrAssignRegion`.
-- *"How does the GUI show the folder tree?"* → `ProjectScreen` + `ProjectTreeSnapshotS2C`.
+- *"How does the GUI show the folder tree?"* → `ProjectExplorerPanel` reading `ProjectTreeState`
+  (fed from `ProjectTreeSnapshotS2C`); legacy `ProjectScreen` renders the same snapshot until hard-cut.
 
 ## Known limitations (v1)
 
