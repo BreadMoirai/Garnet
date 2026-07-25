@@ -6,6 +6,7 @@ import com.breadmoirai.redstonespecs.client.network.registerClientNetworking
 import com.breadmoirai.redstonespecs.client.render.registerBoundsRenderer
 import com.breadmoirai.redstonespecs.client.render.registerHudOverlay
 import com.breadmoirai.redstonespecs.client.viewport.registerCursorFocusToggle
+import com.breadmoirai.redstonespecs.client.viewport.registerDockKeybinds
 import com.breadmoirai.redstonespecs.client.viewport.registerViewportToggle
 import net.fabricmc.api.ClientModInitializer
 import org.slf4j.LoggerFactory
@@ -23,6 +24,7 @@ class RedstonespecsClient : ClientModInitializer {
         registerHudOverlay()
         registerViewportToggle()
         registerCursorFocusToggle()
+        registerDockKeybinds()
         LOGGER.debug("[RedstonespecsClient#onInitializeClient] client initialization complete")
     }
 }

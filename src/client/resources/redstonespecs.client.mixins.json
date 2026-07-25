@@ -5,7 +5,9 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "ClientCommonPacketListenerImplAccessor",
+    "KeyboardHandlerMixin",
     "MinecraftPresentMixin",
+    "MouseHandlerMixin",
     "ScrollWheelHandlerMixin",
     "TitleScreenMixin",
     "WindowMixin"

@@ -16,7 +16,8 @@ feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was 
 `ComposeSceneHost(width, height, content)` is a generic `ImageComposeScene` wrapper (the spike's
 `ComposeScenePanel` generalized: content is now a constructor parameter). It renders the tree to a CPU
 raster `org.jetbrains.skia.Image` each frame (`render(nanos)`) and exposes pointer/scroll/key
-forwarders (`pointerMove/Press/Release`, `scroll`, `sendKey`) for Task 4's input routing.
+forwarders (`pointerMove/Press/Release`, `scroll`, `sendKey`) driven by `DockInputRouter`
+(see `dock-input-routing.md`).
 `ComposeSurface.ensureHost(w, h)` recreates it on window-size change and hosts `RedstoneDock(w, h)`.
 
 ## Layout is in **real framebuffer pixels**
