@@ -43,3 +43,36 @@ fun scanFolder(path: Path): FolderNode {
         .sortedWith(CHILD_ORDER)
     return FolderNode(path.name, children)
 }
+
+/**
+ * Every node under this folder paired with its `/`-joined path relative to this folder, in
+ * depth-first pre-order. The receiver itself is emitted first as `"" to this`. Child order
+ * follows [FolderNode.children] (folders-first, then files, alphabetical).
+ */
+fun FolderNode.walk(): Sequence<Pair<String, FileTreeNode>> = sequence {
+    suspend fun SequenceScope<Pair<String, FileTreeNode>>.visit(prefix: String, node: FileTreeNode) {
+        yield(prefix to node)
+        if (node is FolderNode) {
+            for (child in node.children) {
+                val childPath = if (prefix.isEmpty()) child.name else "$prefix/${child.name}"
+                visit(childPath, child)
+            }
+        }
+    }
+    visit("", this@walk)
+}
+
+/**
+ * Resolve a `/`-joined [path] (relative to this folder; `""` = the folder itself) to a node,
+ * or null if any segment is missing or a non-final segment is a file. Matches children by
+ * [name]; does not depend on holding a specific node instance.
+ */
+fun FolderNode.resolve(path: String): FileTreeNode? {
+    if (path.isEmpty()) return this
+    var current: FileTreeNode = this
+    for (segment in path.split('/')) {
+        val folder = current as? FolderNode ?: return null
+        current = folder.children.firstOrNull { it.name == segment } ?: return null
+    }
+    return current
+}

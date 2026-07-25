@@ -61,4 +61,42 @@ class FileTreeTest : FunSpec({
         val file = (tmp / "file.txt").also { it.writeText("") }
         scanFolder(file) shouldBe FolderNode("file.txt", emptyList())
     }
+
+    test("walk emits every node with its '/'-path, depth-first; root maps to empty string") {
+        val tmp = Files.createTempDirectory("ft-walk")
+        (tmp / "sub").createDirectories()
+        (tmp / "a.spec.kts").writeText("")
+        (tmp / "sub" / "b.spec.kts").writeText("")
+
+        val root = scanFolder(tmp)
+
+        root.walk().map { it.first }.toList() shouldContainExactly
+            listOf("", "sub", "sub/b.spec.kts", "a.spec.kts")
+    }
+
+    test("resolve round-trips every path from walk; empty path returns the receiver; missing returns null") {
+        val tmp = Files.createTempDirectory("ft-resolve")
+        (tmp / "sub").createDirectories()
+        (tmp / "sub" / "b.spec.kts").writeText("")
+
+        val root = scanFolder(tmp)
+
+        root.walk().forEach { (path, node) -> root.resolve(path) shouldBe node }
+        root.resolve("") shouldBe root
+        root.resolve("sub/missing.kts") shouldBe null
+        root.resolve("nope") shouldBe null
+    }
+
+    test("walk/resolve on a subfolder produce paths relative to that subfolder") {
+        val tmp = Files.createTempDirectory("ft-reroot")
+        (tmp / "sub" / "deep").createDirectories()
+        (tmp / "sub" / "deep" / "c.spec.kts").writeText("")
+
+        val root = scanFolder(tmp)
+        val sub = root.resolve("sub") as FolderNode
+
+        sub.walk().map { it.first }.toList() shouldContainExactly
+            listOf("", "deep", "deep/c.spec.kts")
+        sub.resolve("deep/c.spec.kts") shouldBe root.resolve("sub/deep/c.spec.kts")
+    }
 })
