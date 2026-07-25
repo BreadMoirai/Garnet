@@ -73,8 +73,8 @@ object ComposeSurface {
     private var surfaceWidth = 0
     private var surfaceHeight = 0
 
-    /** The real ComposeScene content (Step 3), recreated when the strip size changes. */
-    private var panel: ComposeScenePanel? = null
+    /** The full-window dock scene, recreated when the window size changes. */
+    private var host: ComposeSceneHost? = null
 
     /** Width (px) of the last surface we rendered — the full window width. Read by the overlay. */
     @Volatile
@@ -158,9 +158,9 @@ object ComposeSurface {
      * [GpuTextureView] the caller should blit into the composite, or `null` if Compose is disabled or
      * anything failed this frame. Must be called on the render thread with MC's GL context current.
      *
-     * Step 3 composes a real [ComposeScenePanel] into an off-screen raster [org.jetbrains.skia.Image]
-     * (pure CPU, no GL), then draws that image onto the GL FBO — so the pixels reaching the screen are
-     * produced by actual Compose, not hand-rolled Skia geometry.
+     * Composes the full-window [ComposeSceneHost] (hosting `RedstoneDock`) into an off-screen raster
+     * [org.jetbrains.skia.Image] (pure CPU, no GL), then draws that image onto the GL FBO — so the
+     * pixels reaching the screen are produced by actual Compose, not hand-rolled Skia geometry.
      */
     fun renderFrame(width: Int, height: Int): GpuTextureView? {
         if (disabled) return null
@@ -171,10 +171,10 @@ object ComposeSurface {
         return try {
             val ctx = ensureDirectContext() ?: return null
             val s = ensureSurface(ctx, width, height) ?: return null
-            val p = ensurePanel(width, height)
+            val h = ensureHost(width, height)
 
             // Compose the frame on Compose's own raster surface (no GL), then upload the one image.
-            val image = p.render(System.nanoTime())
+            val image = h.render(System.nanoTime())
             saveGlState(saved)
             val unpack = saveAndResetUnpack()
             try {
@@ -210,35 +210,37 @@ object ComposeSurface {
         }
     }
 
-    private fun ensurePanel(width: Int, height: Int): ComposeScenePanel {
-        panel?.let { if (it.width == width && it.height == height) return it }
-        panel?.close()
-        val p = ComposeScenePanel(width, height)
-        panel = p
-        logger.info("[compose-spike] ComposeScene panel ({}x{}) created", width, height)
-        return p
+    private fun ensureHost(width: Int, height: Int): ComposeSceneHost {
+        host?.let { if (it.width == width && it.height == height) return it }
+        host?.close()
+        val h = ComposeSceneHost(width, height) {
+            com.breadmoirai.redstonespecs.client.ui.compose.dock.RedstoneDock(width, height)
+        }
+        host = h
+        logger.info("[compose] RedstoneDock scene ({}x{}) created", width, height)
+        return h
     }
 
-    // --- Input (Task 2): forward GLFW-derived pointer events into the live ComposeScene ------------
-    // Panel-local coords == strip-local screen coords (Compose draws top-down; the BOTTOM_LEFT surface
+    // --- Input (Task 4): forward GLFW-derived pointer/scroll/key events into the live dock scene ----
+    // Scene-local coords == window-local screen coords (Compose draws top-down; the BOTTOM_LEFT surface
     // + flipV blit presents it upright, so no Y flip is needed for hit-testing).
 
-    /** Panel-local centre of the demo button, or null if no panel yet. */
-    val buttonCenter: Offset? get() = panel?.buttonCenter
+    // TODO(Task 7): remove — temporary no-op stand-ins so the retired ComposeOverlaySpec still compiles.
+    val buttonCenter: Offset? get() = null
+    val clickCount: Int get() = 0
 
-    /** Compose-registered click count on the demo button (proof input reached Compose). */
-    val clickCount: Int get() = panel?.clickCount ?: 0
+    fun sendPointerMove(pos: Offset) = guardedInput { host?.pointerMove(pos) }
+    fun sendPointerPress(pos: Offset) = guardedInput { host?.pointerPress(pos) }
+    fun sendPointerRelease(pos: Offset) = guardedInput { host?.pointerRelease(pos) }
+    fun sendScroll(pos: Offset, delta: Offset) = guardedInput { host?.scroll(pos, delta) }
+    fun sendKey(event: androidx.compose.ui.input.key.KeyEvent) = guardedInput { host?.sendKey(event) }
 
-    fun sendPointerMove(pos: Offset) = guardedPointer { panel?.pointerMove(pos) }
-    fun sendPointerPress(pos: Offset) = guardedPointer { panel?.pointerPress(pos) }
-    fun sendPointerRelease(pos: Offset) = guardedPointer { panel?.pointerRelease(pos) }
-
-    private inline fun guardedPointer(block: () -> Unit) {
+    private inline fun guardedInput(block: () -> Unit) {
         if (disabled) return
         try {
             block()
         } catch (t: Throwable) {
-            kill("ComposeScene pointer dispatch failed", t)
+            kill("ComposeScene input dispatch failed", t)
         }
     }
 
@@ -311,7 +313,7 @@ object ComposeSurface {
         surface?.close(); surface = null
         backendRt?.close(); backendRt = null
         target?.destroyBuffers(); target = null
-        panel?.close(); panel = null
+        host?.close(); host = null
         surfaceWidth = 0; surfaceHeight = 0
     }
 

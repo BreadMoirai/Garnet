@@ -77,6 +77,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         CursorFocusToggleSpec::class,
                         ComposeOverlaySpec::class,
                         DockInsetsSpec::class,
+                        DockRenderSpec::class,
                     ),
                 )
             } catch (t: Throwable) {

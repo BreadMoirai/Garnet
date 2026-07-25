@@ -86,8 +86,10 @@ class ComposeOverlaySpec : ClientSpec({
             "[compose-spike] pressed proof: {} — Compose clickCount {} -> {} (disabled={})",
             pressed, clicksBefore, clicksAfter, ComposeSurface.disabled,
         )
-        // Only assert input reactivity if Compose actually rendered (not a NO-GO disable).
-        if (!ComposeSurface.disabled) {
+        // Only assert input reactivity if Compose actually rendered (not a NO-GO disable) AND the
+        // demo button still exists. Task 3 replaced the spike's demo panel with RedstoneDock, so
+        // buttonCenter/clickCount are now no-op stand-ins (null/0); this whole spec is retired in Task 7.
+        if (!ComposeSurface.disabled && ComposeSurface.buttonCenter != null) {
             (clicksAfter > clicksBefore).shouldBeTrue()
         }
 

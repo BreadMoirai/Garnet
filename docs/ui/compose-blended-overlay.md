@@ -10,9 +10,10 @@ summary: BlitUvPipeline gained a premultiplied-alpha blend pipeline so the Compo
 `ComposeSurface` at the width of the viewport's reserved-left strip and blit it as an **opaque**
 rectangle. It now renders `ComposeSurface` at the **full real window size** and alpha-blends it over
 the already-composited world with `BlitUvPipeline.blit(..., blend = true)`. Only the pixels Compose
-actually paints (the small panel, its text, its button) end up opaque; everywhere else the canvas is
-cleared to `0x00000000` (`ComposeSurface.kt`, `s.canvas.clear(...)`) and `ComposeScenePanel`'s root
-`Box` background is `Color(0x00000000)`, so the live game world composited underneath shows through.
+actually paints (the dock's edge regions — tab strips + panel bodies) end up opaque; everywhere else
+the canvas is cleared to `0x00000000` (`ComposeSurface.kt`, `s.canvas.clear(...)`) and `RedstoneDock`'s
+root `Box` (hosted by `ComposeSceneHost`) has **no** background — its transparent CENTER leaves those
+pixels untouched — so the live game world composited underneath shows through.
 
 ## The blend pipeline: MC 26.2's actual API (not what you'd guess from older MC)
 
