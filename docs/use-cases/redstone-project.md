@@ -15,7 +15,7 @@ A project root is a folder of `.spec.kts` files projected into a runtime-generat
 
 User registers a filesystem folder as a project-spec root; that registration survives MC restarts.
 
-- **UC-MAN-01.a** The user opens `ProjectRootListScreen` (injected as a "Project Specs…" button on `TitleScreen` via `TitleScreenMixin`) and types an absolute path into the `EditBox`.
+- **UC-MAN-01.a** The `TitleScreenMixin` injects a "Redstone Projects…" button on `TitleScreen`; clicking it now calls `ProjectIntegratedBoot.bootWorkspace()` to boot the shared flat-void workspace world directly (project folders are loaded/unloaded in-world). It no longer opens `ProjectRootListScreen`, which survives as an orphaned screen pending removal.
 - **UC-MAN-01.b** Clicking "Add" appends the path to the in-memory list and immediately calls `ProjectRootsConfig.save(configPath, roots)`, writing a JSON array to `<MC-config-dir>/redstonespecs/project-roots.json`.
 - **UC-MAN-01.c** On next client launch `ProjectRootsConfig.load(configPath)` re-reads the file; the root appears in the list without re-entry.
 - **UC-MAN-01.d** Clicking "X" beside a root removes it from the list and re-saves the config; the entry disappears immediately on `rebuildWidgets`.

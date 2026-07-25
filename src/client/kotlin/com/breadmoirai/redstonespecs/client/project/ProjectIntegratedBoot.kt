@@ -38,6 +38,15 @@ object ProjectIntegratedBoot {
     private val pendingRoot = AtomicReference<ProjectRoot?>()
     private val initialized = AtomicBoolean(false)
 
+    /** Fixed workspace save the main-menu button boots into; project folders are loaded/unloaded in-world. */
+    private const val WORKSPACE_SAVE = "redstonespecs-workspace"
+
+    /** Boots (opens or creates) the shared flat-void workspace world, without pinning a project root. */
+    fun bootWorkspace() {
+        ensureListenersRegistered()
+        openOrCreateWorld(WORKSPACE_SAVE)
+    }
+
     private fun ensureListenersRegistered() {
         if (!initialized.compareAndSet(false, true)) return
         ServerLifecycleEvents.SERVER_STARTING.register(ServerLifecycleEvents.ServerStarting { server ->

@@ -16,11 +16,14 @@ See `docs/superpowers/specs/2026-05-08-managed-redstone-worlds-design.md` for th
 
 ## Canvas: a mod-created flat-void singleplayer save
 
-The mod creates the singleplayer save itself, once per project root. From the
-main menu, the user picks a project root via `ProjectRootListScreen`;
-`ProjectIntegratedBoot.boot(rootPath)` then either re-opens the existing save for that root
-or creates a fresh flat-void singleplayer save (creative, peaceful, allow-commands) using
-`WorldOpenFlows.createFreshLevel` with `FlatLevelGeneratorPresets.THE_VOID`.
+The mod creates the singleplayer save itself. From the main menu, the "Redstone Projects…"
+button calls `ProjectIntegratedBoot.bootWorkspace()`, which opens (or creates) a single
+shared flat-void workspace save named `redstonespecs-workspace` — root-agnostic; project
+folders are loaded/unloaded in-world. Both `bootWorkspace()` and the per-root
+`ProjectIntegratedBoot.boot(rootPath)` reuse the same private `openOrCreateWorld` machinery:
+either re-open the existing save, or create a fresh flat-void singleplayer save (creative,
+peaceful, allow-commands) via `WorldOpenFlows.createFreshLevel` with
+`FlatLevelGeneratorPresets.THE_VOID`.
 
 The save name is `project-<root-tail>-<8-hex-pathHash>` (see `ProjectSaveNaming`). Saves are
 **persistent across sessions** — re-opening a project root opens the same save and any
