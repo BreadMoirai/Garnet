@@ -35,4 +35,11 @@ object ProjectTreeState {
     fun toggleExpanded(subpath: String) {
         if (!expanded.remove(subpath)) expanded.add(subpath)
     }
+
+    /** Test/reset hook: clears the snapshot, status, and expanded set back to initial values. */
+    fun reset() {
+        snapshot = null
+        status = ""
+        expanded.clear()
+    }
 }

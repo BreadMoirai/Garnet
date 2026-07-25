@@ -129,6 +129,7 @@ class ProjectEntryFlowSpec : ClientSpec({
         leaf.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
 
         try {
+            runOnClient { ProjectTreeState.reset() }
             onServer {
                 val player = this.overworld().players().firstOrNull() ?: error("no overworld player")
                 ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp.toAbsolutePath())))
@@ -231,6 +232,7 @@ class ProjectEntryFlowSpec : ClientSpec({
         leaf.resolve("a.spec.kts").writeText(RecordingDslEmitter.emitStub("a"))
 
         try {
+            runOnClient { ProjectTreeState.reset() }
             onServer {
                 val player = this.overworld().players().firstOrNull() ?: error("no overworld player")
                 ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp.toAbsolutePath())))

@@ -11,7 +11,7 @@ import com.breadmoirai.redstonespecs.network.project.ProjectLeafEntry
 import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.redstonespecs.testing.ClientSpec
 import io.kotest.matchers.booleans.shouldBeTrue
-import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.shouldBe
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -27,12 +27,16 @@ class ProjectExplorerSpec : ClientSpec({
 
     test("Explorer renders a project tree snapshot") {
         closeClientScreen(); waitClientTicks(2)
+        val leaves = listOf(ProjectLeafEntry("adders/full-adder", 3), ProjectLeafEntry("clocks/ring", 1))
+        val intermediates = listOf("adders", "clocks")
+        val currentSubpath = "adders/full-adder"
         runOnClient { mc ->
             DockState.reset()
+            ProjectTreeState.reset()
             ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(
-                leaves = listOf(ProjectLeafEntry("adders/full-adder", 3), ProjectLeafEntry("clocks/ring", 1)),
-                intermediates = listOf("adders", "clocks"),
-                currentSubpath = "adders/full-adder",
+                leaves = leaves,
+                intermediates = intermediates,
+                currentSubpath = currentSubpath,
             ))
             DockState.leftPanels.add(explorerPanel())
             DockState.setVisible(DockRegion.LEFT, true)
@@ -41,7 +45,9 @@ class ProjectExplorerSpec : ClientSpec({
             (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
         }
         waitClientTicks(12)
-        ProjectTreeState.snapshot shouldNotBe null
+        ProjectTreeState.snapshot?.leaves?.map { it.subpath } shouldBe leaves.map { it.subpath }
+        ProjectTreeState.snapshot?.intermediates shouldBe intermediates
+        ProjectTreeState.snapshot?.currentSubpath shouldBe currentSubpath
         capture("explorer_tree.png")   // controller verifies: tree rows for adders/, clocks/, leaves
 
         runOnClient { mc ->
