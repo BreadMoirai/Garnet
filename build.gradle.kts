@@ -195,14 +195,28 @@ dependencies {
     // exists, which would drag ui/foundation to alpha03 and a different skiko); the Button is built from
     // foundation's clickable + hoverable + InteractionSource, which is pure Compose interaction plumbing.
     //
-    // `runtime` goes on the BASE `implementation`, not `clientImplementation`: the Compose compiler
-    // plugin is applied project-wide and its VersionChecker fails ANY compilation (incl. `main`, `test`)
-    // that lacks the Compose runtime on its classpath, even ones with no @Composable. Putting the
-    // runtime on the base configuration (which every source set extends) satisfies the checker
-    // everywhere; only `ui`/`foundation` (actually used by the composables) stay client-scoped.
-    implementation("org.jetbrains.compose.runtime:runtime-desktop:1.12.0-beta02")
+    // `runtime` is `clientImplementation`-scoped, same as `ui`/`foundation`, keeping Compose out of
+    // the server jar entirely (see docs/build/compose-runtime-scoping.md). This only works because
+    // the compiler-plugin-classpath strip below removes the Compose compiler subplugin from the
+    // non-client `KotlinCompile` tasks; without that strip, the project-wide Compose compiler plugin's
+    // VersionChecker fails `main`/`test`/`gametest` compilation for lacking the runtime on their classpath.
+    "clientImplementation"("org.jetbrains.compose.runtime:runtime-desktop:1.12.0-beta02")
     "clientImplementation"("org.jetbrains.compose.ui:ui-desktop:1.12.0-beta02")
     "clientImplementation"("org.jetbrains.compose.foundation:foundation-desktop:1.12.0-beta02")
+}
+
+// Compose compiler plugin is applied project-wide (plugins {}); it only needs to run on the
+// compilations that contain @Composable code (client, clientTest). Strip it from the others
+// (main, test, gametest) by filtering the Compose subplugin out of their KotlinCompile
+// pluginClasspath — this is what lets `runtime-desktop` above stay client-scoped instead of
+// sitting on the base `implementation` for every source set. See
+// docs/build/compose-runtime-scoping.md for what was tried and why this approach was chosen.
+listOf("compileKotlin", "compileTestKotlin", "compileGametestKotlin").forEach { name ->
+    tasks.findByName(name)?.let { t ->
+        (t as org.jetbrains.kotlin.gradle.tasks.KotlinCompile).pluginClasspath.setFrom(
+            t.pluginClasspath.filter { !it.name.contains("compose") }
+        )
+    }
 }
 
 tasks {
