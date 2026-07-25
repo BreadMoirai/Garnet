@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
 tags: [compose, dock, input, mixin, glfw, keybind]
-summary: How raw GLFW pointer/key callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, and the Alt+1/Shift+1 keybinds.
+summary: How raw GLFW pointer/key callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds, and ESC-drops-focus.
 ---
 
 # Dock input routing
@@ -49,8 +49,16 @@ descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel van
   relies on (pointer-driven interactions).
 - **Key→Compose translation is deferred.** `KeyboardHandlerMixin` currently only *cancels* game keys
   while focused (so movement/hotbar don't leak); it does not yet build a Compose `KeyEvent`.
-  `DockInputRouter` has no `onGlfwKey/Char` yet. **ESC is deliberately never swallowed** so focus can
-  always be dropped by higher-level handling.
+  `DockInputRouter` has no `onGlfwChar` yet.
+- **ESC drops dock focus.** `DockInputRouter.onGlfwKey(key, action)` is the ESC policy, called from
+  `KeyboardHandlerMixin` for every key while captured. While captured, a plain key-**press** of ESC
+  calls `clearFocus()` and returns `true` ("consumed"); the mixin then cancels the callback, so
+  vanilla ESC (pause menu) never runs on top of a dropped dock focus. ESC release/repeat and all
+  other keys return `false` but are still cancelled by the mixin (same as before) since the game must
+  not see keystrokes while a panel is focused. When not captured, `onGlfwKey` always returns `false`
+  and the mixin returns before touching `ci`, so ESC is byte-for-byte vanilla (opens the pause menu
+  as normal). This closes the previous total-input-lockout bug where ESC opened the pause menu while
+  `captured` stayed true, and the mouse mixin then swallowed clicks on that menu too.
 
 ## Keybinds (`DockKeybinds.kt`)
 
@@ -71,4 +79,9 @@ Registered from `RedstonespecsClient.onInitializeClient()` next to `registerView
 `clickable` Box wired to an `AtomicInteger`, focuses via `DockInputRouter.focus(LEFT)`, drives a
 `onGlfwMove` + `onGlfwPress`/`onGlfwRelease` through the **real** router→`ComposeSurface`→scene path
 at the element's window coords, and asserts the counter incremented (skipped only if
-`ComposeSurface.disabled`). It is registered in `ClientTestSentinel` (autoscan is off).
+`ComposeSurface.disabled`). A second `DockInputSpec` case is a pure router-level test (no
+mixin/GLFW window needed) covering the ESC policy: focuses LEFT, calls
+`DockInputRouter.onGlfwKey(GLFW_KEY_ESCAPE, GLFW_PRESS)` and asserts it returns `true` and
+`DockState.focusedRegion` becomes `null`; asserts a non-ESC key returns `false` and leaves focus
+intact; and asserts ESC returns `false` when not captured. It is registered in `ClientTestSentinel`
+(autoscan is off).

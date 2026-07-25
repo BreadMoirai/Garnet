@@ -9,7 +9,10 @@ import com.breadmoirai.redstonespecs.client.ui.compose.input.DockInputRouter
 import com.breadmoirai.redstonespecs.client.viewport.ViewportState
 import com.breadmoirai.redstonespecs.client.viewport.WindowViewportExt
 import com.breadmoirai.redstonespecs.testing.ClientSpec
+import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import org.lwjgl.glfw.GLFW
 import java.util.concurrent.atomic.AtomicInteger
 
 class DockInputSpec : ClientSpec({
@@ -61,5 +65,34 @@ class DockInputSpec : ClientSpec({
             (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
         }
         waitClientTicks(6)
+    }
+
+    test("ESC drops dock focus; other keys and uncaptured ESC are left alone") {
+        runOnClient { DockState.reset() }
+        waitClientTicks(2)
+
+        // Uncaptured: ESC must be reported as not-consumed (vanilla untouched).
+        runOnClient {
+            DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS).shouldBeFalse()
+        }
+
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(2)
+        runOnClient { DockState.focusedRegion.shouldNotBeNull() }
+
+        // A non-ESC key while captured must not drop focus and must report not-consumed.
+        runOnClient {
+            DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_A, GLFW.GLFW_PRESS).shouldBeFalse()
+            DockState.focusedRegion.shouldNotBeNull()
+        }
+
+        // ESC-press while captured drops focus and reports consumed.
+        runOnClient {
+            DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS).shouldBeTrue()
+            DockState.focusedRegion.shouldBeNull()
+        }
+
+        runOnClient { DockInputRouter.clearFocus(); DockState.reset() }
+        waitClientTicks(2)
     }
 })

@@ -5,6 +5,7 @@ import com.breadmoirai.redstonespecs.client.ui.compose.ComposeSurface
 import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
 import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
 import net.minecraft.client.Minecraft
+import org.lwjgl.glfw.GLFW
 
 /**
  * Bridges raw GLFW input (forwarded by MouseHandlerMixin/KeyboardHandlerMixin) into the full-window
@@ -52,5 +53,17 @@ object DockInputRouter {
 
     fun onGlfwScroll(dx: Double, dy: Double) {
         if (captured) ComposeSurface.sendScroll(Offset(lastX.toFloat(), lastY.toFloat()), Offset(dx.toFloat(), dy.toFloat()))
+    }
+
+    /**
+     * ESC policy for the dock's key mixin. While [captured], a plain key-press of ESC drops focus
+     * and reports "consumed" so the mixin cancels vanilla handling (no pause-menu open). Any other
+     * key, action, or the uncaptured state falls through untouched.
+     */
+    fun onGlfwKey(key: Int, action: Int): Boolean {
+        if (!captured) return false
+        if (key != GLFW.GLFW_KEY_ESCAPE || action != GLFW.GLFW_PRESS) return false
+        clearFocus()
+        return true
     }
 }
