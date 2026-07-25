@@ -20,9 +20,11 @@ A `clientTest` (`ComposeOverlaySpec`) toggles the viewport shrink on, enables th
 several frames, drives pointer events into the scene, and captures composites (under
 `versions/26.1/run/screenshots/`, git-ignored run artifacts):
 
-- `compose_in_mc_scene.png` — the real Compose panel (dark `Box`, white `Text` "Compose in MC", a blue
-  button "Click me • clicks=0") in the reserved-left strip, alongside the live world in the centered
-  viewport. Compose pixels reach the screen; MC renders correctly the same frame.
+- `compose_in_mc_scene.png` — the real Compose panel (a small opaque panel with white `Text`
+  "Compose in MC" and a blue button "Click me • clicks=0") blitted full-window with premultiplied-alpha
+  blending, so the live world composited underneath shows through everywhere Compose left transparent
+  (see `docs/ui/compose-blended-overlay.md`). Compose pixels reach the screen; MC renders correctly the
+  same frame.
 - `compose_in_mc_stable.png` — after 20 more frames: **no GL-state drift, no flicker, no crash.**
 - `compose_input_hover.png` / `compose_input_pressed.png` — after a `sendPointerEvent` Move then
   Press at the button centre, the button lightens and the label flips to "Pressed!". The test asserts

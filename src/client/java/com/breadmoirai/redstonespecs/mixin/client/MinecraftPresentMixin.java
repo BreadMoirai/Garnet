@@ -88,11 +88,12 @@ public abstract class MinecraftPresentMixin {
         // flipV=true: the game texture is a Blaze3D render-target color texture (stored bottom-up),
         // so it must be mirrored vertically to present upright — same flip vanilla's screenshot
         // readback applies. Without it the world renders upside-down in the sub-rect.
-        BlitUvPipeline.INSTANCE.blit(gameTexture, composite, x1, y1, x2, y2, true);
+        BlitUvPipeline.INSTANCE.blit(gameTexture, composite, x1, y1, x2, y2, true, false);
 
-        // Compose-in-MC feasibility spike: after the world blit, draw the Skia/Compose panel into the
-        // reserved-left strip. Fully guarded inside ComposeOverlay (and again here) so any Skia/Skiko
-        // failure falls back to the plain solid-edge composite rather than breaking present.
+        // Compose-in-MC feasibility spike: after the world blit, alpha-blend the full-window
+        // Skia/Compose panel over the composite, so the world blitted above shows through the
+        // transparent surround. Fully guarded inside ComposeOverlay (and again here) so any
+        // Skia/Skiko failure falls back to the plain solid-edge composite rather than breaking present.
         try {
             ComposeOverlay.INSTANCE.renderInto(composite, realWidth, realHeight);
         } catch (Throwable composeFailure) {

@@ -76,7 +76,7 @@ object ComposeSurface {
     /** The real ComposeScene content (Step 3), recreated when the strip size changes. */
     private var panel: ComposeScenePanel? = null
 
-    /** Width (px) of the last surface we rendered — the reserved-left strip. Read by the overlay. */
+    /** Width (px) of the last surface we rendered — the full window width. Read by the overlay. */
     @Volatile
     var lastWidth: Int = 0
         private set
@@ -154,7 +154,7 @@ object ComposeSurface {
     }
 
     /**
-     * Render one Skia frame into a [width] x [height] surface (the reserved-left panel) and return the
+     * Render one Skia frame into a [width] x [height] surface (the full window) and return the
      * [GpuTextureView] the caller should blit into the composite, or `null` if Compose is disabled or
      * anything failed this frame. Must be called on the render thread with MC's GL context current.
      *
@@ -185,7 +185,7 @@ object ComposeSurface {
                         image.width, image.height, width, height, unpack[1], unpack[2],
                     )
                 }
-                s.canvas.clear(0xFF1B2433.toInt())
+                s.canvas.clear(0x00000000)   // fully transparent; Compose paints its own opaque regions
                 s.canvas.drawImage(image, 0f, 0f)
                 s.flush()
                 ctx.flush()

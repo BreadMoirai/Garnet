@@ -1,6 +1,8 @@
 package com.breadmoirai.redstonespecs.client.viewport
 
 import com.mojang.blaze3d.buffers.GpuBuffer
+import com.mojang.blaze3d.pipeline.BlendFunction
+import com.mojang.blaze3d.pipeline.ColorTargetState
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.systems.RenderSystem
@@ -50,6 +52,26 @@ object BlitUvPipeline {
         .build()
 
     /**
+     * Blend variant for premultiplied-alpha sources (Skia/Compose): `dst = src + dst*(1-srcA)`.
+     *
+     * MC 26.2's [RenderPipeline.Builder] has no `withBlend(...)` method and
+     * `SourceFactor`/`DestFactor` are top-level types under `com.mojang.blaze3d.platform`
+     * (not nested in `GlStateManager`). Blending is configured via
+     * [RenderPipeline.Builder.withColorTargetState] with a [ColorTargetState] wrapping a
+     * [BlendFunction]. [BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA] already encodes the
+     * exact `(ONE, ONE_MINUS_SRC_ALPHA)` factors needed for both the color and alpha channels.
+     */
+    val PIPELINE_BLEND: RenderPipeline = RenderPipeline.builder()
+        .withLocation(Identifier.fromNamespaceAndPath(NAMESPACE, "pipeline/blit_uv_blend"))
+        .withVertexShader(Identifier.fromNamespaceAndPath(NAMESPACE, "core/blit_uv"))
+        .withFragmentShader(Identifier.fromNamespaceAndPath(NAMESPACE, "core/blit_uv"))
+        .withSampler("InSampler")
+        .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+        .withCull(false)
+        .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA))
+        .build()
+
+    /**
      * Blit [from] into the sub-rect of [to] described by the normalized rectangle
      * `(x1,y1)`..`(x2,y2)`, where `(0,0)` is the top-left of the target and `(1,1)`
      * the bottom-right. The full source texture is sampled across the rect.
@@ -59,8 +81,12 @@ object BlitUvPipeline {
      * `Screenshot` readback compensates for with `height - y - 1`. Sampling one with the default
      * top-left UV mapping would present it upside-down. The default (`false`) keeps the plain
      * top-left-origin mapping for ordinary textures (atlases, PNG-backed textures).
+     *
+     * [blend] selects [PIPELINE_BLEND] instead of the opaque [PIPELINE], alpha-compositing
+     * [from] over the existing contents of [to] (premultiplied-alpha over). Use this for
+     * Skia/Compose surfaces so transparent regions let the destination show through.
      */
-    fun blit(from: GpuTextureView, to: RenderTarget, x1: Float, y1: Float, x2: Float, y2: Float, flipV: Boolean = false) {
+    fun blit(from: GpuTextureView, to: RenderTarget, x1: Float, y1: Float, x2: Float, y2: Float, flipV: Boolean = false, blend: Boolean = false) {
         // Normalized (top-left origin) -> NDC. X: [0,1] -> [-1,1]. Y is flipped
         // because NDC Y grows upward while our normalized Y grows downward.
         val ndcX1 = x1 * 2f - 1f
@@ -94,7 +120,7 @@ object BlitUvPipeline {
             device.createCommandEncoder()
                 .createRenderPass({ "RedstoneSpecs blit_uv" }, target, OptionalInt.empty())
                 .use { pass ->
-                    pass.setPipeline(PIPELINE)
+                    pass.setPipeline(if (blend) PIPELINE_BLEND else PIPELINE)
                     pass.bindTexture("InSampler", from, sampler)
                     pass.setVertexBuffer(0, vertexBuffer)
                     pass.setIndexBuffer(indexBuffer, indexType)

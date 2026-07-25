@@ -75,7 +75,7 @@ class ComposeScenePanel(val width: Int, val height: Int) : AutoCloseable {
 
     @Composable
     private fun Content() {
-        Box(Modifier.fillMaxSize().background(Color(0xFF1B2433))) {
+        Box(Modifier.fillMaxSize().background(Color(0x00000000))) {
             BasicText(
                 "Compose in MC",
                 modifier = Modifier.offset(16.dp, 20.dp),

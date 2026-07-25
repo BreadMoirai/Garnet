@@ -17,9 +17,10 @@ import java.nio.file.Path
  *
  * Turns the viewport on, enables [ComposeOverlay], lets several frames render so [ComposeSurface]
  * stands up a Skia [org.jetbrains.skia.DirectContext] on MC's live GL context and draws a real
- * `ImageComposeScene` (Compose `Box`/`Text`/button) into the reserved-left strip, and captures the
- * composite. It then drives GLFW-style pointer events into the scene (Step 2 / Task 2) and captures
- * the reacted state, asserting Compose itself registered the click.
+ * `ImageComposeScene` (Compose `Box`/`Text`/button) full-window, alpha-blended over the composited
+ * world (Task 1: full-window transparent overlay), and captures the composite. It then drives
+ * GLFW-style pointer events into the scene (Step 2 / Task 2) and captures the reacted state,
+ * asserting Compose itself registered the click.
  *
  * The spec never hard-fails on a Compose *disable*: if Skiko can't load or Skia can't coexist, that is
  * a legitimate NO-GO outcome, so we log [ComposeSurface.disabled]/reason and still assert the client
