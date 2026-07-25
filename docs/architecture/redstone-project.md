@@ -52,6 +52,12 @@ Pure data:
 - `ProjectRoot` — absolute folder + path-traversal-safe `resolveSubpath` (with symlink defeat
   and `InvalidPathException` guard).
 - `ProjectFolderTree` — leaves vs intermediates scan.
+- `FileTree` — recursive tree model (`FolderNode`/`FileNode` under sealed `FileTreeNode`) built by
+  `scanFolder(path)`; mirrors the whole folder (all files/folders, incl. empty), folders-first
+  ordering. Paths are **computed, not stored** — `FolderNode.walk()` (node→path) and
+  `FolderNode.resolve(path)` (path→node), both relative to whichever folder is the root, so
+  re-rooting is free. **Not yet wired** to the network payload or the Explorer, which still use
+  the flat `ProjectFolderTree`.
 - `GridLayout` — `(specs, cellSize, gap, rowMax, yBase) → cells`.
 - `ProjectCell` — pure cell record (origin + size).
 - `ProjectSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation (pure
