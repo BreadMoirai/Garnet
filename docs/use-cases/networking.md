@@ -11,24 +11,31 @@ Spec content never crosses the wire as JSON. Payloads carry origin-relative coor
 
 These UCs cover the recorder/runner C2S/S2C flow only. Project-dim payloads (`network/project/*`) belong in [redstone-project.md](redstone-project.md).
 
+**UI status:** `RecorderScreen`/`RunnerScreen` were deleted in the Compose-dock hard-cut. The server
+still builds and sends `OpenRecorderScreenS2C`/`OpenRunnerScreenS2C`/`RunnerStatusS2C` exactly as
+before (UC-NET-01.a still holds server-side); `ClientNetworkHandler`'s receivers for those three
+payload types are now **no-ops that only log** (`"recorder UI removed (returns as a panel in
+sub-project A/B); ignoring open"`) — no screen opens and no client-side UI state exists to update.
+UC-NET-01.b–d and UC-NET-03.e below describe that no-op reality, not a screen.
+
 ---
 
-### UC-NET-01 — Client requests recorder screen state from the server
+### UC-NET-01 — Client requests recorder screen state from the server (server side is live; client is a no-op)
 
 **Actor:** Player
 **Trigger:** Player right-clicks a placed `RedstoneSpecRecorderBlock`; the block's `useWithoutItem` calls `ServerPlayNetworking.send` with `OpenRecorderScreenS2C`.
-**Preconditions:** The block entity at the clicked position is a `SpecBlockEntity`; the player is in a `ServerLevel`; no recorder screen is currently open on the client.
-**Outcome:** `RecorderScreen` is open on the client, pre-populated with the block entity's current `specId`, `outPath`, `structureId`, and `state` fields as reported by the server.
+**Preconditions:** The block entity at the clicked position is a `SpecBlockEntity`; the player is in a `ServerLevel`.
+**Outcome:** The server sends `OpenRecorderScreenS2C` exactly as before; the client's registered receiver executes on the main thread and logs that the recorder UI is removed. No screen opens; there is currently no live UI to reach a recorder block's state from the client (see `ui/dock-framework.md` — a future Explorer-adjacent panel is the intended replacement).
 
 **System interactions:**
-- UC-NET-01.a — On the server side the block resolves the `SpecBlockEntity` at `blockPos` and builds an `OpenRecorderScreenS2C` payload carrying `originPos`, `specId`, `outPath`, `structureId`, and the current recorder state string.
-- UC-NET-01.b — `ClientNetworkHandler.registerClientNetworking` registers the `OpenRecorderScreenS2C.TYPE` receiver; on arrival the handler executes on the client main thread via `mc.execute`.
-- UC-NET-01.c — The handler instantiates `RecorderScreen(originPos, initialSpecId, initialOutPath, initialStructureId, initialState)` and calls `mc.setScreen`; the client screen holds `originPos` so subsequent C2S packets route back to the same BE.
-- UC-NET-01.d — No C2S packet is sent to open the screen; the server is the initiator of the `OpenRecorderScreenS2C` send — the UI state is never reconstructed by the client from local data.
+- UC-NET-01.a — On the server side the block resolves the `SpecBlockEntity` at `blockPos` and builds an `OpenRecorderScreenS2C` payload carrying `originPos`, `specId`, `outPath`, `structureId`, and the current recorder state string. Unchanged by the hard-cut.
+- UC-NET-01.b — `ClientNetworkHandler.registerClientNetworking` still registers the `OpenRecorderScreenS2C.TYPE` receiver; on arrival the handler executes on the client main thread via `mc.execute` and only logs — it does not instantiate any screen.
+- UC-NET-01.c — No screen is instantiated. `mc.setScreen` is never called for this payload; the payload's fields (`specId`, `outPath`, `structureId`, `state`) are read from the log line only, not surfaced in any widget.
+- UC-NET-01.d — No C2S packet is sent to open the screen; the server is still the sole initiator of the `OpenRecorderScreenS2C` send, even though the client now discards it.
 
 **Invariants:** [persistence/network-payload-contract.md](../persistence/network-payload-contract.md) — server is the only writer; client carries no cached spec state.
 
-**Edge cases referenced elsewhere:** UC-NET-04 (disconnect before screen arrives).
+**Edge cases referenced elsewhere:** UC-NET-04 (disconnect before payload arrives).
 
 ---
 
@@ -49,21 +56,21 @@ These UCs cover the recorder/runner C2S/S2C flow only. Project-dim payloads (`ne
 
 ---
 
-### UC-NET-03 — Server emits S2C confirmation after a state-mutating runner command
+### UC-NET-03 — Server emits S2C confirmation after a state-mutating runner command (client receipt is a no-op)
 
 **Actor:** Server
 **Trigger:** A `RunnerCommandC2S` payload arrives with `cmd` equal to `PLACE_STRUCTURE`, `RUN`, or `RESTORE`.
 **Preconditions:** The `SpecBlockEntity` at `payload.originPos` passes the block-kind guard (`RedstoneSpecRunnerBlock`); for `RUN`, `SpecPersistence.load` must resolve a `RedstoneSpec` from disk.
-**Outcome:** The client receives a `RunnerStatusS2C` payload with an updated `RunnerState` (`IDLE`, `RUNNING`, `PASS`, or `FAIL`) and a human-readable `summary` string; if `RunnerScreen` is still open and its `originPos` matches, `active.pushStatus` updates the displayed status bar.
+**Outcome:** The client receives a `RunnerStatusS2C` payload with an updated `RunnerState` (`IDLE`, `RUNNING`, `PASS`, or `FAIL`) and a human-readable `summary` string; `ClientNetworkHandler` logs it at debug level ("runner status (no UI)"). There is currently no client widget that displays it — `RunnerScreen` (which used to read `active.originPos` and call `pushStatus`) was deleted.
 
 **System interactions:**
-- UC-NET-03.a — `PLACE_STRUCTURE`: if `be.isConfigured`, `StructurePersistence.load` places the structure NBT into the world; the server then sends `RunnerStatusS2C(originPos, RunnerState.IDLE, "Structure placed: $structureId")`; if `be.isConfigured` is false, it sends `RunnerState.IDLE` with `"No spec configured"`.
+- UC-NET-03.a — `PLACE_STRUCTURE`: if `be.isConfigured`, `StructurePersistence.load` places the structure NBT into the world; the server then sends `RunnerStatusS2C(originPos, RunnerState.IDLE, "Structure placed: $structureId")`; if `be.isConfigured` is false, it sends `RunnerState.IDLE` with `"No spec configured"`. Unchanged by the hard-cut — this is entirely server-side.
 - UC-NET-03.b — `RUN` (pre-launch): the server immediately sends `RunnerStatusS2C(originPos, RunnerState.RUNNING, "Running…")` before calling `be.startRun`, providing instant feedback while the spec is still loading. If `SpecPersistence.load` returns null, `RunnerState.FAIL` is sent instead.
 - UC-NET-03.c — `RUN` (already in flight): if `be.startRun` returns `false`, an additional `RunnerStatusS2C(RunnerState.RUNNING, "Already running")` is sent.
 - UC-NET-03.d — `RESTORE`: if `be.isConfigured`, `SpecSnapshot.capture` snapshots the bounds region and `snapshot.restore` resets it; the server sends `RunnerState.IDLE, "Snapshot restored"`.
-- UC-NET-03.e — `ClientNetworkHandler` delivers `RunnerStatusS2C` on the client main thread; it reads `RunnerScreen.active` and calls `active.pushStatus(payload.state, payload.summary)` only if `active.originPos == payload.originPos`, preventing a status update from a different block from corrupting a concurrently open screen.
+- UC-NET-03.e — `ClientNetworkHandler` delivers `RunnerStatusS2C` on the client main thread but no longer reads `RunnerScreen.active` (deleted) or calls `pushStatus`; it only logs `state`/`summary` at debug level. The `originPos`-matching guard that used to prevent cross-block status corruption no longer applies because there is no concurrently-open screen state to corrupt.
 
-**Invariants:** [persistence/network-payload-contract.md](../persistence/network-payload-contract.md) — server is the only writer; `RunnerScreen` never mutates `RunnerState` directly.
+**Invariants:** [persistence/network-payload-contract.md](../persistence/network-payload-contract.md) — server is the only writer; the client applies no local `RunnerState` mutation at all (no screen to mutate).
 
 ---
 
@@ -105,11 +112,11 @@ These UCs cover the recorder/runner C2S/S2C flow only. Project-dim payloads (`ne
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
-| UC-NET-01 | Client requests recorder screen state from server | — | **GAP** |
+| UC-NET-01 | Client requests recorder screen state from server (client receipt is now a no-op) | `ClientNetworkSpec."UC-NET-01.c: OpenRecorderScreenS2C is a no-op (recorder UI removed)"` | covered |
 | UC-NET-01.a | Server resolves BE and builds `OpenRecorderScreenS2C` payload | `RecorderRunnerNetworkRegistrySpec."UC-NET-01.a: server build of OpenRecorderScreenS2C carries BE fields"` | covered |
-| UC-NET-01.b | `ClientNetworkHandler` registers `OpenRecorderScreenS2C.TYPE` receiver | `ClientNetworkSpec."UC-NET-01.c: server build of OpenRecorderScreenS2C opens RecorderScreen with originPos"` (registration implicit in the screen open) | covered |
-| UC-NET-01.c | Handler instantiates `RecorderScreen` with `originPos` and calls `mc.setScreen` | `ClientNetworkSpec."UC-NET-01.c: server build of OpenRecorderScreenS2C opens RecorderScreen with originPos"` | covered |
-| UC-NET-01.d | Server is initiator of screen open; no C2S packet starts the flow | `RecorderRunnerNetworkRegistrySpec."UC-NET-01.a: server build of OpenRecorderScreenS2C carries BE fields"` (verified structurally inside .a) | covered |
+| UC-NET-01.b | `ClientNetworkHandler` registers `OpenRecorderScreenS2C.TYPE` receiver | `ClientNetworkSpec."UC-NET-01.c: OpenRecorderScreenS2C is a no-op (recorder UI removed)"` (registration implicit in the no-op receipt) | covered |
+| UC-NET-01.c | Handler receives the payload and only logs; no screen is opened | `ClientNetworkSpec."UC-NET-01.c: OpenRecorderScreenS2C is a no-op (recorder UI removed)"` | covered |
+| UC-NET-01.d | Server is initiator of the send; no C2S packet starts the flow | `RecorderRunnerNetworkRegistrySpec."UC-NET-01.a: server build of OpenRecorderScreenS2C carries BE fields"` (verified structurally inside .a) | covered |
 | UC-NET-02 | Server validates `originPos` and rejects stale or missing block entities | covered by .a–.d | covered |
 | UC-NET-02.a | Every C2S handler wraps body in `context.server().execute { … }` | covered structurally by all UC-NET tests in `RecorderRunnerNetworkRegistrySpec` | covered |
 | UC-NET-02.b | `as? SpecBlockEntity ?: return@execute` canonical guard on null BE | `RecorderRunnerNetworkRegistrySpec."UC-NET-02.b: handleRecorderCommand on null BE is a silent no-op"` | covered |
@@ -120,7 +127,7 @@ These UCs cover the recorder/runner C2S/S2C flow only. Project-dim payloads (`ne
 | UC-NET-03.b | `RUN` pre-launch: immediately sends `RUNNING` then starts run | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.b: RUN with missing spec sends RunnerStatusS2C(FAIL, 'Spec file not found: ...'"`, `"UC-NET-03.b/c: RUN sends 'Running…' then 'Already running' when slot is in-flight"` | covered |
 | UC-NET-03.c | `RUN` already in flight: sends `RUNNING, "Already running"` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.b/c: RUN sends 'Running…' then 'Already running' when slot is in-flight"` | covered |
 | UC-NET-03.d | `RESTORE`: snapshots region, restores, sends `IDLE, "Snapshot restored"` | `RecorderRunnerNetworkRegistrySpec."UC-NET-03.d: RESTORE configured sends RunnerStatusS2C(IDLE, 'Snapshot restored')"` and `"UC-NET-03.d: RESTORE not-configured sends RunnerStatusS2C(IDLE, 'No spec configured')"` | covered |
-| UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and calls `pushStatus` only when `originPos` matches | `ClientNetworkSpec."UC-NET-03.e: RunnerStatusS2C only updates RunnerScreen.active when originPos matches"` | covered |
+| UC-NET-03.e | `ClientNetworkHandler` delivers `RunnerStatusS2C` and `OpenRunnerScreenS2C`; both are no-ops (runner UI removed) | `ClientNetworkSpec."UC-NET-03.e: OpenRunnerScreenS2C and RunnerStatusS2C are no-ops (runner UI removed)"` | covered |
 | UC-NET-04 | Overwrite-prompt confirmation handshake | covered by .b–.d | covered |
 | UC-NET-04.a | `OverwritePromptS2CPayload` handler opens `ConfirmScreen` whose `BooleanConsumer` sends `OverwriteDecisionC2SPayload` | `ClientNetworkSpec."UC-NET-04.a: OverwritePromptS2C opens ConfirmScreen"`, `"UC-NET-04.a: clicking Overwrite sends OverwriteDecisionC2SPayload(true)"`, `"UC-NET-04.a: clicking Skip Structure sends OverwriteDecisionC2SPayload(false)"` | covered |
 | UC-NET-04.b | `OverwriteDecisionC2SPayload` handler performs `originPos` guard before acting | `RecorderRunnerNetworkRegistrySpec."UC-NET-04.b: handleOverwriteDecision on null BE is a silent no-op"` | covered |

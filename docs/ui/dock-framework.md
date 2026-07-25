@@ -39,6 +39,31 @@ transparent and the composited world shows through. Do not add a background to t
 occlude the world. (See `compose-blended-overlay.md` for the premultiplied-alpha blend that composites
 these transparent pixels.)
 
+## Regions, panels, and tabs
+
+Each of the four `DockRegion`s (LEFT/RIGHT/BOTTOM/CENTER) holds an independent
+`SnapshotStateList<Panel>` (`DockState.leftPanels`/`rightPanels`/`bottomPanels`/`centerPanels`) plus an
+`activeTab: Int` index. `Panel(id, title, content)` is a plain data holder — the "tab" concept has no
+separate type; a region with 2+ panels renders a tab strip (`RegionColumn` in `RedstoneDock.kt`) above
+the active panel's `content`, and clicking a tab writes the region's `activeTab` index. LEFT/RIGHT/
+BOTTOM are hidden by default (`DockState.leftVisible` etc. all start `false`); CENTER's visibility is
+derived (`centerPanels.isNotEmpty()`) rather than an independent flag, since an empty CENTER must stay
+transparent. Seeding a panel into a region (e.g. `explorerPanel()` into `leftPanels` at client init)
+does not make the region visible — only `setVisible`/`toggleVisible` (driven by the Alt+1/Shift+1
+keybinds, see `dock-input-routing.md`) does that, so the dock is off-by-default even once panels exist.
+
+## Input routing and the OFF-by-default guard
+
+The dock never steals input on its own. `DockInputRouter.captured` (`= DockState.focusedRegion !=
+null`) gates every GLFW mouse/keyboard mixin — see [dock-input-routing.md](dock-input-routing.md) for
+the mixin targets, the Alt+1 (focus)/Shift+1 (visibility) keybinds, and the current limitation that
+**key→Compose delivery is deferred**: `KeyboardHandlerMixin` currently only cancels game keys while a
+region is focused (so movement/hotbar input doesn't leak into the world), it does not yet construct
+and forward a Compose `KeyEvent`, so no panel can consume typed text or arrow-key navigation yet.
+Pointer input (move/press/release/scroll) is fully wired end-to-end. Every entry point on
+`ComposeSurface` is guarded — a native-load or Skia failure sets `ComposeSurface.disabled` and the
+whole dock (rendering and input) silently no-ops back to vanilla, never crashing the client.
+
 ## Two Compose 1.12 API gotchas
 
 - **`detectTapGestures` must be imported, not fully-qualified.** A fully-qualified call

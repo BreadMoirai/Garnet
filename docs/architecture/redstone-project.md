@@ -81,19 +81,24 @@ Network:
   `network/Packets.kt`.
 
 Client:
-- `client/project/ProjectScreen` — legacy folder browser GUI (scheduled for hard-cut once the
-  Compose Project Explorer replaces it; still constructable and used by tests until then).
 - `client/ide/ProjectExplorerPanel` + `client/ide/ProjectTreeState` — the Compose dock panel that
-  now renders the folder tree. `ProjectTreeState` is `mutableStateOf`-backed client state fed by the
-  S2C receivers; `explorerPanel()` returns the LEFT-dock `Panel`. Clicking a leaf sends
-  `LoadProjectFolderC2S`; the Refresh row sends `ListProjectTreeC2S`.
-- `client/project/ProjectRootListScreen` — world-list-screen popup; persisted root list.
+  renders the folder tree (LEFT region, hidden by default — Shift+1 reveals it). `ProjectTreeState` is
+  `mutableStateOf`-backed client state fed by the S2C receivers; `explorerPanel()` returns the
+  LEFT-dock `Panel`. Clicking a leaf sends `LoadProjectFolderC2S`; the Refresh row sends
+  `ListProjectTreeC2S`. This is the **only** live client UI for browsing the project tree —
+  `ProjectScreen` and `ProjectRootListScreen` (the legacy folder-browser GUI and world-list-screen
+  root picker) were deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md).
 - `client/project/ProjectClientNetworking` — S2C receivers. They feed `ProjectTreeState`
-  (snapshot/folder-loaded/save-report/error); they no longer open `ProjectScreen`.
-- `client/project/ProjectIntegratedBoot` — creates/opens the `project-<root>` save, pins
-  context on `SERVER_STARTING`; `placeAll` runs on `SERVER_STARTED`.
-- `client/mixin/TitleScreenMixin` (Java) — injects "Project Specs…" button into the main
-  menu so it is reachable even with no singleplayer worlds.
+  (snapshot/folder-loaded/save-report/error); no client screen is opened in response.
+- `client/project/ProjectIntegratedBoot` — `bootWorkspace()` (the only path reachable from the UI,
+  via `TitleScreenMixin`) opens/creates the single shared `redstonespecs-workspace` save with no
+  root pinned. `boot(rootPath)` (per-root save, pins a `ProjectServerContext`) and
+  `ProjectRootsConfig` (persisted multi-root list) still exist and are exercised by unit tests, but
+  are **orphaned from the UI** — their only caller was `ProjectRootListScreen`, which no longer
+  exists. Nothing currently calls `boot(rootPath)` or `ProjectRootsConfig.load/save` outside tests.
+- `client/mixin/TitleScreenMixin` (Java) — injects "Redstone Projects…" button into the main
+  menu (calls `ProjectIntegratedBoot.bootWorkspace()` directly) so it is reachable even with no
+  singleplayer worlds.
 
 ## Where to start reading
 
@@ -106,7 +111,8 @@ Client:
   `ProjectDimLifecycle.saveFolder`.
 - *"How are folders placed in the overworld?"* → `ProjectDimRegistry.getOrAssignRegion`.
 - *"How does the GUI show the folder tree?"* → `ProjectExplorerPanel` reading `ProjectTreeState`
-  (fed from `ProjectTreeSnapshotS2C`); legacy `ProjectScreen` renders the same snapshot until hard-cut.
+  (fed from `ProjectTreeSnapshotS2C`) — the only client UI for this since the legacy `ProjectScreen`
+  was hard-cut.
 
 ## Known limitations (v1)
 

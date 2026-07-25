@@ -80,4 +80,4 @@ dsl/  ←  runner/  ←  persistence/  ←  block/  ←  network/  ←  client/
 
 - *"How does a spec get from the world onto disk?"* → start at `block/RedstoneSpecRecorderBlock.kt`, then `runner/StateRecorder.kt` → `runner/RecordingDslEmitter.kt` → `persistence/SpecPersistence.kt`. See also [recording-pipeline.md](recording-pipeline.md).
 - *"How is a spec replayed and verified?"* → `block/RedstoneSpecRunnerBlock.kt` → `runner/runRedstoneSpec.kt`; the spec's `block` lambda fires inputs and asserts outputs inline. See [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
-- *"Why is the GUI structured this way?"* → `src/client/kotlin/.../screen/RecorderScreen.kt` and `RunnerScreen.kt` plus [ui/dropdown-host-popup-stratum.md](../ui/dropdown-host-popup-stratum.md).
+- *"Why is the GUI structured this way?"* → the legacy `RecorderScreen`/`RunnerScreen`/`ProjectScreen` were hard-cut in favor of a full-window Compose dock; start at [ui/dock-framework.md](../ui/dock-framework.md) and [ui/dock-input-routing.md](../ui/dock-input-routing.md).

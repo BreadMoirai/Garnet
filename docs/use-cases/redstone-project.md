@@ -9,25 +9,41 @@ last_audited_commit: 4c849243e4ce68ca5147bd2a16ce057664baa8fd
 
 A project root is a folder of `.spec.kts` files projected into a runtime-generated void dimension as a deterministic grid. Each spec gets a cell; edits in the cell save back to the spec file (see [architecture/redstone-project.md](../architecture/redstone-project.md)).
 
+**UI status:** `ProjectScreen` and `ProjectRootListScreen` were deleted in the Compose-dock hard-cut
+(see [ui/dock-framework.md](../ui/dock-framework.md)). The only reachable client entry point today is
+`TitleScreenMixin`'s "Redstone Projects…" button, which calls `ProjectIntegratedBoot.bootWorkspace()`
+directly — a single shared `redstonespecs-workspace` save with no root pinned. UC-MAN-01 (multi-root
+registration UI) and UC-MAN-02 (per-root save open via a root-list screen) below describe machinery
+(`ProjectRootsConfig`, `ProjectIntegratedBoot.boot(rootPath)`) that still exists and is still unit
+tested, but has **no live UI caller** — it is orphaned, not reachable in the current game. UC-MAN-06
+("New Spec"), UC-MAN-07 ("Save Now"), and UC-MAN-08 ("Unload") describe buttons that lived on the
+deleted `ProjectScreen`; their server handlers are unchanged and reachable by sending the C2S payload
+directly, but the Compose `ProjectExplorerPanel` (the only live LEFT-dock panel today) does not yet
+expose New Spec/Save Now/Unload actions — only browse/load/refresh.
+
 ---
 
-### UC-MAN-01 — Declare and persist a project root
+### UC-MAN-01 — Declare and persist a project root *(orphaned: no live UI caller)*
 
 User registers a filesystem folder as a project-spec root; that registration survives MC restarts.
+This machinery (`ProjectRootsConfig`) is intact and unit-tested but nothing in the current UI calls it
+— see the UI-status note above.
 
-- **UC-MAN-01.a** The `TitleScreenMixin` injects a "Redstone Projects…" button on `TitleScreen`; clicking it now calls `ProjectIntegratedBoot.bootWorkspace()` to boot the shared flat-void workspace world directly (project folders are loaded/unloaded in-world). It no longer opens `ProjectRootListScreen`, which survives as an orphaned screen pending removal.
-- **UC-MAN-01.b** Clicking "Add" appends the path to the in-memory list and immediately calls `ProjectRootsConfig.save(configPath, roots)`, writing a JSON array to `<MC-config-dir>/redstonespecs/project-roots.json`.
-- **UC-MAN-01.c** On next client launch `ProjectRootsConfig.load(configPath)` re-reads the file; the root appears in the list without re-entry.
-- **UC-MAN-01.d** Clicking "X" beside a root removes it from the list and re-saves the config; the entry disappears immediately on `rebuildWidgets`.
-- **UC-MAN-01.e** `ProjectRoot` enforces that every path is absolute and rejects path-traversal attempts via `resolveSubpath`: a relative or escaping subpath returns `null` (symlink-defeat via `toRealPath` before `startsWith` check).
+- **UC-MAN-01.a** *(historical)* Previously, `TitleScreenMixin`'s button opened `ProjectRootListScreen`, whose `EditBox` + "Add" flow fed `ProjectRootsConfig`. Today the same button calls `ProjectIntegratedBoot.bootWorkspace()` directly — there is no root-registration UI in the current game.
+- **UC-MAN-01.b** Calling `ProjectRootsConfig.save(configPath, roots)` (from a test, or a future caller) writes a JSON array to `<MC-config-dir>/redstonespecs/project-roots.json`.
+- **UC-MAN-01.c** On next client launch `ProjectRootsConfig.load(configPath)` re-reads the file. Nothing currently calls `load` outside tests.
+- **UC-MAN-01.d** *(historical)* Removing a root from the list and re-saving the config was previously wired to a "X" button on `ProjectRootListScreen`; that screen no longer exists.
+- **UC-MAN-01.e** `ProjectRoot` enforces that every path is absolute and rejects path-traversal attempts via `resolveSubpath`: a relative or escaping subpath returns `null` (symlink-defeat via `toRealPath` before `startsWith` check). This guard is exercised regardless of caller (still used by `resolveSubpath` calls from the live `ProjectNetworkRegistry` handlers).
 
 ---
 
-### UC-MAN-02 — Boot the project singleplayer world
+### UC-MAN-02 — Boot the project singleplayer world *(orphaned: no live UI caller for the per-root path)*
 
-Opening a project root from `ProjectRootListScreen` creates or reopens the dedicated singleplayer save for that root, then seeds it with the spec layout.
+`ProjectIntegratedBoot.boot(rootPath)` (per-root save, distinct from the shared workspace booted by
+the title-screen button) still exists and is exercised by unit tests, but its only caller was the now
+-deleted `ProjectRootListScreen`.
 
-- **UC-MAN-02.a** Clicking "Open" in `ProjectRootListScreen` calls `ProjectIntegratedBoot.boot(rootPath)`. `ProjectSaveNaming.saveName` derives `project-<sanitized-tail>-<8-hex-sha1>` from the root's absolute path, so two roots with the same final component get different save names.
+- **UC-MAN-02.a** *(historical)* Previously, clicking "Open" in `ProjectRootListScreen` called `ProjectIntegratedBoot.boot(rootPath)`. `ProjectSaveNaming.saveName` derives `project-<sanitized-tail>-<8-hex-sha1>` from the root's absolute path, so two roots with the same final component get different save names. `boot(rootPath)` itself is unchanged and reachable programmatically, just not from any current UI.
 - **UC-MAN-02.b** `ProjectIntegratedBoot.openOrCreateWorld` calls `Minecraft.levelSource.levelExists(saveName)`. If the save exists, `WorldOpenFlows.openWorld` reopens it; otherwise `WorldOpenFlows.createFreshLevel` creates a creative, peaceful, allow-commands, flat-void world (overworld replaced with `FlatLevelGeneratorPresets.THE_VOID` via `FlatLevelSource`).
 - **UC-MAN-02.c** A `SERVER_STARTING` listener (registered once by `ensureListenersRegistered`) picks up the `pendingRoot` `AtomicReference` and calls `ProjectServerContext.set(server, ProjectServerContext(root))`, pinning the active root for the server lifetime.
 - **UC-MAN-02.d** A `SERVER_STARTED` listener in the mod entrypoint reads `ProjectServerContext.get(server)` and, if present, calls `ProjectDimLifecycle.placeAll(server, root)` to lay out the full tree; any prior `ProjectWorld` for the same root is reused, or a new one is created and stored via `ProjectWorld.set`.
@@ -64,19 +80,19 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 
 A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
 
-- **UC-MAN-05.a** Opening `ProjectScreen` (via `/redstonespecs project` or the world-list flow) immediately sends `ListProjectTreeC2S`. `ProjectNetworkRegistry.handleListTree` calls `ProjectFolderTree.scan(root)` on the server and replies with `ProjectTreeSnapshotS2C` carrying the leaf list (subpath + spec count), intermediate folders, and the player's current `activeSubpath`.
-- **UC-MAN-05.b** `ProjectClientNetworking` receives `ProjectTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot` and recomposes. (Task 5 removed the old behavior of auto-opening/rebuilding `ProjectScreen` on snapshot; `ProjectScreen` still exists until its Task 7 hard-cut and can be opened explicitly from the snapshot.)
+- **UC-MAN-05.a** `/redstonespecs project` immediately sends `ListProjectTreeC2S`. `ProjectNetworkRegistry.handleListTree` calls `ProjectFolderTree.scan(root)` on the server and replies with `ProjectTreeSnapshotS2C` carrying the leaf list (subpath + spec count), intermediate folders, and the player's current `activeSubpath`.
+- **UC-MAN-05.b** `ProjectClientNetworking` receives `ProjectTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot` and recomposes. This is the **only** client-side reaction to the snapshot — the legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut.
 - **UC-MAN-05.c** Clicking a leaf row sends `LoadProjectFolderC2S(subpath)`. `ProjectNetworkRegistry.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `ProjectTeleport.toFolder`, and sends `ProjectFolderLoadedS2C` with the spec-id list and any errors.
 - **UC-MAN-05.d** `ProjectTeleport.toFolder` looks up `ProjectDimRegistry.regionOriginOf(subpath)`, teleports the player to `(region.x+0.5, yBase+2, region.z+0.5)` in `projectLevel()`, and calls `ProjectSession.setActive(player.uuid, subpath)` so subsequent server actions (save, new-spec) scope to the right folder.
-- **UC-MAN-05.e** If the subpath's region has not been assigned (folder not yet placed), `toFolder` returns `false` and the server replies with `ProjectErrorS2C`; `ProjectScreen.onError` updates the status label.
+- **UC-MAN-05.e** If the subpath's region has not been assigned (folder not yet placed), `toFolder` returns `false` and the server replies with `ProjectErrorS2C`. `ProjectTreeState.onError(payload)` sets `status = "error: ${payload.reason}"`, which the Explorer panel renders as its status line — the same mechanism that used to update `ProjectScreen`'s status label.
 
 ---
 
 ### UC-MAN-06 — Create a new spec cell in the active folder
 
-A player names a new spec from the in-game UI; the server writes a stub `.spec.kts`, re-places the folder, and the new cell appears in the world.
+A player names a new spec from the in-game UI; the server writes a stub `.spec.kts`, re-places the folder, and the new cell appears in the world. **No live UI currently sends `NewProjectSpecC2S`** — the deleted `ProjectScreen` had the "New Spec" `EditBox`/button; `ProjectExplorerPanel` (the current LEFT-dock panel) does not yet have an equivalent control. The server handler and packet are otherwise unchanged and reachable by sending the payload directly (as the coverage tests below do).
 
-- **UC-MAN-06.a** The player types a name into the `EditBox` in `ProjectScreen` (validated client-side for non-blank) and clicks "New Spec", sending `NewProjectSpecC2S(name)`.
+- **UC-MAN-06.a** *(historical UI path)* The player types a name into the `EditBox` in the deleted `ProjectScreen` (validated client-side for non-blank) and clicks "New Spec", sending `NewProjectSpecC2S(name)`.
 - **UC-MAN-06.b** `ProjectNetworkRegistry.handleNewSpec` reads `ProjectSession.get(player.uuid)?.activeSubpath`; if no folder is active it replies with `ProjectErrorS2C("no folder selected")`.
 - **UC-MAN-06.c** `ProjectNewSpec.create(folder, name)` enforces that `name` matches `[a-zA-Z0-9_-]+`, that the target file does not already exist, then writes a minimal stub via `RecordingDslEmitter.emitStub(name)`. Throws on any violation so the caller can catch and report.
 - **UC-MAN-06.d** After creating the stub, `handleNewSpec` calls `ProjectDimLifecycle.placeFolder(server, root, activeSubpath)` to re-scan and re-place the entire folder. The new file appears as an empty cell with a `REDSTONE_SPEC_RECORDER_BLOCK` anchor.
@@ -86,22 +102,22 @@ A player names a new spec from the in-game UI; the server writes a stub `.spec.k
 
 ### UC-MAN-07 — Save edited cell blocks back to disk
 
-When the player has modified blocks inside a spec's cell AABB, the server detects the diff and overwrites the source `.spec.kts` structure file.
+When the player has modified blocks inside a spec's cell AABB, the server detects the diff and overwrites the source `.spec.kts` structure file. **No live UI currently sends `SaveNowC2S`** — the deleted `ProjectScreen` had the "Save Now" button; `ProjectExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged and reachable by sending the payload directly.
 
-- **UC-MAN-07.a** The player clicks "Save Now" in `ProjectScreen`, sending `SaveNowC2S`. `ProjectNetworkRegistry.handleSaveNow` calls `ProjectDimLifecycle.saveAll(server)`, which iterates every subpath in `ProjectWorld.perFolder` and calls `saveFolder`.
+- **UC-MAN-07.a** *(historical UI path)* The player clicks "Save Now" in the deleted `ProjectScreen`, sending `SaveNowC2S`. `ProjectNetworkRegistry.handleSaveNow` calls `ProjectDimLifecycle.saveAll(server)`, which iterates every subpath in `ProjectWorld.perFolder` and calls `saveFolder`.
 - **UC-MAN-07.b** `saveFolder` resolves each spec's absolute cell origin via `ProjectWorld.absoluteCellOrigin` (adds `regionOrigin.x/z` to the region-relative `cell.origin.x/z`; Y from `cell.origin.y` is already absolute). It then passes `level`, `loaded`, and `absoluteCellOrigin` to `ProjectCellSaver.captureAndSaveIfDirty`.
 - **UC-MAN-07.c** `ProjectCellSaver` captures the live cell volume with `StructureTemplate.fillFromWorld`, serializes both live and baseline snapshots to `CompoundTag`, and returns `CellSaveResult(saved=false)` if the NBT is equal (no-op). Only a structural change in block data triggers the rewrite.
 - **UC-MAN-07.d** On a dirty diff, `NbtIo.writeCompressed(liveNbt, structureFile)` overwrites `<structureId>.nbt`. The `.spec.kts` source re-emission is deferred (noted in `ProjectCellSaver`); `RecordingDslEmitter` will handle it in a later phase.
 - **UC-MAN-07.e** After a successful save, `saveFolder` captures a fresh `StructureTemplate` and stores it as the new `loadedSnapshot` in `ProjectWorld.perFolder`, so subsequent saves have an accurate baseline.
-- **UC-MAN-07.f** `ProjectSaveReportS2C` is sent back to the player with per-spec `"specId|saved=true/false[|err=…]"` strings; `ProjectScreen.onSaveReport` updates the status label with the count of saved specs.
+- **UC-MAN-07.f** `ProjectSaveReportS2C` is sent back to the player with per-spec `"specId|saved=true/false[|err=…]"` strings; `ProjectTreeState.onSaveReport` sets `status = "saved N spec(s)"`, which the Explorer panel renders as its status line (the same mechanism `ProjectScreen.onSaveReport` used before deletion).
 
 ---
 
 ### UC-MAN-08 — Unload active folder and handle ungraceful session end
 
-A player explicitly unloads their active folder focus, or the session is cleared when the player disconnects or the server stops.
+A player explicitly unloads their active folder focus, or the session is cleared when the player disconnects or the server stops. **No live UI currently sends `UnloadProjectFolderC2S`** — the deleted `ProjectScreen` had the "Unload" button; `ProjectExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged.
 
-- **UC-MAN-08.a** The player clicks "Unload" in `ProjectScreen`, sending `UnloadProjectFolderC2S`. `ProjectNetworkRegistry.handleUnload` calls `ProjectSession.clear(player.uuid)` and replies with `ProjectSaveReportS2C(emptyList())`.
+- **UC-MAN-08.a** *(historical UI path)* The player clicks "Unload" in the deleted `ProjectScreen`, sending `UnloadProjectFolderC2S`. `ProjectNetworkRegistry.handleUnload` calls `ProjectSession.clear(player.uuid)` and replies with `ProjectSaveReportS2C(emptyList())`.
 - **UC-MAN-08.b** After unload, the player's `activeSubpath` is `null`; a subsequent `handleNewSpec` (which requires a folder focus) receives `ProjectErrorS2C("no folder selected")`. `handleSaveNow` is deliberately session-independent — it calls `ProjectDimLifecycle.saveAll(server)` over every loaded folder in `ProjectWorld.perFolder`, so post-unload it still returns a `ProjectSaveReportS2C` (empty when nothing is loaded), not an error.
 - **UC-MAN-08.c** If a player disconnects without clicking Unload (ungraceful exit), `ProjectSession.clear(player.uuid)` must be called from the server-side player disconnect event. The `ProjectSession` map is a `ConcurrentHashMap` keyed by `UUID`; the player's slot is released so it does not linger after reconnect.
 - **UC-MAN-08.d** On server stop, a `SERVER_STOPPED` listener (registered in `Redstonespecs.onInitialize`) calls `ProjectDimLifecycle.releaseServerState(server)`, which invokes `ProjectDimRegistry.dispose(server)`, `ProjectWorld.clear(server)`, and `ProjectServerContext.clear(server)` — removing each `WeakHashMap` entry for the server and releasing all server-scoped state promptly rather than waiting for GC.
@@ -113,9 +129,9 @@ A player explicitly unloads their active folder focus, or the session is cleared
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
-| UC-MAN-01 | Declare and persist a project root | `ProjectRootsConfigTest."save then load roundtrips a list of paths"` | **GAP-PARTIAL** |
-| UC-MAN-01.a | User types path into `EditBox` in `ProjectRootListScreen` | `ProjectEntryFlowSpec."UC-MAN-01.a: TitleScreen RedstoneIconButton opens ProjectRootListScreen"`, `ProjectEntryFlowSpec."UC-MAN-01.b: Add button persists path to config and renders 'Open: <path>' row"` | covered |
-| UC-MAN-01.b | "Add" appends path and calls `ProjectRootsConfig.save` writing JSON | `ProjectRootsConfigTest."save then load roundtrips a list of paths"`, `ProjectRootsConfigTest."save creates parent directories if needed"`, `ProjectEntryFlowSpec."UC-MAN-01.b: Add button persists path to config and renders 'Open: <path>' row"` | covered |
+| UC-MAN-01 | Declare and persist a project root *(orphaned: no live UI caller)* | `ProjectRootsConfigTest."save then load roundtrips a list of paths"` | **GAP-PARTIAL** |
+| UC-MAN-01.a | *(historical)* User types path into `EditBox` in the deleted `ProjectRootListScreen` | — (`ProjectEntryFlowSpec`, the client test that covered this, was deleted with the screen it tested) | **GAP** |
+| UC-MAN-01.b | "Add" appends path and calls `ProjectRootsConfig.save` writing JSON | `ProjectRootsConfigTest."save then load roundtrips a list of paths"`, `ProjectRootsConfigTest."save creates parent directories if needed"` | **GAP-PARTIAL** (config round-trip covered; no UI caller exists to drive "Add" itself) |
 | UC-MAN-01.c | On next launch `ProjectRootsConfig.load` re-reads file | `ProjectRootsConfigTest."save then load roundtrips a list of paths"`, `ProjectRootsConfigTest."load returns empty when file missing"` | covered |
 | UC-MAN-01.d | "X" removes entry and re-saves; entry disappears on `rebuildWidgets` | — | **GAP** |
 | UC-MAN-01.e | `ProjectRoot.resolveSubpath` rejects relative and escaping subpaths | `ProjectRootTest."resolveSubpath rejects parent traversal"`, `ProjectRootTest."resolveSubpath rejects absolute subpath"`, `ProjectRootTest."resolveSubpath rejects symlink that escapes root"` | covered |
@@ -140,12 +156,12 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC-MAN-04.f | `world.perFolder[subpath]` replaced atomically via `ConcurrentHashMap` | `ProjectDimSpec."re-place after adding a new spec keeps region origin and includes new spec"` | **GAP-PARTIAL** |
 | UC-MAN-05 | Browse folder tree in-game and teleport to a folder | `ProjectNetworkRegistrySpec."handleListTree sends snapshot matching ProjectFolderTree.scan"` | **GAP-PARTIAL** |
 | UC-MAN-05.a | `ListProjectTreeC2S` triggers scan and `ProjectTreeSnapshotS2C` reply | `ProjectNetworkRegistrySpec."handleListTree sends snapshot matching ProjectFolderTree.scan"` | covered |
-| UC-MAN-05.b | `ProjectClientNetworking` receives snapshot and feeds `ProjectTreeState`; the Compose Explorer renders it | `ProjectEntryFlowSpec."/redstonespecs managed pushes the tree snapshot to the client ProjectTreeState"`, `ProjectExplorerSpec."Explorer renders a project tree snapshot"`, `ProjectEntryFlowSpec."UC-MAN-05.b: ProjectScreen shows \"Loading…\" placeholder before snapshot, clears after"` | covered |
+| UC-MAN-05.b | `ProjectClientNetworking` receives snapshot and feeds `ProjectTreeState`; the Compose Explorer renders it | `ProjectExplorerSpec."Explorer renders a project tree snapshot"` | covered |
 | UC-MAN-05.c | `LoadProjectFolderC2S` triggers path-traversal guard, teleport, and `ProjectFolderLoadedS2C` reply | `ProjectNetworkRegistrySpec."handleLoadFolder rejects path traversal with ProjectErrorS2C"`, `ProjectNetworkRegistrySpec."handleLoadFolder happy path sends ProjectFolderLoadedS2C and sets session"` | covered |
 | UC-MAN-05.d | `ProjectTeleport.toFolder` teleports player and calls `ProjectSession.setActive` | `ProjectTeleportSpec."toFolder teleports player to region and sets active subpath"` | covered |
 | UC-MAN-05.e | Unknown subpath: `toFolder` returns `false`, server replies with `ProjectErrorS2C` | `ProjectTeleportSpec."toFolder returns false for unknown subpath and does not change session"` | covered |
-| UC-MAN-06 | Create a new spec cell in the active folder | `ProjectNetworkRegistrySpec."handleNewSpec with active session creates file and sends ProjectFolderLoadedS2C"` | covered |
-| UC-MAN-06.a | Player sends `NewProjectSpecC2S(name)` after typing non-blank name | `ProjectEntryFlowSpec."UC-MAN-06.a (text survives snapshot): typed spec name in EditBox survives an incoming ProjectTreeSnapshotS2C"`, `ProjectEntryFlowSpec."UC-MAN-06.a (creates file): clicking \"New Spec\" after typing creates the .spec.kts on disk"` | covered |
+| UC-MAN-06 | Create a new spec cell in the active folder *(orphaned: no live UI caller)* | `ProjectNetworkRegistrySpec."handleNewSpec with active session creates file and sends ProjectFolderLoadedS2C"` | **GAP-PARTIAL** |
+| UC-MAN-06.a | *(historical UI path)* Player sends `NewProjectSpecC2S(name)` after typing non-blank name in the deleted `ProjectScreen` | — (`ProjectEntryFlowSpec`, the client test that covered this, was deleted with the screen it tested; the server-side handler is covered under UC-MAN-06) | **GAP** |
 | UC-MAN-06.b | No active folder → `ProjectErrorS2C("no folder selected")` | `ProjectNetworkRegistrySpec."handleNewSpec without active session returns 'no folder selected'"` | covered |
 | UC-MAN-06.c | `ProjectNewSpec.create` validates name regex, non-duplicate, writes stub | `ProjectNewSpecTest."create writes <name>.spec.kts with stub content"`, `ProjectNewSpecTest."illegal characters in name throw"`, `ProjectNewSpecTest."file already exists throws"` | covered |
 | UC-MAN-06.d | `handleNewSpec` calls `placeFolder` to re-scan and re-place entire folder | `ProjectNetworkRegistrySpec."handleNewSpec with active session creates file and sends ProjectFolderLoadedS2C"`, `ProjectDimSpec."ProjectNewSpec.create writes a stub spec.kts to the leaf folder"` | covered |
@@ -163,3 +179,10 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC-MAN-08.c | Ungraceful disconnect: `ProjectSession.clear` called from disconnect event | `ProjectNetworkRegistrySpec."ungraceful disconnect clears the player's managed session"` | covered |
 | UC-MAN-08.d | Server stop: `dispose` and `clear` calls release all server-scoped state | `ProjectLifecycleReleaseTest."UC-MAN-08.d: releaseServerState disposes registry, world, and context"` | covered |
 | UC-MAN-08.e | On next `placeAll`, cell is rebuilt from on-disk `.nbt` (un-saved in-world edits overwritten); only saved changes persist | — | **GAP** |
+
+**UI-caller gap (not a test gap):** UC-MAN-01/02/06/07/08's `.a` rows above are marked historical
+because their only client trigger (`ProjectScreen`/`ProjectRootListScreen`) was deleted in the
+Compose-dock hard-cut and `ProjectExplorerPanel` does not yet expose New Spec / Save Now / Unload /
+multi-root controls. The server handlers remain fully covered by their gametest specs; what's missing
+is a UI to drive them, tracked as future dock-panel work, not a coverage regression to backfill with
+more tests.

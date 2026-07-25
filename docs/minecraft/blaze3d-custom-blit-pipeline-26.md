@@ -129,6 +129,24 @@ The default `false` keeps the plain top-left mapping for ordinary top-left-origi
 (atlases, PNG-backed). The destination rect (NDC positions) is unaffected — only the source
 `V` is mirrored, so placement stays correct and only the image un-flips.
 
+## The blended variant: `PIPELINE_BLEND` for the Compose overlay
+
+`BlitUvPipeline.blit(...)` has a second pipeline variant, `PIPELINE_BLEND`, selected with a trailing
+`blend: Boolean = false` parameter (`blend=true`). It exists for exactly one caller: compositing the
+full-window Compose dock overlay over the already-presented world composite
+(`ComposeOverlay.renderInto` — see [ui/compose-blended-overlay.md](../ui/compose-blended-overlay.md)).
+The original opaque `PIPELINE` (used by `MinecraftPresentMixin`'s world-into-composite blit) simply
+overwrites destination pixels; the Compose overlay instead needs the destination's existing (opaque)
+world pixels to show through everywhere the Skia canvas painted nothing, so it needs real
+premultiplied-alpha over-compositing (`dst = src + dst*(1-srcA)`), not a copy.
+
+`PIPELINE_BLEND` sets this via `RenderPipeline.Builder.withColorTargetState(ColorTargetState(
+BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA))` — MC 26.2 has no `withBlend(...)` builder method;
+blending is configured through the color-target state instead (see the linked article for the full
+API shape and the sources-jar verification). All non-overlay call sites (the world-into-composite blit
+above) keep the default `blend=false` and use the original opaque `PIPELINE`, so they are unaffected
+by the new variant.
+
 ## Capturing the composite for visual proof
 
 The normal screenshot path (`Screenshot.grab`, Fabric's `ctx.takeScreenshot`) reads

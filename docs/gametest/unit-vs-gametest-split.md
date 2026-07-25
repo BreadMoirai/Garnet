@@ -33,9 +33,9 @@ keybinds, payload round-trips driven from the client — it belongs in
 
 ## Where the contracts actually live
 
-- **Unit (`src/test/`):** `SpecDslTest`, `KtsSpecLoaderTest`,
+- **Unit (`src/test/`):** `KtsSpecLoaderTest`,
   `SpecPersistenceTest`, `StateConditionTest`, `StateRecordingStorageTest`,
-  `StateRecordingViewTest`, `IntEditBoxLogicTest`, `SimTimeTest`. All
+  `StateRecordingViewTest`, `GridLayoutTest`, `SimTimeTest`. All
   pure data / algorithm checks; no level, no runner.
 - **Server gametest (`src/gametest/`):** `RedstonespecsGameTests` —
   currently a placeholder stub. These need a real level: only the live MC

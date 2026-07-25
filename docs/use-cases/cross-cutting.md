@@ -9,6 +9,15 @@ last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 
 These UCs describe full end-to-end flows touching record, persist, network, run, and verify in one motion. They introduce no independent test gaps; coverage points back at the parent UCs in the per-journey articles.
 
+**Retired IDs referenced below:** `UC-REC-*`/`UC-RUN-*` were parent UCs in `recording.md`/`running.md`,
+deleted along with the `RecorderScreen`/`RunnerScreen` client UI they documented (see
+[INDEX.md](INDEX.md)). The journeys below still hold at the server/network layer — recorder and
+runner blocks still record and run specs exactly as described, only the client screen that used to
+trigger/display each step is gone (`ClientNetworkHandler` now no-ops the relevant S2C receivers; see
+[networking.md](networking.md)'s UC-NET-01/UC-NET-03 "UI status" note). Read `UC-REC-*`/`UC-RUN-*`
+below as historical journey labels for "the recording/running step happens here," not as resolvable
+links.
+
 ---
 
 ### UC-X2X-01 — Singleplayer record, persist, restart, reload, and verify pass
