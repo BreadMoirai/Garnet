@@ -19,16 +19,14 @@ See `docs/superpowers/specs/2026-05-08-managed-redstone-worlds-design.md` for th
 The mod creates the singleplayer save itself. From the main menu, the "Redstone Projects…"
 button calls `ProjectIntegratedBoot.bootWorkspace()`, which opens (or creates) a single
 shared flat-void workspace save named `redstonespecs-workspace` — root-agnostic; project
-folders are loaded/unloaded in-world. Both `bootWorkspace()` and the per-root
-`ProjectIntegratedBoot.boot(rootPath)` reuse the same private `openOrCreateWorld` machinery:
-either re-open the existing save, or create a fresh flat-void singleplayer save (creative,
-peaceful, allow-commands) via `WorldOpenFlows.createFreshLevel` with
+folders are loaded/unloaded in-world. `bootWorkspace()` uses the private `openOrCreateWorld`
+helper: either re-open the existing save, or create a fresh flat-void singleplayer save
+(creative, peaceful, allow-commands) via `WorldOpenFlows.createFreshLevel` with
 `FlatLevelGeneratorPresets.THE_VOID`.
 
-The save name is `project-<root-tail>-<8-hex-pathHash>` (see `ProjectSaveNaming`). Saves are
-**persistent across sessions** — re-opening a project root opens the same save and any
-user-placed scratch outside spec bounds is preserved between opens. Spec contents are
-re-placed from disk on each `placeAll`.
+The workspace save name is the fixed `redstonespecs-workspace`. The save is **persistent
+across sessions** — re-opening reuses the same save and any user-placed scratch outside spec
+bounds is preserved between opens. Spec contents are re-placed from disk on each `placeAll`.
 
 The canvas is `server.overworld()` directly — no custom dimension type, no datapack. Each
 loaded folder maps to a distinct **region** in the overworld via counter-based assignment in
@@ -56,8 +54,8 @@ Pure data:
 - `ProjectFolderTree` — leaves vs intermediates scan.
 - `GridLayout` — `(specs, cellSize, gap, rowMax, yBase) → cells`.
 - `ProjectCell` — pure cell record (origin + size).
-- `ProjectSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation.
-- `ProjectRootsConfig` — client-side persistent root list.
+- `ProjectSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation (pure
+  data; no live caller since the per-root boot entry was removed — retained with its unit test).
 
 Server state and lifecycle:
 - `ProjectWorld` — server-wide. `perFolder: Map<subpath, Map<specId, LoadedSpec>>`,
@@ -90,19 +88,18 @@ Client:
   root picker) were deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md).
 - `client/project/ProjectClientNetworking` — S2C receivers. They feed `ProjectTreeState`
   (snapshot/folder-loaded/save-report/error); no client screen is opened in response.
-- `client/project/ProjectIntegratedBoot` — `bootWorkspace()` (the only path reachable from the UI,
-  via `TitleScreenMixin`) opens/creates the single shared `redstonespecs-workspace` save with no
-  root pinned. `boot(rootPath)` (per-root save, pins a `ProjectServerContext`) and
-  `ProjectRootsConfig` (persisted multi-root list) still exist and are exercised by unit tests, but
-  are **orphaned from the UI** — their only caller was `ProjectRootListScreen`, which no longer
-  exists. Nothing currently calls `boot(rootPath)` or `ProjectRootsConfig.load/save` outside tests.
+- `client/project/ProjectIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
+  the UI via `TitleScreenMixin`) opens/creates the single shared `redstonespecs-workspace` save
+  with no root pinned. The dormant `pendingRoot`/`ProjectServerContext` pinning machinery is
+  retained for programmatic use, but no caller sets `pendingRoot`, so the SERVER_STARTING listener
+  is a no-op.
 - `client/mixin/TitleScreenMixin` (Java) — injects "Redstone Projects…" button into the main
   menu (calls `ProjectIntegratedBoot.bootWorkspace()` directly) so it is reachable even with no
   singleplayer worlds.
 
 ## Where to start reading
 
-- *"How is the world created?"* → `ProjectIntegratedBoot.boot` and its private
+- *"How is the world created?"* → `ProjectIntegratedBoot.bootWorkspace` and its private
   `openOrCreateWorld`.
 - *"How does placement work for the whole tree?"* → `ProjectDimLifecycle.placeAll`.
 - *"How does placement work for one folder?"* → `ProjectDimLifecycle.placeFolder` (and
@@ -116,13 +113,6 @@ Client:
 
 ## Known limitations (v1)
 
-- **Per-root save name uses an 8-hex SHA-1 of the absolute path** to disambiguate roots that
-  share the same final path component. Collisions are astronomically unlikely but
-  theoretically possible — two distinct roots hashing to the same 8 hex chars would alias to
-  the same save.
-- **Switching project roots within a session leaves the previous root's regions in the world
-  visually only.** The data is on the previous save's disk and is unaffected; the next time
-  you open that root, the same save reopens and `placeAll` repopulates the regions from disk.
 - **Region partitioning is counter-based and in-memory.** Region origins are stable within a
   server lifetime (subpath-sorted assignment) but rebuild on each server start. The blocks
   in the overworld persist; the registry mapping does not.

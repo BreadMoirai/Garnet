@@ -1,7 +1,6 @@
 package com.breadmoirai.redstonespecs.client.project
 
 import com.breadmoirai.redstonespecs.project.ProjectRoot
-import com.breadmoirai.redstonespecs.project.ProjectSaveNaming
 import com.breadmoirai.redstonespecs.project.ProjectServerContext
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.minecraft.client.Minecraft
@@ -16,7 +15,6 @@ import net.minecraft.world.level.levelgen.WorldOptions
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorPresets
 import net.minecraft.world.level.levelgen.presets.WorldPresets
 import org.slf4j.LoggerFactory
-import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -24,16 +22,14 @@ private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
 object ProjectIntegratedBoot {
     /**
-     * Boots an integrated server pinned to `rootPath`:
-     *  - Save name: `project-<root-tail>-<hash>` (see [ProjectSaveNaming]). If the save exists,
-     *    opens it; else creates a fresh flat-void singleplayer world with that name.
-     *  - On SERVER_STARTING: pins [ProjectServerContext] from the pending root.
-     *  - On SERVER_STARTED: handled by the common listener in `Redstonespecs`, which calls
-     *    [ProjectDimLifecycle.placeAll] for whatever context was pinned.
+     * Project root to pin onto the next integrated server that starts. No caller currently sets
+     * it — the main-menu button boots the root-agnostic [bootWorkspace] — so the SERVER_STARTING
+     * listener below reads it and stays a no-op while it remains null. The pinning path (set
+     * pendingRoot, then open a per-root save) is retained for programmatic use.
      *
-     * The SERVER_STARTING listener is registered exactly once (Fabric's `Event<T>` has no
-     * `unregister`); subsequent `boot` calls just swap in a new pending root. The listener is
-     * a no-op when no root is pending.
+     * On SERVER_STARTING a pinned root sets [ProjectServerContext]; on SERVER_STARTED the common
+     * listener in `Redstonespecs` calls `ProjectDimLifecycle.placeAll` for whatever context was
+     * pinned. The listener is registered exactly once (Fabric's `Event<T>` has no `unregister`).
      */
     private val pendingRoot = AtomicReference<ProjectRoot?>()
     private val initialized = AtomicBoolean(false)
@@ -54,15 +50,6 @@ object ProjectIntegratedBoot {
             ProjectServerContext.set(server, ProjectServerContext(root))
             LOGGER.info("[ProjectIntegratedBoot] pinned root '{}' on SERVER_STARTING", root.path)
         })
-    }
-
-    fun boot(rootPath: Path) {
-        require(rootPath.isAbsolute) { "rootPath must be absolute: $rootPath" }
-        val root = ProjectRoot(rootPath)
-        ensureListenersRegistered()
-        pendingRoot.set(root)
-        val saveName = ProjectSaveNaming.saveName(rootPath)
-        openOrCreateWorld(saveName)
     }
 
     /**

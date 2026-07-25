@@ -53,7 +53,7 @@ links.
 
 **Actor:** Author (filesystem + in-game)
 **Trigger:** Author drops a hand-written `.spec.kts` into a project root folder, then opens the project world to inspect and modify the cell.
-**Preconditions:** A project root is registered in `ProjectRootsConfig`; the project world can be booted; the new spec file passes scripting-host evaluation.
+**Preconditions:** A project root is configured (via `SharedSettings.projectRootPath`); the project world can be booted; the new spec file passes scripting-host evaluation.
 **Outcome:** The spec appears as a cell in the grid; the author edits block state inside the cell; saving back overwrites the original `.spec.kts` on disk; reloading the spec confirms the changes round-trip correctly.
 
 **References:**

@@ -12,10 +12,11 @@ A project root is a folder of `.spec.kts` files projected into a runtime-generat
 **UI status:** `ProjectScreen` and `ProjectRootListScreen` were deleted in the Compose-dock hard-cut
 (see [ui/dock-framework.md](../ui/dock-framework.md)). The only reachable client entry point today is
 `TitleScreenMixin`'s "Redstone Projects…" button, which calls `ProjectIntegratedBoot.bootWorkspace()`
-directly — a single shared `redstonespecs-workspace` save with no root pinned. UC-MAN-01 (multi-root
-registration UI) and UC-MAN-02 (per-root save open via a root-list screen) below describe machinery
-(`ProjectRootsConfig`, `ProjectIntegratedBoot.boot(rootPath)`) that still exists and is still unit
-tested, but has **no live UI caller** — it is orphaned, not reachable in the current game. UC-MAN-06
+directly — a single shared `redstonespecs-workspace` save with no root pinned. The multi-root
+registration store (`ProjectRootsConfig`) and the per-root boot entry (`ProjectIntegratedBoot.boot(rootPath)`)
+were **deleted as dead code** once the title button was retargeted to `bootWorkspace()` — nothing
+referenced them outside their own unit tests. UC-MAN-01 and UC-MAN-02.a below are retained only as
+historical notes on that removed machinery. UC-MAN-06
 ("New Spec"), UC-MAN-07 ("Save Now"), and UC-MAN-08 ("Unload") describe buttons that lived on the
 deleted `ProjectScreen`; their server handlers are unchanged and reachable by sending the C2S payload
 directly, but the Compose `ProjectExplorerPanel` (the only live LEFT-dock panel today) does not yet
@@ -23,29 +24,30 @@ expose New Spec/Save Now/Unload actions — only browse/load/refresh.
 
 ---
 
-### UC-MAN-01 — Declare and persist a project root *(orphaned: no live UI caller)*
+### UC-MAN-01 — Declare and persist a project root *(removed)*
 
-User registers a filesystem folder as a project-spec root; that registration survives MC restarts.
-This machinery (`ProjectRootsConfig`) is intact and unit-tested but nothing in the current UI calls it
-— see the UI-status note above.
+Registering a filesystem folder as a persistent project-spec root is no longer a capability: the
+store that backed it (`ProjectRootsConfig`, a JSON list under `<MC-config-dir>/redstonespecs/`) and
+its unit test were deleted as dead code — see the UI-status note above. The title button boots a
+single shared workspace via `bootWorkspace()`; there is no per-root registration or persisted root
+list. The only piece of this area that survives is the path-safety guard the live network handlers
+still rely on:
 
-- **UC-MAN-01.a** *(historical)* Previously, `TitleScreenMixin`'s button opened `ProjectRootListScreen`, whose `EditBox` + "Add" flow fed `ProjectRootsConfig`. Today the same button calls `ProjectIntegratedBoot.bootWorkspace()` directly — there is no root-registration UI in the current game.
-- **UC-MAN-01.b** Calling `ProjectRootsConfig.save(configPath, roots)` (from a test, or a future caller) writes a JSON array to `<MC-config-dir>/redstonespecs/project-roots.json`.
-- **UC-MAN-01.c** On next client launch `ProjectRootsConfig.load(configPath)` re-reads the file. Nothing currently calls `load` outside tests.
-- **UC-MAN-01.d** *(historical)* Removing a root from the list and re-saving the config was previously wired to a "X" button on `ProjectRootListScreen`; that screen no longer exists.
 - **UC-MAN-01.e** `ProjectRoot` enforces that every path is absolute and rejects path-traversal attempts via `resolveSubpath`: a relative or escaping subpath returns `null` (symlink-defeat via `toRealPath` before `startsWith` check). This guard is exercised regardless of caller (still used by `resolveSubpath` calls from the live `ProjectNetworkRegistry` handlers).
 
 ---
 
-### UC-MAN-02 — Boot the project singleplayer world *(orphaned: no live UI caller for the per-root path)*
+### UC-MAN-02 — Boot the project singleplayer world
 
-`ProjectIntegratedBoot.boot(rootPath)` (per-root save, distinct from the shared workspace booted by
-the title-screen button) still exists and is exercised by unit tests, but its only caller was the now
--deleted `ProjectRootListScreen`.
+The title button boots a single shared workspace via `ProjectIntegratedBoot.bootWorkspace()`, which
+opens or creates the fixed `redstonespecs-workspace` save with no root pinned, using the private
+`openOrCreateWorld` helper. The per-root boot entry that used to derive a `project-<tail>-<hash>` save
+name was removed; the `openOrCreateWorld` helper and the (now dormant) `pendingRoot`/`ProjectServerContext`
+pinning machinery remain.
 
-- **UC-MAN-02.a** *(historical)* Previously, clicking "Open" in `ProjectRootListScreen` called `ProjectIntegratedBoot.boot(rootPath)`. `ProjectSaveNaming.saveName` derives `project-<sanitized-tail>-<8-hex-sha1>` from the root's absolute path, so two roots with the same final component get different save names. `boot(rootPath)` itself is unchanged and reachable programmatically, just not from any current UI.
+- **UC-MAN-02.a** *(removed)* The per-root `boot(rootPath)` entry — which derived a save name via `ProjectSaveNaming.saveName` (`project-<sanitized-tail>-<8-hex-sha1>`, so two roots with the same final component got distinct save names) and set `pendingRoot` to pin a `ProjectServerContext` — was deleted as dead code. `ProjectSaveNaming` itself survives as a pure function with a unit test, but is no longer wired to any boot path.
 - **UC-MAN-02.b** `ProjectIntegratedBoot.openOrCreateWorld` calls `Minecraft.levelSource.levelExists(saveName)`. If the save exists, `WorldOpenFlows.openWorld` reopens it; otherwise `WorldOpenFlows.createFreshLevel` creates a creative, peaceful, allow-commands, flat-void world (overworld replaced with `FlatLevelGeneratorPresets.THE_VOID` via `FlatLevelSource`).
-- **UC-MAN-02.c** A `SERVER_STARTING` listener (registered once by `ensureListenersRegistered`) picks up the `pendingRoot` `AtomicReference` and calls `ProjectServerContext.set(server, ProjectServerContext(root))`, pinning the active root for the server lifetime.
+- **UC-MAN-02.c** *(dormant)* `ProjectIntegratedBoot`'s own `SERVER_STARTING` listener (registered once by `ensureListenersRegistered`, which `bootWorkspace` still calls) reads the `pendingRoot` `AtomicReference` and, if set, calls `ProjectServerContext.set(server, ProjectServerContext(root))`. No caller sets `pendingRoot` anymore, so this listener is a no-op. The live root-pinning path is `Redstonespecs`' own `SERVER_STARTING` listener, which pins a `ProjectServerContext` from the `SharedSettings.projectRootPath` config when set.
 - **UC-MAN-02.d** A `SERVER_STARTED` listener in the mod entrypoint reads `ProjectServerContext.get(server)` and, if present, calls `ProjectDimLifecycle.placeAll(server, root)` to lay out the full tree; any prior `ProjectWorld` for the same root is reused, or a new one is created and stored via `ProjectWorld.set`.
 - **UC-MAN-02.e** Re-opening the same root from a future session reopens the same persistent save; scratch blocks placed outside spec bounds between the previous close and this open are still present, because only cell AABB contents are re-placed from disk.
 
@@ -129,14 +131,10 @@ A player explicitly unloads their active folder focus, or the session is cleared
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
-| UC-MAN-01 | Declare and persist a project root *(orphaned: no live UI caller)* | `ProjectRootsConfigTest."save then load roundtrips a list of paths"` | **GAP-PARTIAL** |
-| UC-MAN-01.a | *(historical)* User types path into `EditBox` in the deleted `ProjectRootListScreen` | — (`ProjectEntryFlowSpec`, the client test that covered this, was deleted with the screen it tested) | **GAP** |
-| UC-MAN-01.b | "Add" appends path and calls `ProjectRootsConfig.save` writing JSON | `ProjectRootsConfigTest."save then load roundtrips a list of paths"`, `ProjectRootsConfigTest."save creates parent directories if needed"` | **GAP-PARTIAL** (config round-trip covered; no UI caller exists to drive "Add" itself) |
-| UC-MAN-01.c | On next launch `ProjectRootsConfig.load` re-reads file | `ProjectRootsConfigTest."save then load roundtrips a list of paths"`, `ProjectRootsConfigTest."load returns empty when file missing"` | covered |
-| UC-MAN-01.d | "X" removes entry and re-saves; entry disappears on `rebuildWidgets` | — | **GAP** |
+| UC-MAN-01 | Declare and persist a project root *(removed — `ProjectRootsConfig` and its test deleted as dead code)* | — | n/a |
 | UC-MAN-01.e | `ProjectRoot.resolveSubpath` rejects relative and escaping subpaths | `ProjectRootTest."resolveSubpath rejects parent traversal"`, `ProjectRootTest."resolveSubpath rejects absolute subpath"`, `ProjectRootTest."resolveSubpath rejects symlink that escapes root"` | covered |
 | UC-MAN-02 | Boot the project singleplayer world | — | **GAP** |
-| UC-MAN-02.a | `ProjectIntegratedBoot.boot` derives save name via `ProjectSaveNaming.saveName` | `ProjectSaveNamingTest."preserves alphanumeric tail and appends 8-hex hash"`, `ProjectSaveNamingTest."same tail at different absolute paths produce different hashes"` | **GAP-PARTIAL** |
+| UC-MAN-02.a | *(removed)* per-root `boot(rootPath)` derived save name via `ProjectSaveNaming.saveName`; `ProjectSaveNaming` survives as a pure function with its own test | `ProjectSaveNamingTest."preserves alphanumeric tail and appends 8-hex hash"`, `ProjectSaveNamingTest."same tail at different absolute paths produce different hashes"` | n/a (derivation covered; no live caller) |
 | UC-MAN-02.b | `openOrCreateWorld` reopens or creates fresh void world | — | **GAP** |
 | UC-MAN-02.c | `SERVER_STARTING` listener picks up `pendingRoot` and calls `ProjectServerContext.set` | — | **GAP** |
 | UC-MAN-02.d | `SERVER_STARTED` listener calls `ProjectDimLifecycle.placeAll` if context present | `ProjectDimSpec."load places cells in the managed dim and registers a session"` | **GAP-PARTIAL** |
