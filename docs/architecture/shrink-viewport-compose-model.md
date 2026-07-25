@@ -6,7 +6,7 @@ summary: How WindowMixin's framebuffer shrink, MinecraftPresentMixin's composite
 
 # Shrink + composite + Compose overlay — how one frame is built
 
-The full-window Compose dock (see [ui/compose-dock-framework.md](../ui/dock-framework.md)) sits on
+The full-window Compose dock (see [ui/dock-framework.md](../ui/dock-framework.md)) sits on
 top of two older pieces of machinery — the framebuffer-shrink lever and the present-time composite —
 that predate it. This article is the frame-ordering picture: what runs when, and why the pieces don't
 fight each other.
