@@ -8,6 +8,7 @@ import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
 import com.breadmoirai.redstonespecs.client.ui.compose.input.DockInputRouter
 import com.breadmoirai.redstonespecs.client.viewport.ViewportState
 import com.breadmoirai.redstonespecs.client.viewport.WindowViewportExt
+import com.breadmoirai.redstonespecs.client.viewport.syncDockViewport
 import com.breadmoirai.redstonespecs.testing.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -93,6 +94,55 @@ class DockInputSpec : ClientSpec({
         }
 
         runOnClient { DockInputRouter.clearFocus(); DockState.reset() }
+        waitClientTicks(2)
+    }
+
+    test("syncDockViewport derives active/enabled from DockState, no GLFW involved") {
+        runOnClient {
+            DockState.reset()
+            ViewportState.active = false
+            ComposeOverlay.enabled = false
+        }
+        waitClientTicks(2)
+
+        // Nothing visible/focused: vanilla stays vanilla.
+        runOnClient {
+            syncDockViewport()
+            ViewportState.active.shouldBeFalse()
+            ComposeOverlay.enabled.shouldBeFalse()
+        }
+
+        // LEFT becomes visible: both flags flip on.
+        runOnClient {
+            DockState.setVisible(DockRegion.LEFT, true)
+            syncDockViewport()
+            ViewportState.active.shouldBeTrue()
+            ComposeOverlay.enabled.shouldBeTrue()
+        }
+
+        // LEFT hidden again: both flags revert to vanilla.
+        runOnClient {
+            DockState.setVisible(DockRegion.LEFT, false)
+            syncDockViewport()
+            ViewportState.active.shouldBeFalse()
+            ComposeOverlay.enabled.shouldBeFalse()
+        }
+
+        // Focus alone (no visible region) also counts as "something to show".
+        runOnClient {
+            DockState.reset()
+            DockInputRouter.focus(DockRegion.LEFT)
+            syncDockViewport()
+            ViewportState.active.shouldBeTrue()
+            ComposeOverlay.enabled.shouldBeTrue()
+        }
+
+        runOnClient {
+            DockInputRouter.clearFocus()
+            DockState.reset()
+            ViewportState.active = false
+            ComposeOverlay.enabled = false
+        }
         waitClientTicks(2)
     }
 })

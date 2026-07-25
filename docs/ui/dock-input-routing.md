@@ -71,7 +71,30 @@ One `KeyMapping` on `1`; the Alt/Shift distinction is read from live GLFW modifi
   `redstonespecs$updateScaledFramebuffer(true)` so the world inset resizes immediately.
 - Bare `1` falls through to the vanilla hotbar slot.
 
+Both branches also call `syncDockViewport()` (defined in `DockKeybinds.kt`) right after mutating
+`DockState` and before the framebuffer-resize call — see "Render enablement is derived from
+DockState" below for what it does and why it makes the dock reachable on its own.
+
 Registered from `RedstonespecsClient.onInitializeClient()` next to `registerViewportToggle()`.
+
+## Render enablement is derived from `DockState`, not a separate toggle
+
+The dock keybind is now self-sufficient: pressing Shift+1 (or Alt+1) is enough to see the dock
+in-world. `DockState.anyActive()` reports whether the dock has anything to show (any of
+`leftVisible`/`rightVisible`/`bottomVisible`, a non-empty `centerPanels`, or a non-null
+`focusedRegion`), and `syncDockViewport()` (`DockKeybinds.kt`) sets `ViewportState.active` and
+`ComposeOverlay.enabled` to that value. When nothing is visible/focused, both flags go back to
+`false` and the client is byte-for-byte vanilla (`WindowMixin.shouldModify()` is false, and
+`ComposeOverlay.renderInto` early-returns).
+
+`syncDockViewport()` is intentionally free of any `Window` dependency (it only flips the two
+flags) so it can be exercised by a clientTest without GLFW; the keybind handler calls
+`redstonespecs$updateScaledFramebuffer(true)` separately, right after, to apply the shrink using
+the live window.
+
+The `V`/`C` keybinds in `ViewportToggle.kt` remain independent debug toggles for the viewport
+shrink and Compose overlay individually — they are no longer required to reach the dock, and are
+unaffected by `syncDockViewport()`.
 
 ## Test coverage
 
@@ -83,5 +106,8 @@ at the element's window coords, and asserts the counter incremented (skipped onl
 mixin/GLFW window needed) covering the ESC policy: focuses LEFT, calls
 `DockInputRouter.onGlfwKey(GLFW_KEY_ESCAPE, GLFW_PRESS)` and asserts it returns `true` and
 `DockState.focusedRegion` becomes `null`; asserts a non-ESC key returns `false` and leaves focus
-intact; and asserts ESC returns `false` when not captured. It is registered in `ClientTestSentinel`
-(autoscan is off).
+intact; and asserts ESC returns `false` when not captured. A third case exercises
+`syncDockViewport()` directly (no GLFW): starting from `DockState.reset()` with both flags `false`,
+it asserts the flags stay `false` when nothing is visible, flip to `true` once `LEFT` becomes
+visible, revert to `false` once hidden again, and also flip to `true` when only `focusedRegion` is
+set (no visible region). `DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).

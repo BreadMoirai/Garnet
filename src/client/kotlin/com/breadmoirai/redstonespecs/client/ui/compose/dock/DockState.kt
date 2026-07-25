@@ -91,6 +91,14 @@ object DockState {
 
     fun toggleVisible(region: DockRegion) = setVisible(region, !isVisible(region))
 
+    /**
+     * True when the dock has something to show: any edge region visible, a center panel present,
+     * or a region focused. Drives whether the viewport shrink + Compose overlay should render
+     * (see `syncDockViewport` in `DockKeybinds.kt`) — read-only, makes no state changes itself.
+     */
+    fun anyActive(): Boolean =
+        leftVisible || rightVisible || bottomVisible || centerPanels.isNotEmpty() || focusedRegion != null
+
     /** Test/reset hook: clears panels, hides all edges, restores default sizes and focus. */
     fun reset() {
         leftVisible = false; rightVisible = false; bottomVisible = false
