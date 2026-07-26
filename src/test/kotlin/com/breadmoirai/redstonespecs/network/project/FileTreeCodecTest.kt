@@ -26,4 +26,17 @@ class FileTreeCodecTest : FunSpec({
 
         decoded shouldBe tree
     }
+
+    test("ProjectTreeSnapshotS2C round-trips with and without currentSubpath") {
+        val tree = FolderNode("root", listOf(
+            FolderNode("adders", listOf(FileNode("full.spec.kts", "kts"))),
+        ))
+        for (current in listOf<String?>(null, "adders")) {
+            val payload = ProjectTreeSnapshotS2C(root = tree, currentSubpath = current)
+            val buf = Unpooled.buffer()
+            ProjectTreeSnapshotS2C.STREAM_CODEC.encode(buf, payload)
+            val decoded = ProjectTreeSnapshotS2C.STREAM_CODEC.decode(buf)
+            decoded shouldBe payload
+        }
+    }
 })

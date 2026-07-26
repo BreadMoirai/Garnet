@@ -24,7 +24,7 @@ val FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode> = object : Stream
         return when (tag) {
             TAG_FOLDER -> {
                 val count = ByteBufCodecs.VAR_INT.decode(buf)
-                val children = ArrayList<FileTreeNode>(count)
+                val children = ArrayList<FileTreeNode>()
                 repeat(count) { children.add(decode(buf)) }
                 FolderNode(name, children)
             }
