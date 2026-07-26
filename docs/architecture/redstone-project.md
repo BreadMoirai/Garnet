@@ -51,13 +51,16 @@ loaded folder maps to a distinct **region** in the overworld via counter-based a
 Pure data:
 - `ProjectRoot` — absolute folder + path-traversal-safe `resolveSubpath` (with symlink defeat
   and `InvalidPathException` guard).
-- `ProjectFolderTree` — leaves vs intermediates scan.
-- `FileTree` — recursive tree model (`FolderNode`/`FileNode` under sealed `FileTreeNode`) built by
-  `scanFolder(path)`; mirrors the whole folder (all files/folders, incl. empty), folders-first
-  ordering. Paths are **computed, not stored** — `FolderNode.walk()` (node→path) and
-  `FolderNode.resolve(path)` (path→node), both relative to whichever folder is the root, so
-  re-rooting is free. **Not yet wired** to the network payload or the Explorer, which still use
-  the flat `ProjectFolderTree`.
+- `ProjectFolderTree` — leaves vs intermediates scan; used by `ProjectDimLifecycle.placeAll` for
+  region placement. Separate concern from the Explorer's tree model (below).
+- `FileTree` — recursive tree model (`FolderNode`/`FileNode` under sealed `FileTreeNode`, package
+  `com.breadmoirai.redstonespecs.project`) built by `scanFolder(path)`; mirrors the whole folder
+  (all files/folders, incl. empty), folders-first ordering. Paths are **computed, not stored** —
+  `FolderNode.walk()` (node→path) and `FolderNode.resolve(path)` (path→node), both relative to
+  whichever folder is the root, so re-rooting is free. This is the tree carried by
+  `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` and rendered recursively by
+  `ProjectExplorerPanel` (below) — the old flat `leaves`/`intermediates`/`ProjectLeafEntry` payload
+  fields are gone.
 - `GridLayout` — `(specs, cellSize, gap, rowMax, yBase) → cells`.
 - `ProjectCell` — pure cell record (origin + size).
 - `ProjectSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation (pure
@@ -86,12 +89,19 @@ Network:
 
 Client:
 - `client/ide/ProjectExplorerPanel` + `client/ide/ProjectTreeState` — the Compose dock panel that
-  renders the folder tree (LEFT region, hidden by default — Shift+1 reveals it). `ProjectTreeState` is
+  recursively renders `snapshot.root.children` (`FolderNode`/`FileNode`), with per-folder
+  expand/collapse (LEFT region, hidden by default — Shift+1 reveals it). `ProjectTreeState` is
   `mutableStateOf`-backed client state fed by the S2C receivers; `explorerPanel()` returns the
-  LEFT-dock `Panel`. Clicking a leaf sends `LoadProjectFolderC2S`; the Refresh row sends
-  `ListProjectTreeC2S`. This is the **only** live client UI for browsing the project tree —
-  `ProjectScreen` and `ProjectRootListScreen` (the legacy folder-browser GUI and world-list-screen
-  root picker) were deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md).
+  LEFT-dock `Panel`. A folder is a "spec-folder" (loadable) iff it directly contains a `FileNode`
+  named `*.spec.kts`: clicking its label then sends `LoadProjectFolderC2S(path)`; otherwise the
+  label (like the triangle) just toggles expand via `ProjectTreeState.toggleExpanded(path)`.
+  Clicking a file calls `ProjectTreeState.select(path)` (highlight only, no packet). Paths are
+  `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
+  `currentSubpath`. The Refresh row sends `ListProjectTreeC2S`. This is the **only** live client UI
+  for browsing the project tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy
+  folder-browser GUI and world-list-screen root picker) were deleted in the Compose-dock hard-cut.
+  See [ui/dock-framework.md](../ui/dock-framework.md) for the render pattern (recursion, expand
+  state, and why it's `Column`+`verticalScroll` rather than `LazyColumn`).
 - `client/project/ProjectClientNetworking` — S2C receivers. They feed `ProjectTreeState`
   (snapshot/folder-loaded/save-report/error); no client screen is opened in response.
 - `client/project/ProjectIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from

@@ -81,20 +81,34 @@ whole dock (rendering and input) silently no-ops back to vanilla, never crashing
 and the template future panels (debugger, timeline) should copy. The pattern:
 
 - **State is a `mutableStateOf`-backed singleton**, not the panel. `ProjectTreeState` holds
-  `snapshot: ProjectTreeSnapshotS2C?` and `status: String` as snapshot state with private setters,
-  mutated only by `onSnapshot/onFolderLoaded/onSaveReport/onError`. The networking layer
-  (`ProjectClientNetworking`, on the client thread via `ctx.client().execute {}`) calls those; the
-  panel `@Composable` reads `ProjectTreeState.snapshot` during composition and recomposes on change.
-  Keep the state object separate from the `Panel` so packet handlers never touch Compose internals.
+  `snapshot: ProjectTreeSnapshotS2C?`, `status: String`, `expanded: SnapshotStateList<String>`, and
+  `selectedPath: String?` as snapshot state with private setters, mutated only by
+  `onSnapshot/onFolderLoaded/onSaveReport/onError/toggleExpanded/select`. The networking layer
+  (`ProjectClientNetworking`, on the client thread via `ctx.client().execute {}`) calls the S2C
+  handlers; the panel `@Composable` reads `ProjectTreeState` during composition and recomposes on
+  change. Keep the state object separate from the `Panel` so packet handlers never touch Compose
+  internals.
 - **`explorerPanel(): Panel`** returns the tab (`Panel("redstonespecs.explorer", "Explorer") { … }`);
   it is seeded once into `DockState.leftPanels` at client init (`RedstonespecsClient`). LEFT stays
   hidden by default (Shift+1 reveals it).
-- **Clicks dispatch existing C2S packets**: a leaf row sends `LoadProjectFolderC2S(subpath)`, the
-  Refresh row sends `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh unit payload —
-  see `ProjectPackets`). The `currentSubpath` leaf is marked with a `●`.
+- **The tree renders recursively.** `snapshot.root` is a `FolderNode` (package
+  `com.breadmoirai.redstonespecs.project`); a private `TreeNode(node, path, depth, currentSubpath)`
+  composable recurses over `FolderNode`/`FileNode` (sealed `FileTreeNode`). Paths are `/`-joined
+  relative to root (`child.name` at depth 0, `"$path/${child.name}"` deeper) to match the server's
+  `FolderNode.walk()` keys and `currentSubpath`. A folder only recurses into its children when
+  `path in ProjectTreeState.expanded`.
+- **Clicks dispatch by node kind**: a folder is a "spec-folder" (directly contains a `FileNode`
+  named `*.spec.kts`) iff `node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }`;
+  clicking a spec-folder's label sends `LoadProjectFolderC2S(path)`, clicking any other folder's
+  label (or its expand triangle) calls `ProjectTreeState.toggleExpanded(path)`. Clicking a file row
+  calls `ProjectTreeState.select(path)` — highlight only, no packet sent. The Refresh row sends
+  `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh unit payload — see
+  `ProjectPackets`). The folder whose path equals `currentSubpath` is marked with a `●`.
 - **Scrolling a panel body** uses `Column(Modifier.verticalScroll(rememberScrollState()))` from
-  `androidx.compose.foundation` (not `LazyColumn`) — sufficient for the small tree and matching the
-  rest of the dock's foundation usage.
+  `androidx.compose.foundation`, **not** `LazyColumn` — this deferred render pipeline bakes
+  scissor/clipping at record time, and `LazyColumn`'s scroll-area clipping interacts badly with
+  that. `Column`+`verticalScroll` is sufficient for the tree sizes involved and matches the rest of
+  the dock's foundation usage.
 
 ## `ImageComposeScene` input API (verified against 1.12.0-beta02)
 

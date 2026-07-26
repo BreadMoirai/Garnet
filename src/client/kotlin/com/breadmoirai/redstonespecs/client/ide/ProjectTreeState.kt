@@ -21,6 +21,10 @@ object ProjectTreeState {
     /** Subpaths the user has expanded in the tree. */
     val expanded = androidx.compose.runtime.mutableStateListOf<String>()
 
+    /** The file the user has clicked (highlighted). Null when nothing is selected. */
+    var selectedPath by mutableStateOf<String?>(null)
+        private set
+
     fun onSnapshot(s: ProjectTreeSnapshotS2C) { snapshot = s }
 
     fun onFolderLoaded(p: ProjectFolderLoadedS2C) {
@@ -36,10 +40,13 @@ object ProjectTreeState {
         if (!expanded.remove(subpath)) expanded.add(subpath)
     }
 
+    fun select(path: String) { selectedPath = path }
+
     /** Test/reset hook: clears the snapshot, status, and expanded set back to initial values. */
     fun reset() {
         snapshot = null
         status = ""
         expanded.clear()
+        selectedPath = null
     }
 }
