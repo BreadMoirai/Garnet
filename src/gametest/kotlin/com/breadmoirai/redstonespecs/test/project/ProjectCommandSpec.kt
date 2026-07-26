@@ -5,6 +5,7 @@ import com.breadmoirai.redstonespecs.project.ProjectCommand
 import com.breadmoirai.redstonespecs.project.ProjectRoot
 import com.breadmoirai.redstonespecs.project.ProjectServerContext
 import com.breadmoirai.redstonespecs.project.ProjectSession
+import com.breadmoirai.redstonespecs.project.walk
 import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.redstonespecs.test.drainPayloads
 import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
@@ -12,6 +13,7 @@ import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import com.mojang.brigadier.CommandDispatcher
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import net.minecraft.commands.CommandSourceStack
 import kotlin.io.path.createDirectories
@@ -57,7 +59,7 @@ class ProjectCommandSpec : RedstoneTestSpec({
                 (rc > 0) shouldBe true
 
                 val snap = drainPayloads(player).filterIsInstance<ProjectTreeSnapshotS2C>().single()
-                snap.leaves.map { it.subpath } shouldBe listOf("set")
+                snap.root.walk().map { it.first }.toList() shouldContain "set/a.spec.kts"
 
                 ProjectServerContext.clear(this)
             }
@@ -83,7 +85,7 @@ class ProjectCommandSpec : RedstoneTestSpec({
                     (rc > 0) shouldBe true
 
                     val snap = drainPayloads(player).filterIsInstance<ProjectTreeSnapshotS2C>().single()
-                    snap.leaves.map { it.subpath } shouldBe listOf("cfg")
+                    snap.root.walk().map { it.first }.toList() shouldContain "cfg/a.spec.kts"
                 }
             } finally {
                 SharedSettings.projectRootPath = prior
@@ -109,8 +111,9 @@ class ProjectCommandSpec : RedstoneTestSpec({
                 (rc > 0) shouldBe true
 
                 val snap = drainPayloads(player).filterIsInstance<ProjectTreeSnapshotS2C>().single()
-                snap.leaves.map { it.subpath } shouldBe listOf("parent/leaf")
-                snap.intermediates shouldBe listOf("parent")
+                val paths = snap.root.walk().map { it.first }.toList()
+                paths shouldContain "parent"
+                paths shouldContain "parent/leaf/a.spec.kts"
                 snap.currentSubpath shouldBe "parent/leaf"
 
                 ProjectSession.clear(player.uuid)

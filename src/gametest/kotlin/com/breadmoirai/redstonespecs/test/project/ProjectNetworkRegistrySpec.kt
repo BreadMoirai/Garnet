@@ -2,11 +2,11 @@ package com.breadmoirai.redstonespecs.test.project
 
 import com.breadmoirai.redstonespecs.project.ProjectDimLifecycle
 import com.breadmoirai.redstonespecs.project.ProjectDimRegistry
-import com.breadmoirai.redstonespecs.project.ProjectFolderTree
 import com.breadmoirai.redstonespecs.project.ProjectRoot
 import com.breadmoirai.redstonespecs.project.ProjectServerContext
 import com.breadmoirai.redstonespecs.project.ProjectSession
 import com.breadmoirai.redstonespecs.project.ProjectWorld
+import com.breadmoirai.redstonespecs.project.walk
 import com.breadmoirai.redstonespecs.network.project.LoadProjectFolderC2S
 import com.breadmoirai.redstonespecs.network.project.ProjectErrorS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectFolderLoadedS2C
@@ -20,6 +20,7 @@ import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -181,7 +182,7 @@ class ProjectNetworkRegistrySpec : RedstoneTestSpec({
         }
     }
 
-    test("handleListTree sends snapshot matching ProjectFolderTree.scan") {
+    test("handleListTree sends a recursive snapshot matching scanFolder") {
         withTempRoot("project-net-list") { tmp ->
             val subA = tmp.resolve("set-a").also { it.createDirectories() }
             writeStub(subA, "x")
@@ -196,9 +197,8 @@ class ProjectNetworkRegistrySpec : RedstoneTestSpec({
                 ProjectNetworkRegistry.handleListTree(this, player)
 
                 val snap = drainPayloads(player).filterIsInstance<ProjectTreeSnapshotS2C>().single()
-                val expected = ProjectFolderTree.scan(ProjectRoot(tmp))
-                snap.leaves.map { it.subpath }.toSet() shouldBe expected.leaves.map { it.subpath }.toSet()
-                snap.leaves.single { it.subpath == "set-b" }.specCount shouldBe 2
+                val paths = snap.root.walk().map { it.first }.toList()
+                paths shouldContainAll listOf("set-a", "set-b", "set-a/x.spec.kts", "set-b/y.spec.kts", "set-b/z.spec.kts")
 
                 ProjectServerContext.clear(this)
             }
