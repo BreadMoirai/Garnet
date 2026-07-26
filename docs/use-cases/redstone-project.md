@@ -152,8 +152,8 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC-MAN-04.d | Anchor block placed; `SpecBlockEntity.projectSourcePath` set and not persisted to NBT | `ProjectDimSpec."load places cells in the managed dim and registers a session"` | **GAP-PARTIAL** |
 | UC-MAN-04.e | `StructureTemplate.fillFromWorld` captures cell volume as `loadedSnapshot` | `ProjectCellSaverSpec."no mutation -> not saved"` | **GAP-PARTIAL** |
 | UC-MAN-04.f | `world.perFolder[subpath]` replaced atomically via `ConcurrentHashMap` | `ProjectDimSpec."re-place after adding a new spec keeps region origin and includes new spec"` | **GAP-PARTIAL** |
-| UC-MAN-05 | Browse folder tree in-game and teleport to a folder | `ProjectNetworkRegistrySpec."handleListTree sends snapshot matching ProjectFolderTree.scan"` | **GAP-PARTIAL** |
-| UC-MAN-05.a | `ListProjectTreeC2S` triggers scan and `ProjectTreeSnapshotS2C` reply | `ProjectNetworkRegistrySpec."handleListTree sends snapshot matching ProjectFolderTree.scan"` | covered |
+| UC-MAN-05 | Browse folder tree in-game and teleport to a folder | `ProjectNetworkRegistrySpec."handleListTree sends a recursive snapshot matching scanFolder"` | **GAP-PARTIAL** |
+| UC-MAN-05.a | `ListProjectTreeC2S` triggers scan and `ProjectTreeSnapshotS2C` reply | `ProjectNetworkRegistrySpec."handleListTree sends a recursive snapshot matching scanFolder"` | covered |
 | UC-MAN-05.b | `ProjectClientNetworking` receives snapshot and feeds `ProjectTreeState`; the Compose Explorer renders it | `ProjectExplorerSpec."Explorer renders a project tree snapshot"` | covered |
 | UC-MAN-05.c | `LoadProjectFolderC2S` triggers path-traversal guard, teleport, and `ProjectFolderLoadedS2C` reply | `ProjectNetworkRegistrySpec."handleLoadFolder rejects path traversal with ProjectErrorS2C"`, `ProjectNetworkRegistrySpec."handleLoadFolder happy path sends ProjectFolderLoadedS2C and sets session"` | covered |
 | UC-MAN-05.d | `ProjectTeleport.toFolder` teleports player and calls `ProjectSession.setActive` | `ProjectTeleportSpec."toFolder teleports player to region and sets active subpath"` | covered |

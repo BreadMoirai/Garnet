@@ -16,14 +16,14 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 **Actor:** Player (server-side command source)
 **Trigger:** A player executes `/redstonespecs project` on a server where a project root is available.
 **Preconditions:** Either `ProjectServerContext.get(server)` returns a non-null context pin, or `SharedSettings.projectRootPath` is a non-blank string that resolves to an absolute path; the command is registered via `ProjectCommand.register(dispatcher)`.
-**Outcome:** The server scans the root via `ProjectFolderTree.scan`, builds a `ProjectTreeSnapshotS2C` payload, and sends it to the requesting player. The client receiver feeds the snapshot into `ProjectTreeState` (the Compose Project Explorer's observable state); it no longer auto-opens `ProjectScreen`. The command returns `Command.SINGLE_SUCCESS`.
+**Outcome:** The server scans the root via `scanFolder(root.path)`, builds a `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` payload carrying the full recursive folder tree, and sends it to the requesting player. The client receiver feeds the snapshot into `ProjectTreeState` (the Compose Project Explorer's observable state); it no longer auto-opens `ProjectScreen`. The command returns `Command.SINGLE_SUCCESS`.
 
 **System interactions:**
 - UC-CMD-01.a — `ProjectCommand.open` calls `ProjectServerContext.get(server)` first; if non-null, its `root` field is used directly without reading `SharedSettings`.
 - UC-CMD-01.b — If the context pin is null but `SharedSettings.projectRootPath` is non-blank, `ProjectRoot(Path.of(rootCfg).toAbsolutePath())` is constructed as the fallback root.
-- UC-CMD-01.c — `ProjectFolderTree.scan(root)` walks the root directory recursively; every subdirectory containing `.spec.kts` files is emitted as a `ProjectLeaf`; subdirectories that themselves contain further subdirectories are added to the `intermediates` set.
+- UC-CMD-01.c — `scanFolder(root.path)` mirrors the whole folder recursively into a `FolderNode` tree — all files and folders, including empty ones — with folders-first ordering.
 - UC-CMD-01.d — `ProjectSession.get(player.uuid)?.activeSubpath` is read to embed the player's current active folder in the snapshot; this value is `null` if the player has no prior session.
-- UC-CMD-01.e — `ServerPlayNetworking.send(player, ProjectTreeSnapshotS2C(leaves, intermediates, currentSubpath))` delivers the snapshot; the client-side receiver (`ProjectClientNetworking`) calls `ProjectTreeState.onSnapshot(payload)`, which the Compose Explorer renders.
+- UC-CMD-01.e — `ServerPlayNetworking.send(player, ProjectTreeSnapshotS2C(root, currentSubpath))` delivers the snapshot; the client-side receiver (`ProjectClientNetworking`) calls `ProjectTreeState.onSnapshot(payload)`, which the Compose Explorer renders.
 - UC-CMD-01.f — The return value is `Command.SINGLE_SUCCESS` (integer 1); Brigadier records a successful execution.
 
 ---
@@ -78,7 +78,7 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 | UC-CMD-01 | `/redstonespecs project` opens project-folder UI when root is available | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
 | UC-CMD-01.a | `ProjectCommand.open` tries context pin first | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
 | UC-CMD-01.b | Falls back to `SharedSettings.projectRootPath` if context pin is null | — | **GAP** |
-| UC-CMD-01.c | `ProjectFolderTree.scan` emits leaves and intermediates | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
+| UC-CMD-01.c | `scanFolder` produces the recursive folder tree | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
 | UC-CMD-01.d | Player's `activeSubpath` embedded in snapshot; null if no prior session | — | **GAP** |
 | UC-CMD-01.e | `ServerPlayNetworking.send` delivers `ProjectTreeSnapshotS2C` to player | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
 | UC-CMD-01.f | Command returns `Command.SINGLE_SUCCESS` (integer > 0) | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
