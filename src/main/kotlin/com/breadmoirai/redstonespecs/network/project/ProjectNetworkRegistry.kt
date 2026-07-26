@@ -124,11 +124,9 @@ object ProjectNetworkRegistry {
             ServerPlayNetworking.send(player, ProjectErrorS2C("project-root not configured"))
             return
         }
-        val tree = ProjectFolderTree.scan(root)
         val current = ProjectSession.get(player.uuid)?.activeSubpath
         ServerPlayNetworking.send(player, ProjectTreeSnapshotS2C(
-            leaves = tree.leaves.map { ProjectLeafEntry(it.subpath, it.specFiles.size) },
-            intermediates = tree.intermediates.toList(),
+            root = scanFolder(root.path),
             currentSubpath = current,
         ))
     }

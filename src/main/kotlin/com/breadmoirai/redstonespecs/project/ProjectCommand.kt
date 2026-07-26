@@ -1,7 +1,6 @@
 package com.breadmoirai.redstonespecs.project
 
 import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.network.project.ProjectLeafEntry
 import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.CommandDispatcher
@@ -34,11 +33,9 @@ object ProjectCommand {
             return 0
         }
 
-        val tree = ProjectFolderTree.scan(root)
         val current = ProjectSession.get(player.uuid)?.activeSubpath
         ServerPlayNetworking.send(player, ProjectTreeSnapshotS2C(
-            leaves = tree.leaves.map { ProjectLeafEntry(it.subpath, it.specFiles.size) },
-            intermediates = tree.intermediates.toList(),
+            root = scanFolder(root.path),
             currentSubpath = current,
         ))
         // Client receiver renders the project tree via the Compose dock Explorer panel.

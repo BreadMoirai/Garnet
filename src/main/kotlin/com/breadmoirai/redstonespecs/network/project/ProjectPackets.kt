@@ -1,5 +1,8 @@
 package com.breadmoirai.redstonespecs.network.project
 
+import com.breadmoirai.redstonespecs.project.FileNode
+import com.breadmoirai.redstonespecs.project.FileTreeNode
+import com.breadmoirai.redstonespecs.project.FolderNode
 import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
@@ -10,34 +13,59 @@ private fun id(p: String) = Identifier.fromNamespaceAndPath("redstonespecs", "pr
 
 // === Tree listing ===
 
-data class ProjectLeafEntry(val subpath: String, val specCount: Int) {
-    companion object {
-        val STREAM_CODEC: StreamCodec<ByteBuf, ProjectLeafEntry> = StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8, ProjectLeafEntry::subpath,
-            ByteBufCodecs.VAR_INT, ProjectLeafEntry::specCount,
-            ::ProjectLeafEntry,
-        )
+private const val TAG_FOLDER: Byte = 0
+private const val TAG_FILE: Byte = 1
+
+/** Recursive codec for a [FileTreeNode] tree. Per-node tag byte: 0 = folder, 1 = file. */
+val FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode> = object : StreamCodec<ByteBuf, FileTreeNode> {
+    override fun decode(buf: ByteBuf): FileTreeNode {
+        val tag = buf.readByte()
+        val name = ByteBufCodecs.STRING_UTF8.decode(buf)
+        return when (tag) {
+            TAG_FOLDER -> {
+                val count = ByteBufCodecs.VAR_INT.decode(buf)
+                val children = ArrayList<FileTreeNode>(count)
+                repeat(count) { children.add(decode(buf)) }
+                FolderNode(name, children)
+            }
+            TAG_FILE -> FileNode(name, ByteBufCodecs.STRING_UTF8.decode(buf))
+            else -> throw IllegalStateException("Unknown FileTreeNode tag: $tag")
+        }
+    }
+
+    override fun encode(buf: ByteBuf, value: FileTreeNode) {
+        when (value) {
+            is FolderNode -> {
+                buf.writeByte(TAG_FOLDER.toInt())
+                ByteBufCodecs.STRING_UTF8.encode(buf, value.name)
+                ByteBufCodecs.VAR_INT.encode(buf, value.children.size)
+                value.children.forEach { encode(buf, it) }
+            }
+            is FileNode -> {
+                buf.writeByte(TAG_FILE.toInt())
+                ByteBufCodecs.STRING_UTF8.encode(buf, value.name)
+                ByteBufCodecs.STRING_UTF8.encode(buf, value.extension)
+            }
+        }
     }
 }
 
 data class ProjectTreeSnapshotS2C(
-    val leaves: List<ProjectLeafEntry>,
-    val intermediates: List<String>,
+    val root: FolderNode,
     val currentSubpath: String?,
 ) : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<ProjectTreeSnapshotS2C>(id("tree_snapshot"))
         val STREAM_CODEC: StreamCodec<ByteBuf, ProjectTreeSnapshotS2C> = object : StreamCodec<ByteBuf, ProjectTreeSnapshotS2C> {
             override fun decode(buf: ByteBuf): ProjectTreeSnapshotS2C {
-                val leaves = ProjectLeafEntry.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf)
-                val intermediates = ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()).decode(buf)
+                val root = FILE_TREE_STREAM_CODEC.decode(buf) as? FolderNode
+                    ?: error("ProjectTreeSnapshotS2C root must be a folder")
                 val hasCurrent = buf.readBoolean()
                 val current = if (hasCurrent) ByteBufCodecs.STRING_UTF8.decode(buf) else null
-                return ProjectTreeSnapshotS2C(leaves, intermediates, current)
+                return ProjectTreeSnapshotS2C(root, current)
             }
             override fun encode(buf: ByteBuf, value: ProjectTreeSnapshotS2C) {
-                ProjectLeafEntry.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, value.leaves)
-                ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()).encode(buf, value.intermediates)
+                FILE_TREE_STREAM_CODEC.encode(buf, value.root)
                 buf.writeBoolean(value.currentSubpath != null)
                 if (value.currentSubpath != null) ByteBufCodecs.STRING_UTF8.encode(buf, value.currentSubpath)
             }
