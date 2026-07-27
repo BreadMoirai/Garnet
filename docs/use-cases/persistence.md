@@ -96,37 +96,15 @@ The persistence layer turns in-memory specs into `.spec.kts` + `.nbt` file pairs
 
 ---
 
-### UC-PER-06 — Capture and restore a structure sidecar (`.nbt`)
+### UC-PER-06 / UC-PER-07 — Structure sidecar capture, restore, and drift *(moved)*
 
-**Actor:** System (editor save / runner setup)
-**Trigger:** The editor saves a spec and the associated circuit region must be persisted; or the runner is about to execute a spec and needs to restore the initial block state.
-**Preconditions:** For save: a `ServerLevel`, origin `BlockPos`, and bounding `Vec3i` are available. For restore: `<id>.nbt` exists in `saveDir`.
-**Outcome:** Save — `<id>.nbt` is written as a compressed NBT structure file usable by MC's `StructureTemplate` API. Restore — the block region is filled back to its saved state at the given origin before the spec runs.
-
-**System interactions:**
-- UC-PER-06.a — `StructurePersistence.save` builds a `StructureTemplate` via `fillFromWorld(level, originPos, bounds, false, emptyList())`, serialises it to a `CompoundTag`, and writes with `NbtIo.writeCompressed`; `IOException` is caught and logged at ERROR without re-throw.
-- UC-PER-06.b — `StructurePersistence.load` reads `<id>.nbt` with `NbtIo.readCompressed` (unlimited heap accounter), reconstructs the template via `StructureTemplate.load(blockGetter, nbt)`, then places blocks with `placeInWorld(..., StructurePlaceSettings(), level.random, 2)`.
-- UC-PER-06.c — `StructurePersistence.hasChanges` compares the saved NBT bytes against a freshly captured live region; returns `true` (treat as changed) on `IOException` to avoid silent data loss.
-- UC-PER-06.d — `StructurePersistence.clearBounds` sets every block in the region to `AIR` before a structure is placed, preventing block merging artifacts.
-
-**Invariants:** [spec-on-disk-format — companion files](../persistence/spec-on-disk-format.md)
-
----
-
-### UC-PER-07 — Handle sidecar drift (script present, `.nbt` missing or stale)
-
-**Actor:** System (runner pre-flight check)
-**Trigger:** `SpecPersistence.load` succeeds (`.spec.kts` present and parses), but `StructurePersistence.load` finds no matching `.nbt`, or `StructurePersistence.hasChanges` reports the live region has diverged from the saved NBT.
-**Preconditions:** `<id>.spec.kts` exists and loads cleanly; `<id>.nbt` is absent, unreadable, or byte-differs from the live block region.
-**Outcome:** The system surfaces the drift to the operator; execution is either blocked or proceeds with a warning, depending on caller policy. The runner never silently runs a spec against a stale circuit.
-
-**System interactions:**
-- UC-PER-07.a — Missing `.nbt`: `StructurePersistence.load` logs `WARN("[StructurePersistence#load] structure file '{}' not found", file)` and returns without placing blocks; the region is whatever the world currently contains.
-- UC-PER-07.b — Unreadable `.nbt`: `IOException` in `StructurePersistence.load` is caught and logged at ERROR; the return path is the same as the missing-file case.
-- UC-PER-07.c — `StructurePersistence.hasChanges` returns `true` when the `.nbt` is absent, on read error, or when the serialised live region's `CompoundTag` does not equal the saved tag byte-for-byte.
-- UC-PER-07.d — `RecordingSidecar.load` returns `null` when `<id>.recording.nbt` is absent; callers that only need the `StateRecording` for visualisation must handle `null` gracefully; the execution path is unaffected.
-
-**Invariants:** [spec-on-disk-format — companion files](../persistence/spec-on-disk-format.md); [kts-script-host — threat model](../persistence/kts-script-host.md)
+The spec-cell structure-sidecar journeys — `StructurePersistence.save`/`load`/`hasChanges`,
+`clearBounds`, and the missing/unreadable/stale-`.nbt` drift handling — now live with the rest of
+the structure-I/O journeys in
+[structure-lifecycle.md](structure-lifecycle.md#spec-cell-structure-sidecar-uc-per-06--uc-per-07).
+The UC IDs (`UC-PER-06.a`–`.d`, `UC-PER-07.a`–`.d`) are unchanged; only the article that hosts them
+moved. `UC-PER-01.b` (the `StructurePersistence.save` call on the finalize path) still lives above,
+in UC-PER-01.
 
 ---
 
@@ -136,7 +114,7 @@ The persistence layer turns in-memory specs into `.spec.kts` + `.nbt` file pairs
 |---|---|---|---|
 | UC-PER-01 | Write `.spec.kts` + `.nbt` + recording sidecar after finalization | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | **GAP-PARTIAL** |
 | UC-PER-01.a | `SpecPersistence.writeSpecKts` creates dirs and writes file | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | covered |
-| UC-PER-01.b | `StructurePersistence.save` captures region and writes `.nbt` | — | **GAP** |
+| UC-PER-01.b | `StructurePersistence.save` captures region and writes `.nbt` | `StructureSidecarPersistenceSpec."UC-PER-06: save captures the region and load restores it byte-for-byte at the origin"` (same call; see [structure-lifecycle.md](structure-lifecycle.md)) | covered |
 | UC-PER-01.c | `RecordingSidecar.save` writes `.recording.nbt` for editor timeline | `RecordingSidecarTest."save then load yields an equivalent recording"`, `SpecPersistenceTest."writeSpecKts with sidecar recording roundtrips"` | covered |
 | UC-PER-01.d | Both files share the same `saveDir` and stem `id` | `SpecPersistenceTest."writeSpecKts with sidecar recording roundtrips"` | covered |
 | UC-PER-02 | Load `.spec.kts` via scripting host | `KtsSpecLoaderTest."loadRedstoneSpec returns a dsl.RedstoneSpec from new-style source"` | covered |
@@ -159,13 +137,5 @@ The persistence layer turns in-memory specs into `.spec.kts` + `.nbt` file pairs
 | UC-PER-05.b | `SpecPersistence.writeSpecKts` resolves path and writes text | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | covered |
 | UC-PER-05.c | `KtsSpecLoader.loadFileAsRedstoneSpec` re-evaluates file and returns `RedstoneSpec` | `KtsSpecLoaderRoundtripTest."new-dsl source roundtrips id, bounds, lifespan via loadRedstoneSpec"` | covered |
 | UC-PER-05.d | Loaded spec's `id`, `bounds`, `lifespan` match emitted values | `KtsSpecLoaderRoundtripTest."new-dsl source roundtrips id, bounds, lifespan via loadRedstoneSpec"` | covered |
-| UC-PER-06 | Capture and restore structure sidecar (`.nbt`) | — | **GAP** |
-| UC-PER-06.a | `StructurePersistence.save` builds template, serialises, writes NBT | — | **GAP** |
-| UC-PER-06.b | `StructurePersistence.load` reads NBT and places blocks with `placeInWorld` | — | **GAP** |
-| UC-PER-06.c | `StructurePersistence.hasChanges` returns `true` on absent file, read error, or byte diff | — | **GAP** |
-| UC-PER-06.d | `StructurePersistence.clearBounds` sets region to AIR before placement | — | **GAP** |
-| UC-PER-07 | Handle sidecar drift (script present, `.nbt` missing or stale) | — | **GAP** |
-| UC-PER-07.a | Missing `.nbt`: `StructurePersistence.load` logs WARN and returns without placing | — | **GAP** |
-| UC-PER-07.b | Unreadable `.nbt`: `IOException` caught and logged at ERROR | — | **GAP** |
-| UC-PER-07.c | `hasChanges` returns `true` on absent file, read error, or byte mismatch | — | **GAP** |
-| UC-PER-07.d | `RecordingSidecar.load` returns `null` when sidecar absent | `RecordingSidecarTest."load returns null when sidecar absent"`, `SpecPersistenceTest."no sidecar without explicit save"` | covered |
+| UC-PER-06 | Capture and restore structure sidecar (`.nbt`) *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |
+| UC-PER-07 | Handle sidecar drift (`.nbt` missing / stale) *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |

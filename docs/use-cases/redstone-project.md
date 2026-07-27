@@ -1,7 +1,7 @@
 ---
 title: Redstone project use-cases
 tags: [redstone-project, dimensions, grid, datapack, use-cases]
-summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back; standalone .nbt structure place/save/create.
+summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back. (Standalone .nbt structures + dirty-state moved to structure-lifecycle.md.)
 last_audited_commit: 4c849243e4ce68ca5147bd2a16ce057664baa8fd
 ---
 
@@ -154,19 +154,13 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
 
 ---
 
-### UC-MAN-10 — Place, save, and create standalone structure files
+### UC-MAN-10 — Place, save, and create standalone structure files *(moved)*
 
-A `.nbt` file in the Explorer is a first-class citizen independent of any spec: clicking it places
-the structure, "Save Structure" auto-fits and rewrites it, and "+ Structure" creates a new empty
-one. See [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files).
-
-- **UC-MAN-10.a** Clicking a `.nbt` `FileNode` in `ProjectExplorerPanel` sends `PlaceStructureC2S(path)`. `ProjectNetworkRegistry.handlePlaceStructure` resolves the subpath, checks for a `.nbt.unsaved` sidecar (`StructurePersistence.unsavedSidecarOf`) and loads it in preference to the committed `.nbt` when present (reporting `hasUnsaved = true`), then delegates to the shared `placeStructureFrom` helper: assigns/reuses a region via `ProjectDimRegistry.getOrAssignStructureRegion` (a disjoint +X lane at `z = STRUCTURE_LANE_Z`), clears only the previously-placed footprint (`placedBoxOf` → `StructurePersistence.clearBounds`), calls `StructurePersistence.placeStructureCentered`, and records the new `PlacedBox` via `setPlacedBox`.
-- **UC-MAN-10.b** `StructureRegionMath.centeredStart`/`anchorY` center the structure in the region and floor it at `SharedSettings.projectGridYBase` (64), or vertically center it when the structure's height is at or above `TALL_THRESHOLD` (256).
-- **UC-MAN-10.c** The `StructureActions()` "Save Structure" button (enabled when `selectedPath` ends with `.nbt`) sends `SaveStructureC2S(path)`. `handleSaveStructure` refuses (with `ProjectErrorS2C`) unless the structure was placed this session (`placedBoxOf(subpath) != null`), then scans the assigned region for non-air, computes the tight box via `StructureRegionMath.autoFit`, calls `StructurePersistence.saveAutoFitToFile` to rewrite `<name>.nbt` (an all-air region returns `null` and no file is written), and deletes the `.nbt.unsaved` sidecar so the structure reports clean.
-- **UC-MAN-10.d** The `StructureActions()` "+ Structure" name field sends `NewStructureC2S(name)`. `handleNewStructure` calls `ProjectNewStructure.create(folder, name)`, which writes an empty `<name>.nbt` into the active folder, then re-sends the project tree.
-- **UC-MAN-10.e** All handlers reply with `StructureResultS2C(subpath, sizeX, sizeY, sizeZ, hasUnsaved, message)`; `ProjectClientNetworking` feeds it to `ProjectTreeState.onStructureResult`, which sets `status = message` — the same status line used by folder load/save results. `hasUnsaved` is `true` only when place loaded from the `.nbt.unsaved` sidecar; save and discard both report `false`.
-- **UC-MAN-10.f** `DiscardStructureC2S(subpath)` → `handleDiscardStructure` deletes the `.nbt.unsaved` sidecar (if any) and re-places from the committed `.nbt` via `placeStructureFrom`, reporting `hasUnsaved = false`. On `ServerLifecycleEvents.BEFORE_SAVE`, `ProjectNetworkRegistry.flushDirtyStructures` iterates `ProjectDimRegistry.placedStructureSubpaths()` and calls `StructurePersistence.flushUnsavedSidecar` for each placed structure's region, writing (or deleting, if the region now matches the committed file) its `.nbt.unsaved` — this is the only auto-persist point for in-progress structure edits; there is no autosave on disconnect.
-- **UC-MAN-10.g** The `StructureActions()` "Discard" button sends `DiscardStructureC2S(selectedPath)` when `selectedPath` ends with `.nbt`; it renders dimmed (`TEXT_DISABLED`) unless `ProjectTreeState.selectedHasUnsaved()` is true. `selectedHasUnsaved()` resolves `selectedPath` against `snapshot.root` via `FolderNode.resolve` and returns true only when it lands on a `FileNode` with `hasUnsaved == true`. The tree also prefixes a `● ` dirty dot on a structure `FileNode`'s label when `node.hasUnsaved` is true.
+The standalone `.nbt` structure journeys — clicking a `.nbt` to place it, "Save Structure",
+"+ Structure", "Discard", and the `.nbt.unsaved` dirty sidecar — now live in their own article,
+alongside the spec-cell sidecar path:
+[structure-lifecycle.md](structure-lifecycle.md#standalone-nbt-structures-uc-man-10). The UC IDs
+(`UC-MAN-10.a`–`.g`) are unchanged; only the article that hosts them moved.
 
 ---
 
@@ -225,14 +219,7 @@ one. See [architecture/redstone-project.md#standalone-structure-files](../archit
 | UC-MAN-09.b | Non-null pick persists + sends `SetProjectRootC2S`; cancel sends nothing | `RootPickerSpec."openFolder sends SetProjectRootC2S and persists the picked path"`, `RootPickerSpec."openFolder sends nothing when the picker is cancelled"` | covered |
 | UC-MAN-09.c | `handleSetRoot` validates dir, swaps root, re-places, re-snapshots; non-dir → `ProjectErrorS2C` | `ProjectNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `ProjectNetworkRegistrySpec."handleSetRoot rejects a non-directory path with ProjectErrorS2C"` | covered |
 | UC-MAN-09.d | *(Plan B)* old grid persists; region assignments accumulate; Attach not implemented | — | n/a |
-| UC-MAN-10 | Place, save, and create standalone structure files | `ProjectStructureNetworkSpec` | covered |
-| UC-MAN-10.a | `PlaceStructureC2S` → `handlePlaceStructure` prefers the `.nbt.unsaved` sidecar when present, assigns/reuses a structure region, cheap-re-clears the prior footprint, places via the shared `placeStructureFrom` helper, and records the new `PlacedBox` | `ProjectStructureNetworkSpec."place then save round-trips a standalone structure via handlers"`, `ProjectStructureNetworkSpec."place rejects a non-.nbt subpath"`, `ProjectStructureNetworkSpec."dirty sidecar lifecycle: flush writes/deletes, place loads unsaved, save+discard clear"`, `ProjectDimRegistryTest."getOrAssignStructureRegion is idempotent and distinct per subpath"`, `ProjectDimRegistryTest."structure regions sit in a lane disjoint from spec-folder regions"`, `ProjectDimRegistryTest."placed-box round-trips per subpath"` | covered |
-| UC-MAN-10.b | `centeredStart`/`anchorY` center in-region and floor/vertically-center by height | `StructureRegionMathTest."centeredStart centers a box in a region (floor-divides odd slack)"`, `StructureRegionMathTest."anchorY floors short structures at yBase"`, `StructureRegionMathTest."anchorY vertically centers structures at or above the tall threshold"` | covered |
-| UC-MAN-10.c | `SaveStructureC2S` → `handleSaveStructure` refuses unless placed this session, auto-fits the non-air region, rewrites the `.nbt`, and deletes the `.nbt.unsaved` sidecar; empty region writes no file | `StructureRegionPersistenceSpec."auto-fit save captures the tight non-air box; place re-centers it"`, `StructureRegionPersistenceSpec."auto-fit save of an empty region writes a file and returns null"`, `StructureRegionMathTest."autoFit tightly boxes scattered non-air cells"`, `StructureRegionMathTest."autoFit returns null when the volume has no non-air"`, `ProjectStructureNetworkSpec."save without placing this session is refused and does not touch the file"`, `ProjectStructureNetworkSpec."dirty sidecar lifecycle: flush writes/deletes, place loads unsaved, save+discard clear"` | covered |
-| UC-MAN-10.d | `NewStructureC2S` → `handleNewStructure` writes an empty `.nbt` and re-sends the tree | `ProjectStructureNetworkSpec."new structure creates the file and re-sends the tree"` | covered |
-| UC-MAN-10.e | `StructureResultS2C` codec and status-line wiring | `StructurePacketsTest."StructureResultS2C codec round-trips"`, `StructurePacketsTest."PlaceStructureC2S codec round-trips"`, `StructurePacketsTest."SaveStructureC2S codec round-trips"`, `StructurePacketsTest."NewStructureC2S codec round-trips"` | covered |
-| UC-MAN-10.f | `DiscardStructureC2S` → `handleDiscardStructure` deletes the sidecar and re-places from the committed `.nbt`; `BEFORE_SAVE` → `flushDirtyStructures` writes/deletes each placed structure's sidecar | `StructurePacketsTest."DiscardStructureC2S codec round-trips"`, `ProjectStructureNetworkSpec."dirty sidecar lifecycle: flush writes/deletes, place loads unsaved, save+discard clear"` | covered |
-| UC-MAN-10.g | Client "Discard" control sends `DiscardStructureC2S(selectedPath)` and dims unless `ProjectTreeState.selectedHasUnsaved()`; dirty dot prefixes a `.nbt` `FileNode` label when `hasUnsaved` | `StructureExplorerSpec."selectedHasUnsaved reflects the dirty flag on the selected .nbt node"` | covered |
+| UC-MAN-10 | Place, save, create, discard standalone `.nbt` structures + `.nbt.unsaved` dirty sidecar *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |
 
 **UI-caller gap (not a test gap):** UC-MAN-01/02/06/07/08's `.a` rows above are marked historical
 because their only client trigger (`ProjectScreen`/`ProjectRootListScreen`) was deleted in the

@@ -8,6 +8,7 @@ import com.breadmoirai.redstonespecs.test.project.ProjectStructureNetworkSpec
 import com.breadmoirai.redstonespecs.test.project.ProjectTeleportSpec
 import com.breadmoirai.redstonespecs.test.network.RecorderRunnerNetworkRegistrySpec
 import com.breadmoirai.redstonespecs.test.persistence.StructureRegionPersistenceSpec
+import com.breadmoirai.redstonespecs.test.persistence.StructureSidecarPersistenceSpec
 import com.breadmoirai.redstonespecs.test.recorder.MarkerToolSpec
 import com.breadmoirai.redstonespecs.test.recorder.RecordingLifecycleSpec
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
@@ -57,6 +58,7 @@ class GametestSentinel {
                             RecordingLifecycleSpec::class,
                             MarkerToolSpec::class,
                             StructureRegionPersistenceSpec::class,
+                            StructureSidecarPersistenceSpec::class,
                         ),
                     )
                 }

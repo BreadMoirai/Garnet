@@ -12,9 +12,10 @@ The prefix list is closed: `PER` (persistence), `NET` (networking), `MAN` (redst
 
 ## Articles
 
-- [Persistence](persistence.md) — `.spec.kts` + `.nbt` save/load, directory scan, sidecar handling. Tags: storage, kts, sidecar.
+- [Persistence](persistence.md) — `.spec.kts` save/load, directory scan, script-host errors. (Structure `.nbt` sidecar UCs moved to structure-lifecycle.md.) Tags: storage, kts, scripting.
+- [Structure lifecycle](structure-lifecycle.md) — `.nbt` save/load on both paths, `.nbt.unsaved` dirty tracking, save-vs-discard (UC-MAN-10, UC-PER-06/07). Tags: structure, dirty-state, save, revert, sidecar.
 - [Networking](networking.md) — C2S/S2C payloads, server-authority, origin-pos lookup. Tags: payloads, sync, authority.
-- [Redstone project](redstone-project.md) — Datapack-driven void dim, grid placement, folder-tree, save-back, standalone `.nbt` structure place/save/create (UC-MAN-10). Tags: redstone-project, dimensions, grid.
+- [Redstone project](redstone-project.md) — Datapack-driven void dim, grid placement, folder-tree, per-spec save-back. (Standalone `.nbt` structures moved to structure-lifecycle.md.) Tags: redstone-project, dimensions, grid.
 - [Command surface](command.md) — `/redstonespecs project` dispatcher. Tags: command, dispatch.
 - [Gametest harness](gametest-harness.md) — Test infrastructure use-cases: fixtures, sentinels, replay. Tags: gametest, harness, fixtures.
 - [Cross-cutting](cross-cutting.md) — End-to-end journeys spanning ≥3 subsystems. Tags: e2e, integration, regression.
