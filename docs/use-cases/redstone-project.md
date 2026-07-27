@@ -127,6 +127,30 @@ A player explicitly unloads their active folder focus, or the session is cleared
 
 ---
 
+### UC-MAN-09 — Re-root the Explorer from a native folder picker
+
+A player opens the Explorer header's option button, chooses **Open Folder**, and picks a folder
+in the OS dialog; the workspace root switches to it. **Attach Folder** is present but disabled
+(multi-root is Plan B).
+
+- **UC-MAN-09.a** Clicking the option button toggles `RootPickerController.menuOpen`, rendering
+  the hand-rolled `RootMenu` overlay. **Open Folder** calls `RootPickerController.openFolder`,
+  which runs the injectable `FolderPicker` (default `TinyfdFolderPicker` →
+  `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
+- **UC-MAN-09.b** On a non-null pick, the controller persists the path client-side
+  (`ModConfig.projectRootPath` → `redstonespecs.json`, also mirrored to
+  `SharedSettings.projectRootPath`) and sends `SetProjectRootC2S(path)` on the client thread via
+  `Minecraft.execute`. A cancel (null) sends nothing.
+- **UC-MAN-09.c** `ProjectNetworkRegistry.handleSetRoot` rejects a non-directory / invalid path
+  with `ProjectErrorS2C`; otherwise it sets `SharedSettings.projectRootPath`, pins a new
+  `ProjectServerContext`, re-runs `ProjectDimLifecycle.placeAll`, and re-sends the single-root
+  `ProjectTreeSnapshotS2C`. The Explorer re-renders rooted at the new folder.
+- **UC-MAN-09.d** *(Plan-A rough edges, deferred to Plan B)* The previous root's already-placed
+  cells remain in the workspace overworld after a swap and `ProjectDimRegistry` keeps
+  accumulating region assignments; **Attach Folder** (a second root) is not implemented.
+
+---
+
 ## Coverage matrix
 
 | UC ID | Description | Test | Status |
@@ -177,6 +201,11 @@ A player explicitly unloads their active folder focus, or the session is cleared
 | UC-MAN-08.c | Ungraceful disconnect: `ProjectSession.clear` called from disconnect event | `ProjectNetworkRegistrySpec."ungraceful disconnect clears the player's managed session"` | covered |
 | UC-MAN-08.d | Server stop: `dispose` and `clear` calls release all server-scoped state | `ProjectLifecycleReleaseTest."UC-MAN-08.d: releaseServerState disposes registry, world, and context"` | covered |
 | UC-MAN-08.e | On next `placeAll`, cell is rebuilt from on-disk `.nbt` (un-saved in-world edits overwritten); only saved changes persist | — | **GAP** |
+| UC-MAN-09 | Re-root the Explorer from a native folder picker | `RootPickerSpec`, `ProjectNetworkRegistrySpec` | **GAP-PARTIAL** |
+| UC-MAN-09.a | Option button toggles the menu; Open Folder runs the `FolderPicker` on a worker thread | `RootPickerSpec."openFolder sends SetProjectRootC2S and persists the picked path"`, `ProjectExplorerSpec."Explorer header renders the root option button and opens the dropdown"` | covered |
+| UC-MAN-09.b | Non-null pick persists + sends `SetProjectRootC2S`; cancel sends nothing | `RootPickerSpec."openFolder sends SetProjectRootC2S and persists the picked path"`, `RootPickerSpec."openFolder sends nothing when the picker is cancelled"` | covered |
+| UC-MAN-09.c | `handleSetRoot` validates dir, swaps root, re-places, re-snapshots; non-dir → `ProjectErrorS2C` | `ProjectNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `ProjectNetworkRegistrySpec."handleSetRoot rejects a non-directory path with ProjectErrorS2C"` | covered |
+| UC-MAN-09.d | *(Plan B)* old grid persists; region assignments accumulate; Attach not implemented | — | n/a |
 
 **UI-caller gap (not a test gap):** UC-MAN-01/02/06/07/08's `.a` rows above are marked historical
 because their only client trigger (`ProjectScreen`/`ProjectRootListScreen`) was deleted in the

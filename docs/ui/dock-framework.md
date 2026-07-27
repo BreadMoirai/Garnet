@@ -109,6 +109,14 @@ and the template future panels (debugger, timeline) should copy. The pattern:
   scissor/clipping at record time, and `LazyColumn`'s scroll-area clipping interacts badly with
   that. `Column`+`verticalScroll` is sufficient for the tree sizes involved and matches the rest of
   the dock's foundation usage.
+- **The panel has a header bar** (`Header` in `ProjectExplorerPanel.kt`, rendered *outside* the
+  tree's `verticalScroll`): an option button labeled with the current root's folder name +
+  `▾`, and a `↻` refresh button. Clicking the option button toggles
+  `RootPickerController.menuOpen`, which renders `RootMenu` — a hand-rolled dropdown overlay
+  (scrim + card) as a z-layered sibling `Box`. **Open Folder** runs a native folder picker and
+  swaps the single server root (`SetProjectRootC2S` → `handleSetRoot`); **Attach Folder** is
+  disabled pending multi-root (Plan B). See [dock-dialogs.md](dock-dialogs.md) for why the menu
+  is hand-rolled and how the native picker is threaded.
 
 ## `ImageComposeScene` input API (verified against 1.12.0-beta02)
 
