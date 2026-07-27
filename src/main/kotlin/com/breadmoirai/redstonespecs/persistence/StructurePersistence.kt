@@ -160,7 +160,7 @@ object StructurePersistence {
         file.parent?.createDirectories()
         try { NbtIo.writeCompressed(tag, file) }
         catch (e: IOException) { LOGGER.error("[StructurePersistence#saveAutoFit] write '{}': {}", file, e.message) }
-        LOGGER.debug("[StructurePersistence#saveAutoFit] captured {} -> {}", box?.size, file)
+        LOGGER.debug("[StructurePersistence#saveAutoFit] captured {} at {} -> {}", box?.size, box?.origin, file)
         return box
     }
 

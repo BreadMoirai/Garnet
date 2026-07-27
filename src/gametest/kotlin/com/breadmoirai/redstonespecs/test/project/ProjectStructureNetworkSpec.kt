@@ -27,6 +27,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Blocks
 import kotlin.io.path.exists
+import kotlin.io.path.readBytes
 
 class ProjectStructureNetworkSpec : RedstoneTestSpec({
 
@@ -162,12 +163,14 @@ class ProjectStructureNetworkSpec : RedstoneTestSpec({
                     lvl, BlockPos(region.x, lvl.minY, region.z),
                     Vec3i(width, lvl.maxY - lvl.minY + 1, width),
                 )
+                // Snapshot the committed file's bytes so we can prove the flush never touches it.
+                val committedBefore = committed.readBytes()
                 // Edit the region, then flush (simulates a world-save): sidecar appears, committed untouched.
                 lvl.setBlock(region.offset(5, 0, 5), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                 ProjectNetworkRegistry.flushDirtyStructures(this)
                 sidecar.exists() shouldBe true
-                // Committed is still the empty structure (place produced size 0 earlier).
-                placed.sizeX shouldBe 0
+                // Flush writes ONLY the sidecar — the committed .nbt is byte-for-byte unchanged.
+                committed.readBytes().toList() shouldBe committedBefore.toList()
 
                 // Re-place: loads the unsaved sidecar (1x1x1 gold), reports hasUnsaved.
                 ProjectNetworkRegistry.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
