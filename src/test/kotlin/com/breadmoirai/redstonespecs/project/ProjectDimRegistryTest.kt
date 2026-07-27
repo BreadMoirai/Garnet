@@ -41,4 +41,29 @@ class ProjectDimRegistryTest : FunSpec({
         (b.x - a.x) shouldBe expectedWidth
         b.z shouldBe a.z
     }
+
+    test("getOrAssignStructureRegion is idempotent and distinct per subpath") {
+        val r = newRegistry()
+        val a1 = r.getOrAssignStructureRegion("things/box.nbt")
+        val a2 = r.getOrAssignStructureRegion("things/box.nbt")
+        a1 shouldBe a2
+        val b = r.getOrAssignStructureRegion("things/other.nbt")
+        (a1 == b) shouldBe false
+    }
+
+    test("structure regions sit in a lane disjoint from spec-folder regions") {
+        val r = newRegistry()
+        val spec = r.getOrAssignRegion("set/a")           // spec lane: z == 0
+        val struct = r.getOrAssignStructureRegion("s.nbt") // structure lane: z == STRUCTURE_LANE_Z
+        spec.z shouldBe 0
+        struct.z shouldBe ProjectDimRegistry.STRUCTURE_LANE_Z
+    }
+
+    test("placed-box round-trips per subpath") {
+        val r = newRegistry()
+        r.placedBoxOf("s.nbt").shouldBeNull()
+        val box = PlacedBox(net.minecraft.core.BlockPos(1, 2, 3), net.minecraft.core.Vec3i(4, 5, 6))
+        r.setPlacedBox("s.nbt", box)
+        r.placedBoxOf("s.nbt") shouldBe box
+    }
 })

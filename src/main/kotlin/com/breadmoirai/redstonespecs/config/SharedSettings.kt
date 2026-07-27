@@ -8,4 +8,7 @@ object SharedSettings {
     var projectRowMax: Int = 8
     var projectGridYBase: Int = 64
     var projectRootPath: String = ""
+
+    /** Side length, in chunks, of a standalone structure's build region (full world height). */
+    var structureRegionChunks: Int = 9
 }
