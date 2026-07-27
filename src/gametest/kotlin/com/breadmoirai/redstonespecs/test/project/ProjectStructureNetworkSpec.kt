@@ -8,6 +8,8 @@ import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectErrorS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectNetworkRegistry
 import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.redstonespecs.persistence.StructurePersistence
+import com.breadmoirai.redstonespecs.project.ProjectDimRegistry
 import com.breadmoirai.redstonespecs.project.ProjectNewStructure
 import com.breadmoirai.redstonespecs.project.ProjectRoot
 import com.breadmoirai.redstonespecs.project.ProjectServerContext
@@ -19,6 +21,8 @@ import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Blocks
 import kotlin.io.path.exists
 
@@ -41,7 +45,16 @@ class ProjectStructureNetworkSpec : RedstoneTestSpec({
                 placed.subpath shouldBe "gadget.nbt"
 
                 // Build a block in the assigned region, then save: captures a 1x1x1 box.
-                val region = com.breadmoirai.redstonespecs.project.ProjectDimRegistry.of(this).structureRegionOriginOf("gadget.nbt")!!
+                val region = ProjectDimRegistry.of(this).structureRegionOriginOf("gadget.nbt")!!
+                val width = SharedSettings.structureRegionChunks * 16
+                val lvl = overworld()
+                // The gametest world's floor terrain isn't part of the region until this test
+                // builds it; clear the column so the auto-fit save below doesn't capture it.
+                StructurePersistence.clearBounds(
+                    lvl,
+                    BlockPos(region.x, lvl.minY, region.z),
+                    Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                )
                 overworld().setBlock(region.offset(5, 0, 5), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                 ProjectNetworkRegistry.handleSaveStructure(this, player, SaveStructureC2S("gadget.nbt"))
                 val saved = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()

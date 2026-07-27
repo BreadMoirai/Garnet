@@ -5,7 +5,6 @@ import com.breadmoirai.redstonespecs.persistence.StructurePersistence
 import com.breadmoirai.redstonespecs.project.*
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
-import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
@@ -173,22 +172,10 @@ object ProjectNetworkRegistry {
         }
         val registry = ProjectDimRegistry.of(server)
         val level = registry.projectLevel()
-        val isFreshRegion = registry.structureRegionOriginOf(payload.subpath) == null
         val origin = registry.getOrAssignStructureRegion(payload.subpath)
         val width = SharedSettings.structureRegionChunks * 16
-        if (isFreshRegion) {
-            // A newly-minted region may sit on real overworld terrain (the managed canvas is the
-            // integrated server's overworld, not a void dimension); clear the whole column once so
-            // a later auto-fit save doesn't capture ambient terrain as part of the structure. The
-            // auto-fit scan covers level.minY..level.maxY, so the clear must start there too, not
-            // at the region's grid-Y (they differ).
-            StructurePersistence.clearBounds(
-                level, BlockPos(origin.x, level.minY, origin.z), Vec3i(width, level.maxY - level.minY + 1, width),
-            )
-        } else {
-            // Cheap re-clear: only the previously-placed footprint, not the whole region.
-            registry.placedBoxOf(payload.subpath)?.let { StructurePersistence.clearBounds(level, it.origin, it.size) }
-        }
+        // Cheap re-clear: only the previously-placed footprint, not the whole region.
+        registry.placedBoxOf(payload.subpath)?.let { StructurePersistence.clearBounds(level, it.origin, it.size) }
         val placed = StructurePersistence.placeStructureCentered(
             file, level, origin, width, level.minY, level.maxY, SharedSettings.projectGridYBase,
         ) ?: run {
