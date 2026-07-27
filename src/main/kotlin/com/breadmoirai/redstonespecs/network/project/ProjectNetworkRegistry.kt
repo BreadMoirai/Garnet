@@ -178,8 +178,9 @@ object ProjectNetworkRegistry {
             ServerPlayNetworking.send(player, ProjectErrorS2C("failed to load structure: ${payload.subpath}")); return
         }
         registry.setPlacedBox(payload.subpath, placed)
-        val yBase = SharedSettings.projectGridYBase
-        val tpY = if (placed.origin.y >= yBase) yBase + 2 else placed.origin.y + placed.size.y + 2
+        // Land the player just above the top of the placed structure (never inside it),
+        // regardless of size. For an empty structure (size 0) this is the region floor + 2.
+        val tpY = placed.origin.y + placed.size.y + 2
         player.teleportTo(
             level,
             (origin.x + width / 2) + 0.5, tpY.toDouble(), (origin.z + width / 2) + 0.5,
