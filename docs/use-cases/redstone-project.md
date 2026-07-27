@@ -137,10 +137,13 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   the hand-rolled `RootMenu` overlay. **Open Folder** calls `RootPickerController.openFolder`,
   which runs the injectable `FolderPicker` (default `TinyfdFolderPicker` →
   `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
-- **UC-MAN-09.b** On a non-null pick, the controller persists the path client-side
-  (`ModConfig.projectRootPath` → `redstonespecs.json`, also mirrored to
-  `SharedSettings.projectRootPath`) and sends `SetProjectRootC2S(path)` on the client thread via
-  `Minecraft.execute`. A cancel (null) sends nothing.
+- **UC-MAN-09.b** On a non-null pick, the controller normalizes the path to absolute (matching
+  the server's canonical form) and persists it client-side (`ModConfig.projectRootPath` →
+  `redstonespecs.json`, also mirrored to `SharedSettings.projectRootPath`) and sends
+  `SetProjectRootC2S(path)` on the client thread via `Minecraft.execute`. A cancel (null) sends
+  nothing. **Persistence is client-side only:** in singleplayer/LAN the integrated server shares
+  the JVM so the choice is restored via `ModConfig.load()`; a dedicated-server root swap is not
+  durable across restart.
 - **UC-MAN-09.c** `ProjectNetworkRegistry.handleSetRoot` rejects a non-directory / invalid path
   with `ProjectErrorS2C`; otherwise it sets `SharedSettings.projectRootPath`, pins a new
   `ProjectServerContext`, re-runs `ProjectDimLifecycle.placeAll`, and re-sends the single-root

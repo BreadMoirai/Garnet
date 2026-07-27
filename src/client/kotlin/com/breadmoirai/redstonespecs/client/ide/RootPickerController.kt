@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.breadmoirai.redstonespecs.client.config.ModConfig
 import com.breadmoirai.redstonespecs.network.project.SetProjectRootC2S
+import java.nio.file.Path
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -37,16 +38,26 @@ object RootPickerController {
         closeMenu()
         if (picking) return
         picking = true
-        runner {
-            try {
-                val path = picker.pick("Open Project Folder", null)
-                if (path != null) {
-                    persist(path)
-                    executor { sender(SetProjectRootC2S(path)) }
+        try {
+            runner {
+                try {
+                    val path = picker.pick("Open Project Folder", null)
+                    if (path != null) {
+                        // Normalize to absolute so the persisted + sent value matches the
+                        // canonical form the server stores (handleSetRoot's toAbsolutePath()).
+                        val abs = Path.of(path).toAbsolutePath().toString()
+                        persist(abs)
+                        executor { sender(SetProjectRootC2S(abs)) }
+                    }
+                } finally {
+                    executor { picking = false }
                 }
-            } finally {
-                executor { picking = false }
             }
+        } catch (e: Throwable) {
+            // runner failed to even start the work (e.g. thread creation threw); release the
+            // guard so a later click can retry rather than latching picking=true forever.
+            picking = false
+            throw e
         }
     }
 

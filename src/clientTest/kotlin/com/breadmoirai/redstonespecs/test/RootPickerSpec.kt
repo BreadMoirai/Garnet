@@ -6,14 +6,22 @@ import com.breadmoirai.redstonespecs.network.project.SetProjectRootC2S
 import com.breadmoirai.redstonespecs.testing.ClientSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import java.nio.file.Path
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
 class RootPickerSpec : ClientSpec({
 
+    afterTest { RootPickerController.resetForTest() }
+
     test("openFolder sends SetProjectRootC2S and persists the picked path") {
         val sent = mutableListOf<CustomPacketPayload>()
         val persisted = mutableListOf<String>()
-        RootPickerController.picker = FolderPicker { _, _ -> "/abs/picked" }
+        val picked = "/abs/picked"
+        // openFolder normalizes to absolute (Path.of(picked).toAbsolutePath()); that resolution
+        // is platform-dependent (e.g. Windows anchors a rootless path to the current drive), so
+        // assert against the same normalization rather than a hardcoded string.
+        val expected = Path.of(picked).toAbsolutePath().toString()
+        RootPickerController.picker = FolderPicker { _, _ -> picked }
         RootPickerController.runner = Runnable::run
         RootPickerController.executor = Runnable::run
         RootPickerController.sender = { sent.add(it) }
@@ -22,12 +30,10 @@ class RootPickerSpec : ClientSpec({
 
         RootPickerController.openFolder()
 
-        sent.filterIsInstance<SetProjectRootC2S>().single().path shouldBe "/abs/picked"
-        persisted.single() shouldBe "/abs/picked"
+        sent.filterIsInstance<SetProjectRootC2S>().single().path shouldBe expected
+        persisted.single() shouldBe expected
         RootPickerController.picking shouldBe false
         RootPickerController.menuOpen shouldBe false
-
-        RootPickerController.resetForTest()
     }
 
     test("openFolder sends nothing when the picker is cancelled") {
@@ -42,7 +48,5 @@ class RootPickerSpec : ClientSpec({
 
         sent.shouldBeEmpty()
         RootPickerController.picking shouldBe false
-
-        RootPickerController.resetForTest()
     }
 })
