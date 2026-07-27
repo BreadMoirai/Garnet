@@ -138,8 +138,17 @@ in the region (`StructurePersistence.saveAutoFitToFile` → `project.autoFit`) a
   world height.
 - **Cheap re-clear:** the registry tracks the last-placed `PlacedBox` per structure subpath;
   re-placing clears only that footprint, not the whole region.
-- **Packets:** `PlaceStructureC2S` / `SaveStructureC2S` / `NewStructureC2S` → `StructureResultS2C`,
-  handled by `ProjectNetworkRegistry.handlePlaceStructure/handleSaveStructure/handleNewStructure`.
+- **Packets:** `PlaceStructureC2S` / `SaveStructureC2S` / `NewStructureC2S` / `DiscardStructureC2S`
+  → `StructureResultS2C`, handled by
+  `ProjectNetworkRegistry.handlePlaceStructure/handleSaveStructure/handleNewStructure/handleDiscardStructure`.
+- **Dirty sidecar lifecycle:** placing a `.nbt` prefers its `.nbt.unsaved` sidecar when present
+  (`StructurePersistence.unsavedSidecarOf`) and reports `hasUnsaved = true`; "Save Structure"
+  writes the committed `.nbt` and deletes the sidecar; "Discard" deletes the sidecar and
+  re-places from the committed `.nbt`. On `ServerLifecycleEvents.BEFORE_SAVE`,
+  `ProjectNetworkRegistry.flushDirtyStructures` captures every placed structure's region into its
+  sidecar via `StructurePersistence.flushUnsavedSidecar` (world-save is the only auto-persist
+  point for in-progress structure edits — there is no autosave on disconnect, matching UC-MAN-07).
+  `ProjectDimRegistry.placedStructureSubpaths()` is the set flushed each world-save.
 
 ## Where to start reading
 
