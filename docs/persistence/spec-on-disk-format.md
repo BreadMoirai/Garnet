@@ -1,7 +1,7 @@
 ---
 title: Spec on-disk format
 tags: [storage, scripting]
-summary: .spec.kts files in the world directory; JSON is network-only; structure NBT remains in .nbt; standalone .nbt structures also live directly in the Explorer.
+summary: .spec.kts files in the world directory; JSON is network-only; structure NBT remains in .nbt; standalone .nbt structures also live directly in the Explorer. Unsaved structure edits are captured to adjacent .nbt.unsaved dirty buffers on world-save.
 ---
 
 # Spec on-disk format
@@ -39,6 +39,13 @@ redstoneSpec("door_latch") {
 - **`<id>.nbt`** — compressed-NBT structure file (the circuit under test).
   Saved/loaded by `StructurePersistence`. Independent of the `.spec.kts`
   file; the spec references it by `structure = "<id>"`.
+- **`<name>.nbt.unsaved`** — dirty-buffer sidecar written adjacent to a standalone `<name>.nbt`
+  whenever Minecraft saves the world (`ServerLifecycleEvents.BEFORE_SAVE`) and the placed
+  region's auto-fit capture differs from the committed `.nbt` (`StructurePersistence.flushUnsavedSidecar`).
+  Placing a structure loads this sidecar when present (resuming unsaved edits and reporting
+  `hasUnsaved = true`); **Save Structure** writes the committed `.nbt` and deletes the sidecar;
+  **Discard** deletes it and re-places the committed version. The Explorer hides `*.nbt.unsaved`
+  files (`scanFolder`) and shows a dirty dot on the owning `.nbt`.
 
 `.nbt` files are also standalone Explorer citizens, not just spec sidecars: they can be
 placed/captured/created directly from the tree without an owning spec. See
