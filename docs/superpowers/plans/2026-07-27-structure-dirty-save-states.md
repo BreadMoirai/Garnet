@@ -143,7 +143,7 @@ private fun normalize(tag: CompoundTag): Pair<Triple<Int, Int, Int>, Set<Cell>> 
     val palette = tag.getListOrEmpty("palette")
     val blocks = tag.getListOrEmpty("blocks")
     val cells = HashSet<Cell>()
-    for (i in 0 until blocks.size()) {
+    for (i in 0 until blocks.size) { // ListTag extends AbstractList → use the .size property, not size()
         val bt = blocks.getCompoundOrEmpty(i)
         val posTag = bt.getListOrEmpty("pos")
         val pos = Triple(posTag.getIntOr(0, 0), posTag.getIntOr(1, 0), posTag.getIntOr(2, 0))
