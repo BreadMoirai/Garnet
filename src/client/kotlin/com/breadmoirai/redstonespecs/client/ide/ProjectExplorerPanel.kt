@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
+import com.breadmoirai.redstonespecs.network.project.DiscardStructureC2S
 import com.breadmoirai.redstonespecs.network.project.ListProjectTreeC2S
 import com.breadmoirai.redstonespecs.network.project.LoadProjectFolderC2S
 import com.breadmoirai.redstonespecs.network.project.NewStructureC2S
@@ -99,6 +100,13 @@ private fun StructureActions() {
             val sel = ProjectTreeState.selectedPath
             if (sel != null && sel.endsWith(".nbt")) ClientPlayNetworking.send(SaveStructureC2S(sel))
         }.padding(horizontal = 6.dp)) { BasicText("Save Structure", style = TextStyle(color = TEXT_DIM)) }
+        val selDirty = ProjectTreeState.selectedHasUnsaved()
+        Box(Modifier.clickable {
+            val sel = ProjectTreeState.selectedPath
+            if (sel != null && sel.endsWith(".nbt")) ClientPlayNetworking.send(DiscardStructureC2S(sel))
+        }.padding(horizontal = 6.dp)) {
+            BasicText("Discard", style = TextStyle(color = if (selDirty) TEXT_DIM else TEXT_DISABLED))
+        }
     }
 }
 
@@ -157,7 +165,8 @@ private fun TreeNode(node: FileTreeNode, path: String, depth: Int, currentSubpat
             val rowMod = if (isSelected) base.background(SELECTED_BG) else base
             Row(rowMod.padding(vertical = 2.dp)) {
                 Spacer(Modifier.width(indent))
-                val label = if (isStructure) "▶ ${node.name}" else node.name
+                val dirtyMark = if (node.hasUnsaved) "● " else ""
+                val label = if (isStructure) "$dirtyMark▶ ${node.name}" else node.name
                 BasicText(label, style = TextStyle(color = if (isSelected) TEXT else TEXT_DIM))
             }
         }

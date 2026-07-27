@@ -100,10 +100,14 @@ Client:
   label (like the triangle) just toggles expand via `ProjectTreeState.toggleExpanded(path)`.
   Clicking a file calls `ProjectTreeState.select(path)` (highlight only, no packet) — except a
   `.nbt` `FileNode` (`node.extension == "nbt"`), which selects **and** sends
-  `PlaceStructureC2S(path)` (rendered with a `▶` prefix as a distinct affordance). A
-  `StructureActions()` row under `Header()` provides "+ Structure" (a `BasicTextField` name input
-  that sends `NewStructureC2S(name)`) and "Save Structure" (sends `SaveStructureC2S(selectedPath)`
-  when `ProjectTreeState.selectedPath` ends with `.nbt`). Paths are
+  `PlaceStructureC2S(path)` (rendered with a `▶` prefix as a distinct affordance, plus a leading
+  `● ` dirty dot when `node.hasUnsaved` is true). A `StructureActions()` row under `Header()`
+  provides "+ Structure" (a `BasicTextField` name input that sends `NewStructureC2S(name)`),
+  "Save Structure" (sends `SaveStructureC2S(selectedPath)` when `ProjectTreeState.selectedPath`
+  ends with `.nbt`), and "Discard" (sends `DiscardStructureC2S(selectedPath)` under the same
+  `.nbt`-selected condition; dimmed via `TEXT_DISABLED` unless
+  `ProjectTreeState.selectedHasUnsaved()` is true, which resolves `selectedPath` against the
+  current snapshot via `FolderNode.resolve` and checks `FileNode.hasUnsaved`). Paths are
   `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
   `currentSubpath`. The Refresh row sends `ListProjectTreeC2S`. This is the **only** live client UI
   for browsing the project tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy

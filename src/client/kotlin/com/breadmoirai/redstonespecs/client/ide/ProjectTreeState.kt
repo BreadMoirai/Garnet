@@ -8,6 +8,8 @@ import com.breadmoirai.redstonespecs.network.project.ProjectFolderLoadedS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectSaveReportS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
+import com.breadmoirai.redstonespecs.project.FileNode
+import com.breadmoirai.redstonespecs.project.resolve
 
 /**
  * Client-side, Compose-observable state for the Project Explorer. The networking layer mutates it
@@ -43,6 +45,13 @@ object ProjectTreeState {
     }
 
     fun select(path: String) { selectedPath = path }
+
+    /** True when [selectedPath] resolves to a `.nbt` file flagged dirty in the current snapshot. */
+    fun selectedHasUnsaved(): Boolean {
+        val path = selectedPath ?: return false
+        val node = snapshot?.root?.resolve(path)
+        return node is FileNode && node.hasUnsaved
+    }
 
     /** Test/reset hook: clears the snapshot, status, and expanded set back to initial values. */
     fun reset() {
