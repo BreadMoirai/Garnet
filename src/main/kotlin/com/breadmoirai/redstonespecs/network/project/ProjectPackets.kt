@@ -216,11 +216,23 @@ data class NewStructureC2S(val name: String) : CustomPacketPayload {
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
+data class DiscardStructureC2S(val subpath: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<DiscardStructureC2S>(id("discard_structure"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, DiscardStructureC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, DiscardStructureC2S::subpath,
+            ::DiscardStructureC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 // === Structure S2C ===
 
 data class StructureResultS2C(
     val subpath: String,
     val sizeX: Int, val sizeY: Int, val sizeZ: Int,
+    val hasUnsaved: Boolean,
     val message: String,
 ) : CustomPacketPayload {
     companion object {
@@ -230,6 +242,7 @@ data class StructureResultS2C(
             ByteBufCodecs.VAR_INT, StructureResultS2C::sizeX,
             ByteBufCodecs.VAR_INT, StructureResultS2C::sizeY,
             ByteBufCodecs.VAR_INT, StructureResultS2C::sizeZ,
+            ByteBufCodecs.BOOL, StructureResultS2C::hasUnsaved,
             ByteBufCodecs.STRING_UTF8, StructureResultS2C::message,
             ::StructureResultS2C,
         )

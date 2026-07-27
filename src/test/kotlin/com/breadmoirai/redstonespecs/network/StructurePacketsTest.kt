@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.network
 
+import com.breadmoirai.redstonespecs.network.project.DiscardStructureC2S
 import com.breadmoirai.redstonespecs.network.project.NewStructureC2S
 import com.breadmoirai.redstonespecs.network.project.PlaceStructureC2S
 import com.breadmoirai.redstonespecs.network.project.SaveStructureC2S
@@ -29,8 +30,14 @@ class StructurePacketsTest : FunSpec({
     }
     test("StructureResultS2C codec round-trips") {
         val buf = Unpooled.buffer()
-        val orig = StructureResultS2C("a/b.nbt", 2, 1, 3, "placed a/b.nbt")
+        val orig = StructureResultS2C("a/b.nbt", 2, 1, 3, hasUnsaved = true, message = "placed a/b.nbt — unsaved changes")
         StructureResultS2C.STREAM_CODEC.encode(buf, orig)
         StructureResultS2C.STREAM_CODEC.decode(buf) shouldBe orig
+    }
+    test("DiscardStructureC2S codec round-trips") {
+        val buf = Unpooled.buffer()
+        val orig = DiscardStructureC2S("a/b.nbt")
+        DiscardStructureC2S.STREAM_CODEC.encode(buf, orig)
+        DiscardStructureC2S.STREAM_CODEC.decode(buf) shouldBe orig
     }
 })

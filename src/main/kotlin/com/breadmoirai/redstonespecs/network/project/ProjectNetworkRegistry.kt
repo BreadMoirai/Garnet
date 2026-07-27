@@ -187,7 +187,7 @@ object ProjectNetworkRegistry {
             emptySet<Relative>(), player.yRot, player.xRot, true,
         )
         ServerPlayNetworking.send(player, StructureResultS2C(
-            payload.subpath, placed.size.x, placed.size.y, placed.size.z, "placed ${payload.subpath}",
+            payload.subpath, placed.size.x, placed.size.y, placed.size.z, false, "placed ${payload.subpath}",
         ))
     }
 
@@ -214,7 +214,7 @@ object ProjectNetworkRegistry {
         if (box != null) registry.setPlacedBox(payload.subpath, box)
         val msg = if (box == null) "saved ${payload.subpath} (empty)"
                   else "saved ${payload.subpath} (${size.x}×${size.y}×${size.z})"
-        ServerPlayNetworking.send(player, StructureResultS2C(payload.subpath, size.x, size.y, size.z, msg))
+        ServerPlayNetworking.send(player, StructureResultS2C(payload.subpath, size.x, size.y, size.z, false, msg))
     }
 
     fun handleNewStructure(server: MinecraftServer, player: ServerPlayer, payload: NewStructureC2S) {
