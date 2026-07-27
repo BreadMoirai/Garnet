@@ -78,6 +78,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         DockInputSpec::class,
                         ProjectExplorerSpec::class,
                         RootPickerSpec::class,
+                        StructureExplorerSpec::class,
                     ),
                 )
             } catch (t: Throwable) {

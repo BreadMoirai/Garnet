@@ -7,6 +7,7 @@ import com.breadmoirai.redstonespecs.network.project.ProjectErrorS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectFolderLoadedS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectSaveReportS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
 
 /**
  * Client-side, Compose-observable state for the Project Explorer. The networking layer mutates it
@@ -35,6 +36,7 @@ object ProjectTreeState {
 
     fun onSaveReport(r: ProjectSaveReportS2C) { status = "saved ${r.perSpec.size} spec(s)" }
     fun onError(e: ProjectErrorS2C) { status = "error: ${e.reason}" }
+    fun onStructureResult(r: StructureResultS2C) { status = r.message }
 
     fun toggleExpanded(subpath: String) {
         if (!expanded.remove(subpath)) expanded.add(subpath)

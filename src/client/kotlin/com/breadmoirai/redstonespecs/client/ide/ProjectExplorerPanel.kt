@@ -13,8 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -22,6 +27,9 @@ import androidx.compose.ui.unit.dp
 import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
 import com.breadmoirai.redstonespecs.network.project.ListProjectTreeC2S
 import com.breadmoirai.redstonespecs.network.project.LoadProjectFolderC2S
+import com.breadmoirai.redstonespecs.network.project.NewStructureC2S
+import com.breadmoirai.redstonespecs.network.project.PlaceStructureC2S
+import com.breadmoirai.redstonespecs.network.project.SaveStructureC2S
 import com.breadmoirai.redstonespecs.project.FileNode
 import com.breadmoirai.redstonespecs.project.FileTreeNode
 import com.breadmoirai.redstonespecs.project.FolderNode
@@ -41,6 +49,7 @@ private fun ProjectExplorer() {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(4.dp)) {
             Header()
+            StructureActions()
             val snap = ProjectTreeState.snapshot
             if (snap == null) {
                 BasicText("(no project loaded — Refresh)", Modifier.padding(vertical = 2.dp), style = TextStyle(color = TEXT_DIM))
@@ -69,6 +78,27 @@ private fun Header() {
         Box(Modifier.clickable { ClientPlayNetworking.send(ListProjectTreeC2S.INSTANCE) }) {
             BasicText("↻", style = TextStyle(color = TEXT_DIM))
         }
+    }
+}
+
+@Composable
+private fun StructureActions() {
+    var newName by remember { mutableStateOf("") }
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Box(Modifier.width(90.dp).background(Color(0x22000000)).padding(horizontal = 4.dp, vertical = 2.dp)) {
+            BasicTextField(
+                value = newName, onValueChange = { newName = it },
+                textStyle = TextStyle(color = TEXT), singleLine = true,
+            )
+        }
+        Box(Modifier.clickable {
+            if (newName.isNotBlank()) { ClientPlayNetworking.send(NewStructureC2S(newName)); newName = "" }
+        }.padding(horizontal = 6.dp)) { BasicText("+ Structure", style = TextStyle(color = TEXT_DIM)) }
+        Spacer(Modifier.weight(1f))
+        Box(Modifier.clickable {
+            val sel = ProjectTreeState.selectedPath
+            if (sel != null && sel.endsWith(".nbt")) ClientPlayNetworking.send(SaveStructureC2S(sel))
+        }.padding(horizontal = 6.dp)) { BasicText("Save Structure", style = TextStyle(color = TEXT_DIM)) }
     }
 }
 
@@ -118,11 +148,17 @@ private fun TreeNode(node: FileTreeNode, path: String, depth: Int, currentSubpat
         }
         is FileNode -> {
             val isSelected = path == ProjectTreeState.selectedPath
-            val base = Modifier.fillMaxWidth().clickable { ProjectTreeState.select(path) }
+            val isStructure = node.extension == "nbt"
+            val onClick: () -> Unit = {
+                ProjectTreeState.select(path)
+                if (isStructure) ClientPlayNetworking.send(PlaceStructureC2S(path))
+            }
+            val base = Modifier.fillMaxWidth().clickable(onClick = onClick)
             val rowMod = if (isSelected) base.background(SELECTED_BG) else base
             Row(rowMod.padding(vertical = 2.dp)) {
                 Spacer(Modifier.width(indent))
-                BasicText(node.name, style = TextStyle(color = if (isSelected) TEXT else TEXT_DIM))
+                val label = if (isStructure) "▶ ${node.name}" else node.name
+                BasicText(label, style = TextStyle(color = if (isSelected) TEXT else TEXT_DIM))
             }
         }
     }
