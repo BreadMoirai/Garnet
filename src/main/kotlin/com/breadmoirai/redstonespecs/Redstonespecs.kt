@@ -57,6 +57,9 @@ class Redstonespecs : ModInitializer {
         ServerLifecycleEvents.SERVER_STOPPED.register { server ->
             ProjectDimLifecycle.releaseServerState(server)
         }
+        ServerLifecycleEvents.BEFORE_SAVE.register { server, _, _ ->
+            com.breadmoirai.redstonespecs.network.project.ProjectNetworkRegistry.flushDirtyStructures(server)
+        }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             ProjectCommand.register(dispatcher)
         }

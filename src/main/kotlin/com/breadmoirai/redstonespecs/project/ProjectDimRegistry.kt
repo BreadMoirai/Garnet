@@ -85,6 +85,9 @@ class ProjectDimRegistry(private val server: MinecraftServer) {
 
     fun setPlacedBox(subpath: String, box: PlacedBox) { placedBoxes[subpath] = box }
 
+    /** Subpaths with a recorded placed box this session (the set to flush on world-save). */
+    fun placedStructureSubpaths(): Set<String> = placedBoxes.keys.toSet()
+
     companion object {
         const val REGION_PAD = 64  // empty void between adjacent regions
 

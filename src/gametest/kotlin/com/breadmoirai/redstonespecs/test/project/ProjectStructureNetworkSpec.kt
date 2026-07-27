@@ -1,6 +1,7 @@
 package com.breadmoirai.redstonespecs.test.project
 
 import com.breadmoirai.redstonespecs.config.SharedSettings
+import com.breadmoirai.redstonespecs.network.project.DiscardStructureC2S
 import com.breadmoirai.redstonespecs.network.project.NewStructureC2S
 import com.breadmoirai.redstonespecs.network.project.PlaceStructureC2S
 import com.breadmoirai.redstonespecs.network.project.SaveStructureC2S
@@ -135,6 +136,61 @@ class ProjectStructureNetworkSpec : RedstoneTestSpec({
                 drainPayloads(player).filterIsInstance<ProjectTreeSnapshotS2C>() shouldHaveSize 1
                 ProjectSession.clear(player.uuid)
             }
+        }
+    }
+
+    test("dirty sidecar lifecycle: flush writes/deletes, place loads unsaved, save+discard clear") {
+        withTempRoot("struct-dirty") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            SharedSettings.structureRegionChunks = 1
+            ProjectNewStructure.create(tmp, "widget") // empty widget.nbt at root
+            val committed = tmp.resolve("widget.nbt")
+            val sidecar = com.breadmoirai.redstonespecs.persistence.StructurePersistence.unsavedSidecarOf(committed)
+            onServer {
+                ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp)))
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+
+                ProjectNetworkRegistry.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
+                val placed = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
+                placed.hasUnsaved shouldBe false
+
+                val region = ProjectDimRegistry.of(this).structureRegionOriginOf("widget.nbt")!!
+                val width = SharedSettings.structureRegionChunks * 16
+                val lvl = overworld()
+                StructurePersistence.clearBounds(
+                    lvl, BlockPos(region.x, lvl.minY, region.z),
+                    Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                )
+                // Edit the region, then flush (simulates a world-save): sidecar appears, committed untouched.
+                lvl.setBlock(region.offset(5, 0, 5), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                ProjectNetworkRegistry.flushDirtyStructures(this)
+                sidecar.exists() shouldBe true
+                // Committed is still the empty structure (place produced size 0 earlier).
+                placed.sizeX shouldBe 0
+
+                // Re-place: loads the unsaved sidecar (1x1x1 gold), reports hasUnsaved.
+                ProjectNetworkRegistry.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
+                val replaced = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
+                replaced.hasUnsaved shouldBe true
+                replaced.sizeX shouldBe 1
+
+                // Explicit Save: writes committed, deletes sidecar, reports clean.
+                ProjectNetworkRegistry.handleSaveStructure(this, player, SaveStructureC2S("widget.nbt"))
+                val saved = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
+                saved.hasUnsaved shouldBe false
+                sidecar.exists() shouldBe false
+
+                // Edit again + flush -> sidecar reappears; then Discard removes it and re-places committed.
+                lvl.setBlock(region.offset(6, 0, 6), Blocks.IRON_BLOCK.defaultBlockState(), 2)
+                ProjectNetworkRegistry.flushDirtyStructures(this)
+                sidecar.exists() shouldBe true
+                ProjectNetworkRegistry.handleDiscardStructure(this, player, DiscardStructureC2S("widget.nbt"))
+                val discarded = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
+                discarded.hasUnsaved shouldBe false
+                sidecar.exists() shouldBe false
+            }
+            SharedSettings.structureRegionChunks = prevChunks
         }
     }
 })
