@@ -21,6 +21,7 @@ object ModConfig {
 
     var autoSaveOnExit: Boolean = false
     var specSaveDir: String = "redstonespecs"
+    var projectRootPath: String = ""
 
     fun load() {
         if (!configFile.exists()) return
@@ -29,11 +30,13 @@ object ModConfig {
                 val json = JsonParser.parseReader(reader) as? JsonObject ?: return@use
                 autoSaveOnExit = json.get("autoSaveOnExit")?.asBoolean ?: false
                 specSaveDir = json.get("specSaveDir")?.asString ?: "redstonespecs"
+                projectRootPath = json.get("projectRootPath")?.asString ?: ""
             }
         }.onFailure { e ->
             LOGGER.warn("Failed to load ModConfig from {}", configFile.absolutePath, e)
         }
         SharedSettings.specSaveDir = specSaveDir
+        SharedSettings.projectRootPath = projectRootPath
     }
 
     fun save() {
@@ -41,12 +44,14 @@ object ModConfig {
         val json = JsonObject()
         json.addProperty("autoSaveOnExit", autoSaveOnExit)
         json.addProperty("specSaveDir", specSaveDir)
+        json.addProperty("projectRootPath", projectRootPath)
         runCatching {
             configFile.writeText(json.toString())
         }.onFailure { e ->
             LOGGER.error("Failed to save ModConfig to {}", configFile.absolutePath, e)
         }
         SharedSettings.specSaveDir = specSaveDir
+        SharedSettings.projectRootPath = projectRootPath
     }
 
     fun createScreen(parent: Screen): Screen = YetAnotherConfigLib.createBuilder()
