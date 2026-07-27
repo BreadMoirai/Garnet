@@ -95,7 +95,12 @@ Client:
   LEFT-dock `Panel`. A folder is a "spec-folder" (loadable) iff it directly contains a `FileNode`
   named `*.spec.kts`: clicking its label then sends `LoadProjectFolderC2S(path)`; otherwise the
   label (like the triangle) just toggles expand via `ProjectTreeState.toggleExpanded(path)`.
-  Clicking a file calls `ProjectTreeState.select(path)` (highlight only, no packet). Paths are
+  Clicking a file calls `ProjectTreeState.select(path)` (highlight only, no packet) — except a
+  `.nbt` `FileNode` (`node.extension == "nbt"`), which selects **and** sends
+  `PlaceStructureC2S(path)` (rendered with a `▶` prefix as a distinct affordance). A
+  `StructureActions()` row under `Header()` provides "+ Structure" (a `BasicTextField` name input
+  that sends `NewStructureC2S(name)`) and "Save Structure" (sends `SaveStructureC2S(selectedPath)`
+  when `ProjectTreeState.selectedPath` ends with `.nbt`). Paths are
   `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
   `currentSubpath`. The Refresh row sends `ListProjectTreeC2S`. This is the **only** live client UI
   for browsing the project tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy
@@ -103,7 +108,10 @@ Client:
   See [ui/dock-framework.md](../ui/dock-framework.md) for the render pattern (recursion, expand
   state, and why it's `Column`+`verticalScroll` rather than `LazyColumn`).
 - `client/project/ProjectClientNetworking` — S2C receivers. They feed `ProjectTreeState`
-  (snapshot/folder-loaded/save-report/error); no client screen is opened in response.
+  (snapshot/folder-loaded/save-report/error/structure-result); no client screen is opened in
+  response. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
+  `r.message` (place/save/new-structure outcomes all surface through the same status line as
+  folder load/save results).
 - `client/project/ProjectIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
   the UI via `TitleScreenMixin`) opens/creates the single shared `redstonespecs-workspace` save
   with no root pinned. The dormant `pendingRoot`/`ProjectServerContext` pinning machinery is
@@ -112,6 +120,23 @@ Client:
 - `client/mixin/TitleScreenMixin` (Java) — injects "Redstone Projects…" button into the main
   menu (calls `ProjectIntegratedBoot.bootWorkspace()` directly) so it is reachable even with no
   singleplayer worlds.
+
+## Standalone structure files
+
+`.nbt` files are also first-class in the Explorer, independent of specs. Clicking a `.nbt`
+places it (`StructurePersistence.placeStructureCentered`) centered in an auto-assigned region
+(`ProjectDimRegistry.getOrAssignStructureRegion`, a disjoint +X lane at
+`z = STRUCTURE_LANE_Z = 4096`), floored at `projectGridYBase` (64) — or vertically centered when
+the structure's height ≥ `TALL_THRESHOLD` (256). "Save Structure" auto-fits the tight non-air box
+in the region (`StructurePersistence.saveAutoFitToFile` → `project.autoFit`) and rewrites the file.
+"New Structure" (`ProjectNewStructure.create`) writes an empty `<name>.nbt` into the active folder.
+
+- **Region size:** `SharedSettings.structureRegionChunks` (default 9 → 144×144 blocks), full
+  world height.
+- **Cheap re-clear:** the registry tracks the last-placed `PlacedBox` per structure subpath;
+  re-placing clears only that footprint, not the whole region.
+- **Packets:** `PlaceStructureC2S` / `SaveStructureC2S` / `NewStructureC2S` → `StructureResultS2C`,
+  handled by `ProjectNetworkRegistry.handlePlaceStructure/handleSaveStructure/handleNewStructure`.
 
 ## Where to start reading
 

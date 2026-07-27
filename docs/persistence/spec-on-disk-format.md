@@ -1,7 +1,7 @@
 ---
 title: Spec on-disk format
 tags: [storage, scripting]
-summary: .spec.kts files in the world directory; JSON is network-only; structure NBT remains in .nbt.
+summary: .spec.kts files in the world directory; JSON is network-only; structure NBT remains in .nbt; standalone .nbt structures also live directly in the Explorer.
 ---
 
 # Spec on-disk format
@@ -39,6 +39,10 @@ redstoneSpec("door_latch") {
 - **`<id>.nbt`** — compressed-NBT structure file (the circuit under test).
   Saved/loaded by `StructurePersistence`. Independent of the `.spec.kts`
   file; the spec references it by `structure = "<id>"`.
+
+`.nbt` files are also standalone Explorer citizens, not just spec sidecars: they can be
+placed/captured/created directly from the tree without an owning spec. See
+[architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files).
 
 ## Editor save flow
 

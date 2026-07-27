@@ -1,7 +1,7 @@
 ---
 title: Redstone project use-cases
 tags: [redstone-project, dimensions, grid, datapack, use-cases]
-summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back.
+summary: Per-folder void-dim workspace via runtime datapack; deterministic grid; per-spec save-back; standalone .nbt structure place/save/create.
 last_audited_commit: 4c849243e4ce68ca5147bd2a16ce057664baa8fd
 ---
 
@@ -154,6 +154,20 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
 
 ---
 
+### UC-MAN-10 — Place, save, and create standalone structure files
+
+A `.nbt` file in the Explorer is a first-class citizen independent of any spec: clicking it places
+the structure, "Save Structure" auto-fits and rewrites it, and "+ Structure" creates a new empty
+one. See [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files).
+
+- **UC-MAN-10.a** Clicking a `.nbt` `FileNode` in `ProjectExplorerPanel` sends `PlaceStructureC2S(path)`. `ProjectNetworkRegistry.handlePlaceStructure` resolves the subpath, assigns/reuses a region via `ProjectDimRegistry.getOrAssignStructureRegion` (a disjoint +X lane at `z = STRUCTURE_LANE_Z`), clears only the previously-placed footprint (`placedBoxOf` → `StructurePersistence.clearBounds`), calls `StructurePersistence.placeStructureCentered`, and records the new `PlacedBox` via `setPlacedBox`.
+- **UC-MAN-10.b** `StructureRegionMath.centeredStart`/`anchorY` center the structure in the region and floor it at `SharedSettings.projectGridYBase` (64), or vertically center it when the structure's height is at or above `TALL_THRESHOLD` (256).
+- **UC-MAN-10.c** The `StructureActions()` "Save Structure" button (enabled when `selectedPath` ends with `.nbt`) sends `SaveStructureC2S(path)`. `handleSaveStructure` scans the assigned region for non-air, computes the tight box via `StructureRegionMath.autoFit`, and calls `StructurePersistence.saveAutoFitToFile` to rewrite `<name>.nbt`; an all-air region returns `null` and no file is written.
+- **UC-MAN-10.d** The `StructureActions()` "+ Structure" name field sends `NewStructureC2S(name)`. `handleNewStructure` calls `ProjectNewStructure.create(folder, name)`, which writes an empty `<name>.nbt` into the active folder, then re-sends the project tree.
+- **UC-MAN-10.e** All three handlers reply with `StructureResultS2C(subpath, sizeX, sizeY, sizeZ, message)`; `ProjectClientNetworking` feeds it to `ProjectTreeState.onStructureResult`, which sets `status = message` — the same status line used by folder load/save results.
+
+---
+
 ## Coverage matrix
 
 | UC ID | Description | Test | Status |
@@ -209,6 +223,12 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
 | UC-MAN-09.b | Non-null pick persists + sends `SetProjectRootC2S`; cancel sends nothing | `RootPickerSpec."openFolder sends SetProjectRootC2S and persists the picked path"`, `RootPickerSpec."openFolder sends nothing when the picker is cancelled"` | covered |
 | UC-MAN-09.c | `handleSetRoot` validates dir, swaps root, re-places, re-snapshots; non-dir → `ProjectErrorS2C` | `ProjectNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `ProjectNetworkRegistrySpec."handleSetRoot rejects a non-directory path with ProjectErrorS2C"` | covered |
 | UC-MAN-09.d | *(Plan B)* old grid persists; region assignments accumulate; Attach not implemented | — | n/a |
+| UC-MAN-10 | Place, save, and create standalone structure files | `ProjectStructureNetworkSpec` | covered |
+| UC-MAN-10.a | `PlaceStructureC2S` → `handlePlaceStructure` assigns/reuses a structure region, cheap-re-clears the prior footprint, places, and records the new `PlacedBox` | `ProjectStructureNetworkSpec."place then save round-trips a standalone structure via handlers"`, `ProjectStructureNetworkSpec."place rejects a non-.nbt subpath"`, `ProjectDimRegistryTest."getOrAssignStructureRegion is idempotent and distinct per subpath"`, `ProjectDimRegistryTest."structure regions sit in a lane disjoint from spec-folder regions"`, `ProjectDimRegistryTest."placed-box round-trips per subpath"` | covered |
+| UC-MAN-10.b | `centeredStart`/`anchorY` center in-region and floor/vertically-center by height | `StructureRegionMathTest."centeredStart centers a box in a region (floor-divides odd slack)"`, `StructureRegionMathTest."anchorY floors short structures at yBase"`, `StructureRegionMathTest."anchorY vertically centers structures at or above the tall threshold"` | covered |
+| UC-MAN-10.c | `SaveStructureC2S` → `handleSaveStructure` auto-fits the non-air region and rewrites the `.nbt`; empty region writes no file | `StructureRegionPersistenceSpec."auto-fit save captures the tight non-air box; place re-centers it"`, `StructureRegionPersistenceSpec."auto-fit save of an empty region writes a file and returns null"`, `StructureRegionMathTest."autoFit tightly boxes scattered non-air cells"`, `StructureRegionMathTest."autoFit returns null when the volume has no non-air"` | covered |
+| UC-MAN-10.d | `NewStructureC2S` → `handleNewStructure` writes an empty `.nbt` and re-sends the tree | `ProjectStructureNetworkSpec."new structure creates the file and re-sends the tree"` | covered |
+| UC-MAN-10.e | `StructureResultS2C` codec and status-line wiring | `StructurePacketsTest."StructureResultS2C codec round-trips"`, `StructurePacketsTest."PlaceStructureC2S codec round-trips"`, `StructurePacketsTest."SaveStructureC2S codec round-trips"`, `StructurePacketsTest."NewStructureC2S codec round-trips"` | covered |
 
 **UI-caller gap (not a test gap):** UC-MAN-01/02/06/07/08's `.a` rows above are marked historical
 because their only client trigger (`ProjectScreen`/`ProjectRootListScreen`) was deleted in the

@@ -101,9 +101,20 @@ and the template future panels (debugger, timeline) should copy. The pattern:
   named `*.spec.kts`) iff `node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }`;
   clicking a spec-folder's label sends `LoadProjectFolderC2S(path)`, clicking any other folder's
   label (or its expand triangle) calls `ProjectTreeState.toggleExpanded(path)`. Clicking a file row
-  calls `ProjectTreeState.select(path)` — highlight only, no packet sent. The Refresh row sends
-  `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh unit payload — see
-  `ProjectPackets`). The folder whose path equals `currentSubpath` is marked with a `●`.
+  calls `ProjectTreeState.select(path)` — highlight only, no packet sent — **except** a `.nbt`
+  `FileNode` (`node.extension == "nbt"`, rendered with a `▶` prefix), which selects **and** sends
+  `PlaceStructureC2S(path)` to place the standalone structure centered in its auto-assigned region.
+  The Refresh row sends `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh unit
+  payload — see `ProjectPackets`). The folder whose path equals `currentSubpath` is marked with a
+  `●`.
+- **`StructureActions()`**, rendered under `Header()`, provides "+ Structure" (a name input that
+  sends `NewStructureC2S(name)` to write an empty `.nbt` into the active folder) and "Save
+  Structure" (sends `SaveStructureC2S(selectedPath)` when the current `selectedPath` ends with
+  `.nbt`, auto-fitting and rewriting that file). `StructureResultS2C` for all three structure
+  packets (place/save/new) surfaces through `ProjectTreeState.onStructureResult` into the same
+  status line as folder load/save results. See
+  [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
+  for the region-placement model these actions drive.
 - **Scrolling a panel body** uses `Column(Modifier.verticalScroll(rememberScrollState()))` from
   `androidx.compose.foundation`, **not** `LazyColumn` — this deferred render pipeline bakes
   scissor/clipping at record time, and `LazyColumn`'s scroll-area clipping interacts badly with
