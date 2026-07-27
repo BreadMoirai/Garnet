@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.io.path.isDirectory
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
 
@@ -29,6 +30,7 @@ object ProjectNetworkRegistry {
         PayloadTypeRegistry.serverboundPlay().register(UnloadProjectFolderC2S.TYPE, UnloadProjectFolderC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(SaveNowC2S.TYPE, SaveNowC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(NewProjectSpecC2S.TYPE, NewProjectSpecC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(SetProjectRootC2S.TYPE, SetProjectRootC2S.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(ProjectTreeSnapshotS2C.TYPE, ProjectTreeSnapshotS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(ProjectFolderLoadedS2C.TYPE, ProjectFolderLoadedS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(ProjectSaveReportS2C.TYPE, ProjectSaveReportS2C.STREAM_CODEC)
@@ -48,6 +50,9 @@ object ProjectNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(NewProjectSpecC2S.TYPE) { payload, ctx ->
             ctx.server().execute { handleNewSpec(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(SetProjectRootC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { handleSetRoot(ctx.server(), ctx.player(), payload) }
         }
     }
 
@@ -117,6 +122,22 @@ object ProjectNetworkRegistry {
             parseErrors = report.parseErrors.map { "${it.filename}: ${it.message}" },
             layoutErrors = report.errors.map { "${it.specId} (${it.filename}): ${it.reason}" },
         ))
+    }
+
+    fun handleSetRoot(server: MinecraftServer, player: ServerPlayer, payload: SetProjectRootC2S) {
+        val abs = try {
+            Path.of(payload.path).toAbsolutePath()
+        } catch (e: java.nio.file.InvalidPathException) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("invalid path: ${payload.path}")); return
+        }
+        if (!abs.isDirectory()) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("not a folder: $abs")); return
+        }
+        val root = ProjectRoot(abs)
+        SharedSettings.projectRootPath = abs.toString()
+        ProjectServerContext.set(server, ProjectServerContext(root))
+        ProjectDimLifecycle.placeAll(server, root)
+        sendTree(server, player)
     }
 
     private fun sendTree(server: MinecraftServer, player: ServerPlayer) {

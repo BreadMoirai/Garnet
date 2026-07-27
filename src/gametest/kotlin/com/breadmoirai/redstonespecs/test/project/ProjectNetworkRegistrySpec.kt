@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.test.project
 
+import com.breadmoirai.redstonespecs.config.SharedSettings
 import com.breadmoirai.redstonespecs.project.ProjectDimLifecycle
 import com.breadmoirai.redstonespecs.project.ProjectDimRegistry
 import com.breadmoirai.redstonespecs.project.ProjectRoot
@@ -14,6 +15,7 @@ import com.breadmoirai.redstonespecs.network.project.ProjectNetworkRegistry
 import com.breadmoirai.redstonespecs.network.project.ProjectSaveReportS2C
 import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.redstonespecs.network.project.NewProjectSpecC2S
+import com.breadmoirai.redstonespecs.network.project.SetProjectRootC2S
 import com.breadmoirai.redstonespecs.test.drainPayloads
 import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
 import com.breadmoirai.redstonespecs.test.withTempRoot
@@ -28,6 +30,7 @@ import io.kotest.matchers.string.shouldContain
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
+import kotlin.io.path.writeText
 
 class ProjectNetworkRegistrySpec : RedstoneTestSpec({
 
@@ -201,6 +204,47 @@ class ProjectNetworkRegistrySpec : RedstoneTestSpec({
                 paths shouldContainAll listOf("set-a", "set-b", "set-a/x.spec.kts", "set-b/y.spec.kts", "set-b/z.spec.kts")
 
                 ProjectServerContext.clear(this)
+            }
+        }
+    }
+
+    test("handleSetRoot switches root, persists it, and sends a snapshot of the new folder") {
+        withTempRoot("project-net-setroot") { tmp ->
+            val newRoot = tmp.resolve("workspace").also { it.createDirectories() }
+            val folder = newRoot.resolve("set").also { it.createDirectories() }
+            writeStub(folder, "a")
+            val originalRootPath = SharedSettings.projectRootPath
+            onServer {
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+
+                ProjectNetworkRegistry.handleSetRoot(this, player, SetProjectRootC2S(newRoot.toString()))
+
+                SharedSettings.projectRootPath shouldBe newRoot.toAbsolutePath().toString()
+                val snap = drainPayloads(player).filterIsInstance<ProjectTreeSnapshotS2C>().single()
+                snap.root.name shouldBe "workspace"
+                snap.root.walk().map { it.first }.toList() shouldContain "set/a.spec.kts"
+
+                SharedSettings.projectRootPath = originalRootPath
+                ProjectWorld.clear(this)
+                ProjectServerContext.clear(this)
+            }
+        }
+    }
+
+    test("handleSetRoot rejects a non-directory path with ProjectErrorS2C") {
+        withTempRoot("project-net-setroot-bad") { tmp ->
+            val notAFolder = tmp.resolve("notafolder.txt").also { it.writeText("x") }
+            val originalRootPath = SharedSettings.projectRootPath
+            onServer {
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+
+                ProjectNetworkRegistry.handleSetRoot(this, player, SetProjectRootC2S(notAFolder.toString()))
+
+                val err = drainPayloads(player).filterIsInstance<ProjectErrorS2C>().single()
+                err.reason shouldContain "not a folder"
+                SharedSettings.projectRootPath shouldBe originalRootPath
             }
         }
     }
