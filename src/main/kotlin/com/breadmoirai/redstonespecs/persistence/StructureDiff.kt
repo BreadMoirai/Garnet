@@ -1,15 +1,6 @@
 package com.breadmoirai.redstonespecs.persistence
 
 import net.minecraft.nbt.CompoundTag
-import net.minecraft.nbt.ListTag
-
-// Extension methods for NBT access with defaults
-private fun ListTag.size(): Int = this.size
-private fun CompoundTag.getListOrEmpty(key: String): ListTag = getList(key).orElse(ListTag())
-private fun CompoundTag.getIntOr(key: String, default: Int): Int = if (contains(key)) getInt(key) as Int else default
-private fun CompoundTag.getStringOr(key: String, default: String): String = if (contains(key)) getString(key) as String else default
-private fun ListTag.getCompoundOrEmpty(index: Int): CompoundTag = if (index < this.size) getCompound(index) as CompoundTag else CompoundTag()
-private fun ListTag.getIntOr(index: Int, default: Int): Int = if (index < this.size) getInt(index) as Int else default
 
 /**
  * True when two `StructureTemplate.save()` tags describe different block content: different size,
@@ -26,7 +17,7 @@ private fun normalize(tag: CompoundTag): Pair<Triple<Int, Int, Int>, Set<Cell>> 
     val palette = tag.getListOrEmpty("palette")
     val blocks = tag.getListOrEmpty("blocks")
     val cells = HashSet<Cell>()
-    for (i in 0 until blocks.size()) {
+    for (i in 0 until blocks.size) {
         val bt = blocks.getCompoundOrEmpty(i)
         val posTag = bt.getListOrEmpty("pos")
         val pos = Triple(posTag.getIntOr(0, 0), posTag.getIntOr(1, 0), posTag.getIntOr(2, 0))
