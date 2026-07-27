@@ -96,6 +96,56 @@ object StructurePersistence {
         return saveDir.listDirectoryEntries("*.nbt").map { it.nameWithoutExtension }
     }
 
+    /** `<name>.nbt` → adjacent `<name>.nbt.unsaved` dirty buffer (same directory). */
+    fun unsavedSidecarOf(file: Path): Path = file.resolveSibling("${file.fileName}.unsaved")
+
+    /**
+     * Auto-fit scans the region for non-air, returning the saved [StructureTemplate] tag plus the
+     * tight [PlacedBox] (null when the region is empty; the tag is still a valid empty structure).
+     * Does not write anything.
+     */
+    fun captureAutoFit(
+        level: ServerLevel, regionOrigin: BlockPos,
+        regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int,
+    ): Pair<CompoundTag, PlacedBox?> {
+        val dimY = regionMaxY - regionMinY + 1
+        val fit = autoFit(regionSizeXZ, dimY, regionSizeXZ) { lx, ly, lz ->
+            !level.getBlockState(BlockPos(regionOrigin.x + lx, regionMinY + ly, regionOrigin.z + lz)).`is`(Blocks.AIR)
+        }
+        val template = StructureTemplate()
+        if (fit == null) return template.save(CompoundTag()) to null
+        val tightOrigin = BlockPos(regionOrigin.x + fit.minX, regionMinY + fit.minY, regionOrigin.z + fit.minZ)
+        val size = Vec3i(fit.sizeX, fit.sizeY, fit.sizeZ)
+        template.fillFromWorld(level, tightOrigin, size, false, emptyList())
+        return template.save(CompoundTag()) to PlacedBox(tightOrigin, size)
+    }
+
+    /**
+     * Captures the region and compares to the committed [file]; writes `<file>.unsaved` when they
+     * differ (or the committed file is missing), deletes the sidecar when they match. Returns true
+     * when the structure is now dirty (sidecar present).
+     */
+    fun flushUnsavedSidecar(
+        file: Path, level: ServerLevel, regionOrigin: BlockPos,
+        regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int,
+    ): Boolean {
+        val (capturedTag, _) = captureAutoFit(level, regionOrigin, regionSizeXZ, regionMinY, regionMaxY)
+        val committedTag = if (file.exists()) {
+            try { NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()) }
+            catch (e: IOException) { LOGGER.error("[StructurePersistence#flush] read '{}': {}", file, e.message); null }
+        } else null
+        val sidecar = unsavedSidecarOf(file)
+        val dirty = committedTag == null || structuresDiffer(committedTag, capturedTag)
+        if (dirty) {
+            sidecar.parent?.createDirectories()
+            try { NbtIo.writeCompressed(capturedTag, sidecar) }
+            catch (e: IOException) { LOGGER.error("[StructurePersistence#flush] write '{}': {}", sidecar, e.message) }
+        } else {
+            sidecar.deleteIfExists()
+        }
+        return dirty
+    }
+
     /**
      * Scans the full region volume ([regionSizeXZ] wide, `regionMinY..regionMaxY` tall) for
      * non-air, computes the tight box, and writes exactly that box into [file] as a compressed
@@ -106,24 +156,12 @@ object StructurePersistence {
         file: Path, level: ServerLevel, regionOrigin: BlockPos,
         regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int,
     ): PlacedBox? {
-        val dimY = regionMaxY - regionMinY + 1
-        val fit = autoFit(regionSizeXZ, dimY, regionSizeXZ) { lx, ly, lz ->
-            !level.getBlockState(BlockPos(regionOrigin.x + lx, regionMinY + ly, regionOrigin.z + lz)).`is`(Blocks.AIR)
-        }
+        val (tag, box) = captureAutoFit(level, regionOrigin, regionSizeXZ, regionMinY, regionMaxY)
         file.parent?.createDirectories()
-        val template = StructureTemplate()
-        if (fit == null) {
-            try { NbtIo.writeCompressed(template.save(CompoundTag()), file) }
-            catch (e: IOException) { LOGGER.error("[StructurePersistence#saveAutoFit] write empty '{}': {}", file, e.message) }
-            return null
-        }
-        val tightOrigin = BlockPos(regionOrigin.x + fit.minX, regionMinY + fit.minY, regionOrigin.z + fit.minZ)
-        val size = Vec3i(fit.sizeX, fit.sizeY, fit.sizeZ)
-        template.fillFromWorld(level, tightOrigin, size, false, emptyList())
-        try { NbtIo.writeCompressed(template.save(CompoundTag()), file) }
+        try { NbtIo.writeCompressed(tag, file) }
         catch (e: IOException) { LOGGER.error("[StructurePersistence#saveAutoFit] write '{}': {}", file, e.message) }
-        LOGGER.debug("[StructurePersistence#saveAutoFit] captured {} at {} -> {}", size, tightOrigin, file)
-        return PlacedBox(tightOrigin, size)
+        LOGGER.debug("[StructurePersistence#saveAutoFit] captured {} -> {}", box?.size, file)
+        return box
     }
 
     /**
