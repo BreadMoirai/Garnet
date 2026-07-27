@@ -88,7 +88,13 @@ class ProjectDimRegistry(private val server: MinecraftServer) {
     companion object {
         const val REGION_PAD = 64  // empty void between adjacent regions
 
-        /** Z coordinate of the standalone-structure region lane (far from the spec lane at z=0). */
+        /**
+         * Z coordinate of the standalone-structure region lane (far from the spec lane at z=0).
+         * This separation is a practical bound, not a hard guarantee: the spec lane grows in +Z
+         * as a folder accumulates specs, so a single folder with enough specs (~900+, per the
+         * row/grid math in [computeRegionOrigin]) could in principle grow its grid past z≈4096
+         * and collide with the structure lane.
+         */
         const val STRUCTURE_LANE_Z = 4096
 
         private val perServer = java.util.WeakHashMap<MinecraftServer, ProjectDimRegistry>()

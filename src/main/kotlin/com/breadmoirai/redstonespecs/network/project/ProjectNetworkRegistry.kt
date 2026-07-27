@@ -11,7 +11,6 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Relative
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
-import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
@@ -167,9 +166,6 @@ object ProjectNetworkRegistry {
         if (!payload.subpath.endsWith(".nbt")) {
             ServerPlayNetworking.send(player, ProjectErrorS2C("not a structure file: ${payload.subpath}")); return
         }
-        if (!file.exists()) {
-            ServerPlayNetworking.send(player, ProjectErrorS2C("structure file not found: ${payload.subpath}")); return
-        }
         val registry = ProjectDimRegistry.of(server)
         val level = registry.projectLevel()
         val origin = registry.getOrAssignStructureRegion(payload.subpath)
@@ -182,9 +178,11 @@ object ProjectNetworkRegistry {
             ServerPlayNetworking.send(player, ProjectErrorS2C("failed to load structure: ${payload.subpath}")); return
         }
         registry.setPlacedBox(payload.subpath, placed)
+        val yBase = SharedSettings.projectGridYBase
+        val tpY = if (placed.origin.y >= yBase) yBase + 2 else placed.origin.y + placed.size.y + 2
         player.teleportTo(
             level,
-            (origin.x + width / 2) + 0.5, (SharedSettings.projectGridYBase + 2).toDouble(), (origin.z + width / 2) + 0.5,
+            (origin.x + width / 2) + 0.5, tpY.toDouble(), (origin.z + width / 2) + 0.5,
             emptySet<Relative>(), player.yRot, player.xRot, true,
         )
         ServerPlayNetworking.send(player, StructureResultS2C(

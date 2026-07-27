@@ -154,7 +154,7 @@ object StructurePersistence {
             template.placeInWorld(level, origin, origin, StructurePlaceSettings(), level.random, 2)
             LOGGER.debug("[StructurePersistence#placeCentered] placed {} ({}) at {}", file, size, origin)
             PlacedBox(origin, size)
-        } catch (e: IOException) {
+        } catch (e: Exception) {
             LOGGER.error("[StructurePersistence#placeCentered] read '{}': {}", file, e.message)
             null
         }

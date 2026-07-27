@@ -105,6 +105,24 @@ class ProjectStructureNetworkSpec : RedstoneTestSpec({
         }
     }
 
+    test("placing a corrupt .nbt replies with an error instead of throwing") {
+        withTempRoot("struct-net-corrupt") { tmp ->
+            java.nio.file.Files.write(tmp.resolve("corrupt.nbt"), byteArrayOf(1, 2, 3, 4, 5))
+            onServer {
+                ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp)))
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+
+                ProjectNetworkRegistry.handlePlaceStructure(this, player, PlaceStructureC2S("corrupt.nbt"))
+                val payloads = drainPayloads(player)
+                payloads.filterIsInstance<ProjectErrorS2C>() shouldHaveSize 1
+                payloads.filterIsInstance<StructureResultS2C>() shouldHaveSize 0
+
+                ProjectSession.clear(player.uuid)
+            }
+        }
+    }
+
     test("new structure creates the file and re-sends the tree") {
         withTempRoot("struct-net-new") { tmp ->
             onServer {
