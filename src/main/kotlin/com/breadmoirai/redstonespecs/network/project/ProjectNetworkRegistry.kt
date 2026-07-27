@@ -31,10 +31,14 @@ object ProjectNetworkRegistry {
         PayloadTypeRegistry.serverboundPlay().register(SaveNowC2S.TYPE, SaveNowC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(NewProjectSpecC2S.TYPE, NewProjectSpecC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(SetProjectRootC2S.TYPE, SetProjectRootC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(PlaceStructureC2S.TYPE, PlaceStructureC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(SaveStructureC2S.TYPE, SaveStructureC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(NewStructureC2S.TYPE, NewStructureC2S.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(ProjectTreeSnapshotS2C.TYPE, ProjectTreeSnapshotS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(ProjectFolderLoadedS2C.TYPE, ProjectFolderLoadedS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(ProjectSaveReportS2C.TYPE, ProjectSaveReportS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(ProjectErrorS2C.TYPE, ProjectErrorS2C.STREAM_CODEC)
+        PayloadTypeRegistry.clientboundPlay().register(StructureResultS2C.TYPE, StructureResultS2C.STREAM_CODEC)
 
         ServerPlayNetworking.registerGlobalReceiver(ListProjectTreeC2S.TYPE) { _, ctx ->
             ctx.server().execute { handleListTree(ctx.server(), ctx.player()) }

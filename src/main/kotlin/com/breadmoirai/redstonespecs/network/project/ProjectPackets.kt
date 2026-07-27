@@ -179,3 +179,59 @@ data class ProjectErrorS2C(val reason: String) : CustomPacketPayload {
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
+
+// === Structure C2S ===
+
+data class PlaceStructureC2S(val subpath: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<PlaceStructureC2S>(id("place_structure"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, PlaceStructureC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, PlaceStructureC2S::subpath,
+            ::PlaceStructureC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class SaveStructureC2S(val subpath: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SaveStructureC2S>(id("save_structure"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, SaveStructureC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, SaveStructureC2S::subpath,
+            ::SaveStructureC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+data class NewStructureC2S(val name: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<NewStructureC2S>(id("new_structure"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, NewStructureC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, NewStructureC2S::name,
+            ::NewStructureC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+// === Structure S2C ===
+
+data class StructureResultS2C(
+    val subpath: String,
+    val sizeX: Int, val sizeY: Int, val sizeZ: Int,
+    val message: String,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<StructureResultS2C>(id("structure_result"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, StructureResultS2C> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, StructureResultS2C::subpath,
+            ByteBufCodecs.VAR_INT, StructureResultS2C::sizeX,
+            ByteBufCodecs.VAR_INT, StructureResultS2C::sizeY,
+            ByteBufCodecs.VAR_INT, StructureResultS2C::sizeZ,
+            ByteBufCodecs.STRING_UTF8, StructureResultS2C::message,
+            ::StructureResultS2C,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
