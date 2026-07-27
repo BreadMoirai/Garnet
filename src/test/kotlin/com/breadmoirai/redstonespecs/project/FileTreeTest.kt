@@ -5,6 +5,7 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import java.nio.file.Files
 import kotlin.io.path.createDirectories
+import kotlin.io.path.createFile
 import kotlin.io.path.div
 import kotlin.io.path.name
 import kotlin.io.path.writeText
@@ -85,6 +86,18 @@ class FileTreeTest : FunSpec({
         root.resolve("") shouldBe root
         root.resolve("sub/missing.kts") shouldBe null
         root.resolve("nope") shouldBe null
+    }
+
+    test("scanFolder hides .nbt.unsaved and flags the sibling .nbt as dirty") {
+        val dir = kotlin.io.path.createTempDirectory("scan-dirty")
+        dir.resolve("gadget.nbt").createFile()
+        dir.resolve("gadget.nbt.unsaved").createFile()
+        dir.resolve("clean.nbt").createFile()
+        val root = scanFolder(dir)
+        val files = root.children.filterIsInstance<FileNode>()
+        files.map { it.name } shouldBe listOf("clean.nbt", "gadget.nbt") // sidecar hidden, sorted
+        files.first { it.name == "gadget.nbt" }.hasUnsaved shouldBe true
+        files.first { it.name == "clean.nbt" }.hasUnsaved shouldBe false
     }
 
     test("walk/resolve on a subfolder produce paths relative to that subfolder") {

@@ -60,7 +60,10 @@ Pure data:
   whichever folder is the root, so re-rooting is free. This is the tree carried by
   `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` and rendered recursively by
   `ProjectExplorerPanel` (below) — the old flat `leaves`/`intermediates`/`ProjectLeafEntry` payload
-  fields are gone.
+  fields are gone. `FileNode.hasUnsaved: Boolean = false` flags a `<name>.nbt` node that has a
+  sibling `<name>.nbt.unsaved` dirty-buffer sidecar; `scanFolder` sets it and omits the sidecar
+  file itself from the tree. `FILE_TREE_STREAM_CODEC` (in `ProjectPackets.kt`) serializes it as a
+  trailing boolean on the file-node tag.
 - `GridLayout` — `(specs, cellSize, gap, rowMax, yBase) → cells`.
 - `ProjectCell` — pure cell record (origin + size).
 - `ProjectSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation (pure

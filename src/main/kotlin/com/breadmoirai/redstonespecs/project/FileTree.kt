@@ -17,10 +17,12 @@ data class FolderNode(
     val children: List<FileTreeNode>,
 ) : FileTreeNode
 
-/** A file. [extension] is the lowercased last-dot extension, "" when the name has no dot. */
+/** A file. [extension] is the lowercased last-dot extension, "" when the name has no dot.
+ *  [hasUnsaved] is true for an `<name>.nbt` that has an adjacent `<name>.nbt.unsaved` dirty buffer. */
 data class FileNode(
     override val name: String,
     val extension: String,
+    val hasUnsaved: Boolean = false,
 ) : FileTreeNode
 
 // Folders before files (false < true), then case-insensitive name order.
@@ -35,10 +37,17 @@ private val CHILD_ORDER: Comparator<FileTreeNode> =
  */
 fun scanFolder(path: Path): FolderNode {
     if (!path.isDirectory()) return FolderNode(path.name, emptyList())
-    val children = path.listDirectoryEntries()
+    val entries = path.listDirectoryEntries()
+    val names = entries.map { it.name }.toHashSet()
+    val children = entries
+        .filterNot { !it.isDirectory() && it.name.endsWith(".nbt.unsaved") }
         .map { entry ->
             if (entry.isDirectory()) scanFolder(entry)
-            else FileNode(entry.name, entry.extension.lowercase())
+            else FileNode(
+                entry.name,
+                entry.extension.lowercase(),
+                hasUnsaved = entry.name.endsWith(".nbt") && "${entry.name}.unsaved" in names,
+            )
         }
         .sortedWith(CHILD_ORDER)
     return FolderNode(path.name, children)

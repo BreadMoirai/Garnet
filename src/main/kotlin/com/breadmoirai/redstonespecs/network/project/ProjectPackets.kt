@@ -28,7 +28,7 @@ val FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode> = object : Stream
                 repeat(count) { children.add(decode(buf)) }
                 FolderNode(name, children)
             }
-            TAG_FILE -> FileNode(name, ByteBufCodecs.STRING_UTF8.decode(buf))
+            TAG_FILE -> FileNode(name, ByteBufCodecs.STRING_UTF8.decode(buf), buf.readBoolean())
             else -> throw IllegalStateException("Unknown FileTreeNode tag: $tag")
         }
     }
@@ -45,6 +45,7 @@ val FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode> = object : Stream
                 buf.writeByte(TAG_FILE.toInt())
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.name)
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.extension)
+                buf.writeBoolean(value.hasUnsaved)
             }
         }
     }
