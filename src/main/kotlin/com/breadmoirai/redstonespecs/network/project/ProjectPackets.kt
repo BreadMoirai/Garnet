@@ -99,6 +99,17 @@ data class LoadProjectFolderC2S(val subpath: String) : CustomPacketPayload {
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
+data class SetProjectRootC2S(val path: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<SetProjectRootC2S>(id("set_root"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, SetProjectRootC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, SetProjectRootC2S::path,
+            ::SetProjectRootC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 class UnloadProjectFolderC2S : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<UnloadProjectFolderC2S>(id("unload"))

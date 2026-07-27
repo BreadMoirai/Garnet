@@ -39,4 +39,12 @@ class FileTreeCodecTest : FunSpec({
             decoded shouldBe payload
         }
     }
+
+    test("SetProjectRootC2S round-trips its path through STREAM_CODEC") {
+        val payload = SetProjectRootC2S("/abs/some/workspace")
+        val buf = io.netty.buffer.Unpooled.buffer()
+        SetProjectRootC2S.STREAM_CODEC.encode(buf, payload)
+        val decoded = SetProjectRootC2S.STREAM_CODEC.decode(buf)
+        decoded shouldBe payload
+    }
 })
