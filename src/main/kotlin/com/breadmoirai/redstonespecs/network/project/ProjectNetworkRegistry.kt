@@ -1,13 +1,18 @@
 package com.breadmoirai.redstonespecs.network.project
 
 import com.breadmoirai.redstonespecs.config.SharedSettings
+import com.breadmoirai.redstonespecs.persistence.StructurePersistence
 import com.breadmoirai.redstonespecs.project.*
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Vec3i
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.entity.Relative
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 
 private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
@@ -57,6 +62,15 @@ object ProjectNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(SetProjectRootC2S.TYPE) { payload, ctx ->
             ctx.server().execute { handleSetRoot(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(PlaceStructureC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { handlePlaceStructure(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(SaveStructureC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { handleSaveStructure(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(NewStructureC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { handleNewStructure(ctx.server(), ctx.player(), payload) }
         }
     }
 
@@ -141,6 +155,97 @@ object ProjectNetworkRegistry {
         SharedSettings.projectRootPath = abs.toString()
         ProjectServerContext.set(server, ProjectServerContext(root))
         ProjectDimLifecycle.placeAll(server, root)
+        sendTree(server, player)
+    }
+
+    fun handlePlaceStructure(server: MinecraftServer, player: ServerPlayer, payload: PlaceStructureC2S) {
+        val root = rootFor(server) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("project-root not configured")); return
+        }
+        val file = root.resolveSubpath(payload.subpath) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("subpath not found or escapes root: ${payload.subpath}")); return
+        }
+        if (!payload.subpath.endsWith(".nbt")) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("not a structure file: ${payload.subpath}")); return
+        }
+        if (!file.exists()) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("structure file not found: ${payload.subpath}")); return
+        }
+        val registry = ProjectDimRegistry.of(server)
+        val level = registry.projectLevel()
+        val isFreshRegion = registry.structureRegionOriginOf(payload.subpath) == null
+        val origin = registry.getOrAssignStructureRegion(payload.subpath)
+        val width = SharedSettings.structureRegionChunks * 16
+        if (isFreshRegion) {
+            // A newly-minted region may sit on real overworld terrain (the managed canvas is the
+            // integrated server's overworld, not a void dimension); clear the whole column once so
+            // a later auto-fit save doesn't capture ambient terrain as part of the structure. The
+            // auto-fit scan covers level.minY..level.maxY, so the clear must start there too, not
+            // at the region's grid-Y (they differ).
+            StructurePersistence.clearBounds(
+                level, BlockPos(origin.x, level.minY, origin.z), Vec3i(width, level.maxY - level.minY + 1, width),
+            )
+        } else {
+            // Cheap re-clear: only the previously-placed footprint, not the whole region.
+            registry.placedBoxOf(payload.subpath)?.let { StructurePersistence.clearBounds(level, it.origin, it.size) }
+        }
+        val placed = StructurePersistence.placeStructureCentered(
+            file, level, origin, width, level.minY, level.maxY, SharedSettings.projectGridYBase,
+        ) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("failed to load structure: ${payload.subpath}")); return
+        }
+        registry.setPlacedBox(payload.subpath, placed)
+        player.teleportTo(
+            level,
+            (origin.x + width / 2) + 0.5, (SharedSettings.projectGridYBase + 2).toDouble(), (origin.z + width / 2) + 0.5,
+            emptySet<Relative>(), player.yRot, player.xRot, true,
+        )
+        ServerPlayNetworking.send(player, StructureResultS2C(
+            payload.subpath, placed.size.x, placed.size.y, placed.size.z, "placed ${payload.subpath}",
+        ))
+    }
+
+    fun handleSaveStructure(server: MinecraftServer, player: ServerPlayer, payload: SaveStructureC2S) {
+        val root = rootFor(server) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("project-root not configured")); return
+        }
+        val file = root.resolveSubpath(payload.subpath) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("subpath not found or escapes root: ${payload.subpath}")); return
+        }
+        if (!payload.subpath.endsWith(".nbt")) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("not a structure file: ${payload.subpath}")); return
+        }
+        val registry = ProjectDimRegistry.of(server)
+        val level = registry.projectLevel()
+        val origin = registry.getOrAssignStructureRegion(payload.subpath)
+        val width = SharedSettings.structureRegionChunks * 16
+        val box = StructurePersistence.saveAutoFitToFile(file, level, origin, width, level.minY, level.maxY)
+        val size = box?.size ?: Vec3i(0, 0, 0)
+        if (box != null) registry.setPlacedBox(payload.subpath, box)
+        val msg = if (box == null) "saved ${payload.subpath} (empty)"
+                  else "saved ${payload.subpath} (${size.x}×${size.y}×${size.z})"
+        ServerPlayNetworking.send(player, StructureResultS2C(payload.subpath, size.x, size.y, size.z, msg))
+    }
+
+    fun handleNewStructure(server: MinecraftServer, player: ServerPlayer, payload: NewStructureC2S) {
+        val activeSubpath = ProjectSession.get(player.uuid)?.activeSubpath ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("no folder selected")); return
+        }
+        val root = rootFor(server) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("project-root not configured")); return
+        }
+        val world = ProjectWorld.get(server)
+        val folderAbsolute = world?.folderAbsoluteByPath?.get(activeSubpath)
+            ?: root.resolveSubpath(activeSubpath)
+            ?: run {
+                ServerPlayNetworking.send(player, ProjectErrorS2C("active folder not resolvable: $activeSubpath")); return
+            }
+        try {
+            ProjectNewStructure.create(folderAbsolute, payload.name)
+        } catch (e: Exception) {
+            LOGGER.error("[project/new-structure] create {}/{}: {}", activeSubpath, payload.name, e.message, e)
+            ServerPlayNetworking.send(player, ProjectErrorS2C("new-structure failed: ${e.message}")); return
+        }
         sendTree(server, player)
     }
 

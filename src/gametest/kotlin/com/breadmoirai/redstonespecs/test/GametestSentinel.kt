@@ -4,6 +4,7 @@ import com.breadmoirai.redstonespecs.test.project.ProjectCellSaverSpec
 import com.breadmoirai.redstonespecs.test.project.ProjectCommandSpec
 import com.breadmoirai.redstonespecs.test.project.ProjectDimSpec
 import com.breadmoirai.redstonespecs.test.project.ProjectNetworkRegistrySpec
+import com.breadmoirai.redstonespecs.test.project.ProjectStructureNetworkSpec
 import com.breadmoirai.redstonespecs.test.project.ProjectTeleportSpec
 import com.breadmoirai.redstonespecs.test.network.RecorderRunnerNetworkRegistrySpec
 import com.breadmoirai.redstonespecs.test.persistence.StructureRegionPersistenceSpec
@@ -50,6 +51,7 @@ class GametestSentinel {
                             ProjectCellSaverSpec::class,
                             ProjectTeleportSpec::class,
                             ProjectNetworkRegistrySpec::class,
+                            ProjectStructureNetworkSpec::class,
                             ProjectCommandSpec::class,
                             RecorderRunnerNetworkRegistrySpec::class,
                             RecordingLifecycleSpec::class,
