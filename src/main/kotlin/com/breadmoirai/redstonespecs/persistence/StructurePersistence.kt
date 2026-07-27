@@ -1,5 +1,9 @@
 package com.breadmoirai.redstonespecs.persistence
 
+import com.breadmoirai.redstonespecs.project.PlacedBox
+import com.breadmoirai.redstonespecs.project.anchorY
+import com.breadmoirai.redstonespecs.project.autoFit
+import com.breadmoirai.redstonespecs.project.centeredStart
 import net.minecraft.core.BlockPos
 import net.minecraft.core.HolderGetter
 import net.minecraft.core.Vec3i
@@ -90,5 +94,69 @@ object StructurePersistence {
     fun listIds(saveDir: Path): List<String> {
         if (!saveDir.exists()) return emptyList()
         return saveDir.listDirectoryEntries("*.nbt").map { it.nameWithoutExtension }
+    }
+
+    /**
+     * Scans the full region volume ([regionSizeXZ] wide, `regionMinY..regionMaxY` tall) for
+     * non-air, computes the tight box, and writes exactly that box into [file] as a compressed
+     * structure. Returns the captured [PlacedBox] (absolute origin + size), or null when the
+     * region is empty (an empty structure is still written).
+     */
+    fun saveAutoFitToFile(
+        file: Path, level: ServerLevel, regionOrigin: BlockPos,
+        regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int,
+    ): PlacedBox? {
+        val dimY = regionMaxY - regionMinY + 1
+        val fit = autoFit(regionSizeXZ, dimY, regionSizeXZ) { lx, ly, lz ->
+            !level.getBlockState(BlockPos(regionOrigin.x + lx, regionMinY + ly, regionOrigin.z + lz)).`is`(Blocks.AIR)
+        }
+        file.parent?.createDirectories()
+        val template = StructureTemplate()
+        if (fit == null) {
+            try { NbtIo.writeCompressed(template.save(CompoundTag()), file) }
+            catch (e: IOException) { LOGGER.error("[StructurePersistence#saveAutoFit] write empty '{}': {}", file, e.message) }
+            return null
+        }
+        val tightOrigin = BlockPos(regionOrigin.x + fit.minX, regionMinY + fit.minY, regionOrigin.z + fit.minZ)
+        val size = Vec3i(fit.sizeX, fit.sizeY, fit.sizeZ)
+        template.fillFromWorld(level, tightOrigin, size, false, emptyList())
+        try { NbtIo.writeCompressed(template.save(CompoundTag()), file) }
+        catch (e: IOException) { LOGGER.error("[StructurePersistence#saveAutoFit] write '{}': {}", file, e.message) }
+        LOGGER.debug("[StructurePersistence#saveAutoFit] captured {} at {} -> {}", size, tightOrigin, file)
+        return PlacedBox(tightOrigin, size)
+    }
+
+    /**
+     * Loads [file] and places it centered (X/Z) in the region, floored at [yBase] unless the
+     * structure is tall enough to require vertical centering (see [anchorY]). Returns the placed
+     * [PlacedBox], or null when [file] does not exist / fails to read.
+     */
+    fun placeStructureCentered(
+        file: Path, level: ServerLevel, regionOrigin: BlockPos,
+        regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int, yBase: Int,
+    ): PlacedBox? {
+        if (!file.exists()) {
+            LOGGER.warn("[StructurePersistence#placeCentered] file '{}' not found", file)
+            return null
+        }
+        return try {
+            val nbt = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap())
+            val blockGetter: HolderGetter<Block> = level.registryAccess().lookupOrThrow(Registries.BLOCK)
+            val template = StructureTemplate()
+            template.load(blockGetter, nbt)
+            val size = template.size  // Vec3i
+            val regionHeight = regionMaxY - regionMinY + 1
+            val origin = BlockPos(
+                centeredStart(regionOrigin.x, regionSizeXZ, size.x),
+                anchorY(size.y, yBase, regionMinY, regionHeight),
+                centeredStart(regionOrigin.z, regionSizeXZ, size.z),
+            )
+            template.placeInWorld(level, origin, origin, StructurePlaceSettings(), level.random, 2)
+            LOGGER.debug("[StructurePersistence#placeCentered] placed {} ({}) at {}", file, size, origin)
+            PlacedBox(origin, size)
+        } catch (e: IOException) {
+            LOGGER.error("[StructurePersistence#placeCentered] read '{}': {}", file, e.message)
+            null
+        }
     }
 }

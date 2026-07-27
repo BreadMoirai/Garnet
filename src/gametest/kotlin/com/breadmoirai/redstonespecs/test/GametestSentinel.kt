@@ -6,6 +6,7 @@ import com.breadmoirai.redstonespecs.test.project.ProjectDimSpec
 import com.breadmoirai.redstonespecs.test.project.ProjectNetworkRegistrySpec
 import com.breadmoirai.redstonespecs.test.project.ProjectTeleportSpec
 import com.breadmoirai.redstonespecs.test.network.RecorderRunnerNetworkRegistrySpec
+import com.breadmoirai.redstonespecs.test.persistence.StructureRegionPersistenceSpec
 import com.breadmoirai.redstonespecs.test.recorder.MarkerToolSpec
 import com.breadmoirai.redstonespecs.test.recorder.RecordingLifecycleSpec
 import com.breadmoirai.redstonespecs.testing.core.RedstoneTestLifecycle
@@ -53,6 +54,7 @@ class GametestSentinel {
                             RecorderRunnerNetworkRegistrySpec::class,
                             RecordingLifecycleSpec::class,
                             MarkerToolSpec::class,
+                            StructureRegionPersistenceSpec::class,
                         ),
                     )
                 }
