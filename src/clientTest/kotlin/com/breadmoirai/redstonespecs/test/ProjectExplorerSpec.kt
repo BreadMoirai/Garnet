@@ -70,4 +70,30 @@ class ProjectExplorerSpec : ClientSpec({
         }
         waitClientTicks(6)
     }
+
+    test("Explorer header renders the root option button and opens the dropdown") {
+        closeClientScreen(); waitClientTicks(2)
+        val tree = FolderNode("myroot", listOf(
+            FolderNode("set", listOf(FileNode("a.spec.kts", "kts"))),
+        ))
+        runOnClient { mc ->
+            DockState.reset(); ProjectTreeState.reset()
+            com.breadmoirai.redstonespecs.client.ide.RootPickerController.resetForTest()
+            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root = tree, currentSubpath = null))
+            com.breadmoirai.redstonespecs.client.ide.RootPickerController.toggleMenu()
+            DockState.leftPanels.add(explorerPanel())
+            DockState.setVisible(DockRegion.LEFT, true); DockState.setSize(DockRegion.LEFT, 300)
+            ViewportState.active = true; ComposeOverlay.enabled = true
+            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(12)
+        com.breadmoirai.redstonespecs.client.ide.RootPickerController.menuOpen shouldBe true
+        capture("explorer_root_menu.png")
+        runOnClient { mc ->
+            com.breadmoirai.redstonespecs.client.ide.RootPickerController.resetForTest()
+            ComposeOverlay.enabled = false; ViewportState.active = false; DockState.reset()
+            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(6)
+    }
 })

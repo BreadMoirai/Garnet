@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -28,27 +29,62 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 
 private val TEXT = Color(0xFFDDE3EC)
 private val TEXT_DIM = Color(0xFF8FA0B5)
+private val TEXT_DISABLED = Color(0xFF5A6678)
 private val SELECTED_BG = Color(0x334A90E2)
+private val MENU_BG = Color(0xF01A2130)
 
 /** The Explorer tab for DockState.leftPanels. */
 fun explorerPanel(): Panel = Panel("redstonespecs.explorer", "Explorer") { ProjectExplorer() }
 
 @Composable
 private fun ProjectExplorer() {
-    Column(Modifier.fillMaxSize().padding(4.dp)) {
-        Row2("↻ Refresh", TEXT_DIM) { ClientPlayNetworking.send(ListProjectTreeC2S.INSTANCE) }
-        val snap = ProjectTreeState.snapshot
-        if (snap == null) {
-            Row2("(no project loaded — Refresh)", TEXT_DIM) {}
-        } else {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                snap.root.children.forEach { child ->
-                    TreeNode(child, path = child.name, depth = 0, currentSubpath = snap.currentSubpath)
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(4.dp)) {
+            Header()
+            val snap = ProjectTreeState.snapshot
+            if (snap == null) {
+                BasicText("(no project loaded — Refresh)", Modifier.padding(vertical = 2.dp), style = TextStyle(color = TEXT_DIM))
+            } else {
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                    snap.root.children.forEach { child ->
+                        TreeNode(child, path = child.name, depth = 0, currentSubpath = snap.currentSubpath)
+                    }
                 }
             }
+            val status = ProjectTreeState.status
+            if (status.isNotEmpty()) BasicText(status, Modifier.padding(top = 4.dp), style = TextStyle(color = TEXT_DIM))
         }
-        val status = ProjectTreeState.status
-        if (status.isNotEmpty()) BasicText(status, Modifier.padding(top = 4.dp), style = TextStyle(color = TEXT_DIM))
+        if (RootPickerController.menuOpen) RootMenu()
+    }
+}
+
+@Composable
+private fun Header() {
+    val rootName = ProjectTreeState.snapshot?.root?.name ?: "(no root)"
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Box(Modifier.clickable { RootPickerController.toggleMenu() }.padding(end = 8.dp)) {
+            BasicText("$rootName  ▾", style = TextStyle(color = TEXT))
+        }
+        Spacer(Modifier.weight(1f))
+        Box(Modifier.clickable { ClientPlayNetworking.send(ListProjectTreeC2S.INSTANCE) }) {
+            BasicText("↻", style = TextStyle(color = TEXT_DIM))
+        }
+    }
+}
+
+@Composable
+private fun RootMenu() {
+    // Scrim (lower z): click outside closes the menu.
+    Box(Modifier.fillMaxSize().clickable { RootPickerController.closeMenu() })
+    // Menu card (higher z): offset to sit just under the option button.
+    Column(Modifier.offset(x = 4.dp, y = 22.dp).background(MENU_BG).padding(4.dp)) {
+        Box(Modifier.fillMaxWidth().clickable { RootPickerController.openFolder() }
+            .padding(vertical = 3.dp, horizontal = 6.dp)) {
+            BasicText("Open Folder", style = TextStyle(color = TEXT))
+        }
+        Box(Modifier.fillMaxWidth().padding(vertical = 3.dp, horizontal = 6.dp)) {
+            BasicText("Attach Folder  (soon)", style = TextStyle(color = TEXT_DISABLED))
+        }
     }
 }
 
@@ -91,9 +127,3 @@ private fun TreeNode(node: FileTreeNode, path: String, depth: Int, currentSubpat
         }
     }
 }
-
-@Composable
-private fun Row2(label: String, color: Color, onClick: () -> Unit) =
-    Box(Modifier.fillMaxWidth().clickable { onClick() }.padding(vertical = 2.dp)) {
-        BasicText(label, style = TextStyle(color = color))
-    }
