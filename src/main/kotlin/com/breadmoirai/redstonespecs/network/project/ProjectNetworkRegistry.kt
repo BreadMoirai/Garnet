@@ -203,6 +203,10 @@ object ProjectNetworkRegistry {
             ServerPlayNetworking.send(player, ProjectErrorS2C("not a structure file: ${payload.subpath}")); return
         }
         val registry = ProjectDimRegistry.of(server)
+        if (registry.placedBoxOf(payload.subpath) == null) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("place the structure before saving: ${payload.subpath}"))
+            return
+        }
         val level = registry.projectLevel()
         val origin = registry.getOrAssignStructureRegion(payload.subpath)
         val width = SharedSettings.structureRegionChunks * 16

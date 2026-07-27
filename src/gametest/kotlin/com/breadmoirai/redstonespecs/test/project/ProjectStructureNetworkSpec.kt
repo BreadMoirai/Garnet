@@ -20,6 +20,7 @@ import com.breadmoirai.redstonespecs.test.withTempRoot
 import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
 import com.breadmoirai.redstonespecs.testing.server.onServer
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
@@ -75,6 +76,30 @@ class ProjectStructureNetworkSpec : RedstoneTestSpec({
                 drainPayloads(player)
                 ProjectNetworkRegistry.handlePlaceStructure(this, player, PlaceStructureC2S("notes.txt"))
                 drainPayloads(player).filterIsInstance<ProjectErrorS2C>() shouldHaveSize 1
+                ProjectSession.clear(player.uuid)
+            }
+        }
+    }
+
+    test("save without placing this session is refused and does not touch the file") {
+        withTempRoot("struct-net-unplaced") { tmp ->
+            ProjectNewStructure.create(tmp, "unplaced")  // seed unplaced.nbt at root, never placed
+            val before = java.nio.file.Files.readAllBytes(tmp.resolve("unplaced.nbt"))
+            onServer {
+                ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp)))
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+
+                ProjectNetworkRegistry.handleSaveStructure(this, player, SaveStructureC2S("unplaced.nbt"))
+                val payloads = drainPayloads(player)
+                payloads.filterIsInstance<ProjectErrorS2C>() shouldHaveSize 1
+                payloads.filterIsInstance<StructureResultS2C>() shouldHaveSize 0
+
+                val after = java.nio.file.Files.readAllBytes(tmp.resolve("unplaced.nbt"))
+                after shouldBe before
+
+                ProjectDimRegistry.of(this).structureRegionOriginOf("unplaced.nbt").shouldBeNull()
+
                 ProjectSession.clear(player.uuid)
             }
         }
