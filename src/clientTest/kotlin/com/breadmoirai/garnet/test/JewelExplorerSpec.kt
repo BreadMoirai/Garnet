@@ -22,8 +22,6 @@ import io.kotest.matchers.shouldBe
 import org.lwjgl.glfw.GLFW
 import java.nio.file.Files
 import java.nio.file.Path
-import javax.imageio.ImageIO
-import kotlin.math.abs
 
 /**
  * Verification gate for the Jewel migration. The assertions cover what can be checked in code; the
@@ -46,24 +44,22 @@ class JewelExplorerSpec : ClientSpec({
         return p
     }
 
-    // Counts, out of a fixed sample grid over the dropdown-menu region (x 12..160, y 55..118 in the
-    // 854x480 composite, measured from jewel_explorer_dropdown.png), how many sampled pixels differ
-    // from a plain-panel background sample at (250, 300). A menu card painted over that region fills
-    // it almost entirely (measured 170/170 open vs 62/170 with the panel mounted but no menu), so this
+    // Counts, out of a fixed sample grid over the dropdown-menu region, how many sampled pixels
+    // differ from a plain-panel background sample. A menu card painted over that region fills it
+    // almost entirely (measured 170/170 open vs 62/170 with the panel mounted but no menu), so this
     // discriminates "menu rendered" from "menu absent" rather than just "capture file exists".
-    fun dropdownRegionDiffCount(png: Path): Int {
-        val img = ImageIO.read(png.toFile())
-        fun rgb(x: Int, y: Int): Triple<Int, Int, Int> {
-            val p = img.getRGB(x, y)
-            return Triple((p shr 16) and 0xFF, (p shr 8) and 0xFF, p and 0xFF)
+    // Lives in PanelPixelProbe because ProjectExplorerSpec needs the same probe to prove its own
+    // captures are menu-FREE.
+    fun dropdownRegionDiffCount(png: Path): Int = PanelPixelProbe.menuRegionDiffCount(png)
+
+    fun openRootMenu() {
+        runOnClient {
+            DockInputRouter.onGlfwMove(40.0, 34.0)
+            DockInputRouter.onGlfwPress(0)
         }
-        val (bgR, bgG, bgB) = rgb(250, 300)
-        return (58..112 step 6).sumOf { y ->
-            (16..150 step 8).count { x ->
-                val (r, g, b) = rgb(x, y)
-                abs(r - bgR) + abs(g - bgG) + abs(b - bgB) > 20
-            }
-        }
+        waitClientTicks(2)
+        runOnClient { DockInputRouter.onGlfwRelease(0) }
+        waitClientTicks(8)
     }
 
     val tree = FolderNode("myproject", listOf(
@@ -77,14 +73,14 @@ class JewelExplorerSpec : ClientSpec({
         FileNode("README.md", "md"),
     ))
 
-    fun mountExplorer() {
+    fun mountExplorer(width: Int = 320) {
         runOnClient { mc ->
             DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
             ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root = tree, currentSubpath = "adders/full-adder"))
             ExplorerTreeState.toggleExpanded("adders")
             DockState.leftPanels.add(explorerPanel())
             DockState.setVisible(DockRegion.LEFT, true)
-            DockState.setSize(DockRegion.LEFT, 320)
+            DockState.setSize(DockRegion.LEFT, width)
             ViewportState.active = true
             ComposeOverlay.enabled = true
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
@@ -183,13 +179,7 @@ class JewelExplorerSpec : ClientSpec({
         println("[jewel] dropdown probe (closed): diffCount=$closedCount/170")
 
         // Click the header dropdown anchor, just below the panel tab strip.
-        runOnClient {
-            DockInputRouter.onGlfwMove(40.0, 34.0)
-            DockInputRouter.onGlfwPress(0)
-        }
-        waitClientTicks(2)
-        runOnClient { DockInputRouter.onGlfwRelease(0) }
-        waitClientTicks(8)
+        openRootMenu()
         // Read this back: "Open Folder" and "Attach Folder (soon)" must appear INSIDE the capture.
         // The capture is the FBO RenderTarget, not a screen grab, so an OS window physically cannot
         // appear in it -- if the menu is visible here, it genuinely rendered in-scene.
@@ -203,8 +193,121 @@ class JewelExplorerSpec : ClientSpec({
         // failure mode would still leave both of those true). Require the open capture to be
         // (near-)fully covered by non-background pixels in the menu region, and the closed baseline
         // to be well below that — measured 170/170 open vs 62/170 closed on a known-good build.
-        closedCount shouldBeLessThan 120
-        openCount shouldBeGreaterThan 140
+        closedCount shouldBeLessThan PanelPixelProbe.MENU_CLOSED_MAX
+        openCount shouldBeGreaterThan PanelPixelProbe.MENU_OPEN_MIN
+        unmount()
+        ComposeSurface.disabled.shouldBeFalse()
+    }
+
+    test("an open Dropdown cannot survive the panel being unmounted and remounted") {
+        // REGRESSION (final-review Critical 1). The dock's ComposeSceneHost is a long-lived singleton
+        // and rendering STOPS the moment the dock is hidden, so before the DockState.mountEpoch fix
+        // the panel's composition was never disposed: a remounted Explorer reused the same slot, kept
+        // the Jewel Dropdown's remembered open flag, and repainted the menu over the fresh panel.
+        // In-game that is a ghost menu after hide/show with no way to dismiss it.
+        //
+        // This MUST be a pixel assertion. Every state flag (DockState, ProjectTreeState,
+        // ExplorerTreeState) is reset by unmount/remount and looks perfectly clean while the menu is
+        // still painting — the whole defect is that only the pixels remember.
+        closeClientScreen(); waitClientTicks(2)
+        mountExplorer()
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(2)
+        openRootMenu()
+        // Guard the guard: if the menu never opened, the post-remount assertion below would pass
+        // vacuously and this test would prove nothing.
+        val openCount = dropdownRegionDiffCount(capture("jewel_explorer_leak_open.png"))
+        println("[jewel] leak probe (open, before unmount): diffCount=$openCount/170")
+        openCount shouldBeGreaterThan PanelPixelProbe.MENU_OPEN_MIN
+
+        unmount()
+        mountExplorer()
+        val afterCount = dropdownRegionDiffCount(capture("jewel_explorer_leak_remount.png"))
+        println("[jewel] leak probe (after remount): diffCount=$afterCount/170")
+        afterCount shouldBeLessThan PanelPixelProbe.MENU_CLOSED_MAX
+
+        unmount()
+        ComposeSurface.disabled.shouldBeFalse()
+    }
+
+    test("an open Dropdown cannot survive the LEFT region being hidden and shown again") {
+        // The in-game path for the same defect: the keybind hides the region (it does NOT reset
+        // DockState), syncDockViewport stops the overlay, and showing it again must not bring the
+        // menu back. Exercises the setVisible(false) epoch bump specifically, which DockState.reset()
+        // would otherwise mask.
+        closeClientScreen(); waitClientTicks(2)
+        mountExplorer()
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(2)
+        openRootMenu()
+        dropdownRegionDiffCount(capture("jewel_explorer_hide_open.png")) shouldBeGreaterThan PanelPixelProbe.MENU_OPEN_MIN
+
+        runOnClient { mc ->
+            DockInputRouter.clearFocus()
+            DockState.setVisible(DockRegion.LEFT, false)
+            ComposeOverlay.enabled = false; ViewportState.active = false
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(6)
+        runOnClient { mc ->
+            DockState.setVisible(DockRegion.LEFT, true)
+            ViewportState.active = true; ComposeOverlay.enabled = true
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(16)
+
+        val afterCount = dropdownRegionDiffCount(capture("jewel_explorer_hide_reshow.png"))
+        println("[jewel] hide/reshow probe: diffCount=$afterCount/170")
+        afterCount shouldBeLessThan PanelPixelProbe.MENU_CLOSED_MAX
+
+        unmount()
+        ComposeSurface.disabled.shouldBeFalse()
+    }
+
+    test("ESC closes an open Dropdown before it drops dock focus") {
+        // Finding 6: ESC used to drop dock focus unconditionally, so it could never reach an open
+        // menu — which is what made the leaked menu undismissable. ESC must still report consumed to
+        // the mixin in BOTH branches (vanilla's pause menu must never open over the dock); that half
+        // of the contract is asserted here and in DockInputSpec.
+        closeClientScreen(); waitClientTicks(2)
+        mountExplorer()
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(2)
+        openRootMenu()
+        dropdownRegionDiffCount(capture("jewel_explorer_esc_open.png")) shouldBeGreaterThan PanelPixelProbe.MENU_OPEN_MIN
+
+        onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS, 0) } shouldBe true
+        waitClientTicks(8)
+        val afterEsc = dropdownRegionDiffCount(capture("jewel_explorer_esc_closed.png"))
+        val focusAfterEsc = onClient { DockState.focusedRegion }
+        println("[jewel] esc probe: diffCount=$afterEsc/170 focus=$focusAfterEsc")
+        afterEsc shouldBeLessThan PanelPixelProbe.MENU_CLOSED_MAX
+
+        // A second ESC (nothing left to consume it) must still drop dock focus.
+        onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS, 0) } shouldBe true
+        onClient { DockState.focusedRegion } shouldBe null
+
+        unmount()
+        ComposeSurface.disabled.shouldBeFalse()
+    }
+
+    test("the action row renders intact at the shipped DEFAULT_LEFT width") {
+        // Finding 9: the 300px layout fix was only ever exercised at 300/320px, but DEFAULT_LEFT is
+        // the width users actually get from the keybind, so that is what has to be covered.
+        //
+        // Comparing against a wide reference capture rather than probing a bounding box: at 260 (the
+        // old default) all four controls WERE on-canvas and the Discard box drew its full border —
+        // Jewel squeezed the button's inner width instead, truncating the label to "Discar". Only a
+        // pixel comparison against a width that definitely fits catches that.
+        closeClientScreen(); waitClientTicks(2)
+        mountExplorer(width = 320)
+        val reference = capture("jewel_explorer_row_ref320.png")
+        unmount()
+        mountExplorer(width = DockState.DEFAULT_LEFT)
+        val shot = capture("jewel_explorer_default_width.png")
+        val mismatch = PanelPixelProbe.actionRowMismatch(reference, shot)
+        println("[jewel] default-width(${DockState.DEFAULT_LEFT}) action-row mismatch=$mismatch px")
+        mismatch shouldBe 0
         unmount()
         ComposeSurface.disabled.shouldBeFalse()
     }
