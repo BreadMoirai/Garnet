@@ -6,10 +6,10 @@ pluginManagement {
         maven("https://maven.fabricmc.net/")
         maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
         maven("https://maven.terraformersmc.com/releases/")
-        // IntelliJ platform icon ARTWORK (com.jetbrains.intellij.platform:icons). Jewel's jewel-ui
-        // ships the AllIconsKeys catalog but no SVGs, and the artwork artifact is not published to
-        // Maven Central — only here. Jewel's own transitive icons-api/-impl DO come from Central.
-        maven("https://www.jetbrains.com/intellij-repository/releases") { name = "IntelliJ Repository" }
+        // NOTE: the IntelliJ platform icon-ARTWORK repo is deliberately NOT declared here.
+        // pluginManagement.repositories governs *plugin* resolution only; a repo declared here has
+        // no effect on project dependency resolution. The working declaration lives in
+        // build.gradle.kts's repositories { } block.
     }
 }
 

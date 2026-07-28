@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,8 +54,14 @@ private fun ProjectExplorer() {
             if (snap == null) {
                 Text("(no project loaded — Refresh)", Modifier.padding(vertical = 2.dp))
             } else {
+                // remember(snap.root): buildTreeFrom walks the WHOLE project tree recursively and
+                // allocates a fresh Tree, which LazyTree then has to re-flatten. This scope also
+                // reads ProjectTreeState.status, which changes on every S2C packet, so an
+                // un-remembered call rebuilds the entire tree on each packet. Keyed on the root so a
+                // genuinely new snapshot still rebuilds.
+                val tree = remember(snap.root) { ExplorerTreeState.buildTreeFrom(snap.root) }
                 LazyTree(
-                    tree = ExplorerTreeState.buildTreeFrom(snap.root),
+                    tree = tree,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     treeState = ExplorerTreeState.treeState,
                     onElementClick = { element -> onElementClick(element.data, ExplorerTreeState.pathOf(element)) },
@@ -72,9 +79,13 @@ private fun ProjectExplorer() {
  * Click behavior, preserved from the hand-rolled tree: a `.nbt` places its structure, a folder that
  * directly contains any `*.spec.kts` loads that folder as a project, and every other folder just
  * expands/collapses (which LazyTree already does on its own for nodes).
+ *
+ * Deliberately does **not** call `ExplorerTreeState.select(path)`: LazyTree has already written the
+ * clicked element's id into `TreeState.selectedKeys` before invoking this callback, and Jewel's
+ * TreeState is the declared single source of truth for selection. A second writer here would be a
+ * silent no-op today and a divergence the moment the two disagree (multi-select, drag-select).
  */
 private fun onElementClick(node: com.breadmoirai.garnet.project.FileTreeNode, path: String) {
-    ExplorerTreeState.select(path)
     when (node) {
         is FileNode -> if (node.extension == "nbt") ClientPlayNetworking.send(PlaceStructureC2S(path))
         is FolderNode ->
