@@ -1,7 +1,7 @@
 ---
 title: Shrink + composite + Compose overlay — how one frame is built
-tags: [compose, viewport, rendering, frame-ordering, architecture]
-summary: How WindowMixin's framebuffer shrink, MinecraftPresentMixin's composite blit, and the full-window blended Compose overlay stack into one presented frame, and why the shrink is never gated on a Compose pass.
+tags: [compose, viewport, rendering, frame-ordering, input, architecture]
+summary: How WindowMixin's framebuffer shrink, MinecraftPresentMixin's composite blit, and the full-window blended Compose overlay stack into one presented frame, why the shrink is never gated on a Compose pass, and how the raw cursor is re-mapped through the content-rect offset for vanilla screens.
 ---
 
 # Shrink + composite + Compose overlay — how one frame is built
@@ -21,8 +21,10 @@ fight each other.
    therefore renders the *game world* at the smaller effective size. `WindowMixin` does not decide
    *where* the smaller image ends up on screen; it only shrinks what gets rendered.
 2. **`MinecraftPresentMixin`** (`@WrapOperation` on `RenderTarget.blitToScreen()` inside
-   `Minecraft.renderFrame`) — composites that shrunk game texture into a centered sub-rect of a
-   full-real-size `CompositeTarget`, clears the rest to an opaque edge color, and presents the
+   `Minecraft.renderFrame`) — composites that shrunk game texture into the content sub-rect of a
+   full-real-size `CompositeTarget` at origin `(frameX, frameY)` = `(insets.left, insets.top)` (top
+   is `0` today, so the content is left-aligned/top-aligned and the reserved strips fall on the right
+   and bottom — **not** centered), clears the rest to an opaque edge color, and presents the
    composite instead of the raw shrunk texture. This is the step that turns "smaller game image" into
    "smaller game image inside reserved-edge borders at the real window size." See
    [minecraft/blaze3d-custom-blit-pipeline-26.md](../minecraft/blaze3d-custom-blit-pipeline-26.md) for
@@ -71,3 +73,25 @@ folds `DockInsets(left, right, bottom, top)` — computed from `DockState.leftWi
 independent viewport-shrink-keybind reservation. A dock resize or visibility toggle calls
 `redstonespecs$updateScaledFramebuffer(true)` explicitly (see `DockKeybinds`'s Shift+1 handler) so the
 world inset updates immediately rather than waiting for the next incidental window resize.
+
+## Cursor input maps through the shrink offset
+
+Rendering shrinks and offsets the frame, but the raw OS cursor still arrives in real-window pixels.
+A vanilla `Screen` opened while the shrink is active (the pause / Game Menu, an inventory, any GUI)
+renders into the same content sub-rect at origin `(frameX, frameY)`, so its widgets are drawn shifted
+right by `insets.left`. MC converts the raw cursor to GUI-scaled coordinates in
+`MouseHandler.getScaledXPos/getScaledYPos` as `raw * guiScaledWidth / screenWidth` — it picks up the
+shrunk `screenWidth`/`guiScaledWidth` from `WindowMixin`, but it **never subtracts the content-rect
+origin**. Uncorrected, a screen reports the cursor `frameX/scale` GUI-units too far right, so a
+button's hitbox sits at its *un-offset* on-screen position and you have to hover left of where the
+button is actually drawn to click it.
+
+`MouseHandlerViewportMixin` closes that gap: it injects the two **instance** overloads
+`getScaledXPos(Window)` / `getScaledYPos(Window)` — the ones MC feeds the absolute cursor to
+`Screen#mouseMoved/mouseClicked/mouseScrolled` — and returns `getScaledXPos(window, xpos -
+ViewportState.contentOffsetX())` (and the Y mate). It deliberately does **not** touch the static
+`getScaledXPos(Window, double)` overload, which MC also calls with movement *deltas* (drag distance,
+camera-turn accumulation) that must not be offset. When the shrink is off both offsets are `0` and
+the injections fall through, leaving vanilla coordinate mapping byte-for-byte. `contentOffsetX/Y`
+read the same `ViewportState.contentRect` the composite blit uses, so hitbox and paint stay in
+lockstep. Covered by `ViewportCursorMappingSpec` (clientTest).

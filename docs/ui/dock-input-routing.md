@@ -11,6 +11,11 @@ Raw GLFW input reaches the full-window dock `ComposeScene` through `DockInputRou
 MC's input handlers. The whole path is **active-only and OFF by default**: it does nothing until a
 region is focused, so uncaptured input stays byte-for-byte vanilla.
 
+This article covers routing into the *Compose* dock. Vanilla `Screen`s (pause menu, inventory, …)
+opened while the viewport is shrunk are a separate concern: their cursor coordinates are re-mapped
+through the content-rect offset by `MouseHandlerViewportMixin` — see
+[architecture/shrink-viewport-compose-model.md#cursor-input-maps-through-the-shrink-offset](../architecture/shrink-viewport-compose-model.md#cursor-input-maps-through-the-shrink-offset).
+
 ## The capture gate
 
 `DockInputRouter.captured` is simply `DockState.focusedRegion != null`. `focus(region)` sets the

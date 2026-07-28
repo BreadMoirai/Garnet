@@ -8,6 +8,7 @@
     "KeyboardHandlerMixin",
     "MinecraftPresentMixin",
     "MouseHandlerMixin",
+    "MouseHandlerViewportMixin",
     "ScrollWheelHandlerMixin",
     "TitleScreenMixin",
     "WindowMixin"

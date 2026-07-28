@@ -58,5 +58,16 @@ object ViewportState {
         return ContentRect(frameX, frameY, frameWidth, frameHeight)
     }
 
+    /**
+     * X origin (real framebuffer px) of the shrunk content sub-rect within the real window — the
+     * left strip the dock reserves — or `0` when the shrink is inactive. `MouseHandler`'s
+     * raw-cursor→GUI-scale conversion must subtract this so a cursor over the offset viewport maps
+     * to the right screen coordinate. Reads the cached [realWidth]/[realHeight] snapshot.
+     */
+    fun contentOffsetX(): Int = if (shouldModify()) contentRect(realWidth, realHeight).frameX else 0
+
+    /** Y origin of the shrunk content sub-rect (see [contentOffsetX]); `0` today since `top` is never reserved. */
+    fun contentOffsetY(): Int = if (shouldModify()) contentRect(realWidth, realHeight).frameY else 0
+
     data class ContentRect(val frameX: Int, val frameY: Int, val frameWidth: Int, val frameHeight: Int)
 }

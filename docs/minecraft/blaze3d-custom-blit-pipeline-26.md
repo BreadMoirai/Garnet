@@ -1,7 +1,7 @@
 ---
 title: Custom blit RenderPipeline on the 26.2 Blaze3D GPU API
 tags: [mc-api, render-state, gpu, blaze3d, versions, quirks]
-summary: How to build a RenderPipeline and record a RenderPass to blit a GpuTextureView into a sub-rect on MC 26.2, the non-obvious traps (nullable getters, per-frame vertex buffer, shared quad index buffer, lazy shader compile), the render-target Y-flip, and how to intercept the present blit to composite a centered sub-rect.
+summary: How to build a RenderPipeline and record a RenderPass to blit a GpuTextureView into a sub-rect on MC 26.2, the non-obvious traps (nullable getters, per-frame vertex buffer, shared quad index buffer, lazy shader compile), the render-target Y-flip, and how to intercept the present blit to composite into an offset sub-rect.
 ---
 
 # Custom blit RenderPipeline on the 26.2 Blaze3D GPU API
@@ -88,7 +88,8 @@ MixinExtras `@WrapOperation` on the `blitToScreen()` call:
 
 When the viewport effect is off it just forwards `original.call(mainTarget)` — byte-for-byte
 vanilla. When on it: sizes a full-*real*-size `CompositeTarget`, clears it to an opaque edge
-color, blits the (shrunk) game texture into the centered content sub-rect, then presents the
+color, blits the (shrunk) game texture into the content sub-rect (at the inset-derived origin
+`(frameX, frameY)` — left/top-aligned, not centered), then presents the
 **composite** via `original.call(composite)`. Because the composite is the real window size,
 `presentTexture` maps it 1:1 and the content lands in its sub-rect with the reserved strips
 showing the fill color. Filling the whole composite with an opaque clear first (rather than
@@ -151,7 +152,7 @@ by the new variant.
 
 The normal screenshot path (`Screenshot.grab`, Fabric's `ctx.takeScreenshot`) reads
 `mc.mainRenderTarget` — which is *upstream* of the present-time composite, so it can only ever
-show the shrunk world full-frame, never the centered composite. To get a PNG of the actual
+show the shrunk world full-frame, never the offset composite. To get a PNG of the actual
 composited output, point the same vanilla readback at the composite target:
 `CompositeTarget.captureToPng(target, path)` calls `Screenshot.takeScreenshot(target) { image
 -> image.writeToFile(path) }`. The readback callback is asynchronous (a GPU download), so the

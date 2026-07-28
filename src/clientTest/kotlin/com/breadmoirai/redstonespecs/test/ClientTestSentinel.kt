@@ -72,6 +72,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         ClientNetworkSpec::class,
                         ViewportCompositeSpec::class,
                         ViewportPickingSpec::class,
+                        ViewportCursorMappingSpec::class,
                         CursorFocusToggleSpec::class,
                         DockInsetsSpec::class,
                         DockRenderSpec::class,
