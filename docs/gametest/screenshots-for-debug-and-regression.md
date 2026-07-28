@@ -1,7 +1,7 @@
 ---
 title: Screenshots for client-test debugging and visual regression
-tags: [testing, client-gametest, screenshots, debugging, regression]
-summary: How to capture client screenshots from a Kotest spec, and the optional Fabric comparison API for visual regression.
+tags: [testing, client-gametest, screenshots, debugging, regression, pixel-probe]
+summary: How to capture client screenshots from a Kotest spec, the optional Fabric comparison API for visual regression, and pixel-probing the dock composite.
 ---
 
 # Screenshots for debugging and visual regression
@@ -81,6 +81,32 @@ The test fails and a diff image is saved alongside the original capture in `vers
 
 `TestScreenshotComparisonOptions#save()` writes the captured frame to disk **and** compares against the template. Useful for keeping a record of every comparison frame, not just the failing ones.
 
+## Pixel-probing the dock composite (`PanelPixelProbe`)
+
+Compose dock UI has a third case neither of the above covers: assertions about the *dock's* pixels,
+where the alternative is a test that only re-asserts the fixture data it just set. Those pass while
+the panel renders nothing, or while a leaked popup covers it — a real defect that shipped green.
+
+`src/clientTest/.../PanelPixelProbe.kt` samples a fixed grid inside a region of the composite capture
+(`ViewportState.compositeCaptureRequest`, **not** `takeClientScreenshot` — the composite is the
+render target the dock is blitted into, so an OS-level window physically cannot appear in it) and
+counts how many samples differ from a known flat panel-background pixel. That turns "did this
+actually paint?" into a number. Two rules make it a real gate rather than decoration:
+
+- **The probe must be discriminating.** Capture the negative case too and show the numbers separate
+  (the dropdown probe measures 170/170 open vs 62/170 closed). A probe that cannot tell the two
+  apart is testing nothing.
+- **Prefer comparing two captures over thresholding one** when the defect is a *shift* rather than a
+  presence/absence. `actionRowMismatch` compares the same row at two panel widths and expects exactly
+  0 differing pixels; that is what caught a button label truncating inside a border that still drew
+  in full — invisible to any bounding-box or "something painted here" check.
+
+**Gotcha: the capture is written asynchronously.** `MinecraftPresentMixin` hands the composite to
+`Screenshot.takeScreenshot`, which downloads the GPU buffer and writes the PNG on its own schedule.
+Polling `Files.exists` wins the race against the writer and hands `ImageIO.read` a truncated file —
+which it reports by **returning `null`**, surfacing as a baffling NPE inside the probe rather than as
+a timing failure. Poll for *decodability* (`PanelPixelProbe.awaitDecodable`), not existence.
+
 ## When to reach for which
 
 | Situation | Use |
@@ -101,4 +127,6 @@ The test fails and a diff image is saved alongside the original capture in `vers
 
 - `docs/gametest/client-test-threading.md` — pump and `onClient`/`runOnClient` mechanics.
 - `src/clientTest/.../ClientTestSupport.kt` — `takeClientScreenshot` implementation.
+- `src/clientTest/.../PanelPixelProbe.kt` — the dock-composite probes; used by `JewelExplorerSpec` and `ProjectExplorerSpec`.
+- `docs/ui/dock-framework.md` — the panel-mount-lifecycle defect these probes regression-test.
 - Fabric API source: `net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotComparisonOptions`.

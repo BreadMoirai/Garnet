@@ -83,11 +83,26 @@ descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel van
   satisfying `isTypedEvent`'s `instanceof java.awt.event.KeyEvent` check. Both paths are additive: they
   still return/report nothing that changes cancellation, so a focused text field or list can now consume
   arrow keys and typed text.
-- **ESC drops dock focus.** `DockInputRouter.onGlfwKey(key, action, mods = 0)` keeps its original ESC
-  policy first and unchanged, called from `KeyboardHandlerMixin` for every key while captured. While
-  captured, a plain key-**press** of ESC calls `clearFocus()` and returns `true` ("consumed"); the
-  mixin then cancels the callback, so vanilla ESC (pause menu) never runs on top of a dropped dock
-  focus. ESC release/repeat and all other keys (including ones now forwarded to Compose) return
+  The throwaway `java.awt.Canvas` that serves as that event's source is **`by lazy`, and must stay
+  that way**. `DockInputRouter` is an `object` and `KeyboardHandlerMixin` reads `captured` on every
+  keystroke of *ordinary, uncaptured* play, so an eager initializer would class-initialize
+  `java.awt.Component` (`Toolkit.loadLibraries()`, `AppContext.getAppContext()`) during plain
+  gameplay — the same AWT-init surface as the hang above, and the one thing that could break the
+  dock's OFF-by-default invariant. `by lazy` defers it to the first typed character while a panel
+  actually has input captured.
+- **ESC drops dock focus — but the scene gets first refusal.** `DockInputRouter.onGlfwKey(key,
+  action, mods = 0)` is called from `KeyboardHandlerMixin` for every key while captured. While
+  captured, a key-**press** of ESC is first *sent into the Compose scene*; only if the scene does
+  **not** consume it does `clearFocus()` run. Either way the function returns `true` ("consumed")
+  and the mixin cancels the callback, so vanilla ESC (pause menu) never runs on top of the dock —
+  the mixin-facing half of the contract is unchanged, and with nothing in the scene interested in
+  ESC the old behavior runs verbatim.
+  The reason for the first-refusal step: an open Jewel `Dropdown` menu *does* consume ESC, and
+  before this it could never see the key, so the only way to close a menu was to click elsewhere.
+  Combined with the panel-lifecycle defect (see [dock-framework.md](dock-framework.md)) that made a
+  leaked menu completely undismissable. `GlfwKeyMap` maps `GLFW_KEY_ESCAPE` for the release/repeat
+  cases; the press branch builds its own `Key.Escape` event because it needs the *return* value.
+  ESC release/repeat and all other keys (including ones now forwarded to Compose) return
   `false` but are still cancelled by the mixin (same as before) since the game must not see keystrokes
   while a panel is focused. When not captured, `onGlfwKey` always returns `false` and the mixin
   returns before touching `ci`, so ESC is byte-for-byte vanilla (opens the pause menu as normal). This

@@ -52,6 +52,38 @@ transparent. Seeding a panel into a region (e.g. `explorerPanel()` into `leftPan
 does not make the region visible — only `setVisible`/`toggleVisible` (driven by the Alt+1/Shift+1
 keybinds, see `dock-input-routing.md`) does that, so the dock is off-by-default even once panels exist.
 
+Default region sizes live on `DockState` (`DEFAULT_LEFT` = **280**, `DEFAULT_RIGHT`, `DEFAULT_BOTTOM`).
+`DEFAULT_LEFT` is 280 rather than a rounder 260 because the Explorer's action row needs ~268px of
+content to render intact; see the Project Explorer section below.
+
+## Panel composition must not outlive its mount
+
+**Two guards, and both are load-bearing.** The dock composes into a *long-lived singleton* scene
+(`ComposeSurface.host`), and **composition only advances during a rendered frame**. Two independent
+consequences follow, each of which was observed as a real defect (a Jewel `Dropdown` menu that stayed
+painted over the panel after the dock was hidden and shown again, with ESC unable to reach it):
+
+1. **Remounting the same panel reuses its composition.** `RegionColumn` invokes
+   `panels[active].content(...)` at a fixed slot, and a panel rebuilt by the same factory yields a
+   composable lambda with the *same source key* — so Compose reuses the group and every `remember`
+   inside the panel survives, including a `Dropdown`'s open flag and the `Popup`/`ComposeSceneLayer`
+   it attached. Guard: `DockState.mountEpoch(region)`, a per-region counter bumped on hide and on
+   `reset()`, used together with the panel id as the `key(...)` of the panel body. A remount is then
+   a genuinely new composition.
+2. **Hiding the dock stops rendering before the removal can be disposed.** `syncDockViewport` drives
+   `ComposeOverlay.enabled` off `DockState.anyActive()`, so the frame after a hide never happens: the
+   scene freezes with the panel still mounted, still focused, popup layers still attached. Guard:
+   `ComposeOverlay.enabled`'s **setter** calls `ComposeSurface.markSceneStale()`, which makes the next
+   `renderFrame` discard and rebuild the whole scene, and makes `ComposeSurface`'s input forwarders
+   refuse events in between (a stale focused widget would otherwise keep consuming keys — enough to
+   swallow the ESC that is supposed to drop dock focus). Putting it in the setter rather than at each
+   hide site is deliberate: that flag is the choke point every hide path already goes through.
+
+Neither guard subsumes the other: (1) covers a panel swap or `DockState.reset()` while the dock stays
+visible and rendering; (2) covers everything frozen by rendering stopping. Both are regression-tested
+in `JewelExplorerSpec`, and necessarily by **pixel probe** — every state flag reads clean while the
+stale menu is still painting.
+
 ## Input routing and the OFF-by-default guard
 
 The dock never steals input on its own. `DockInputRouter.captured` (`= DockState.focusedRegion !=
@@ -97,7 +129,10 @@ entirely from JetBrains Jewel components (`LazyTree`, `Dropdown`, `TextField`, `
   it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT stays
   hidden by default (Shift+1 reveals it).
 - **The tree renders via Jewel's `LazyTree`**, not a hand-written recursive composable.
-  `ExplorerTreeState.buildTreeFrom(snap.root)` builds the `Tree<FileTreeNode>` each recomposition;
+  `val tree = remember(snap.root) { ExplorerTreeState.buildTreeFrom(snap.root) }` builds the
+  `Tree<FileTreeNode>` — **`remember` it**: the enclosing scope also reads `ProjectTreeState.status`,
+  which changes on every S2C packet, so an un-remembered call rebuilds the whole project tree
+  recursively (and makes `LazyTree` re-flatten it) on each packet;
   `LazyTree(tree, treeState = ExplorerTreeState.treeState, onElementClick = { ... }) { element ->
   TreeRow(...) }` handles expand/collapse and row layout — `LazyTree` has no `selectionMode`
   parameter of its own in Jewel 0.39.1-262.9437.29 despite some Jewel docs implying otherwise;
@@ -111,8 +146,11 @@ entirely from JetBrains Jewel components (`LazyTree`, `Dropdown`, `TextField`, `
   "spec-folder" (directly contains a `FileNode` named `*.spec.kts`) iff `node.children.any { it is
   FileNode && it.name.endsWith(".spec.kts") }`; clicking a spec-folder sends
   `LoadProjectFolderC2S(path)`, other folders just expand/collapse (`LazyTree`'s own click-to-toggle
-  behavior). Clicking a file row calls `ExplorerTreeState.select(path)` — highlight only, no packet
-  sent — **except** a `.nbt` `FileNode` (`node.extension == "nbt"`), which selects **and** sends
+  behavior). Clicking a file row is highlight-only, no packet sent — and `onElementClick` deliberately
+  does **not** call `ExplorerTreeState.select(path)`: `LazyTree` has already written the clicked
+  element's id into `TreeState.selectedKeys` before invoking the callback, and Jewel's `TreeState` is
+  the declared single source of truth for selection, so a second writer here is at best redundant.
+  The exception is a `.nbt` `FileNode` (`node.extension == "nbt"`), which additionally sends
   `PlaceStructureC2S(path)` to place the standalone structure centered in its auto-assigned region.
   The Refresh `IconButton` sends `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh
   unit payload — see `ProjectPackets`). `TreeRow` prefixes a row's label with `●` when the row's
@@ -127,6 +165,15 @@ entirely from JetBrains Jewel components (`LazyTree`, `Dropdown`, `TextField`, `
   "Save"/"Discard" `OutlinedButton`s (send `SaveStructureC2S`/`DiscardStructureC2S(selectedPath)`
   when `ExplorerTreeState.selectedPath` ends with `.nbt`; Discard is additionally gated on
   `ExplorerTreeState.selectedHasUnsaved()` and dims via Jewel's own disabled-button styling).
+  **The row is width-critical and already at its floor**: slim button variants
+  (`DefaultSlimButton`/`OutlinedSlimButton`), a 48.dp name field (~6 characters), a shortened
+  "+ New" label, and fixed 4px gaps rather than a flex `Spacer` (a flex spacer cannot go negative,
+  so it does not prevent overflow). Even so it needs ~268px of panel to render intact — which is why
+  `DockState.DEFAULT_LEFT` is 280. Below that, the failure mode is **not** a control falling off the
+  canvas: Jewel squeezes the last button's inner width and its *label* truncates ("Discard" →
+  "Discar") while the button's border still draws in full. A bounding-box check does not see that, so
+  the regression test compares the action row pixel-for-pixel against a capture at a width that
+  definitely fits.
   `StructureResultS2C` for all four structure packets (place/save/new/discard) surfaces through
   `ProjectTreeState.onStructureResult` into the same status line as folder load/save results. See
   [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)

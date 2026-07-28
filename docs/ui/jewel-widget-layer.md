@@ -87,6 +87,19 @@ window — Jewel menus render in-scene with no extra plumbing. See
 [dock-dialogs.md](dock-dialogs.md) for the full writeup (including the hand-rolled `RootMenu`
 overlay this replaced) and why that used to be assumed impossible.
 
+**The lifecycle is the sharp edge, not the rendering.** A popup layer belongs to the composition
+that opened it, and the dock composes into a long-lived singleton scene that only advances during a
+rendered frame. So an open `Dropdown` menu will happily outlive the panel that created it — repainting
+over the *next* mount — unless the dock explicitly ends the composition. Two guards in the dock make
+that impossible (`DockState.mountEpoch` + `ComposeSurface.markSceneStale()`); see
+[dock-framework.md](dock-framework.md#panel-composition-must-not-outlive-its-mount). If you add
+another popup-bearing Jewel widget, you inherit those guards for free — but do not reintroduce a
+panel-content call site that bypasses the `key(...)`.
+
+Also worth knowing: Jewel's `Dropdown` **does** consume `Key.Escape` while its menu is open. That is
+why `DockInputRouter` offers ESC to the scene before dropping dock focus (see
+[dock-input-routing.md](dock-input-routing.md)) — without that step the menu is unclosable by keyboard.
+
 ## Tree state is Jewel's, not a custom model
 
 The Project Explorer's file tree is a Jewel `LazyTree` (see
