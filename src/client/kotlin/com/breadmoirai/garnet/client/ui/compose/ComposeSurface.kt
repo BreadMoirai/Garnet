@@ -106,7 +106,7 @@ object ComposeSurface {
         return try {
             org.jetbrains.skiko.Library.load()
             nativeLoaded = true
-            logger.info("[compose-spike] Skiko native loaded (skiko 0.150.1, desktop-GL)")
+            logger.info("[compose-spike] Skiko native loaded (skiko 0.144.6, desktop-GL)")
             true
         } catch (t: Throwable) {
             kill("Skiko native load failed under Knot classloader", t)

@@ -125,6 +125,10 @@ repositories {
     maven("https://maven.isxander.dev/releases") {
         name = "Xander Maven"
     }
+    // IntelliJ platform icon ARTWORK (com.jetbrains.intellij.platform:icons). Jewel's jewel-ui
+    // ships the AllIconsKeys catalog but no SVGs, and the artwork artifact is not published to
+    // Maven Central — only here. Jewel's own transitive icons-api/-impl DO come from Central.
+    maven("https://www.jetbrains.com/intellij-repository/releases") { name = "IntelliJ Repository" }
     maven {
         url = uri("https://maven.pkg.github.com/livefront/auto-emit")
         credentials {
@@ -180,17 +184,21 @@ dependencies {
     // Skiko is JetBrains' Skia binding; the `skiko-awt-runtime-<platform>` artifact bundles the
     // desktop-GL Skia native for that platform. This project's dev/runtime host is Windows-x64
     // (runClient(Test) launches via cmd.exe on Windows), MC 26.2 ships LWJGL 3.4.1 + JDK 25, and
-    // Skiko 0.150.1 is the desktop-GL build Compose Multiplatform 1.12.x targets. We take Skiko
+    // Skiko 0.144.6 is the desktop-GL build Compose Multiplatform 1.11.x targets. We take Skiko
     // directly (not the Compose Gradle plugin) so the Skia-over-Blaze3D-GL coexistence — the actual
     // spike risk — is proven without dragging in the @Composable compiler. If this platform detail
     // ever needs to be cross-platform, switch to `org.jetbrains.skiko:skiko-awt` + per-OS runtime.
-    "clientImplementation"("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.1")
+    // Re-pinned 0.150.1 -> 0.144.6: this must EXACTLY match the transitive skiko of the Compose line
+    // below, which moved to 1.11.0 to match Jewel. A mismatch risks a skiko version-guard failure or
+    // a native ABI break. See docs/ui/jewel-widget-layer.md.
+    "clientImplementation"("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.144.6")
 
     // Compose Multiplatform runtime (Step 3): a REAL ComposeScene renders to a Skia canvas, replacing
-    // the plain-Skia proof panel. We pin 1.12.0-beta02 because its transitive skiko-awt is 0.150.1 —
-    // an EXACT match for the desktop-GL natives above (a mismatch risks a skiko version-guard failure
-    // or native ABI break). Coordinates use the explicit `-desktop` variant: without the Compose Gradle
-    // plugin there are no KMP target attributes to resolve the aggregator coords to the desktop artifact.
+    // the plain-Skia proof panel. We pin 1.11.0 (stable) because Jewel 0.39.1-262.9437.29 is built
+    // against it, and its transitive skiko-awt is 0.144.6 — an EXACT match for the desktop-GL natives
+    // above (a mismatch risks a skiko version-guard failure or native ABI break). Coordinates use the
+    // explicit `-desktop` variant: without the Compose Gradle plugin there are no KMP target attributes
+    // to resolve the aggregator coords to the desktop artifact.
     // material3 is deliberately omitted (its version diverged from the Compose BOM — only 1.12.0-alpha03
     // exists, which would drag ui/foundation to alpha03 and a different skiko); the Button is built from
     // foundation's clickable + hoverable + InteractionSource, which is pure Compose interaction plumbing.
@@ -200,9 +208,21 @@ dependencies {
     // the compiler-plugin-classpath strip below removes the Compose compiler subplugin from the
     // non-client `KotlinCompile` tasks; without that strip, the project-wide Compose compiler plugin's
     // VersionChecker fails `main`/`test`/`gametest` compilation for lacking the runtime on their classpath.
-    "clientImplementation"("org.jetbrains.compose.runtime:runtime-desktop:1.12.0-beta02")
-    "clientImplementation"("org.jetbrains.compose.ui:ui-desktop:1.12.0-beta02")
-    "clientImplementation"("org.jetbrains.compose.foundation:foundation-desktop:1.12.0-beta02")
+    "clientImplementation"("org.jetbrains.compose.runtime:runtime-desktop:1.11.0")
+    "clientImplementation"("org.jetbrains.compose.ui:ui-desktop:1.11.0")
+    "clientImplementation"("org.jetbrains.compose.foundation:foundation-desktop:1.11.0")
+
+    // JetBrains Jewel — IntelliJ-look Compose widgets; the dock's widget layer. Transitively pulls
+    // jewel-ui + jewel-foundation + compose foundation-desktop:1.11.0 + skiko 0.144.6 (matching the
+    // pins above), and bundles the Int UI theme + Inter fonts.
+    "clientImplementation"("org.jetbrains.jewel:jewel-int-ui-standalone:0.39.1-262.9437.29")
+
+    // IntelliJ component icon ARTWORK. jewel-ui ships the AllIconsKeys catalog but zero SVGs, and
+    // IconKey resolves icons as classloader resource paths (there is no Painter/ImageVector seam),
+    // so without this the tree chevrons render as magenta missing-resource placeholders.
+    // Version skew is deliberate: Jewel is built against icon build 262.9437.29, but only the
+    // 262.8665.x line is published; paths are stable within the 262 branch.
+    "clientImplementation"("com.jetbrains.intellij.platform:icons:262.8665.369")
 }
 
 // Compose compiler plugin is applied project-wide (plugins {}); it only needs to run on the
