@@ -56,6 +56,21 @@ Compose subplugin and the runtime).
   — none of the Compose Multiplatform jars ship in the server jar.
 - The pluginClasspath-stripping block lives directly below the `dependencies { }`
   block in `build.gradle.kts`, immediately before the `tasks { }` block.
+- Compose is pinned to **`1.11.0` (stable)**, with skiko `0.144.6` — down from the
+  original feasibility spike's `1.12.0-beta02`/`0.150.1` pre-release pins. The move
+  happened because the jewel-widget-layer migration added JetBrains Jewel
+  (`jewel-int-ui-standalone:0.39.1-262.9437.29`) as the dock's widget library, and
+  Jewel is built against Compose `1.11.0`; the Compose runtime, the skiko native, and
+  Jewel all move as one triple, since Jewel forces the Compose version and Compose
+  forces the skiko version. See
+  [ui/jewel-widget-layer.md](../ui/jewel-widget-layer.md).
+- Jewel (`jewel-int-ui-standalone`) and the IntelliJ icon-artwork artifact
+  (`com.jetbrains.intellij.platform:icons`, needed because Jewel's own artifacts ship
+  the `AllIconsKeys` catalog but not the SVGs — see
+  [ui/jewel-widget-layer.md](../ui/jewel-widget-layer.md#icons-need-two-artifacts-and-one-of-them-isnt-on-central))
+  are also declared `clientImplementation`, following the same scoping this article
+  describes for the base Compose runtime — they compile only under `compileClientKotlin`,
+  which still carries the (unstripped) Compose subplugin.
 
 ## Caveats / fragility
 

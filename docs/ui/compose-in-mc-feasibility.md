@@ -39,7 +39,7 @@ several frames, drives pointer events into the scene, and captures composites (u
   `Surface.makeRasterN32Premul` (pure CPU — no GL) and hands back a snapshot `Image` from
   `render(nanoTime)`. Only the final one-image upload touches Minecraft's GL context. This keeps the
   whole Compose tree off Blaze3D's context and sidesteps a second GPU surface entirely.
-- **Why `ImageComposeScene` and not a raw scene factory.** In Compose 1.12 the low-level
+- **Why `ImageComposeScene` and not a raw scene factory.** In Compose Multiplatform's low-level
   `CanvasLayersComposeScene(...)` factory takes a `FrameRecomposer` + `PlatformContext` the caller must
   build and drive. `ImageComposeScene` wraps all of that — recomposer, `BroadcastFrameClock`, and
   crucially its own `GlobalSnapshotManager` registration — so the `ComposeScene`↔`GlobalSnapshotManager`
@@ -87,19 +87,22 @@ raw CPU→GPU texture upload sharing Blaze3D's context must neutralize the unpac
 
 ## Build wiring
 
-- `clientImplementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.1")` — desktop-GL Skia
+- `clientImplementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.144.6")` — desktop-GL Skia
   native (Windows-x64 pinned to the dev/runtime host; switch to `skiko-awt` + per-OS runtimes for
-  cross-platform).
+  cross-platform). **Re-pinned from the spike's original 0.150.1** when the jewel-widget-layer
+  migration moved the whole triple down to Compose 1.11.0 (stable) to match Jewel — see
+  [jewel-widget-layer.md](jewel-widget-layer.md) for why the three versions move together.
 - **Compose compiler plugin:** `kotlin("plugin.compose") version "2.3.20"` (versioned in lockstep with
   Kotlin 2.3.20) — the Kotlin compiler plugin only, **not** the `org.jetbrains.compose` Gradle plugin,
   to avoid fighting Loom/Stonecutter's source-set + run wiring.
 - **Compose runtime:** `org.jetbrains.compose.{runtime:runtime-desktop, ui:ui-desktop,
-  foundation:foundation-desktop}:1.12.0-beta02`. Pinned to 1.12.0-beta02 because its transitive
-  `skiko-awt` is **0.150.1** — an exact match for the native above (a mismatch risks a skiko
-  version-guard failure). The explicit `-desktop` coordinates are required: without the Compose Gradle
-  plugin there are no KMP target attributes to resolve the aggregator coords. `material3` is omitted (its
-  artifact version diverged from the Compose BOM — only 1.12.0-alpha03 exists, which would drag
-  ui/foundation to alpha03 and a different skiko); the button uses foundation primitives instead.
+  foundation:foundation-desktop}:1.11.0` (stable; the spike originally pinned the `1.12.0-beta02`
+  pre-release, moved down to `1.11.0` for the Jewel migration). Its transitive `skiko-awt` is
+  **0.144.6** — an exact match for the native above (a mismatch risks a skiko version-guard failure).
+  The explicit `-desktop` coordinates are required: without the Compose Gradle plugin there are no KMP
+  target attributes to resolve the aggregator coords. `material3` is omitted (its artifact version has
+  historically diverged from the Compose BOM); the dock's buttons come from foundation primitives and,
+  since the Jewel migration, from Jewel's own `DefaultButton`/`OutlinedButton` components.
 - **Repos:** `google()` (androidx transitive KMP artifacts) + the JetBrains
   `maven.pkg.jetbrains.space/public/p/compose/dev` fallback.
 - **The compiler-plugin quirk that bites first:** the Compose compiler plugin is applied project-wide,

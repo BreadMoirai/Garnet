@@ -1,7 +1,7 @@
 ---
 title: GarnetDock — full-window Compose dock over the world composite
 tags: [compose, dock, layout, panels, input, rendering]
-summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real framebuffer pixels via ComposeSceneHost, why the center is transparent by omission, and two Compose 1.12 API gotchas.
+summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real framebuffer pixels via ComposeSceneHost, why the center is transparent by omission, and two Compose API gotchas (verified against 1.11.0, formerly 1.12.0-beta02).
 ---
 
 # GarnetDock — full-window Compose dock
@@ -62,7 +62,7 @@ wired end-to-end into the Compose scene while a region is focused. Every entry p
 `ComposeSurface` is guarded — a native-load or Skia failure sets `ComposeSurface.disabled` and the
 whole dock (rendering and input) silently no-ops back to vanilla, never crashing the client.
 
-## Two Compose 1.12 API gotchas
+## Two Compose API gotchas
 
 - **`detectTapGestures` must be imported, not fully-qualified.** A fully-qualified call
   `androidx.compose.foundation.gestures.detectTapGestures(...)` fails to resolve ("Unresolved
@@ -141,7 +141,7 @@ entirely from JetBrains Jewel components (`LazyTree`, `Dropdown`, `TextField`, `
   believed unable to render inside the embedded scene — see [dock-dialogs.md](dock-dialogs.md) for
   why that premise turned out to be wrong and how the native picker is threaded.
 
-## `ImageComposeScene` input API (verified against 1.12.0-beta02)
+## `ImageComposeScene` input API (verified against 1.11.0, formerly 1.12.0-beta02)
 
 `sendPointerEvent(eventType, position, scrollDelta = Offset(...))` — the scroll delta parameter is
 named `scrollDelta`. `sendKeyEvent(KeyEvent): Boolean`. Both confirmed against the `ui-desktop` jar.
