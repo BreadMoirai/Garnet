@@ -1,6 +1,9 @@
 package com.breadmoirai.garnet.client.ide
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.breadmoirai.garnet.project.FileNode
 import com.breadmoirai.garnet.project.FileTreeNode
 import com.breadmoirai.garnet.project.FolderNode
@@ -24,7 +27,7 @@ import org.jetbrains.jewel.foundation.lazy.tree.buildTree
  */
 object ExplorerTreeState {
 
-    var treeState: TreeState = newTreeState()
+    var treeState: TreeState by mutableStateOf(newTreeState())
         private set
 
     private fun newTreeState() = TreeState(SelectableLazyListState(LazyListState()))

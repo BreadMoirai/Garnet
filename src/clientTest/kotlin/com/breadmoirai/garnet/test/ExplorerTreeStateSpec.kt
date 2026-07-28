@@ -10,6 +10,7 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
+import org.jetbrains.jewel.foundation.lazy.tree.Tree
 
 class ExplorerTreeStateSpec : ClientSpec({
 
@@ -52,6 +53,28 @@ class ExplorerTreeStateSpec : ClientSpec({
         val built = ExplorerTreeState.buildTreeFrom(tree)
         val ids = built.roots.map { it.id }
         ids shouldContainExactly listOf("adders", "dirty.nbt", "clean.nbt")
+    }
+
+    test("buildTreeFrom nests folder children with /-joined ids, matching select/toggleExpanded's format") {
+        val built = ExplorerTreeState.buildTreeFrom(tree)
+        val adders = built.roots.first { it.id == "adders" } as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        adders.open(false) // children are lazily evaluated on open, per Jewel's Tree.Element.Node
+        val addersChildren = adders.children ?: emptyList()
+        addersChildren.map { it.id } shouldContainExactly listOf("adders/full-adder")
+        val fullAdder = addersChildren.first() as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        fullAdder.open(false)
+        val fullAdderChildren = fullAdder.children ?: emptyList()
+        fullAdderChildren.map { it.id } shouldContainExactly listOf("adders/full-adder/full.spec.kts")
+    }
+
+    test("selectedHasUnsaved is false with no snapshot, and with a selection absent from the snapshot") {
+        runOnClient { ProjectTreeState.reset(); ExplorerTreeState.reset(); ExplorerTreeState.select("dirty.nbt") }
+        ExplorerTreeState.selectedHasUnsaved() shouldBe false
+        runOnClient {
+            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(tree, currentSubpath = null))
+            ExplorerTreeState.select("does/not/exist")
+        }
+        ExplorerTreeState.selectedHasUnsaved() shouldBe false
     }
 
     test("reset clears selection and expansion") {
