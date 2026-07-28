@@ -64,10 +64,25 @@ descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel van
   isAltPressed, isShiftPressed, nativeEvent)` (opt-in: `@OptIn(InternalComposeUiApi::class)` — despite
   looking like a candidate for `@ExperimentalComposeUiApi`, the factory's actual marker annotation in
   the 1.11.0 jar is `InternalComposeUiApi`). Keys with no `glfwKeyToComposeKey` mapping
-  (`GlfwKeyMap.kt`) are dropped rather than guessed at. `DockInputRouter.onGlfwChar(codePoint)`, fed by
-  the new `garnet$charTyped` injection, delivers printable text the same way with `key = Key.Unknown`.
-  Both paths are additive: they still return/report nothing that changes cancellation, so a focused
-  text field or list can now consume arrow keys and typed text.
+  (`GlfwKeyMap.kt`) are dropped rather than guessed at. Both `onGlfwKey`/ESC and arrow-key/navigation
+  traffic leave `nativeEvent` as its default `null` — nothing downstream needs it for those.
+  `DockInputRouter.onGlfwChar(codePoint)`, fed by the new `garnet$charTyped` injection, reuses the same
+  factory but *does* populate `nativeEvent`, with a real (never-shown) `java.awt.event.KeyEvent(..,
+  KEY_TYPED, .., keyChar)`: Compose desktop's typed-text recognition
+  (`TextFieldKeyInput_desktopKt.isTypedEvent` → `AwtEvents_desktopKt.getAwtEventOrNull`) only fires when
+  it can unwrap a real AWT `KeyEvent` off that field and read `getKeyChar()` — a `KeyEvent` with
+  `codePoint` set but `nativeEvent = null` reaches `Modifier.onKeyEvent` handlers fine but a
+  `BasicTextField` silently ignores it. Deliberately does **not** use the "documented fallback"
+  `KeyEvent_desktopKt.toComposeEvent(awtEvent)` conversion function to build that `nativeEvent`: that
+  function's modifier computation calls `Toolkit.getDefaultToolkit()`, which on Windows lazily starts a
+  real, non-daemon native message-pump thread that does not reliably dispose itself — this hung the
+  whole client process after test completion during verification (confirmed via `Get-Process` reporting
+  `Responding: False` for many minutes; the process had to be force-killed). The synthetic factory
+  computes modifiers from plain booleans and never touches `Toolkit`, so building the AWT event only to
+  carry as `nativeEvent` (never handing it to `toComposeEvent`) avoids that hazard while still
+  satisfying `isTypedEvent`'s `instanceof java.awt.event.KeyEvent` check. Both paths are additive: they
+  still return/report nothing that changes cancellation, so a focused text field or list can now consume
+  arrow keys and typed text.
 - **ESC drops dock focus.** `DockInputRouter.onGlfwKey(key, action, mods = 0)` keeps its original ESC
   policy first and unchanged, called from `KeyboardHandlerMixin` for every key while captured. While
   captured, a plain key-**press** of ESC calls `clearFocus()` and returns `true` ("consumed"); the

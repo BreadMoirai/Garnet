@@ -10,6 +10,8 @@ import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
 import com.breadmoirai.garnet.client.ui.compose.dock.DockState
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
+import java.awt.Canvas
+import java.awt.event.KeyEvent as AwtKeyEvent
 
 /**
  * Bridges raw GLFW input (forwarded by MouseHandlerMixin/KeyboardHandlerMixin) into the full-window
@@ -68,8 +70,16 @@ object DockInputRouter {
      * cannot leak into the game, but "not consumed" keeps that behavior exactly as it was.
      *
      * Additively, non-ESC keys are now *delivered* into the Compose scene, which is what makes tree
-     * navigation and text fields work at all. Unmapped keys ([glfwKeyToComposeKey] returns null) are
-     * dropped rather than guessed at.
+     * navigation (arrow keys, tab, etc.) work. Unmapped keys ([glfwKeyToComposeKey] returns null) are
+     * dropped rather than guessed at. This is fine for non-typed keys: nothing downstream (focus
+     * traversal, `onKeyEvent` handlers, scrollable-list navigation) needs the AWT-derived typed-char
+     * recognition that [onGlfwChar] requires — see that function's doc for why *it* can't use this
+     * same synthetic-factory path.
+     *
+     * Uses the Compose-desktop synthetic `KeyEvent(...)` factory, which is annotated
+     * `@InternalComposeUiApi`: an internal, cross-module API with no compatibility guarantee across
+     * Compose releases. If a future Compose bump breaks compilation here, that annotation is why —
+     * check the factory's signature/behavior against the new version rather than assuming it's stable.
      */
     @OptIn(InternalComposeUiApi::class)
     fun onGlfwKey(key: Int, action: Int, mods: Int = 0): Boolean {
@@ -99,14 +109,64 @@ object DockInputRouter {
     }
 
     /**
+     * A throwaway AWT `Component` to satisfy `java.awt.event.KeyEvent`'s constructor, which throws
+     * `IllegalArgumentException` on a `null` source. Never added to any UI; exists only to be a
+     * legal event source. Cached because a `Canvas` isn't free to construct and this fires per
+     * keystroke.
+     */
+    private val awtEventSource = Canvas()
+
+    /**
      * Printable text from the GLFW character callback. Control keys arrive via [onGlfwKey]; actual
      * typed characters only exist here, so a Compose text field needs both paths wired to be usable.
+     *
+     * Reuses [onGlfwKey]'s synthetic `KeyEvent(...)` factory (same `@InternalComposeUiApi` opt-in),
+     * but — unlike that function — also passes `nativeEvent`. Compose desktop's text-input pipeline
+     * (`TextFieldKeyInput_desktopKt.isTypedEvent`, via `AwtEvents_desktopKt.getAwtEventOrNull`)
+     * recognizes a "typed character" *only* by unwrapping a real `java.awt.event.KeyEvent` off that
+     * `nativeEvent` field and reading `getKeyChar()`; a `KeyEvent` built with `nativeEvent = null`
+     * (`onGlfwKey`'s case — it never needs this) reaches a widget's `Modifier.onKeyEvent` handler fine
+     * but a `BasicTextField`'s internal typed-text handling silently ignores it, since
+     * `getAwtEventOrNull` returns `null` and `isTypedEvent` short-circuits to `false`. So this
+     * constructs a real AWT `KEY_TYPED` event purely to serve as that `nativeEvent` payload.
+     *
+     * Deliberately does **not** call `KeyEvent_desktopKt.toComposeEvent(awtEvent)` (the documented
+     * AWT-conversion fallback) to get there: that function's modifier computation
+     * (`getLockingKeyStateSafe`) calls `Toolkit.getDefaultToolkit()`, which on Windows lazily spins up
+     * a real, non-daemon native "AWT-Windows" message-pump thread the very first time any code in the
+     * JVM touches `Toolkit`. That thread does not reliably dispose itself once Minecraft has otherwise
+     * finished shutting down, which hung the whole client process after test completion during manual
+     * verification of this function (confirmed via `Get-Process -Id <pid>` reporting `Responding:
+     * False` with the process still resident many minutes after the last log line, in a dev + gametest
+     * environment where nothing else in this codebase ever touches `java.awt.Toolkit`). The synthetic
+     * factory takes modifiers as plain booleans (computed by [GlfwMods], not by inspecting AWT/Toolkit
+     * lock-key state) and never calls `Toolkit`, so building the AWT event only to carry it as
+     * `nativeEvent` — never handing it to `toComposeEvent` — avoids that hazard entirely while still
+     * satisfying `isTypedEvent`'s `instanceof java.awt.event.KeyEvent` check.
+     *
+     * `KEY_TYPED` events require `keyCode == VK_UNDEFINED` (AWT contract); `keyChar` is a UTF-16
+     * `Char`, so a `codePoint` outside the BMP (a surrogate pair) truncates to its low 16 bits here —
+     * out of scope for GLFW's char callback in practice (English/Latin dock UI text), but a real
+     * limitation if this is ever asked to carry astral-plane characters.
      */
     @OptIn(InternalComposeUiApi::class)
     fun onGlfwChar(codePoint: Int) {
         if (!captured) return
+        val awtEvent = AwtKeyEvent(
+            awtEventSource,
+            AwtKeyEvent.KEY_TYPED,
+            System.currentTimeMillis(),
+            0,
+            AwtKeyEvent.VK_UNDEFINED,
+            codePoint.toChar(),
+        )
         ComposeSurface.sendKey(
-            KeyEvent(key = Key.Unknown, type = KeyEventType.KeyDown, codePoint = codePoint),
+            KeyEvent(
+                key = Key.Unknown,
+                type = KeyEventType.KeyDown,
+                codePoint = codePoint,
+                nativeEvent = awtEvent,
+            ),
         )
     }
 }

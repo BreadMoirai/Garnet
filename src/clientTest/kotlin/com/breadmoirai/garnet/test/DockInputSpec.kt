@@ -21,7 +21,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -31,6 +36,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.kotest.matchers.shouldBe
 import org.lwjgl.glfw.GLFW
@@ -212,5 +218,53 @@ class DockInputSpec : ClientSpec({
         onClient { DockState.focusedRegion } shouldBe null
         // Uncaptured: never consumed, so vanilla ESC still opens the pause menu.
         onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS, 0) } shouldBe false
+    }
+
+    test("onGlfwChar delivers typed characters into a focused Compose text field") {
+        // Regression coverage for the Task-3 review finding: onGlfwChar must land on a real
+        // BasicTextField's committed text, not merely arrive at an onKeyEvent handler. A widget-level
+        // onKeyEvent assertion (as in the test above) would NOT catch this -- Compose's own
+        // typed-character recognition (TextFieldKeyInput_desktopKt.isTypedEvent) requires unwrapping a
+        // real java.awt.event.KeyEvent off the Compose KeyEvent's nativeEvent field; a KeyEvent built
+        // without one (as onGlfwKey builds for non-typed keys) is invisible to it. See
+        // DockInputRouter.onGlfwChar's doc for how nativeEvent is populated and why.
+        closeClientScreen(); waitClientTicks(2)
+        val text = AtomicReference("")
+        val focusRequester = FocusRequester()
+
+        runOnClient { mc ->
+            DockState.reset()
+            DockState.leftPanels.add(Panel("test.textfield", "Text") {
+                var value by remember { mutableStateOf(TextFieldValue("")) }
+                BasicTextField(
+                    value = value,
+                    onValueChange = { new -> value = new; text.set(new.text) },
+                    modifier = Modifier.fillMaxSize().focusRequester(focusRequester),
+                )
+                LaunchedEffect(Unit) { focusRequester.requestFocus() }
+            })
+            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.setSize(DockRegion.LEFT, 300)
+            ViewportState.active = true
+            ComposeOverlay.enabled = true
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(8)
+
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(2)
+        runOnClient {
+            "hi".forEach { c -> DockInputRouter.onGlfwChar(c.code) }
+        }
+        waitClientTicks(6)
+
+        text.get() shouldBe "hi"
+
+        runOnClient { mc ->
+            ComposeOverlay.enabled = false; ViewportState.active = false
+            DockInputRouter.clearFocus(); DockState.reset()
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(6)
     }
 })
