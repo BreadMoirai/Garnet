@@ -77,6 +77,37 @@ object ComposeSurface {
     /** The full-window dock scene, recreated when the window size changes. */
     private var host: ComposeSceneHost? = null
 
+    /**
+     * Set when the dock stops rendering, meaning the live scene must be torn down and rebuilt before
+     * it is used again.
+     *
+     * ## Why (do not remove)
+     * The scene is a long-lived singleton but the overlay only renders while the dock is active, and
+     * **composition only advances during a render**. So when the dock is hidden, whatever was on
+     * screen at that instant is frozen *inside* the scene: removed panels are never disposed,
+     * focus stays where it was, and any `Popup`/`ComposeSceneLayer` a Jewel `Dropdown` added is still
+     * attached. Showing the dock again then repaints that stale content over the fresh panel (the
+     * "ghost menu" defect), and — more subtly — a stale focused widget keeps consuming forwarded key
+     * events, which is enough to swallow the ESC that is supposed to drop dock focus.
+     *
+     * Marking instead of closing here is deliberate: [markSceneStale] is called from wherever the
+     * overlay is switched off (a client tick, a test worker), while `ImageComposeScene.close()` must
+     * happen on the render thread. The flag is honored at the top of [renderFrame] — which is on the
+     * render thread by construction — and by [guardedInput], so a stale scene accepts no input in the
+     * window between the two.
+     */
+    @Volatile
+    private var sceneStale = false
+
+    /**
+     * Discard the live Compose scene: no state composed into it may outlive the dock being hidden.
+     * Cheap and non-blocking (see [sceneStale]); the actual teardown/rebuild happens on the next
+     * rendered frame. Safe to call from any thread and any number of times.
+     */
+    fun markSceneStale() {
+        sceneStale = true
+    }
+
     /** Width (px) of the last surface we rendered — the full window width. Read by the overlay. */
     @Volatile
     var lastWidth: Int = 0
@@ -215,6 +246,12 @@ object ComposeSurface {
     }
 
     private fun ensureHost(width: Int, height: Int): ComposeSceneHost {
+        // On the render thread: honor a pending staleness mark before anything can compose again.
+        if (sceneStale) {
+            sceneStale = false
+            host?.close()
+            host = null
+        }
         host?.let { if (it.width == width && it.height == height) return it }
         host?.close()
         val h = ComposeSceneHost(width, height) {
@@ -233,14 +270,30 @@ object ComposeSurface {
     fun sendPointerPress(pos: Offset) = guardedInput { host?.pointerPress(pos) }
     fun sendPointerRelease(pos: Offset) = guardedInput { host?.pointerRelease(pos) }
     fun sendScroll(pos: Offset, delta: Offset) = guardedInput { host?.scroll(pos, delta) }
-    fun sendKey(event: androidx.compose.ui.input.key.KeyEvent) = guardedInput { host?.sendKey(event) }
+    /**
+     * Deliver a key event to the scene and report whether the scene **consumed** it. The return value
+     * is what lets [com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter] give an open
+     * in-scene popup (a Jewel `Dropdown` menu) first refusal on ESC before dropping dock focus.
+     * Returns `false` when Compose is disabled or no scene exists, so callers fall back to their
+     * pre-Compose behavior.
+     */
+    fun sendKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean =
+        guardedInput(false) { host?.sendKey(event) ?: false }
 
     private inline fun guardedInput(block: () -> Unit) {
-        if (disabled) return
-        try {
+        guardedInput(Unit) { block() }
+    }
+
+    private inline fun <T> guardedInput(fallback: T, block: () -> T): T {
+        // A scene awaiting teardown must not receive input: its composition is frozen at whatever was
+        // on screen when the dock was hidden, so a stale focused widget would happily consume keys
+        // (including the ESC that has to drop dock focus). See [sceneStale].
+        if (disabled || sceneStale) return fallback
+        return try {
             block()
         } catch (t: Throwable) {
             kill("ComposeScene input dispatch failed", t)
+            fallback
         }
     }
 

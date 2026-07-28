@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.client.ui.compose.dock
 
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -19,8 +20,19 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
  */
 object DockState {
 
-    /** Default reserved sizes (px) when a region is first shown. */
-    const val DEFAULT_LEFT = 260
+    /**
+     * Default reserved sizes (px) when a region is first shown.
+     *
+     * [DEFAULT_LEFT] is 280, not 260, because the Explorer's action row (name field, `+ New`, `Save`,
+     * `Discard`) needs ~268px of content to render intact. At 260 every control is on-canvas and the
+     * Discard button's box draws in full, but Jewel squeezes the button's inner width and its label
+     * clips to "Discar" — a defect a "does it fit" bounds check does not catch. The row is already at
+     * its floor (slim button variants, a 48.dp name field ≈ 6 characters, fixed 4px gaps), so the
+     * default width was raised to meet the row rather than shrinking the row further. Widths below
+     * ~268 still clip the label; [MIN_EDGE] permits them, since a user dragging the splitter narrow
+     * is making that trade deliberately.
+     */
+    const val DEFAULT_LEFT = 280
     const val DEFAULT_RIGHT = 220
     const val DEFAULT_BOTTOM = 160
 
@@ -55,6 +67,34 @@ object DockState {
     /** Which region currently owns keyboard/pointer focus, or null when the game does. */
     var focusedRegion by mutableStateOf<DockRegion?>(null)
 
+    /**
+     * Per-region "mount epoch": bumped whenever a region is hidden or [reset], and used by
+     * [GarnetDock] as the `key()` of that region's panel body so the whole subtree is torn down and
+     * rebuilt from scratch on the next mount.
+     *
+     * ## Why this exists (do not remove)
+     * Panel content is invoked at a fixed slot position, and a re-mounted panel built by the same
+     * factory produces a composable lambda with the *same* source key. Compose therefore reuses the
+     * existing group and every `remember` inside the panel survives — including a Jewel `Dropdown`'s
+     * internal open flag and the `Popup` layer it added to the scene. Worse, the dock stops rendering
+     * the instant it is hidden ([com.breadmoirai.garnet.client.viewport.syncDockViewport] drives
+     * `ComposeOverlay.enabled` off `anyActive()`), so no recomposition ever runs *while* the panel is
+     * absent and the removal that would have disposed that popup never happens. Net effect: open the
+     * root menu, hide the dock, show it again, and a ghost menu paints over the fresh panel.
+     *
+     * Keying on the epoch makes "hidden then shown again" a genuinely new composition, so popup
+     * layers and per-panel widget state cannot outlive the mount that created them. It is per-region
+     * rather than global so hiding LEFT does not throw away RIGHT/BOTTOM panel state.
+     */
+    private val mountEpochs: Map<DockRegion, MutableIntState> =
+        DockRegion.entries.associateWith { mutableIntStateOf(0) }
+
+    fun mountEpoch(region: DockRegion): Int = mountEpochs.getValue(region).intValue
+
+    private fun bumpMountEpoch(region: DockRegion) {
+        mountEpochs.getValue(region).intValue++
+    }
+
     fun panelsFor(region: DockRegion): SnapshotStateList<Panel> = when (region) {
         DockRegion.LEFT -> leftPanels
         DockRegion.RIGHT -> rightPanels
@@ -70,6 +110,9 @@ object DockState {
     }
 
     fun setVisible(region: DockRegion, visible: Boolean) {
+        // Hiding a region ends its panels' mount: bump the epoch so the next show composes fresh
+        // (see [mountEpochs] for the ghost-popup failure mode this prevents).
+        if (!visible && isVisible(region)) bumpMountEpoch(region)
         when (region) {
             DockRegion.LEFT -> leftVisible = visible
             DockRegion.RIGHT -> rightVisible = visible
@@ -106,5 +149,8 @@ object DockState {
         leftPanels.clear(); rightPanels.clear(); bottomPanels.clear(); centerPanels.clear()
         leftActiveTab = 0; rightActiveTab = 0; bottomActiveTab = 0; centerActiveTab = 0
         focusedRegion = null
+        // Every region's panels are gone: force a fresh composition for whatever mounts next, so no
+        // popup/widget state from the previous mount can bleed through (see [mountEpochs]).
+        DockRegion.entries.forEach { bumpMountEpoch(it) }
     }
 }

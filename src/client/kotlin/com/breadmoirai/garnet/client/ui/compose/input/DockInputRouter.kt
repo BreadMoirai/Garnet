@@ -64,10 +64,18 @@ object DockInputRouter {
     /**
      * Key policy for the dock's key mixin, called for every key while [captured].
      *
-     * ESC keeps its original contract: a plain key-**press** of ESC drops focus and returns `true`
-     * ("consumed") so the mixin cancels vanilla handling and the pause menu never opens on top of a
-     * dropped dock focus. Every other key returns `false` — the mixin cancels it anyway so keystrokes
-     * cannot leak into the game, but "not consumed" keeps that behavior exactly as it was.
+     * ESC keeps its original contract *to the mixin*: a key-**press** of ESC while captured always
+     * returns `true` ("consumed") so the mixin cancels vanilla handling and the pause menu never
+     * opens on top of the dock. Every other key returns `false` — the mixin cancels it anyway so
+     * keystrokes cannot leak into the game, but "not consumed" keeps that behavior exactly as it was.
+     *
+     * What changed: ESC is now *offered to the scene first* and only drops dock focus if the scene
+     * did **not** consume it. Without this an in-scene popup (a Jewel `Dropdown` menu) can never be
+     * closed with ESC — focus was dropped before the key could reach it, leaving a menu painted over
+     * the panel with no keyboard way out. The mixin-facing return value is unchanged in both
+     * branches, so `DockInputSpec`'s ESC contract (consumed while captured, not consumed when
+     * uncaptured, and focus ultimately dropped once nothing else wants the key) still holds: with no
+     * popup open nothing consumes ESC and the old behavior runs verbatim.
      *
      * Additively, non-ESC keys are now *delivered* into the Compose scene, which is what makes tree
      * navigation (arrow keys, tab, etc.) work. Unmapped keys ([glfwKeyToComposeKey] returns null) are
@@ -85,7 +93,18 @@ object DockInputRouter {
     fun onGlfwKey(key: Int, action: Int, mods: Int = 0): Boolean {
         if (!captured) return false
         if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_PRESS) {
-            clearFocus()
+            val consumedByScene = ComposeSurface.sendKey(
+                KeyEvent(
+                    key = Key.Escape,
+                    type = KeyEventType.KeyDown,
+                    codePoint = 0,
+                    isCtrlPressed = GlfwMods.ctrl(mods),
+                    isMetaPressed = GlfwMods.meta(mods),
+                    isAltPressed = GlfwMods.alt(mods),
+                    isShiftPressed = GlfwMods.shift(mods),
+                ),
+            )
+            if (!consumedByScene) clearFocus()
             return true
         }
         val composeKey = glfwKeyToComposeKey(key) ?: return false
@@ -113,8 +132,17 @@ object DockInputRouter {
      * `IllegalArgumentException` on a `null` source. Never added to any UI; exists only to be a
      * legal event source. Cached because a `Canvas` isn't free to construct and this fires per
      * keystroke.
+     *
+     * **Must stay `by lazy`, not an eager initializer.** `DockInputRouter` is an `object`, and
+     * `KeyboardHandlerMixin` reads [captured] on *every* keystroke of ordinary, uncaptured play —
+     * which class-initializes this object. An eager `Canvas()` would therefore drag
+     * `java.awt.Component`'s static init (`Toolkit.loadLibraries()`) and `AppContext.getAppContext()`
+     * into normal gameplay: precisely the AWT-init surface behind the Windows non-daemon
+     * "AWT-Windows" thread hang documented on [onGlfwChar], and the one escape from the dock's
+     * OFF-by-default invariant (uncaptured input must be byte-for-byte vanilla). `by lazy` defers it
+     * to the first *typed character while the dock has captured input*, i.e. never during plain play.
      */
-    private val awtEventSource = Canvas()
+    private val awtEventSource by lazy { Canvas() }
 
     /**
      * Printable text from the GLFW character callback. Control keys arrive via [onGlfwKey]; actual

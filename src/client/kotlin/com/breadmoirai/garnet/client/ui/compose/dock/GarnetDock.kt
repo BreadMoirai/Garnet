@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -88,7 +89,15 @@ private fun RegionColumn(region: DockRegion, modifier: Modifier) {
                 }
             }
         }
-        Box(Modifier.fillMaxSize()) { panels[active].content(panels[active]) }
+        // key(): a panel body must not be able to outlive its mount. Panel content is invoked at a
+        // fixed slot, and a re-mounted panel from the same factory has the same composable source
+        // key, so without this Compose reuses the group and every `remember` inside survives — most
+        // visibly a Jewel Dropdown's open menu and its Popup layer, which then paints over the next
+        // mount. See DockState.mountEpoch for the full mechanism. Panel id is in the key too so
+        // swapping which panel occupies a tab index is likewise a fresh mount.
+        Box(Modifier.fillMaxSize()) {
+            key(DockState.mountEpoch(region), panels[active].id) { panels[active].content(panels[active]) }
+        }
     }
 }
 

@@ -19,9 +19,24 @@ object ComposeOverlay {
 
     private val logger = LoggerFactory.getLogger("Garnet")
 
-    /** Master switch for the spike overlay. OFF unless a test or the debug keybind turns it on. */
+    /**
+     * Master switch for the spike overlay. OFF unless a test or the debug keybind turns it on.
+     *
+     * Switching it **off** marks the Compose scene stale ([ComposeSurface.markSceneStale]), because
+     * composition only advances while frames are being rendered: the moment this goes false the
+     * scene freezes with whatever was mounted — panels that were then removed are never disposed,
+     * focus is never released, and an open `Dropdown`'s popup layer stays attached, to be repainted
+     * over the next mount. Doing it in the setter rather than at each call site is deliberate: this
+     * flag is the single choke point every hide path (keybind, `syncDockViewport`, tests) already
+     * goes through, so the invariant "nothing composed survives the dock being hidden" cannot be
+     * bypassed by forgetting a cleanup call.
+     */
     @Volatile
     var enabled: Boolean = false
+        set(value) {
+            if (field && !value) ComposeSurface.markSceneStale()
+            field = value
+        }
 
     private var loggedDisabled = false
 

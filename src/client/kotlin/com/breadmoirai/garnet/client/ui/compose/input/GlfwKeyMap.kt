@@ -43,6 +43,10 @@ private val KEY_TABLE: Map<Int, Key> = buildMap {
     put(GLFW.GLFW_KEY_DELETE, Key.Delete)
     put(GLFW.GLFW_KEY_INSERT, Key.Insert)
     put(GLFW.GLFW_KEY_SPACE, Key.Spacebar)
+    // ESC reaches the scene through both paths: the KeyUp/repeat cases go through this table, while
+    // [DockInputRouter.onGlfwKey]'s ESC-press branch builds its own Key.Escape event because it has
+    // to inspect the *return* value (did an open popup consume it?) before deciding to drop focus.
+    // Keep this entry: dropping it would make the down/up pair asymmetric for the scene.
     put(GLFW.GLFW_KEY_ESCAPE, Key.Escape)
 
     // Modifiers (delivered as their own key events, and widgets track them)
