@@ -14,7 +14,7 @@ indexed, how it stays fresh, and how to rebuild it.
 
 ## What is indexed
 
-One collection, **`redstonespecs-docs`**, rooted at `docs/` with the glob:
+One collection, **`garnet-docs`**, rooted at `docs/` with the glob:
 
 ```
 !(superpowers)/**/*.md
@@ -97,9 +97,9 @@ native addon is missing. Use npm.
 
 ```bash
 npm install -g @tobilu/qmd
-cd /path/to/RedstoneSpecs
+cd /path/to/garnet
 qmd init
-qmd collection add ./docs --name redstonespecs-docs
+qmd collection add ./docs --name garnet-docs
 qmd context add ./docs "<one-paragraph description of the project>"
 qmd update && qmd embed
 ```
@@ -138,5 +138,5 @@ expansion entirely.
 1. `tail .qmd/reindex.log` — every hook run appends a timestamped header, so an empty or old log
    means the hook isn't firing (see the settings-watcher note above).
 2. `qmd collection list` — check the file count and "Updated" age.
-3. `qmd ls redstonespecs-docs` — confirm the specific article is actually in the index. A file
+3. `qmd ls garnet-docs` — confirm the specific article is actually in the index. A file
    present on disk but absent here means a glob or exclude-list problem, not an embedding problem.

@@ -18,13 +18,13 @@ After this cycle, footnotes ⁴ and ⁵ in `networking.md` are retired and the m
 ## Out of scope
 
 - Wiring a recorder/runner-side producer for `OverwritePromptS2CPayload` (footnote ³ row). Still a feature change, not a gap-fill.
-- The UC-NET-03 `RUN happy-path → actual coroutine progress` behavior. Production `startRun` launches a fire-and-forget coroutine; we test the synchronous packet sends around it without waiting for the run to complete. The engine's own behavior is exercised by `RunRedstoneSpecSmokeTest` and unit tests.
+- The UC-NET-03 `RUN happy-path → actual coroutine progress` behavior. Production `startRun` launches a fire-and-forget coroutine; we test the synchronous packet sends around it without waiting for the run to complete. The engine's own behavior is exercised by `RunGarnetSpecSmokeTest` and unit tests.
 
 ## Architecture
 
 ### UC-NET-03.b/c — `tryClaimRun` test seam
 
-Production change in `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`. Add two methods on the BE:
+Production change in `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`. Add two methods on the BE:
 
 ```kotlin
 /** Atomically marks this BE as having a run in flight. Returns false if one is already in flight. */
@@ -37,7 +37,7 @@ fun releaseRunClaim(): Boolean = inFlightRuns.remove(blockPos)
 Refactor `startRun`'s opening to call `tryClaimRun()`:
 
 ```kotlin
-fun startRun(dslSpec: RedstoneSpec, serverLevel: ServerLevel): Boolean {
+fun startRun(dslSpec: GarnetSpec, serverLevel: ServerLevel): Boolean {
     if (!tryClaimRun()) {
         LOGGER.debug("[SpecBlockEntity#startRun] '{}' already running, ignoring", dslSpec.id)
         return false
@@ -58,10 +58,10 @@ No other behavior change. The two new methods are intentionally public so the ga
 
 Mirror the server-side `drainPayloads(player)` pattern for client → server packets.
 
-**New mixin** `src/client/java/com/breadmoirai/redstonespecs/mixin/client/ClientCommonPacketListenerImplAccessor.java`:
+**New mixin** `src/client/java/com/breadmoirai/garnet/mixin/client/ClientCommonPacketListenerImplAccessor.java`:
 
 ```java
-package com.breadmoirai.redstonespecs.mixin.client;
+package com.breadmoirai.garnet.mixin.client;
 
 import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
 import net.minecraft.network.Connection;
@@ -71,11 +71,11 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(ClientCommonPacketListenerImpl.class)
 public interface ClientCommonPacketListenerImplAccessor {
     @Accessor("connection")
-    Connection redstonespecs$getConnection();
+    Connection garnet$getConnection();
 }
 ```
 
-Registered in `src/client/resources/redstonespecs.client.mixins.json` under the `client[]` list.
+Registered in `src/client/resources/garnet.client.mixins.json` under the `client[]` list.
 
 **New helper** in `src/clientTest/kotlin/.../ClientNetworkTestSupport.kt`:
 
@@ -89,8 +89,8 @@ Registered in `src/client/resources/redstonespecs.client.mixins.json` under the 
  */
 fun drainClientPayloads(): List<CustomPacketPayload> = onClient { mc ->
     val listener = mc.connection ?: return@onClient emptyList()
-    val conn = (listener as ClientCommonPacketListenerImplAccessor).`redstonespecs$getConnection`()
-    val ch = (conn as ConnectionAccessor).`redstonespecs$getChannel`() as? EmbeddedChannel
+    val conn = (listener as ClientCommonPacketListenerImplAccessor).`garnet$getConnection`()
+    val ch = (conn as ConnectionAccessor).`garnet$getChannel`() as? EmbeddedChannel
         ?: return@onClient emptyList()
     val out = mutableListOf<CustomPacketPayload>()
     while (true) {
@@ -208,7 +208,7 @@ In `docs/use-cases/networking.md`:
 ## Deliverables
 
 1. **Production:** `SpecBlockEntity.tryClaimRun()` + `releaseRunClaim()` (`src/main/`).
-2. **Production (client):** `ClientCommonPacketListenerImplAccessor.java` + registration in `redstonespecs.client.mixins.json` (`src/client/`).
+2. **Production (client):** `ClientCommonPacketListenerImplAccessor.java` + registration in `garnet.client.mixins.json` (`src/client/`).
 3. **Tests (gametest):** new combined UC-NET-03.b/c test in `RecorderRunnerNetworkRegistrySpec`.
 4. **Tests (clientTest):** `drainClientPayloads()` helper in `ClientNetworkTestSupport`; two new UC-NET-04.a click tests in `ClientNetworkSpec`.
 5. **Docs:** `docs/use-cases/networking.md` matrix updated; footnotes ⁴ and ⁵ retired; `last_audited_commit` bumped.

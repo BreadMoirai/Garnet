@@ -57,7 +57,7 @@ by the composite proof: the game texture handed to the present mixin is exactly
 
 `WindowMixin` also `@Inject`s into `Window.onFramebufferResize` at the
 `WindowEventHandler.resizeGui()` invoke, calling
-`redstonespecs$updateScaledFramebuffer(false)` (no nested resize) so the
+`garnet$updateScaledFramebuffer(false)` (no nested resize) so the
 override recomputes from the fresh real framebuffer size. Without it, an OS
 window resize while the effect is active would leave a stale override (the real
 size updates but `getWidth()` keeps returning the old content size).

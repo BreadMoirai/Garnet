@@ -8,15 +8,15 @@ summary: Why 0xFFFFFF renders invisible in both GuiGraphicsExtractor.text()/fill
 
 Two color APIs in this codebase pack alpha into the top byte and silently render nothing if you
 forget it: MC's deferred-render `GuiGraphicsExtractor` (still used by the one surviving legacy widget,
-`RedstoneIconButton`) and Compose's `androidx.compose.ui.graphics.Color(Long)` constructor (used
-throughout `RedstoneDock` and every dock panel). The failure mode is identical in both — write a bare
+`GarnetIconButton`) and Compose's `androidx.compose.ui.graphics.Color(Long)` constructor (used
+throughout `GarnetDock` and every dock panel). The failure mode is identical in both — write a bare
 24-bit hex literal and you have written a **fully transparent** color — only the fix looks slightly
 different per API.
 
 ## Compose: `Color(0x1B2433)` is invisible, `Color(0xFF1B2433)` is opaque
 
 `androidx.compose.ui.graphics.Color(color: Long)` treats the `Long` as packed **ARGB** — same
-convention as MC's — and the top byte is alpha. `RedstoneDock.kt`'s palette constants show the correct
+convention as MC's — and the top byte is alpha. `GarnetDock.kt`'s palette constants show the correct
 pattern:
 
 ```kotlin
@@ -47,11 +47,11 @@ The same applies to `graphics.fill(...)`: a 24-bit RGB literal needs alpha added
 `0xFF000000.toInt() or (rgb and 0xFFFFFF)` — before it will draw. `0xFF000000` is a `Long` in Kotlin
 (it overflows `Int`); `.toInt()` truncates it to the signed `Int` bit pattern the ARGB packing wants.
 This extension point (`extractWidgetRenderState`/`extractContents` on `GuiGraphicsExtractor`) is now
-only exercised by `RedstoneIconButton` — see
+only exercised by `GarnetIconButton` — see
 [render-state-extraction-26.1.md](../minecraft/render-state-extraction-26.1.md) for the wider
 deferred-render-state rules this pitfall lives inside.
 
 ## Files
 
-- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/ui/compose/dock/RedstoneDock.kt`
-- `/mnt/h/Repo/RedstoneSpecs/src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RedstoneIconButton.kt`
+- `/mnt/h/Repo/garnet/src/client/kotlin/com/breadmoirai/garnet/client/ui/compose/dock/GarnetDock.kt`
+- `/mnt/h/Repo/garnet/src/client/kotlin/com/breadmoirai/garnet/client/screen/GarnetIconButton.kt`

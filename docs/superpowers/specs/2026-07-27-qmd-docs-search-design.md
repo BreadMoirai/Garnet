@@ -50,7 +50,7 @@ Project-local index, created at the repo root:
 
 ```sh
 qmd init                                     # creates ./.qmd/index.yml
-qmd collection add . --name redstonespecs-docs
+qmd collection add . --name garnet-docs
 ```
 
 Scoped to `docs/**/*.md` plus the root `CLAUDE.md`. Project-local (`.qmd/`) rather than
@@ -82,7 +82,7 @@ does X work", "where is Y handled", "why was Z done this way", plus any task tha
 
 Body content:
 
-1. **The query.** `qmd query "<question>" -c redstonespecs-docs -n 8 --format md`, then `Read` the
+1. **The query.** `qmd query "<question>" -c garnet-docs -n 8 --format md`, then `Read` the
    top hits and cite `file:line` from the actual file, never from the qmd excerpt.
 2. **Mode selection**, the non-obvious part:
    - `qmd search` — BM25, for exact identifiers: `SpecBlockEntity`, `DiodeBlock.FACING`, `ClientSpec`.
@@ -136,7 +136,7 @@ the remainder of the turn that wrote the doc.
 The skill alone is not enough — CLAUDE.md is what every session reads unconditionally. Its
 **"How to search for information"** section is rewritten qmd-first:
 
-1. Query the index (`qmd query ... -c redstonespecs-docs`).
+1. Query the index (`qmd query ... -c garnet-docs`).
 2. `Read` the hits it names; source code remains the source of truth, and `file:line` citations in
    articles must still be verified against current code.
 3. Only if qmd returns nothing: browse the category `INDEX.md` files, then `grep -ri` across

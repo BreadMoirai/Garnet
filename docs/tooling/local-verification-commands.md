@@ -13,7 +13,7 @@ has independent compile tasks that can fail independently.
 ## The full command
 
 ```sh
-cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.2:clientClasses :26.2:classes :26.2:gametestClasses :26.2:clientTestClasses :26.2:testClasses"
+cmd.exe /c "cd /d H:\\Repo\\garnet && gradlew.bat :26.2:clientClasses :26.2:classes :26.2:gametestClasses :26.2:clientTestClasses :26.2:testClasses"
 ```
 
 Use `*Classes` aggregate tasks rather than `compile*Kotlin` so that Java
@@ -27,11 +27,11 @@ sources, resource processing, and KSP-generated sources all run.
 loom {
     splitEnvironmentSourceSets()
     mods {
-        register("redstonespecs") {
+        register("garnet") {
             sourceSet("main")
             sourceSet("client")
         }
-        register("redstonespecs-clienttest") {
+        register("garnet-clienttest") {
             sourceSet("clientTest")
         }
     }
@@ -46,7 +46,7 @@ Fabric API's `configureTests` creates the server-side `gametest` source set;
 fabricApi {
     configureTests {
         createSourceSet = true
-        modId = "redstonespecs-gametest"
+        modId = "garnet-gametest"
         enableGameTests = true
         enableClientGameTests = false   // we own the client-test run config
         eula = true
@@ -93,7 +93,7 @@ cmd.exe /c "gradlew.bat :26.2:runClientTest"   # FabricClientGameTest harness
 ```
 
 Both `runGameTest` and `runClientTest` are Loom-managed JavaExec tasks with
-log4j JVM args set in `build.gradle.kts` to surface the `redstonespecs`
+log4j JVM args set in `build.gradle.kts` to surface the `garnet`
 logger at DEBUG. `runGameTest` comes from Fabric API's `configureTests`;
 `runClientTest` is registered via `loom.runs.register("clientTest") { ... }`
 (see below).
@@ -111,7 +111,7 @@ val clientTestSourceSet = sourceSets.create("clientTest")
 
 loom {
     mods {
-        register("redstonespecs-clienttest") {
+        register("garnet-clienttest") {
             sourceSet(clientTestSourceSet)
         }
     }

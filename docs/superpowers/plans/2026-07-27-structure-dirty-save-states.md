@@ -22,18 +22,18 @@
 ## File Structure
 
 **New files:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiff.kt` — pure blocks-only structure-tag diff.
-- `src/test/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiffTest.kt` — unit tests for the diff.
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/StructureDiff.kt` — pure blocks-only structure-tag diff.
+- `src/test/kotlin/com/breadmoirai/garnet/persistence/StructureDiffTest.kt` — unit tests for the diff.
 
 **Modified files:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt` — `FileNode.hasUnsaved`; `scanFolder` hides `.nbt.unsaved` and flags dirty `.nbt` nodes.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt` — `FileNode` codec carries `hasUnsaved`; `StructureResultS2C` gains `hasUnsaved`; new `DiscardStructureC2S`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructurePersistence.kt` — `unsavedSidecarOf`, `captureAutoFit`, `flushUnsavedSidecar`; `saveAutoFitToFile` refactored onto `captureAutoFit`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectDimRegistry.kt` — `placedStructureSubpaths()`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt` — sidecar-aware place, save deletes sidecar, `handleDiscardStructure`, `flushDirtyStructures`, `placeStructureFrom` helper, packet registration.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt` — register `BEFORE_SAVE` flush.
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt` — `selectedHasUnsaved()`.
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt` — Discard action + dirty dot.
+- `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt` — `FileNode.hasUnsaved`; `scanFolder` hides `.nbt.unsaved` and flags dirty `.nbt` nodes.
+- `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt` — `FileNode` codec carries `hasUnsaved`; `StructureResultS2C` gains `hasUnsaved`; new `DiscardStructureC2S`.
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/StructurePersistence.kt` — `unsavedSidecarOf`, `captureAutoFit`, `flushUnsavedSidecar`; `saveAutoFitToFile` refactored onto `captureAutoFit`.
+- `src/main/kotlin/com/breadmoirai/garnet/project/ProjectDimRegistry.kt` — `placedStructureSubpaths()`.
+- `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt` — sidecar-aware place, save deletes sidecar, `handleDiscardStructure`, `flushDirtyStructures`, `placeStructureFrom` helper, packet registration.
+- `src/main/kotlin/com/breadmoirai/garnet/garnet.kt` — register `BEFORE_SAVE` flush.
+- `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt` — `selectedHasUnsaved()`.
+- `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt` — Discard action + dirty dot.
 - Tests: `src/test/.../FileTreeTest.kt`, `src/test/.../network/StructurePacketsTest.kt`, `src/test/.../network/project/FileTreeCodecTest.kt`, `src/gametest/.../project/ProjectStructureNetworkSpec.kt`, `src/clientTest/.../StructureExplorerSpec.kt`.
 
 ---
@@ -41,18 +41,18 @@
 ## Task 1: Pure structure diff helper
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiff.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiffTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/persistence/StructureDiff.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/persistence/StructureDiffTest.kt`
 
 **Interfaces:**
-- Produces: `fun structuresDiffer(a: CompoundTag, b: CompoundTag): Boolean` in package `com.breadmoirai.redstonespecs.persistence` — true when the two `StructureTemplate.save()` tags differ in size or in their set of `(pos, blockStateTag, blockEntityNbt?)` block cells. Ignores `DataVersion`, palette ordering, and entities.
+- Produces: `fun structuresDiffer(a: CompoundTag, b: CompoundTag): Boolean` in package `com.breadmoirai.garnet.persistence` — true when the two `StructureTemplate.save()` tags differ in size or in their set of `(pos, blockStateTag, blockEntityNbt?)` block cells. Ignores `DataVersion`, palette ordering, and entities.
 
 Background: `StructureTemplate.save(tag)` writes `size` (int ListTag of 3), `palette` (ListTag of block-state CompoundTags), and `blocks` (ListTag of `{pos:[x,y,z] ints, state:int palette index, nbt?:CompoundTag}`). NBT tags implement structural `equals`, so comparing resolved palette CompoundTags and pos triples in a `Set` is order-independent.
 
 - [ ] **Step 1: Write the failing test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.persistence
+package com.breadmoirai.garnet.persistence
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -124,7 +124,7 @@ Expected: FAIL — `structuresDiffer` unresolved (compile error).
 - [ ] **Step 3: Write the implementation**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.persistence
+package com.breadmoirai.garnet.persistence
 
 import net.minecraft.nbt.CompoundTag
 
@@ -163,8 +163,8 @@ Expected: PASS (4 `StructureDiffTest` tests green in the XML report).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiff.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiffTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/persistence/StructureDiff.kt \
+        src/test/kotlin/com/breadmoirai/garnet/persistence/StructureDiffTest.kt
 git commit -m "feat(persistence): pure blocks-only structure diff helper"
 ```
 
@@ -173,10 +173,10 @@ git commit -m "feat(persistence): pure blocks-only structure diff helper"
 ## Task 2: FileNode dirty flag + scanFolder sidecar handling
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt` (FILE_TREE codec only)
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt` (FILE_TREE codec only)
+- Test: `src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt`
 
 **Interfaces:**
 - Consumes: nothing from prior tasks.
@@ -200,7 +200,7 @@ Add these tests inside the existing `FileTreeTest` spec body (they create files 
     }
 ```
 
-Ensure imports at the top of the test file include `com.breadmoirai.redstonespecs.project.FileNode` (if not already), `io.kotest.matchers.shouldBe`, and `kotlin.io.path.createFile` / `createTempDirectory`.
+Ensure imports at the top of the test file include `com.breadmoirai.garnet.project.FileNode` (if not already), `io.kotest.matchers.shouldBe`, and `kotlin.io.path.createFile` / `createTempDirectory`.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -273,7 +273,7 @@ Add a test in `FileTreeCodecTest` that a dirty `FileNode` survives the round-tri
     }
 ```
 
-Ensure `com.breadmoirai.redstonespecs.network.project.FILE_TREE_STREAM_CODEC` and `com.breadmoirai.redstonespecs.project.FileNode` are imported in that test file (the existing tests already reference the tree types; add what's missing).
+Ensure `com.breadmoirai.garnet.network.project.FILE_TREE_STREAM_CODEC` and `com.breadmoirai.garnet.project.FileNode` are imported in that test file (the existing tests already reference the tree types; add what's missing).
 
 - [ ] **Step 6: Run tests to verify they pass**
 
@@ -288,10 +288,10 @@ Expected: BUILD SUCCESSFUL (no other `FileNode(` call sites break — client/tes
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt \
+        src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt \
+        src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt
 git commit -m "feat(project): FileNode dirty flag; scanFolder hides .nbt.unsaved and flags dirty structures"
 ```
 
@@ -300,9 +300,9 @@ git commit -m "feat(project): FileNode dirty flag; scanFolder hides .nbt.unsaved
 ## Task 3: Packet changes — StructureResultS2C.hasUnsaved + DiscardStructureC2S
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt` (two `StructureResultS2C(` call sites, to compile)
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/network/StructurePacketsTest.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt` (two `StructureResultS2C(` call sites, to compile)
+- Test: `src/test/kotlin/com/breadmoirai/garnet/network/StructurePacketsTest.kt`
 
 **Interfaces:**
 - Consumes: nothing.
@@ -329,7 +329,7 @@ Replace the existing `StructureResultS2C codec round-trips` test body and add a 
     }
 ```
 
-Add `import com.breadmoirai.redstonespecs.network.project.DiscardStructureC2S` to the test file.
+Add `import com.breadmoirai.garnet.network.project.DiscardStructureC2S` to the test file.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -402,9 +402,9 @@ Expected: PASS — packet round-trip tests green; main compiles.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/network/StructurePacketsTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt \
+        src/test/kotlin/com/breadmoirai/garnet/network/StructurePacketsTest.kt
 git commit -m "feat(net): StructureResultS2C.hasUnsaved + DiscardStructureC2S packet"
 ```
 
@@ -413,8 +413,8 @@ git commit -m "feat(net): StructureResultS2C.hasUnsaved + DiscardStructureC2S pa
 ## Task 4: StructurePersistence — sidecar path, capture-to-tag, flush
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructurePersistence.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiffTest.kt` (add a path-helper unit test here to avoid a new file; or create `StructureSidecarTest.kt`)
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/persistence/StructurePersistence.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/persistence/StructureDiffTest.kt` (add a path-helper unit test here to avoid a new file; or create `StructureSidecarTest.kt`)
 
 **Interfaces:**
 - Consumes: `structuresDiffer` (Task 1).
@@ -431,7 +431,7 @@ Add to `StructureDiffTest.kt` (pure, no level needed):
 ```kotlin
     test("unsavedSidecarOf appends .unsaved adjacent to the file") {
         val f = java.nio.file.Path.of("/proj", "sub", "gadget.nbt")
-        val sc = com.breadmoirai.redstonespecs.persistence.StructurePersistence.unsavedSidecarOf(f)
+        val sc = com.breadmoirai.garnet.persistence.StructurePersistence.unsavedSidecarOf(f)
         sc.fileName.toString() shouldBe "gadget.nbt.unsaved"
         sc.parent shouldBe f.parent
         sc.fileName.toString().endsWith(".nbt") shouldBe false
@@ -515,7 +515,7 @@ Replace the body of `saveAutoFitToFile` to delegate:
     }
 ```
 
-Add `import com.breadmoirai.redstonespecs.persistence.structuresDiffer` is unnecessary (same package). Confirm the file already imports `Blocks`, `autoFit`, `PlacedBox`, `StructureTemplate`, `CompoundTag`, `NbtIo`, `NbtAccounter`, `Vec3i` (it does).
+Add `import com.breadmoirai.garnet.persistence.structuresDiffer` is unnecessary (same package). Confirm the file already imports `Blocks`, `autoFit`, `PlacedBox`, `StructureTemplate`, `CompoundTag`, `NbtIo`, `NbtAccounter`, `Vec3i` (it does).
 
 - [ ] **Step 4: Run unit tests + main compile**
 
@@ -525,8 +525,8 @@ Expected: PASS — `unsavedSidecarOf` test green; main compiles; existing `saveA
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructurePersistence.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/persistence/StructureDiffTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/persistence/StructurePersistence.kt \
+        src/test/kotlin/com/breadmoirai/garnet/persistence/StructureDiffTest.kt
 git commit -m "feat(persistence): sidecar path, capture-to-tag, and dirty-flush helpers"
 ```
 
@@ -535,10 +535,10 @@ git commit -m "feat(persistence): sidecar path, capture-to-tag, and dirty-flush 
 ## Task 5: Wire the server flow — place/save/discard + BEFORE_SAVE flush
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectDimRegistry.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt`
-- Test: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectStructureNetworkSpec.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/project/ProjectDimRegistry.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/garnet.kt`
+- Test: `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectStructureNetworkSpec.kt`
 
 **Interfaces:**
 - Consumes: `unsavedSidecarOf`, `flushUnsavedSidecar` (Task 4); `DiscardStructureC2S`, `StructureResultS2C.hasUnsaved` (Task 3).
@@ -560,7 +560,7 @@ Add to `ProjectStructureNetworkSpec` (after the existing test). It mirrors the e
             SharedSettings.structureRegionChunks = 1
             ProjectNewStructure.create(tmp, "widget") // empty widget.nbt at root
             val committed = tmp.resolve("widget.nbt")
-            val sidecar = com.breadmoirai.redstonespecs.persistence.StructurePersistence.unsavedSidecarOf(committed)
+            val sidecar = com.breadmoirai.garnet.persistence.StructurePersistence.unsavedSidecarOf(committed)
             onServer {
                 ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp)))
                 val player = makeMockServerPlayer(this)
@@ -610,7 +610,7 @@ Add to `ProjectStructureNetworkSpec` (after the existing test). It mirrors the e
     }
 ```
 
-Add imports to the spec: `com.breadmoirai.redstonespecs.network.project.DiscardStructureC2S`, `kotlin.io.path.exists` (already present per the existing test's imports — verify).
+Add imports to the spec: `com.breadmoirai.garnet.network.project.DiscardStructureC2S`, `kotlin.io.path.exists` (already present per the existing test's imports — verify).
 
 - [ ] **Step 2: Run the gametest to verify it fails**
 
@@ -739,11 +739,11 @@ and the receiver alongside the other structure receivers:
 
 - [ ] **Step 6: Register the BEFORE_SAVE flush**
 
-In `Redstonespecs.kt`, add inside `onInitialize` (next to the other `ServerLifecycleEvents.*` registrations):
+In `garnet.kt`, add inside `onInitialize` (next to the other `ServerLifecycleEvents.*` registrations):
 
 ```kotlin
         ServerLifecycleEvents.BEFORE_SAVE.register { server, _, _ ->
-            com.breadmoirai.redstonespecs.network.project.ProjectNetworkRegistry.flushDirtyStructures(server)
+            com.breadmoirai.garnet.network.project.ProjectNetworkRegistry.flushDirtyStructures(server)
         }
 ```
 
@@ -753,15 +753,15 @@ Run: `cmd.exe /c "gradlew.bat :26.1:classes :26.1:gametestClasses"`
 Expected: BUILD SUCCESSFUL.
 
 Run: `cmd.exe /c "gradlew.bat :26.1:runGameTest"`
-Expected: PASS — `src/gametest/` specs run via `runGameTest` (NOT `:26.1:test`). Check the Kotest report under `build/reports/redstonespecs/gametest/` (XML under `build/test-results/gametest/`) for `ProjectStructureNetworkSpec`'s new "dirty sidecar lifecycle" test green. Never use `--tests`.
+Expected: PASS — `src/gametest/` specs run via `runGameTest` (NOT `:26.1:test`). Check the Kotest report under `build/reports/garnet/gametest/` (XML under `build/test-results/gametest/`) for `ProjectStructureNetworkSpec`'s new "dirty sidecar lifecycle" test green. Never use `--tests`.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectDimRegistry.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectStructureNetworkSpec.kt
+git add src/main/kotlin/com/breadmoirai/garnet/project/ProjectDimRegistry.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt \
+        src/main/kotlin/com/breadmoirai/garnet/garnet.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectStructureNetworkSpec.kt
 git commit -m "feat(net): sidecar-aware place/save, Discard handler, BEFORE_SAVE dirty flush"
 ```
 
@@ -770,9 +770,9 @@ git commit -m "feat(net): sidecar-aware place/save, Discard handler, BEFORE_SAVE
 ## Task 6: Client — dirty status, Discard action, dirty dot
 
 **Files:**
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt`
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt`
-- Test: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/StructureExplorerSpec.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt`
+- Test: `src/clientTest/kotlin/com/breadmoirai/garnet/test/StructureExplorerSpec.kt`
 
 **Interfaces:**
 - Consumes: `StructureResultS2C.hasUnsaved`, `DiscardStructureC2S` (Task 3); `FileNode.hasUnsaved` (Task 2).
@@ -783,14 +783,14 @@ git commit -m "feat(net): sidecar-aware place/save, Discard handler, BEFORE_SAVE
 Extend `StructureExplorerSpec`. Update the existing status test's `StructureResultS2C` call for the new arity, and add dirty-state assertions:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ide.ProjectTreeState
-import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
-import com.breadmoirai.redstonespecs.project.FileNode
-import com.breadmoirai.redstonespecs.project.FolderNode
-import com.breadmoirai.redstonespecs.testing.ClientSpec
+import com.breadmoirai.garnet.client.ide.ProjectTreeState
+import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.garnet.network.project.StructureResultS2C
+import com.breadmoirai.garnet.project.FileNode
+import com.breadmoirai.garnet.project.FolderNode
+import com.breadmoirai.garnet.testing.ClientSpec
 import io.kotest.matchers.shouldBe
 
 class StructureExplorerSpec : ClientSpec({
@@ -834,8 +834,8 @@ In `ProjectTreeState.kt` add (uses `FolderNode.resolve` from the project package
     /** True when [selectedPath] resolves to a `.nbt` file flagged dirty in the current snapshot. */
     fun selectedHasUnsaved(): Boolean {
         val path = selectedPath ?: return false
-        val node = snapshot?.root?.let { com.breadmoirai.redstonespecs.project.resolve(it, path) }
-        return node is com.breadmoirai.redstonespecs.project.FileNode && node.hasUnsaved
+        val node = snapshot?.root?.let { com.breadmoirai.garnet.project.resolve(it, path) }
+        return node is com.breadmoirai.garnet.project.FileNode && node.hasUnsaved
     }
 ```
 
@@ -845,15 +845,15 @@ Note: `resolve` is an extension `FolderNode.resolve(path)`. Call it as `it.resol
     fun selectedHasUnsaved(): Boolean {
         val path = selectedPath ?: return false
         val node = snapshot?.root?.resolve(path)
-        return node is com.breadmoirai.redstonespecs.project.FileNode && node.hasUnsaved
+        return node is com.breadmoirai.garnet.project.FileNode && node.hasUnsaved
     }
 ```
 
-Add imports: `com.breadmoirai.redstonespecs.project.FileNode` and `com.breadmoirai.redstonespecs.project.resolve`.
+Add imports: `com.breadmoirai.garnet.project.FileNode` and `com.breadmoirai.garnet.project.resolve`.
 
 - [ ] **Step 4: Run the client test to verify it passes**
 
-Run: `cmd.exe /c "gradlew.bat :26.1:runClientTest"` — `src/clientTest/` specs run via `runClientTest` (NOT `:26.1:test`). Confirm `StructureExplorerSpec` green in the Kotest report under `build/reports/redstonespecs/clientTest/` (XML under `build/test-results/clientTest/`).
+Run: `cmd.exe /c "gradlew.bat :26.1:runClientTest"` — `src/clientTest/` specs run via `runClientTest` (NOT `:26.1:test`). Confirm `StructureExplorerSpec` green in the Kotest report under `build/reports/garnet/clientTest/` (XML under `build/test-results/clientTest/`).
 Expected: PASS.
 
 - [ ] **Step 5: Add the Discard action and dirty dot to the Explorer UI**
@@ -863,7 +863,7 @@ In `ProjectExplorerPanel.kt`:
 Import the discard packet at the top:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.project.DiscardStructureC2S
+import com.breadmoirai.garnet.network.project.DiscardStructureC2S
 ```
 
 In `StructureActions`, add a Discard control after the "Save Structure" box (inside the same `Row`). It sends `DiscardStructureC2S` for the selected `.nbt` and dims when the selection isn't dirty:
@@ -895,7 +895,7 @@ Expected: BUILD SUCCESSFUL.
 Run: `cmd.exe /c "gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
 Expected: BUILD SUCCESSFUL.
 
-Run each test tier via its own task and confirm green in `build/reports/redstonespecs/<sourceSet>/`:
+Run each test tier via its own task and confirm green in `build/reports/garnet/<sourceSet>/`:
 - `cmd.exe /c "gradlew.bat :26.1:test"` — unit (`src/test`)
 - `cmd.exe /c "gradlew.bat :26.1:runGameTest"` — gametest (`src/gametest`)
 - `cmd.exe /c "gradlew.bat :26.1:runClientTest"` — client (`src/clientTest`)
@@ -904,9 +904,9 @@ Expected: PASS on all three.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/StructureExplorerSpec.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/StructureExplorerSpec.kt
 git commit -m "feat(ui): Explorer dirty dot + Discard action for structures"
 ```
 

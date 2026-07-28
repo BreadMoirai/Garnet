@@ -23,7 +23,7 @@ cmd.exe /c "gradlew.bat :26.1:runClientTest"
 ## Task 1: `tryClaimRun` / `releaseRunClaim` on `SpecBlockEntity`
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`
 
 Add two public methods that expose the `inFlightRuns` slot lifecycle. `startRun` is rewritten to call `tryClaimRun()` instead of the inline `inFlightRuns.add(blockPos)`. No production behavior change.
 
@@ -37,7 +37,7 @@ Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 2: Read the current `startRun` body**
 
-Read `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt` lines 165–190. Confirm the body matches the spec's quoted snippet.
+Read `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt` lines 165–190. Confirm the body matches the spec's quoted snippet.
 
 - [ ] **Step 3: Replace `startRun` and add the new methods**
 
@@ -45,10 +45,10 @@ Find this block (lines ~167–190):
 
 ```kotlin
 /**
- * Launches [runRedstoneSpec] on the server thread using the BE's own coroutine scope.
+ * Launches [runGarnetSpec] on the server thread using the BE's own coroutine scope.
  * Returns false if a run is already in flight for this BE (debounce).
  */
-fun startRun(dslSpec: com.breadmoirai.redstonespecs.dsl.RedstoneSpec, serverLevel: ServerLevel): Boolean {
+fun startRun(dslSpec: com.breadmoirai.garnet.dsl.GarnetSpec, serverLevel: ServerLevel): Boolean {
     if (!inFlightRuns.add(blockPos)) {
         LOGGER.debug("[SpecBlockEntity#startRun] '{}' already running, ignoring", dslSpec.id)
         return false
@@ -56,7 +56,7 @@ fun startRun(dslSpec: com.breadmoirai.redstonespecs.dsl.RedstoneSpec, serverLeve
     coroutineScope.launch(McDispatchers.Server) {
         try {
             LOGGER.info("[SpecBlockEntity#startRun] launching '{}' at {}", dslSpec.id, blockPos)
-            runRedstoneSpec(serverLevel, blockPos, dslSpec)
+            runGarnetSpec(serverLevel, blockPos, dslSpec)
             LOGGER.info("[SpecBlockEntity#startRun] '{}' PASSED", dslSpec.id)
         } catch (e: AssertionError) {
             LOGGER.warn("[SpecBlockEntity#startRun] '{}' FAILED: {}", dslSpec.id, e.message)
@@ -87,10 +87,10 @@ fun tryClaimRun(): Boolean = inFlightRuns.add(blockPos)
 fun releaseRunClaim(): Boolean = inFlightRuns.remove(blockPos)
 
 /**
- * Launches [runRedstoneSpec] on the server thread using the BE's own coroutine scope.
+ * Launches [runGarnetSpec] on the server thread using the BE's own coroutine scope.
  * Returns false if a run is already in flight for this BE (debounce).
  */
-fun startRun(dslSpec: com.breadmoirai.redstonespecs.dsl.RedstoneSpec, serverLevel: ServerLevel): Boolean {
+fun startRun(dslSpec: com.breadmoirai.garnet.dsl.GarnetSpec, serverLevel: ServerLevel): Boolean {
     if (!tryClaimRun()) {
         LOGGER.debug("[SpecBlockEntity#startRun] '{}' already running, ignoring", dslSpec.id)
         return false
@@ -98,7 +98,7 @@ fun startRun(dslSpec: com.breadmoirai.redstonespecs.dsl.RedstoneSpec, serverLeve
     coroutineScope.launch(McDispatchers.Server) {
         try {
             LOGGER.info("[SpecBlockEntity#startRun] launching '{}' at {}", dslSpec.id, blockPos)
-            runRedstoneSpec(serverLevel, blockPos, dslSpec)
+            runGarnetSpec(serverLevel, blockPos, dslSpec)
             LOGGER.info("[SpecBlockEntity#startRun] '{}' PASSED", dslSpec.id)
         } catch (e: AssertionError) {
             LOGGER.warn("[SpecBlockEntity#startRun] '{}' FAILED: {}", dslSpec.id, e.message)
@@ -125,7 +125,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 5: Commit**
 
 ```
-git add src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt
+git add src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt
 git commit -m "refactor(block): extract tryClaimRun/releaseRunClaim from startRun
 
 Makes the inFlightRuns lifecycle explicitly callable so gametest specs
@@ -142,7 +142,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 2: UC-NET-03.b/c gametest
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`
 
 Add one combined test asserting both packets that `handleRunnerCommand(RUN)` emits when the slot is pre-claimed.
 
@@ -161,7 +161,7 @@ Insert this test inside the `RecorderRunnerNetworkRegistrySpec({ ... })` block, 
                 val dir = saveDir(this)
                 java.nio.file.Files.createDirectories(dir)
                 writeStub(dir, "demo")
-                val be = level.getBlockEntity(pos) as com.breadmoirai.redstonespecs.block.SpecBlockEntity
+                val be = level.getBlockEntity(pos) as com.breadmoirai.garnet.block.SpecBlockEntity
                 be.tryClaimRun()
                 drainPayloads(player)
 
@@ -186,7 +186,7 @@ Insert this test inside the `RecorderRunnerNetworkRegistrySpec({ ... })` block, 
 If `writeStub` is not already imported in this file, add the import to the existing import block (do not duplicate):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.test.managed.writeStub
+import com.breadmoirai.garnet.test.managed.writeStub
 ```
 
 Same for `saveDir` and `placeRunnerBE` if not present — verify by grepping the file. (Per memory the prior cycle dropped `writeStub` after Task 6 of the earlier plan, so it's likely absent again now.)
@@ -204,7 +204,7 @@ If the test fails with "expected 2, got 1", check whether `placeRunnerBE` config
 - [ ] **Step 3: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt
 git commit -m "test(network): UC-NET-03.b/c covered via tryClaimRun pre-claim
 
 Pre-claiming the run slot forces handleRunnerCommand to send 'Running…'
@@ -218,17 +218,17 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 3: `ClientCommonPacketListenerImplAccessor` mixin
 
 **Files:**
-- Create: `src/client/java/com/breadmoirai/redstonespecs/mixin/client/ClientCommonPacketListenerImplAccessor.java`
-- Modify: `src/client/resources/redstonespecs.client.mixins.json`
+- Create: `src/client/java/com/breadmoirai/garnet/mixin/client/ClientCommonPacketListenerImplAccessor.java`
+- Modify: `src/client/resources/garnet.client.mixins.json`
 
-Mirrors the existing `src/main/java/com/breadmoirai/redstonespecs/mixin/ServerCommonPacketListenerImplAccessor.java`.
+Mirrors the existing `src/main/java/com/breadmoirai/garnet/mixin/ServerCommonPacketListenerImplAccessor.java`.
 
 - [ ] **Step 1: Create the mixin file**
 
-Create `src/client/java/com/breadmoirai/redstonespecs/mixin/client/ClientCommonPacketListenerImplAccessor.java` with:
+Create `src/client/java/com/breadmoirai/garnet/mixin/client/ClientCommonPacketListenerImplAccessor.java` with:
 
 ```java
-package com.breadmoirai.redstonespecs.mixin.client;
+package com.breadmoirai.garnet.mixin.client;
 
 import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
 import net.minecraft.network.Connection;
@@ -238,13 +238,13 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(ClientCommonPacketListenerImpl.class)
 public interface ClientCommonPacketListenerImplAccessor {
     @Accessor("connection")
-    Connection redstonespecs$getConnection();
+    Connection garnet$getConnection();
 }
 ```
 
 - [ ] **Step 2: Register the mixin in the client config**
 
-Read `src/client/resources/redstonespecs.client.mixins.json`. The current `client[]` block is:
+Read `src/client/resources/garnet.client.mixins.json`. The current `client[]` block is:
 
 ```json
   "client": [
@@ -263,7 +263,7 @@ Replace with:
   ],
 ```
 
-(Alphabetical ordering; matches the style of `redstonespecs.mixins.json`.)
+(Alphabetical ordering; matches the style of `garnet.mixins.json`.)
 
 - [ ] **Step 3: Verify build**
 
@@ -276,8 +276,8 @@ Expected: BUILD SUCCESSFUL. The mixin must compile and pass Mixin's annotation v
 - [ ] **Step 4: Commit**
 
 ```
-git add src/client/java/com/breadmoirai/redstonespecs/mixin/client/ClientCommonPacketListenerImplAccessor.java \
-        src/client/resources/redstonespecs.client.mixins.json
+git add src/client/java/com/breadmoirai/garnet/mixin/client/ClientCommonPacketListenerImplAccessor.java \
+        src/client/resources/garnet.client.mixins.json
 git commit -m "mixin(client): add ClientCommonPacketListenerImplAccessor
 
 Exposes ClientCommonPacketListenerImpl#connection so clientTest specs
@@ -292,13 +292,13 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 4: `drainClientPayloads` helper
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt`
 
 Adds the C2S equivalent of `drainPayloads`. Uses the new mixin accessor.
 
 - [ ] **Step 1: Add the helper**
 
-Read `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt` and append after the existing `sendOverwritePrompt`:
+Read `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt` and append after the existing `sendOverwritePrompt`:
 
 ```kotlin
 /**
@@ -313,9 +313,9 @@ Read `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTest
  */
 fun drainClientPayloads(): List<net.minecraft.network.protocol.common.custom.CustomPacketPayload> = onClient { mc ->
     val listener = mc.connection ?: return@onClient emptyList()
-    val conn = (listener as com.breadmoirai.redstonespecs.mixin.client.ClientCommonPacketListenerImplAccessor)
-        .`redstonespecs$getConnection`()
-    val ch = (conn as com.breadmoirai.redstonespecs.mixin.ConnectionAccessor).`redstonespecs$getChannel`()
+    val conn = (listener as com.breadmoirai.garnet.mixin.client.ClientCommonPacketListenerImplAccessor)
+        .`garnet$getConnection`()
+    val ch = (conn as com.breadmoirai.garnet.mixin.ConnectionAccessor).`garnet$getChannel`()
         as? io.netty.channel.embedded.EmbeddedChannel
         ?: return@onClient emptyList<net.minecraft.network.protocol.common.custom.CustomPacketPayload>()
     val out = mutableListOf<net.minecraft.network.protocol.common.custom.CustomPacketPayload>()
@@ -338,7 +338,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt
 git commit -m "test(client): add drainClientPayloads helper
 
 Reads outbound C2S CustomPacketPayloads from Minecraft.getInstance().connection
@@ -355,7 +355,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 5: UC-NET-04.a click → send (Overwrite + Skip)
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt`
 
 Two tests, one per ConfirmScreen button.
 
@@ -364,7 +364,7 @@ Two tests, one per ConfirmScreen button.
 In `ClientNetworkSpec.kt`, add the following to the existing import block (merge, do not duplicate):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.OverwriteDecisionC2SPayload
+import com.breadmoirai.garnet.network.OverwriteDecisionC2SPayload
 import io.kotest.matchers.collections.shouldHaveSize
 ```
 
@@ -381,7 +381,7 @@ Inside the spec body, after the existing `"UC-NET-04.a: OverwritePromptS2C opens
         sendOverwritePrompt(OverwritePromptS2CPayload(pos, "demo"))
         waitForClientScreen(ConfirmScreen::class.java)
 
-        com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump.runOnTestThread { ctx ->
+        com.breadmoirai.garnet.testing.core.FabricTestThreadPump.runOnTestThread { ctx ->
             ctx.clickScreenButton("Overwrite")
         }
 
@@ -400,7 +400,7 @@ Inside the spec body, after the existing `"UC-NET-04.a: OverwritePromptS2C opens
         sendOverwritePrompt(OverwritePromptS2CPayload(pos, "demo"))
         waitForClientScreen(ConfirmScreen::class.java)
 
-        com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump.runOnTestThread { ctx ->
+        com.breadmoirai.garnet.testing.core.FabricTestThreadPump.runOnTestThread { ctx ->
             ctx.clickScreenButton("Skip Structure")
         }
 
@@ -426,7 +426,7 @@ Expected: `Kotest: All 6 tests passed` (was 4; +2 new tests).
 
 1. Add a one-shot diagnostic inside `drainClientPayloads` (above the cast):
    ```kotlin
-   println("CLIENT_CHANNEL_TYPE: ${conn::class.qualifiedName} -> ${(conn as com.breadmoirai.redstonespecs.mixin.ConnectionAccessor).`redstonespecs\$getChannel`()::class.qualifiedName}")
+   println("CLIENT_CHANNEL_TYPE: ${conn::class.qualifiedName} -> ${(conn as com.breadmoirai.garnet.mixin.ConnectionAccessor).`garnet\$getChannel`()::class.qualifiedName}")
    ```
 2. Re-run; observe the actual channel class.
 3. Adapt `drainClientPayloads` to read outbound from that class (likely `io.netty.channel.local.LocalChannel`: use a `ChannelOutboundHandler` mixin OR poll `LocalChannel`'s `unsafe().outboundBuffer()`).
@@ -435,7 +435,7 @@ Expected: `Kotest: All 6 tests passed` (was 4; +2 new tests).
 - [ ] **Step 4: Commit (only after Step 3 green)**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt
 git commit -m "test(client): UC-NET-04.a click->send half via drainClientPayloads
 
 Two tests: clicking Overwrite sends OverwriteDecisionC2SPayload(originPos, true);
@@ -602,4 +602,4 @@ If any step failed, fix the underlying issue with a new commit (not amending Tas
 - **`tryClaimRun` cleanup discipline (Task 2):** `inFlightRuns` is process-static. The test wraps work in `try/finally` and calls `releaseRunClaim` to keep the BE clean for subsequent tests.
 - **Channel type fallback (Task 5):** if the cast in `drainClientPayloads` returns empty, follow the fallback procedure in Task 5 Step 3.
 - **Footnote bookkeeping (Task 6):** keep footnote ³ because the producer is genuinely missing in production code. ⁴ and ⁵ become retired HTML comments alongside ⁶ for git-history continuity.
-- **No new test base classes or infrastructure.** This cycle reuses what the previous cycles built (`ClientSpec`, `FabricTestThreadPump`, `RedstoneTestSpec`, `NetworkTestSupport`).
+- **No new test base classes or infrastructure.** This cycle reuses what the previous cycles built (`ClientSpec`, `FabricTestThreadPump`, `GarnetTestSpec`, `NetworkTestSupport`).

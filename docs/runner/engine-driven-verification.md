@@ -1,10 +1,10 @@
 ---
-title: runRedstoneSpec — inline verification
+title: runGarnetSpec — inline verification
 tags: [execution, kotest, verification]
-summary: How runRedstoneSpec drives the tick loop from inside a Kotest test body and asserts via inline shouldBe callbacks in the spec lambda.
+summary: How runGarnetSpec drives the tick loop from inside a Kotest test body and asserts via inline shouldBe callbacks in the spec lambda.
 ---
 
-# runRedstoneSpec — inline verification
+# runGarnetSpec — inline verification
 
 Verification is not a separate post-run step. Assertions execute inline,
 inside the tick loop, through callbacks registered by the spec's `block`
@@ -12,7 +12,7 @@ lambda. The spec *is* the test.
 
 ## How a run starts
 
-`runRedstoneSpec(level, origin, spec)` is a suspend fun in `runner/runRedstoneSpec.kt`.
+`runGarnetSpec(level, origin, spec)` is a suspend fun in `runner/runGarnetSpec.kt`.
 It is called directly from a Kotest test body (or from the runner block's
 server coroutine). There is no coordinator singleton or per-run object —
 all state lives on the call stack.
@@ -35,7 +35,7 @@ all state lives on the call stack.
 
 ```kotlin
 test("comparator latches after 4 ticks") {
-    runRedstoneSpec(level, origin, spec)
+    runGarnetSpec(level, origin, spec)
     // throws AssertionError if the spec's output assertions failed
 }
 ```
@@ -44,7 +44,7 @@ The spec itself carries all assertions:
 
 ```kotlin
 // inside the .spec.kts file
-redstoneSpec("comparator_latch") {
+garnetSpec("comparator_latch") {
     lifespan = 6
     input(1, 1, 0) {
         at(tick = 0) { press() }
@@ -55,7 +55,7 @@ redstoneSpec("comparator_latch") {
 }
 ```
 
-`runRedstoneSpec` is the only public entry point. The test body never needs
+`runGarnetSpec` is the only public entry point. The test body never needs
 to call `assertOutputsMatch` separately — the lambda's `output { … }` blocks
 already contain all assertions.
 
@@ -66,15 +66,15 @@ was replaced by a single suspend function and a lean `SpecRun` context object.
 
 | Old                                   | New                                              |
 |---------------------------------------|--------------------------------------------------|
-| `SpecRunnerCoordinator.startRun`      | `runRedstoneSpec(level, origin, spec)`           |
-| `EngineDrivenRun.run`                 | Tick loop inside `runRedstoneSpec`               |
+| `SpecRunnerCoordinator.startRun`      | `runGarnetSpec(level, origin, spec)`           |
+| `EngineDrivenRun.run`                 | Tick loop inside `runGarnetSpec`               |
 | `SpecRunner.applyCondition`           | `InputScope` callbacks + `tryApplyAsPlayerInteraction` |
 | `assertOutputsMatch` / `OutputVerifier` | `OutputScope` callbacks inline in the tick loop  |
 | `RecordingFinalizer`                  | `RecordingDslEmitter` (emit stage, not run stage)|
 
 ## strict mode
 
-If `RedstoneSpec.strict = true`, `runRedstoneSpec` additionally scans the
+If `GarnetSpec.strict = true`, `runGarnetSpec` additionally scans the
 replay recording for change-ticks at declared output positions that were
 **not** declared in the spec. Each unexpected change adds a `SpecFailure`
 entry. This replaces the old "unexpected change detection" that

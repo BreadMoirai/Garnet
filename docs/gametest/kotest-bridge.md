@@ -4,7 +4,7 @@ tags: [testing, kotest, coroutines, gametest, client-gametest]
 summary: How specs work in src/gametest, src/clientTest, src/test — the awaitTicks / spawnStructure cookbook plus invariants you must respect.
 ---
 
-The same base class is used by shipped `.spec.kts` files at runtime — see `docs/superpowers/specs/2026-05-07-redstonespec-kotest-bridge-design.md`.
+The same base class is used by shipped `.spec.kts` files at runtime — see `docs/superpowers/specs/2026-05-07-garnet-kotest-bridge-design.md`.
 
 # Kotest + coroutine test bridge
 
@@ -18,17 +18,17 @@ All three test source sets (`src/test/`, `src/gametest/`, `src/clientTest/`) run
 | `src/gametest/` | `GametestSentinel` — single `@GameTest` method that spawns a worker | `./gradlew :26.2:runGameTest` |
 | `src/clientTest/` | `ClientTestSentinel` — `FabricClientGameTest.runTest` (already on a worker thread) | `./gradlew :26.2:runClientTest` |
 
-All three produce Kotest's built-in HTML report under `build/reports/redstonespecs/<sourceSet>/` and JUnit XML under `build/test-results/<sourceSet>/`.
+All three produce Kotest's built-in HTML report under `build/reports/garnet/<sourceSet>/` and JUnit XML under `build/test-results/<sourceSet>/`.
 
 ## Base class
 
 ```kotlin
-abstract class RedstoneTestSpec(body: RedstoneTestSpec.() -> Unit = {}) : FunSpec()
+abstract class GarnetTestSpec(body: GarnetTestSpec.() -> Unit = {}) : FunSpec()
 ```
 
-Extends Kotest's `FunSpec`. Uses `CoroutineDispatcherFactory` to wrap every test body and lifecycle hook in `withContext(McDispatchers.Server)`. Inside a `RedstoneTestSpec`, you are always on the server thread — direct access to world state, block entities, and levels is safe without an `onServer { }` wrapper.
+Extends Kotest's `FunSpec`. Uses `CoroutineDispatcherFactory` to wrap every test body and lifecycle hook in `withContext(McDispatchers.Server)`. Inside a `GarnetTestSpec`, you are always on the server thread — direct access to world state, block entities, and levels is safe without an `onServer { }` wrapper.
 
-`RedstoneTestSpec` is also used by shipped `.spec.kts` scripts at runtime (outside the gametest harness). The same base class is registered at both test-time (via the Kotest JUnit Platform engine or the sentinel-based gametest paths) and script-runtime, so specs written for the editor run unchanged as game-test specs.
+`GarnetTestSpec` is also used by shipped `.spec.kts` scripts at runtime (outside the gametest harness). The same base class is registered at both test-time (via the Kotest JUnit Platform engine or the sentinel-based gametest paths) and script-runtime, so specs written for the editor run unchanged as game-test specs.
 
 ## Primitives
 
@@ -43,11 +43,11 @@ suspend fun awaitTickEnd(): MinecraftServer
 suspend fun awaitTickWhere(predicate: (MinecraftServer) -> Boolean): MinecraftServer
 
 // Hop to the server thread, run block, return result.
-// Inside RedstoneTestSpec this is a no-op — the dispatcher already short-circuits.
+// Inside GarnetTestSpec this is a no-op — the dispatcher already short-circuits.
 suspend fun <T> onServer(block: suspend MinecraftServer.() -> T): T
 ```
 
-`onServer { }` is primarily useful in raw `FunSpec` subclasses (e.g., `src/test/` specs that bootstrap MC registries) or in helper functions that may be called from either context. Inside `RedstoneTestSpec` it is redundant — the `CoroutineDispatcherFactory` already ensures server-thread dispatch, and the dispatcher short-circuits when `isSameThread` is true, so there is no overhead from leaving `onServer { }` calls in place.
+`onServer { }` is primarily useful in raw `FunSpec` subclasses (e.g., `src/test/` specs that bootstrap MC registries) or in helper functions that may be called from either context. Inside `GarnetTestSpec` it is redundant — the `CoroutineDispatcherFactory` already ensures server-thread dispatch, and the dispatcher short-circuits when `isSameThread` is true, so there is no overhead from leaving `onServer { }` calls in place.
 
 ### Same-tick guarantee
 
@@ -84,9 +84,9 @@ Not `data/<namespace>/structures/`. The Fabric Gametest API's `StructureManager`
 ## Cookbook example
 
 ```kotlin
-class ComparatorSpec : RedstoneTestSpec({
+class ComparatorSpec : GarnetTestSpec({
     test("comparator latches after 4 ticks") {
-        val s = spawnStructure(Identifier.fromNamespaceAndPath("redstonespecs", "comparator_basic"))
+        val s = spawnStructure(Identifier.fromNamespaceAndPath("garnet", "comparator_basic"))
         try {
             // server-thread direct access — no onServer { } wrapper needed
             McDispatchers.currentServer.overworld().setBlock(
@@ -115,12 +115,12 @@ Use `spawnStructure` per test for isolation. With sequential mode (the default: 
 
 ## Spec style
 
-The project standard is Kotest's `FunSpec`. `RedstoneTestSpec` extends `FunSpec`; unit tests in `src/test/` extend `FunSpec` directly. Use `context("group") { test("case") { ... } }` nesting when a logical group of cases shares setup or wants to be documented together. Other Kotest styles (`DescribeSpec`, `BehaviorSpec`, `StringSpec`) are not used to keep specs uniform across the codebase.
+The project standard is Kotest's `FunSpec`. `GarnetTestSpec` extends `FunSpec`; unit tests in `src/test/` extend `FunSpec` directly. Use `context("group") { test("case") { ... } }` nesting when a logical group of cases shares setup or wants to be documented together. Other Kotest styles (`DescribeSpec`, `BehaviorSpec`, `StringSpec`) are not used to keep specs uniform across the codebase.
 
 ## Reports
 
 ```
-build/reports/redstonespecs/
+build/reports/garnet/
 ├── test/        — Kotest HTML
 ├── gametest/    — Kotest HTML
 └── clientTest/  — Kotest HTML

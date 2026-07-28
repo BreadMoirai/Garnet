@@ -4,7 +4,7 @@
 
 **Goal:** Prove, on MC 26.2, that we can render the live game world into a central sub-rect while our MC-GUI panel layer draws in the reserved edges at full window size — using a **clean-room** custom blit shader (no Flashback code).
 
-**Architecture:** A client `ViewportState` publishes a hard-coded content rect. A `WindowMixin` overrides the window's reported framebuffer/gui dimensions so MC renders the world+HUD at content-rect *size*. A `MinecraftMixin` wraps the final present-blit, compositing the (shrunk) game texture into a full-size target at the frame offset via **our own** `RenderPipeline` (`redstonespecs:blit_uv`, GLSL authored in-repo). Mouse picking is remapped and the cursor is grabbed/released on a keybind.
+**Architecture:** A client `ViewportState` publishes a hard-coded content rect. A `WindowMixin` overrides the window's reported framebuffer/gui dimensions so MC renders the world+HUD at content-rect *size*. A `MinecraftMixin` wraps the final present-blit, compositing the (shrunk) game texture into a full-size target at the frame offset via **our own** `RenderPipeline` (`garnet:blit_uv`, GLSL authored in-repo). Mouse picking is remapped and the cursor is grabbed/released on a keybind.
 
 **Tech Stack:** Kotlin (state/registration) + Java mixins (`src/client/java/.../mixin/client`), MC 26.2 Blaze3D GPU API (`RenderPipeline`, `GpuSurface`/`CommandEncoder`/`GpuTextureView`, `RenderPass`, `TextureTarget`), Fabric key-mapping-api, Gradle via `cmd.exe /c "gradlew.bat …"`.
 
@@ -12,9 +12,9 @@
 
 - **Clean-room:** Flashback (`../Flashback`) is licensed "All rights reserved, do not redistribute." Study it for *technique/approach only*. **Copy no code, no shader source, no asset.** Every line here is ours. The `WindowMixin` overrides public MC API (a generic technique) — acceptable; the shader GLSL and pipeline must be original.
 - **Single MC version:** Stonecutter has one node (`:26.1:` task prefix, `minecraft_version=26.2`). No version-gating needed now; if a second node is added later, the mixins/pipeline become backport candidates.
-- **Mixins:** Java, `package com.breadmoirai.redstonespecs.mixin.client`, registered in `src/client/resources/redstonespecs.client.mixins.json`, `compatibilityLevel JAVA_25`, `abstract` + package-private, `@Unique` fields prefixed `redstonespecs$`.
+- **Mixins:** Java, `package com.breadmoirai.garnet.mixin.client`, registered in `src/client/resources/garnet.client.mixins.json`, `compatibilityLevel JAVA_25`, `abstract` + package-private, `@Unique` fields prefixed `garnet$`.
 - **Do not regress existing behavior.** The viewport effect is OFF unless toggled by the spike keybind; when off, every `WindowMixin`/`MinecraftMixin` inject must early-return so vanilla behavior is byte-for-byte unchanged.
-- **Build (5 source sets):** `cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`.
+- **Build (5 source sets):** `cmd.exe /c "cd /d H:\\Repo\\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`.
 - **Runtime verify:** `cmd.exe /c "gradlew.bat :26.1:runClientTest"` — client game tests can drive input and capture screenshots (see `docs/gametest/` client-test helpers, `ClientSpec`). New client specs must be registered in `ClientTestSentinel`. A manual `runClient` pass is an acceptable fallback for visual confirmation.
 - Reference (read, don't copy): Flashback `mixin/MixinWindow.java`, `mixin/MixinMinecraft.java` (`renderFrame` `@WrapOperation` on `GpuSurface.blitFromTexture`), `FramebufferUtils.java`, `editor/ui/ReplayUI.java` (`transitionActiveState`, `getMouseViewportFraction`).
 
@@ -29,9 +29,9 @@ MC's default present **stretches** the game texture to fill the surface, so shri
 **Goal:** Draw an arbitrary `GpuTextureView` into an arbitrary sub-rect of a `RenderTarget`, using our own pipeline. Prove it in isolation before any Window shrink.
 
 **Files:**
-- Create: `src/client/resources/assets/redstonespecs/shaders/core/blit_uv.vsh` / `.fsh` (original GLSL: position + UV attributes, samples `InSampler`, no post-processing).
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/viewport/BlitUvPipeline.kt` — builds a `RenderPipeline` via `RenderPipeline.builder(...)` referencing our shaders + `DefaultVertexFormat.POSITION_TEX`; a `blit(from: GpuTextureView, to: RenderTarget, x1,y1,x2,y2: Float)` that records a `RenderPass` drawing a quad (NDC from normalized rect) sampling `from`.
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/viewport/CompositeTarget.kt` — `resizeOrCreate(RenderTarget?, w, h): TextureTarget` + `clearTransparent(RenderTarget)` (our own, modeled on the MC API not on Flashback).
+- Create: `src/client/resources/assets/garnet/shaders/core/blit_uv.vsh` / `.fsh` (original GLSL: position + UV attributes, samples `InSampler`, no post-processing).
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/viewport/BlitUvPipeline.kt` — builds a `RenderPipeline` via `RenderPipeline.builder(...)` referencing our shaders + `DefaultVertexFormat.POSITION_TEX`; a `blit(from: GpuTextureView, to: RenderTarget, x1,y1,x2,y2: Float)` that records a `RenderPass` drawing a quad (NDC from normalized rect) sampling `from`.
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/viewport/CompositeTarget.kt` — `resizeOrCreate(RenderTarget?, w, h): TextureTarget` + `clearTransparent(RenderTarget)` (our own, modeled on the MC API not on Flashback).
 
 **Interfaces:**
 - Produces: `BlitUvPipeline.blit(from, to, x1, y1, x2, y2)`; `CompositeTarget.resizeOrCreate(...)`, `CompositeTarget.clearTransparent(...)`.
@@ -45,15 +45,15 @@ MC's default present **stretches** the game texture to fill the surface, so shri
 ### Task 2: `ViewportState` + `WindowMixin` (shrink the game render)
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/viewport/ViewportState.kt` — `var active`, hard-coded insets (e.g. left=260, bottom=160), `contentRect(realW, realH)` → `frameX/frameY/frameWidth/frameHeight`, `realWidth/realHeight` (cached from the un-overridden window at resize), `shouldModify()`.
-- Create: `src/client/java/com/breadmoirai/redstonespecs/mixin/client/WindowMixin.java` — `@Shadow` `framebufferWidth/Height`, `width/height`, `guiScale/guiScaledWidth/guiScaledHeight`, `eventHandler`; `@Unique` override dims + `redstonespecs$updateScaledFramebuffer(bool)`; `@Inject(HEAD, cancellable)` into `getWidth/getHeight/getScreenWidth/getScreenHeight/calculateScale/setGuiScale` returning content-rect values when `shouldModify()`.
-- Modify: `src/client/resources/redstonespecs.client.mixins.json` (add `WindowMixin`).
-- Modify: `RedstonespecsClient.kt` (register a `ViewportState` keybind toggle via `ClientTickEvents`, calling `updateScaledFramebuffer(true)` on change).
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/viewport/ViewportState.kt` — `var active`, hard-coded insets (e.g. left=260, bottom=160), `contentRect(realW, realH)` → `frameX/frameY/frameWidth/frameHeight`, `realWidth/realHeight` (cached from the un-overridden window at resize), `shouldModify()`.
+- Create: `src/client/java/com/breadmoirai/garnet/mixin/client/WindowMixin.java` — `@Shadow` `framebufferWidth/Height`, `width/height`, `guiScale/guiScaledWidth/guiScaledHeight`, `eventHandler`; `@Unique` override dims + `garnet$updateScaledFramebuffer(bool)`; `@Inject(HEAD, cancellable)` into `getWidth/getHeight/getScreenWidth/getScreenHeight/calculateScale/setGuiScale` returning content-rect values when `shouldModify()`.
+- Modify: `src/client/resources/garnet.client.mixins.json` (add `WindowMixin`).
+- Modify: `GarnetClient.kt` (register a `ViewportState` keybind toggle via `ClientTickEvents`, calling `updateScaledFramebuffer(true)` on change).
 
 **Decision baked in:** For the spike, override `setGuiScale`/`guiScaled*` too (full shrink, like the reference). The MC-GUI-panel-in-reserved-edges coexistence is resolved in Task 3 by drawing panels into the *composite* pass at real size.
 
 - [ ] **Step 1:** Implement `ViewportState`. Capture `realWidth/Height` in `updateScaledFramebuffer` from the shadowed `framebufferWidth/Height` *before* overriding (the tracker the composite needs, since the window will start lying).
-- [ ] **Step 2:** Implement `WindowMixin` (mirror the confirmed public-API overrides; `@Unique` prefix `redstonespecs$`).
+- [ ] **Step 2:** Implement `WindowMixin` (mirror the confirmed public-API overrides; `@Unique` prefix `garnet$`).
 - [ ] **Step 3:** Register mixin + keybind. Build 5 source sets → SUCCESSFUL; launch client, toggle on → confirm no mixin-apply errors in log and no crash.
 - [ ] **Step 4 (runtime):** With a **non-16:9** content rect (e.g. a square), toggle on and screenshot. **Expected:** the world visibly changes aspect (stretched) / resolution — proving projection + gui scale follow the Window override. (Still full-screen; centering comes in Task 3.)
 - [ ] **Step 5:** Commit `feat(viewport): ViewportState + WindowMixin shrink lever`.
@@ -61,7 +61,7 @@ MC's default present **stretches** the game texture to fill the surface, so shri
 ### Task 3: Composite the shrunk world into the center + panels in the edges
 
 **Files:**
-- Create: `src/client/java/com/breadmoirai/redstonespecs/mixin/client/MinecraftPresentMixin.java` — `@WrapOperation` on the present blit in `Minecraft.renderFrame` (`GpuSurface.blitFromTexture(CommandEncoder, GpuTextureView)`; confirm the exact target via `javap`/bytecode of `renderFrame`). When `ViewportState.shouldModify()`: build a full-size composite via `CompositeTarget`, clear it, `BlitUvPipeline.blit` the game `textureView` into the normalized frame rect, draw a solid fill in the reserved edges (spike stand-in for panels) via a second blit/HUD pass at real size, then `original.call(..., composite.getColorTextureView())`; else `original.call` untouched. Also `@Inject` `framebufferSizeChanged` → `updateScaledFramebuffer(false)`.
+- Create: `src/client/java/com/breadmoirai/garnet/mixin/client/MinecraftPresentMixin.java` — `@WrapOperation` on the present blit in `Minecraft.renderFrame` (`GpuSurface.blitFromTexture(CommandEncoder, GpuTextureView)`; confirm the exact target via `javap`/bytecode of `renderFrame`). When `ViewportState.shouldModify()`: build a full-size composite via `CompositeTarget`, clear it, `BlitUvPipeline.blit` the game `textureView` into the normalized frame rect, draw a solid fill in the reserved edges (spike stand-in for panels) via a second blit/HUD pass at real size, then `original.call(..., composite.getColorTextureView())`; else `original.call` untouched. Also `@Inject` `framebufferSizeChanged` → `updateScaledFramebuffer(false)`.
 
 - [ ] **Step 1:** Implement the wrap; confirm the exact `blitFromTexture` descriptor and that `renderFrame` invokes it once.
 - [ ] **Step 2:** Build → SUCCESSFUL.
@@ -71,7 +71,7 @@ MC's default present **stretches** the game texture to fill the surface, so shri
 ### Task 4: Mouse-pick remap + cursor grab/focus keybind
 
 **Files:**
-- Create: `src/client/java/com/breadmoirai/redstonespecs/mixin/client/MouseHandlerViewportMixin.java` — remap for world picking. First **test whether it's needed**: because `WindowMixin` overrides the window dims and 26.2 routes raw→gui through `MouseHandler.getScaledXPos/YPos(Window, …)`, picking may already be correct within the shrunk framebuffer. If the crosshair mis-picks, remap `xpos/ypos` (or the scaled-pos results) by the frame offset.
+- Create: `src/client/java/com/breadmoirai/garnet/mixin/client/MouseHandlerViewportMixin.java` — remap for world picking. First **test whether it's needed**: because `WindowMixin` overrides the window dims and 26.2 routes raw→gui through `MouseHandler.getScaledXPos/YPos(Window, …)`, picking may already be correct within the shrunk framebuffer. If the crosshair mis-picks, remap `xpos/ypos` (or the scaled-pos results) by the frame offset.
 - Modify: `ViewportState` + client init — a focus keybind: on focus, GLFW `CURSOR_NORMAL` + on un-focus re-grab via `mouseHandler.grabMouse()` and `setIgnoreFirstMove()` (confirm method name in 26.2) to avoid a camera jump.
 
 - [ ] **Step 1 (runtime):** With the viewport shrunk, aim the crosshair at a known block; verify `Minecraft.hitResult` targets the correct block (F3 or a debug HUD line). If correct, skip the remap mixin.

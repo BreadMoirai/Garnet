@@ -28,4 +28,4 @@ stonecutter {
     }
 }
 
-rootProject.name = "RedstoneSpecs"
+rootProject.name = "garnet"

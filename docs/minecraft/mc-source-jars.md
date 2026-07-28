@@ -23,7 +23,7 @@ artifact roots (one pair per stonecutter version slice):
   `minecraft-common`.
 
 For 26.2 the common sources jar is at:
-`/mnt/h/Repo/RedstoneSpecs/.gradle/loom-cache/minecraftMaven/net/minecraft/minecraft-common-a89b853bf9/26.2/minecraft-common-a89b853bf9-26.2-sources.jar`
+`/mnt/h/Repo/garnet/.gradle/loom-cache/minecraftMaven/net/minecraft/minecraft-common-a89b853bf9/26.2/minecraft-common-a89b853bf9-26.2-sources.jar`
 (the `<hash>` differs between the compiled and `-sources` jars, and changes when the MC version
 or mappings change — glob `*26.2*sources.jar` under `loom-cache` rather than hard-coding it).
 
@@ -38,7 +38,7 @@ Use `/mnt/c/temp/` as the staging directory:
 
 ```bash
 mkdir -p /mnt/c/temp/mcsrc
-cp /mnt/h/Repo/RedstoneSpecs/.gradle/loom-cache/.../minecraft-common-...-sources.jar \
+cp /mnt/h/Repo/garnet/.gradle/loom-cache/.../minecraft-common-...-sources.jar \
    /mnt/c/temp/mcsrc.jar
 cd /mnt/c/temp/mcsrc
 cmd.exe /c "jar xf C:\\temp\\mcsrc.jar net/minecraft/world/level/block/DiodeBlock.java"

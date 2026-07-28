@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.breadmoirai.garnet.mixin.client",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "ClientCommonPacketListenerImplAccessor",
+    "KeyboardHandlerMixin",
+    "MinecraftPresentMixin",
+    "MouseHandlerMixin",
+    "MouseHandlerViewportMixin",
+    "ScrollWheelHandlerMixin",
+    "TitleScreenMixin",
+    "WindowMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

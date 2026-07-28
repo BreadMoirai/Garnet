@@ -12,7 +12,7 @@ A project root is a folder of `.spec.kts` files projected into a runtime-generat
 **UI status:** `ProjectScreen` and `ProjectRootListScreen` were deleted in the Compose-dock hard-cut
 (see [ui/dock-framework.md](../ui/dock-framework.md)). The only reachable client entry point today is
 `TitleScreenMixin`'s "Redstone Projects…" button, which calls `ProjectIntegratedBoot.bootWorkspace()`
-directly — a single shared `redstonespecs-workspace` save with no root pinned. The multi-root
+directly — a single shared `garnet-workspace` save with no root pinned. The multi-root
 registration store (`ProjectRootsConfig`) and the per-root boot entry (`ProjectIntegratedBoot.boot(rootPath)`)
 were **deleted as dead code** once the title button was retargeted to `bootWorkspace()` — nothing
 referenced them outside their own unit tests. UC-MAN-01 and UC-MAN-02.a below are retained only as
@@ -27,7 +27,7 @@ expose New Spec/Save Now/Unload actions — only browse/load/refresh.
 ### UC-MAN-01 — Declare and persist a project root *(removed)*
 
 Registering a filesystem folder as a persistent project-spec root is no longer a capability: the
-store that backed it (`ProjectRootsConfig`, a JSON list under `<MC-config-dir>/redstonespecs/`) and
+store that backed it (`ProjectRootsConfig`, a JSON list under `<MC-config-dir>/garnet/`) and
 its unit test were deleted as dead code — see the UI-status note above. The title button boots a
 single shared workspace via `bootWorkspace()`; there is no per-root registration or persisted root
 list. The only piece of this area that survives is the path-safety guard the live network handlers
@@ -40,14 +40,14 @@ still rely on:
 ### UC-MAN-02 — Boot the project singleplayer world
 
 The title button boots a single shared workspace via `ProjectIntegratedBoot.bootWorkspace()`, which
-opens or creates the fixed `redstonespecs-workspace` save with no root pinned, using the private
+opens or creates the fixed `garnet-workspace` save with no root pinned, using the private
 `openOrCreateWorld` helper. The per-root boot entry that used to derive a `project-<tail>-<hash>` save
 name was removed; the `openOrCreateWorld` helper and the (now dormant) `pendingRoot`/`ProjectServerContext`
 pinning machinery remain.
 
 - **UC-MAN-02.a** *(removed)* The per-root `boot(rootPath)` entry — which derived a save name via `ProjectSaveNaming.saveName` (`project-<sanitized-tail>-<8-hex-sha1>`, so two roots with the same final component got distinct save names) and set `pendingRoot` to pin a `ProjectServerContext` — was deleted as dead code. `ProjectSaveNaming` itself survives as a pure function with a unit test, but is no longer wired to any boot path.
 - **UC-MAN-02.b** `ProjectIntegratedBoot.openOrCreateWorld` calls `Minecraft.levelSource.levelExists(saveName)`. If the save exists, `WorldOpenFlows.openWorld` reopens it; otherwise `WorldOpenFlows.createFreshLevel` creates a creative, peaceful, allow-commands, flat-void world (overworld replaced with `FlatLevelGeneratorPresets.THE_VOID` via `FlatLevelSource`).
-- **UC-MAN-02.c** *(dormant)* `ProjectIntegratedBoot`'s own `SERVER_STARTING` listener (registered once by `ensureListenersRegistered`, which `bootWorkspace` still calls) reads the `pendingRoot` `AtomicReference` and, if set, calls `ProjectServerContext.set(server, ProjectServerContext(root))`. No caller sets `pendingRoot` anymore, so this listener is a no-op. The live root-pinning path is `Redstonespecs`' own `SERVER_STARTING` listener, which pins a `ProjectServerContext` from the `SharedSettings.projectRootPath` config when set.
+- **UC-MAN-02.c** *(dormant)* `ProjectIntegratedBoot`'s own `SERVER_STARTING` listener (registered once by `ensureListenersRegistered`, which `bootWorkspace` still calls) reads the `pendingRoot` `AtomicReference` and, if set, calls `ProjectServerContext.set(server, ProjectServerContext(root))`. No caller sets `pendingRoot` anymore, so this listener is a no-op. The live root-pinning path is `garnet`' own `SERVER_STARTING` listener, which pins a `ProjectServerContext` from the `SharedSettings.projectRootPath` config when set.
 - **UC-MAN-02.d** A `SERVER_STARTED` listener in the mod entrypoint reads `ProjectServerContext.get(server)` and, if present, calls `ProjectDimLifecycle.placeAll(server, root)` to lay out the full tree; any prior `ProjectWorld` for the same root is reused, or a new one is created and stored via `ProjectWorld.set`.
 - **UC-MAN-02.e** Re-opening the same root from a future session reopens the same persistent save; scratch blocks placed outside spec bounds between the previous close and this open are still present, because only cell AABB contents are re-placed from disk.
 
@@ -72,7 +72,7 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 - **UC-MAN-04.a** `GridLayout.compute` accepts sorted `LayoutInput` entries (sorted case-insensitively by filename, then by `spec.id`) and places each into slot `(slotIndex % rowMax, slotIndex / rowMax)`. Origin is `BlockPos(sx*(cellSize.x+gap), yBase, sz*(cellSize.z+gap))` — all offsets are region-relative.
 - **UC-MAN-04.b** Any spec whose `bounds` exceeds `cellSize` on any axis is excluded with a `LayoutError`; it does not consume a slot and its error is reported in `LoadFolderReport.errors`.
 - **UC-MAN-04.c** `placeCell` reads `<spec.structure ?: spec.id>.nbt` beside the spec file. If the file exists it loads the `StructureTemplate` via `NbtIo.readCompressed` and calls `tpl.placeInWorld`. If it does not exist the cell is placed empty (new spec path).
-- **UC-MAN-04.d** An anchor block (`REDSTONE_SPEC_RUNNER_BLOCK` for existing structure, `REDSTONE_SPEC_RECORDER_BLOCK` for new) is placed at `absOrigin.offset(spec.bounds.x, 0, 0)` and its `SpecBlockEntity.projectSourcePath` is set to the spec file path. This binding is not persisted to NBT and is reset on every `placeFolder`.
+- **UC-MAN-04.d** An anchor block (`GARNET_RUNNER_BLOCK` for existing structure, `GARNET_RECORDER_BLOCK` for new) is placed at `absOrigin.offset(spec.bounds.x, 0, 0)` and its `SpecBlockEntity.projectSourcePath` is set to the spec file path. This binding is not persisted to NBT and is reset on every `placeFolder`.
 - **UC-MAN-04.e** After placement, `StructureTemplate.fillFromWorld` captures the cell volume as `loadedSnapshot` and stores it in `LoadedSpec`. This snapshot is the dirty-diff baseline used by `ProjectCellSaver`.
 - **UC-MAN-04.f** `world.perFolder[subpath]` is replaced atomically (via `ConcurrentHashMap`) with the newly placed specs so that stale entries from a prior placement of the same subpath are not visible.
 
@@ -82,7 +82,7 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 
 A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
 
-- **UC-MAN-05.a** `/redstonespecs project` immediately sends `ListProjectTreeC2S`. `ProjectNetworkRegistry.handleListTree` (via private `sendTree`) calls `scanFolder(root.path)` on the server and replies with `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` carrying the full recursive folder tree (every file/folder, not just spec leaves) and the player's current `activeSubpath`.
+- **UC-MAN-05.a** `/garnet project` immediately sends `ListProjectTreeC2S`. `ProjectNetworkRegistry.handleListTree` (via private `sendTree`) calls `scanFolder(root.path)` on the server and replies with `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` carrying the full recursive folder tree (every file/folder, not just spec leaves) and the player's current `activeSubpath`.
 - **UC-MAN-05.b** `ProjectClientNetworking` receives `ProjectTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot` and recursively renders `snapshot.root.children`, recomposing on change. This is the **only** client-side reaction to the snapshot — the legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the recursive render pattern and expand/select state.
 - **UC-MAN-05.c** Clicking a "spec-folder" row (a folder directly containing a `*.spec.kts` file) sends `LoadProjectFolderC2S(path)`. `ProjectNetworkRegistry.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `ProjectTeleport.toFolder`, and sends `ProjectFolderLoadedS2C` with the spec-id list and any errors. Clicking a non-spec folder or its expand triangle just toggles expand client-side (no packet); clicking a file row selects/highlights it client-side (no packet).
 - **UC-MAN-05.d** `ProjectTeleport.toFolder` looks up `ProjectDimRegistry.regionOriginOf(subpath)`, teleports the player to `(region.x+0.5, yBase+2, region.z+0.5)` in `projectLevel()`, and calls `ProjectSession.setActive(player.uuid, subpath)` so subsequent server actions (save, new-spec) scope to the right folder.
@@ -97,7 +97,7 @@ A player names a new spec from the in-game UI; the server writes a stub `.spec.k
 - **UC-MAN-06.a** *(historical UI path)* The player types a name into the `EditBox` in the deleted `ProjectScreen` (validated client-side for non-blank) and clicks "New Spec", sending `NewProjectSpecC2S(name)`.
 - **UC-MAN-06.b** `ProjectNetworkRegistry.handleNewSpec` reads `ProjectSession.get(player.uuid)?.activeSubpath`; if no folder is active it replies with `ProjectErrorS2C("no folder selected")`.
 - **UC-MAN-06.c** `ProjectNewSpec.create(folder, name)` enforces that `name` matches `[a-zA-Z0-9_-]+`, that the target file does not already exist, then writes a minimal stub via `RecordingDslEmitter.emitStub(name)`. Throws on any violation so the caller can catch and report.
-- **UC-MAN-06.d** After creating the stub, `handleNewSpec` calls `ProjectDimLifecycle.placeFolder(server, root, activeSubpath)` to re-scan and re-place the entire folder. The new file appears as an empty cell with a `REDSTONE_SPEC_RECORDER_BLOCK` anchor.
+- **UC-MAN-06.d** After creating the stub, `handleNewSpec` calls `ProjectDimLifecycle.placeFolder(server, root, activeSubpath)` to re-scan and re-place the entire folder. The new file appears as an empty cell with a `GARNET_RECORDER_BLOCK` anchor.
 - **UC-MAN-06.e** `ProjectFolderLoadedS2C` is sent back with the updated spec-id list and any parse/layout errors from the re-place.
 
 ---
@@ -122,7 +122,7 @@ A player explicitly unloads their active folder focus, or the session is cleared
 - **UC-MAN-08.a** *(historical UI path)* The player clicks "Unload" in the deleted `ProjectScreen`, sending `UnloadProjectFolderC2S`. `ProjectNetworkRegistry.handleUnload` calls `ProjectSession.clear(player.uuid)` and replies with `ProjectSaveReportS2C(emptyList())`.
 - **UC-MAN-08.b** After unload, the player's `activeSubpath` is `null`; a subsequent `handleNewSpec` (which requires a folder focus) receives `ProjectErrorS2C("no folder selected")`. `handleSaveNow` is deliberately session-independent — it calls `ProjectDimLifecycle.saveAll(server)` over every loaded folder in `ProjectWorld.perFolder`, so post-unload it still returns a `ProjectSaveReportS2C` (empty when nothing is loaded), not an error.
 - **UC-MAN-08.c** If a player disconnects without clicking Unload (ungraceful exit), `ProjectSession.clear(player.uuid)` must be called from the server-side player disconnect event. The `ProjectSession` map is a `ConcurrentHashMap` keyed by `UUID`; the player's slot is released so it does not linger after reconnect.
-- **UC-MAN-08.d** On server stop, a `SERVER_STOPPED` listener (registered in `Redstonespecs.onInitialize`) calls `ProjectDimLifecycle.releaseServerState(server)`, which invokes `ProjectDimRegistry.dispose(server)`, `ProjectWorld.clear(server)`, and `ProjectServerContext.clear(server)` — removing each `WeakHashMap` entry for the server and releasing all server-scoped state promptly rather than waiting for GC.
+- **UC-MAN-08.d** On server stop, a `SERVER_STOPPED` listener (registered in `garnet.onInitialize`) calls `ProjectDimLifecycle.releaseServerState(server)`, which invokes `ProjectDimRegistry.dispose(server)`, `ProjectWorld.clear(server)`, and `ProjectServerContext.clear(server)` — removing each `WeakHashMap` entry for the server and releasing all server-scoped state promptly rather than waiting for GC.
 - **UC-MAN-08.e** Spec cell blocks persist in the singleplayer save across sessions, but on next `placeAll` the cell is **rebuilt from disk, not preserved**: when the `.nbt` exists, `placeCell` calls `StructureTemplate.placeInWorld` over the cell AABB (`ProjectDimLifecycle.placeCell`), overwriting whatever was there, then `fillFromWorld` snapshots that freshly-placed structure as the new `loadedSnapshot` baseline. So **only changes previously saved to `.nbt` persist; un-saved in-world edits inside the cell are discarded on the next placement.** Two exceptions: a brand-new spec with no `.nbt` yet is placed empty (nothing to overwrite), and blocks *outside* the cell AABB are never re-placed and survive (see UC-MAN-02.e). "Save Now" (UC-MAN-07) is the mechanism for persisting edits; there is no auto-save on disconnect.
 
 ---
@@ -139,7 +139,7 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
 - **UC-MAN-09.b** On a non-null pick, the controller normalizes the path to absolute (matching
   the server's canonical form) and persists it client-side (`ModConfig.projectRootPath` →
-  `redstonespecs.json`, also mirrored to `SharedSettings.projectRootPath`) and sends
+  `garnet.json`, also mirrored to `SharedSettings.projectRootPath`) and sends
   `SetProjectRootC2S(path)` on the client thread via `Minecraft.execute`. A cancel (null) sends
   nothing. **Persistence is client-side only:** in singleplayer/LAN the integrated server shares
   the JVM so the choice is restored via `ModConfig.load()`; a dedicated-server root swap is not

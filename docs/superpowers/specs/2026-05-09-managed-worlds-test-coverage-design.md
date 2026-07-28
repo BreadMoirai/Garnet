@@ -14,8 +14,8 @@ Non-goals: rendering/UI tests for `ManagedScreen` / `ManagedRootListScreen` (out
 
 ## Conventions
 
-- **Unit tests** live in `src/test/kotlin/com/breadmoirai/redstonespecs/managed/`. Use `io.kotest.core.spec.style.FunSpec` and `io.kotest.matchers.*`. No `MinecraftServer` allowed.
-- **Gametests** live in `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/`. Use `RedstoneTestSpec({ ... })` with `onServer { ... }` for server-thread work.
+- **Unit tests** live in `src/test/kotlin/com/breadmoirai/garnet/managed/`. Use `io.kotest.core.spec.style.FunSpec` and `io.kotest.matchers.*`. No `MinecraftServer` allowed.
+- **Gametests** live in `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/`. Use `GarnetTestSpec({ ... })` with `onServer { ... }` for server-thread work.
 - **One test file per class** (`<ClassName>Test.kt` for unit, `<ClassName>Spec.kt` for gametest), mirroring the existing convention. The single exception is `ManagedDimSpec.kt`, which is *extended* with new lifecycle edge-case tests rather than split.
 - Every gametest ends its `onServer` block with `ManagedWorld.clear(this)`; tests touching `ManagedSession` also `ManagedSession.clear(playerId)`.
 - Tests must not assume specific region indices from `ManagedDimRegistry` — only relative invariants (distinct subpaths → distinct origins; same subpath → same origin).
@@ -127,7 +127,7 @@ Drives the extracted `handleX` functions directly. Each test creates a fresh roo
 - **`handleListTree`.** `ManagedTreeSnapshotS2C.leaves` matches `ManagedFolderTree.scan(root).leaves` (same subpaths and counts).
 
 #### `ManagedCommandSpec.kt`
-- **No root configured.** `SharedSettings.managedRootPath` is blank and no `ManagedServerContext` set → `/redstonespecs managed` writes a system message starting with `Managed root not configured` and returns 0.
+- **No root configured.** `SharedSettings.managedRootPath` is blank and no `ManagedServerContext` set → `/garnet managed` writes a system message starting with `Managed root not configured` and returns 0.
 - **Root configured via context.** With a `ManagedServerContext` set → returns `Command.SINGLE_SUCCESS` and a `ManagedTreeSnapshotS2C` is sent (read from the player channel).
 
 ## Out of scope
@@ -144,7 +144,7 @@ Drives the extracted `handleX` functions directly. Each test creates a fresh roo
 
 ## File summary
 
-New unit files (`src/test/kotlin/com/breadmoirai/redstonespecs/managed/`):
+New unit files (`src/test/kotlin/com/breadmoirai/garnet/managed/`):
 - `ManagedSaveNamingTest.kt`
 - `ManagedDimRegistryTest.kt` *(may collapse into `ManagedDimSpec.kt`)*
 - `ManagedCellTest.kt`
@@ -153,7 +153,7 @@ New unit files (`src/test/kotlin/com/breadmoirai/redstonespecs/managed/`):
 - `ManagedNewSpecTest.kt`
 - `ManagedServerContextTest.kt`
 
-New gametest files (`src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/`):
+New gametest files (`src/gametest/kotlin/com/breadmoirai/garnet/test/managed/`):
 - `ManagedTestSupport.kt` *(shared fixtures, no tests)*
 - `ManagedCellSaverSpec.kt`
 - `ManagedTeleportSpec.kt`

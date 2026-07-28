@@ -60,19 +60,19 @@ links.
 - UC-PER-02, UC-PER-04, UC-PER-05 — scripting-host loads the hand-authored file; malformed files are rejected; round-trip equality holds after save-back
 - UC-MAN-02, UC-MAN-03, UC-MAN-04 — project world boots, folder tree scanned, cell placed in grid
 - UC-MAN-07, UC-MAN-08 — cell edits saved back to disk; session ends cleanly
-- UC-CMD-01, UC-CMD-03 — `/redstonespecs project` opens the folder UI; root resolved via priority chain
+- UC-CMD-01, UC-CMD-03 — `/garnet project` opens the folder UI; root resolved via priority chain
 
 ---
 
-### UC-X2X-04 — Kotest spec registered, harness drives runRedstoneSpec, diagnostic recording on failure
+### UC-X2X-04 — Kotest spec registered, harness drives runGarnetSpec, diagnostic recording on failure
 
 **Actor:** Test author (CI / local `:26.2:test` run)
 **Trigger:** A new Kotest spec is added to `GametestSentinel` and `:26.2:test` is executed.
-**Preconditions:** The spec class is registered in the sentinel's explicit list; `runRedstoneSpec` references a valid `.spec.kts` fixture; the fixture encodes at least one verifiable output condition.
+**Preconditions:** The spec class is registered in the sentinel's explicit list; `runGarnetSpec` references a valid `.spec.kts` fixture; the fixture encodes at least one verifiable output condition.
 **Outcome:** When the spec passes, the test run reports green. When an output value diverges, the harness captures a diagnostic recording that identifies the failing tick and output position; the Kotest report surfaces the recording path.
 
 **References:**
-- UC-GT-01, UC-GT-02, UC-GT-04 — sentinel registration, `runRedstoneSpec` dispatch, diagnostic recording on failure
+- UC-GT-01, UC-GT-02, UC-GT-04 — sentinel registration, `runGarnetSpec` dispatch, diagnostic recording on failure
 - UC-REC-05, UC-REC-06 — finalization path and failure recovery mirror the diagnostic capture path
 - UC-RUN-02, UC-RUN-05 — replay execution and abort recovery exercised by the harness
 - UC-PER-02, UC-PER-05 — scripting host loads the fixture; round-trip fidelity of the recorded diagnostic
@@ -101,5 +101,5 @@ links.
 | UC-X2X-01 | Singleplayer record → persist → restart → reload → verify pass | see UC-REC-04, UC-REC-05, UC-PER-01, UC-PER-02, UC-PER-05, UC-RUN-01, UC-RUN-02, UC-RUN-04 | see refs |
 | UC-X2X-02 | Dedicated-server record → client confirmation → server persist → second-client run | see UC-REC-04, UC-REC-05, UC-NET-01, UC-NET-03, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02, UC-RUN-04 | see refs |
 | UC-X2X-03 | Hand-authored spec → project root → grid projection → cell edit → save-back | see UC-PER-02, UC-PER-04, UC-PER-05, UC-MAN-02, UC-MAN-03, UC-MAN-04, UC-MAN-07, UC-MAN-08, UC-CMD-01, UC-CMD-03 | see refs |
-| UC-X2X-04 | Kotest spec registered → harness drives runRedstoneSpec → diagnostic recording on failure | see UC-GT-01, UC-GT-02, UC-GT-04, UC-REC-05, UC-REC-06, UC-RUN-02, UC-RUN-05, UC-PER-02, UC-PER-05 | see refs |
+| UC-X2X-04 | Kotest spec registered → harness drives runGarnetSpec → diagnostic recording on failure | see UC-GT-01, UC-GT-02, UC-GT-04, UC-REC-05, UC-REC-06, UC-RUN-02, UC-RUN-05, UC-PER-02, UC-PER-05 | see refs |
 | UC-X2X-05 | Overwrite-prompt handshake guards re-recording an existing spec | see UC-REC-05, UC-NET-03, UC-NET-04, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02 | see refs |

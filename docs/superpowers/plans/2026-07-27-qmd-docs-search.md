@@ -12,7 +12,7 @@
 
 - **Runtime floor:** qmd requires Node ≥22 or Bun ≥1.0. This machine has **neither inside WSL** — the only Node (v24.13.1) is a Windows mise install whose shims fail here (`exec: mise: not found`). Install Bun.
 - **No `jq` on this machine.** `flock` (`/usr/bin/flock`), `bash` (`/usr/bin/bash`), and `python3` (3.12.3) are present. Hook scripts must parse JSON with `python3`, never `jq`.
-- **Collection name is exactly `redstonespecs-docs`** everywhere — skill, CLAUDE.md, hook script.
+- **Collection name is exactly `garnet-docs`** everywhere — skill, CLAUDE.md, hook script.
 - **Corpus is `docs/**/*.md` plus the root `CLAUDE.md`.** Never `src/`.
 - **Hooks must never block a turn** — every hook entry sets `"async": true`.
 - **Hooks must degrade silently** — no qmd installed means clean `exit 0`, never an error.
@@ -30,7 +30,7 @@ This task is **interactive** — the Bun install and the ~2 GB model download ru
 
 **Interfaces:**
 - Consumes: nothing (first task).
-- Produces: a working `qmd` binary on `PATH`; a collection named **`redstonespecs-docs`**; the file `.qmd/index.yml`; measured latencies for `qmd query`, `qmd search`, `qmd vsearch`, and `qmd query --no-rerank`, which Task 3 writes into the skill.
+- Produces: a working `qmd` binary on `PATH`; a collection named **`garnet-docs`**; the file `.qmd/index.yml`; measured latencies for `qmd query`, `qmd search`, `qmd vsearch`, and `qmd query --no-rerank`, which Task 3 writes into the skill.
 
 - [ ] **Step 1: Ask the user to install Bun and qmd**
 
@@ -51,9 +51,9 @@ If `qmd: command not found`, `~/.bun/bin` is not on `PATH` — have the user ope
 - [ ] **Step 3: Create the project-local index and collection**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 qmd init
-qmd collection add . --name redstonespecs-docs
+qmd collection add . --name garnet-docs
 ```
 
 - [ ] **Step 4: Inspect the generated config and scope it to docs**
@@ -79,18 +79,18 @@ Expected: first run downloads ~2 GB of GGUF models (embedding 300 MB, reranker 6
 
 ```bash
 qmd collection list
-qmd query "how are structures saved to disk" -c redstonespecs-docs -n 5
+qmd query "how are structures saved to disk" -c garnet-docs -n 5
 ```
 
-Expected: `collection list` shows `redstonespecs-docs` with a non-zero document count near 100. The query returns hits naming real files under `docs/persistence/`. **If document count is 0, or hits point at files outside `docs/`, fix the scoping in Step 4 before continuing.**
+Expected: `collection list` shows `garnet-docs` with a non-zero document count near 100. The query returns hits naming real files under `docs/persistence/`. **If document count is 0, or hits point at files outside `docs/`, fix the scoping in Step 4 before continuing.**
 
 - [ ] **Step 7: Benchmark the four search modes**
 
 ```bash
-time qmd query  "how does the spec runner verify outputs" -c redstonespecs-docs -n 8 >/dev/null
-time qmd query  "how does the spec runner verify outputs" -c redstonespecs-docs -n 8 --no-rerank >/dev/null
-time qmd vsearch "how does the spec runner verify outputs" -c redstonespecs-docs -n 8 >/dev/null
-time qmd search "SpecBlockEntity" -c redstonespecs-docs -n 8 >/dev/null
+time qmd query  "how does the spec runner verify outputs" -c garnet-docs -n 8 >/dev/null
+time qmd query  "how does the spec runner verify outputs" -c garnet-docs -n 8 --no-rerank >/dev/null
+time qmd vsearch "how does the spec runner verify outputs" -c garnet-docs -n 8 >/dev/null
+time qmd search "SpecBlockEntity" -c garnet-docs -n 8 >/dev/null
 ```
 
 Record the four wall-clock times. Task 3 writes these into the skill so its mode guidance rests on real numbers. CPU-only inference under WSL2 is the risk here: **if `qmd query` exceeds ~15s, `--no-rerank` becomes the skill's documented default** and the plan continues unchanged otherwise.
@@ -128,7 +128,7 @@ git commit -m "build(docs): add qmd index over docs/"
 - Create: `.claude/settings.json`
 
 **Interfaces:**
-- Consumes: the `redstonespecs-docs` collection and working `qmd` binary from Task 1.
+- Consumes: the `garnet-docs` collection and working `qmd` binary from Task 1.
 - Produces: `.claude/hooks/qmd-reindex.sh`, invoked with **no arguments** and the hook payload on **stdin**. Contract: exit 0 always; reindex only when stdin carries no `tool_input.file_path` (SessionStart) or carries one matching `<repo>/docs/**/*.md`. Appends to `.qmd/reindex.log`.
 
 - [ ] **Step 1: Write the hook script**
@@ -205,7 +205,7 @@ chmod +x .claude/hooks/qmd-reindex.sh
 - [ ] **Step 3: Pipe-test — a docs path must reindex**
 
 ```bash
-echo '{"tool_name":"Write","tool_input":{"file_path":"/mnt/h/Repo/RedstoneSpecs/docs/persistence/INDEX.md"}}' \
+echo '{"tool_name":"Write","tool_input":{"file_path":"/mnt/h/Repo/garnet/docs/persistence/INDEX.md"}}' \
   | .claude/hooks/qmd-reindex.sh
 echo "exit=$?"
 tail -5 .qmd/reindex.log
@@ -217,7 +217,7 @@ Expected: `exit=0`, and the log gained a `reindex (trigger path: .../docs/persis
 
 ```bash
 : > .qmd/reindex.log
-echo '{"tool_name":"Edit","tool_input":{"file_path":"/mnt/h/Repo/RedstoneSpecs/src/main/kotlin/Foo.kt"}}' \
+echo '{"tool_name":"Edit","tool_input":{"file_path":"/mnt/h/Repo/garnet/src/main/kotlin/Foo.kt"}}' \
   | .claude/hooks/qmd-reindex.sh
 echo "exit=$?"
 wc -c .qmd/reindex.log
@@ -307,7 +307,7 @@ Note for the next session: hooks are picked up by a watcher that only watches di
 - Create: `.claude/skills/docs-search/SKILL.md`
 
 **Interfaces:**
-- Consumes: the `redstonespecs-docs` collection (Task 1); the four benchmark timings from Task 1 Step 7.
+- Consumes: the `garnet-docs` collection (Task 1); the four benchmark timings from Task 1 Step 7.
 - Produces: a skill named `docs-search` that CLAUDE.md (Task 4) references by name.
 
 - [ ] **Step 1: Write the skill**
@@ -322,14 +322,14 @@ description: Use when answering any question about this mod's own behavior, arch
 
 # Searching the docs
 
-`docs/` is indexed by [qmd](https://github.com/tobi/qmd) as the collection **`redstonespecs-docs`**
+`docs/` is indexed by [qmd](https://github.com/tobi/qmd) as the collection **`garnet-docs`**
 (~100 articles). Query it before grepping — articles are hyperspecialized and often describe a
 concept in different words than the question uses, which is exactly the case lexical search misses.
 
 ## Default query
 
 ```bash
-qmd query "<the user's question, in natural language>" -c redstonespecs-docs -n 8 --format md
+qmd query "<the user's question, in natural language>" -c garnet-docs -n 8 --format md
 ```
 
 Then **`Read` the files it names.** qmd returns excerpts; the article is the source of truth and the
@@ -385,7 +385,7 @@ Expected: `exit=1` and no output — meaning every timing placeholder was replac
 Copy the default query line out of the skill and run it verbatim:
 
 ```bash
-qmd query "how does the spec runner verify outputs" -c redstonespecs-docs -n 8 --format md
+qmd query "how does the spec runner verify outputs" -c garnet-docs -n 8 --format md
 ```
 
 Expected: markdown-formatted hits naming real files under `docs/runner/`. If the flags error, correct the skill to match this qmd version's actual flags — the skill must never document a command that doesn't run.
@@ -406,7 +406,7 @@ git commit -m "feat(docs): add docs-search skill backed by qmd"
 - Modify: `CLAUDE.md` ("Keep docs in sync with code" — one added line)
 
 **Interfaces:**
-- Consumes: the `docs-search` skill name (Task 3), the collection name `redstonespecs-docs` (Task 1).
+- Consumes: the `docs-search` skill name (Task 3), the collection name `garnet-docs` (Task 1).
 - Produces: no downstream consumer — this is the outermost layer.
 
 - [ ] **Step 1: Replace the search section**
@@ -429,9 +429,9 @@ Replace exactly that block with:
 ## How to search for information
 
 `docs/` is indexed for semantic search by [qmd](https://github.com/tobi/qmd) as the collection
-`redstonespecs-docs`. **Query it first** — don't hand-walk the folder table.
+`garnet-docs`. **Query it first** — don't hand-walk the folder table.
 
-1. `qmd query "<your question>" -c redstonespecs-docs -n 8 --format md`. The **docs-search** skill
+1. `qmd query "<your question>" -c garnet-docs -n 8 --format md`. The **docs-search** skill
    covers mode selection (`search` for exact identifiers, `query` for concepts) and flags.
 2. `Read` the articles it names. Excerpts are for ranking; the file is what you cite.
 3. **If qmd returns nothing** (or isn't installed — it's an optional local tool): fall back to the
@@ -454,7 +454,7 @@ running `qmd embed` by hand only contends for the reindex lock.
 
 ```bash
 grep -n "Skim the \*\*Category index\*\* below" CLAUDE.md; echo "exit=$?"
-grep -n "redstonespecs-docs" CLAUDE.md
+grep -n "garnet-docs" CLAUDE.md
 ```
 
 Expected: first `grep` prints nothing with `exit=1` (old step 1 replaced); second prints the two new mentions. The "Category index" **table** further down must still exist — only the numbered ladder was replaced. Confirm with `grep -n "## Category index" CLAUDE.md`.
@@ -499,10 +499,10 @@ summary: How docs/ is indexed by qmd, how the reindex hooks fire, and how to reb
 
 Body must cover, as prose:
 
-- **What is indexed** — collection `redstonespecs-docs`, scoped to `docs/**/*.md` + root `CLAUDE.md`.
+- **What is indexed** — collection `garnet-docs`, scoped to `docs/**/*.md` + root `CLAUDE.md`.
   Never `src/`.
 - **Rebuilding from scratch** — the exact Bun + `bun install -g @tobilu/qmd` + `qmd init` +
-  `qmd collection add . --name redstonespecs-docs` + `qmd update && qmd embed` sequence, and the
+  `qmd collection add . --name garnet-docs` + `qmd update && qmd embed` sequence, and the
   ~2 GB model download on first run.
 - **Optional by design** — qmd is not a build dependency. `.claude/hooks/qmd-reindex.sh` exits 0 when
   `qmd` is absent, so a fresh clone works without it and search degrades to grep.
@@ -545,7 +545,7 @@ and tell the user to open `/hooks` once or restart. Do not "fix" a working scrip
 - [ ] **Step 5: Verify the new article is searchable**
 
 ```bash
-qmd query "how is the documentation index kept up to date" -c redstonespecs-docs -n 5
+qmd query "how is the documentation index kept up to date" -c garnet-docs -n 5
 ```
 
 Expected: `docs/build/docs-search.md` appears in the hits — proving the write→index→search loop

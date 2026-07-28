@@ -1,7 +1,7 @@
 ---
 title: MC 26.1 deferred render-state extraction for widgets
 tags: [render-state, ui, mc-api, versions, widgets]
-summary: Custom AbstractWidget subclasses must override extractContents/extractWidgetRenderState with GuiGraphicsExtractor; the old renderWidget(GuiGraphics) signature does not exist in 26.1. Only RedstoneIconButton still uses this path — the Compose dock bypasses it entirely.
+summary: Custom AbstractWidget subclasses must override extractContents/extractWidgetRenderState with GuiGraphicsExtractor; the old renderWidget(GuiGraphics) signature does not exist in 26.1. Only GarnetIconButton still uses this path — the Compose dock bypasses it entirely.
 ---
 
 # MC 26.1 deferred render-state extraction for widgets
@@ -28,14 +28,14 @@ in 26.1.
 
 ## Example in this repo
 
-`RedstoneIconButton.kt` (`AbstractButton` subclass, the title-screen "Redstone Projects…" button — see
+`GarnetIconButton.kt` (`AbstractButton` subclass, the title-screen "Redstone Projects…" button — see
 [architecture/redstone-project.md](../architecture/redstone-project.md)) is the sole surviving user of
 this extension point; everything else that used to live under `client/screen/` (`RecorderScreen`,
 `RunnerScreen`, `ProjectScreen`, `ProjectRootListScreen`, `IntEditBox`, `DropdownButton`, `IntStepper`)
 was hard-cut when the Compose dock replaced the legacy screens:
 
 ```kotlin
-// RedstoneIconButton.kt (Button subclass — uses extractContents)
+// GarnetIconButton.kt (Button subclass — uses extractContents)
 override fun extractContents(
     graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float
 ) {
@@ -49,14 +49,14 @@ Note `centeredText(..., -1)`: text color is ARGB; `-1` (=0xFFFFFFFF) is white.
 [ui/argb-color-pitfalls.md](../ui/argb-color-pitfalls.md) (which also covers the analogous Compose
 `Color(Long)` pitfall the dock panels are subject to).
 
-**The Compose dock does not use this system at all.** `RedstoneDock` and every dock panel are ordinary
+**The Compose dock does not use this system at all.** `GarnetDock` and every dock panel are ordinary
 `@Composable` functions rendered by a real Skia `ComposeScene` (see
 [ui/compose-in-mc-feasibility.md](../ui/compose-in-mc-feasibility.md) and
 [ui/dock-framework.md](../ui/dock-framework.md)) — there is no `GuiGraphicsExtractor`, no deferred
 record/replay step, and no scissor-stratum baking to worry about inside the dock. The scissor/stratum
 caveats below are historical, from when a dropdown popup (`DropdownButton`, deleted) needed to escape a
 scrollable list's scissor; they remain accurate for any *future* `GuiGraphicsExtractor`-based widget
-(i.e. `RedstoneIconButton`-style code), but do not apply to anything under `ui/compose/`.
+(i.e. `GarnetIconButton`-style code), but do not apply to anything under `ui/compose/`.
 
 ## Why the change matters: scissor and stratum baking
 

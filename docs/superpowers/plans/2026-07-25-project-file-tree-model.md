@@ -22,8 +22,8 @@
 ### Task 1: Node types + `scanFolder`
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt`
 
 **Interfaces:**
 - Consumes: nothing (leaf task).
@@ -35,10 +35,10 @@
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt`:
+Create `src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.project
+package com.breadmoirai.garnet.project
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
@@ -111,10 +111,10 @@ Expected: FAIL — compilation error, `scanFolder` / `FolderNode` / `FileNode` u
 
 - [ ] **Step 3: Write the minimal implementation**
 
-Create `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt`:
+Create `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.project
+package com.breadmoirai.garnet.project
 
 import java.nio.file.Path
 import kotlin.io.path.extension
@@ -169,8 +169,8 @@ Expected: PASS — the 4 `FileTreeTest` cases green in the console summary (and 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt \
+        src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt
 git commit -m "feat(project): recursive file-tree model (FolderNode/FileNode) + scanFolder"
 ```
 
@@ -179,8 +179,8 @@ git commit -m "feat(project): recursive file-tree model (FolderNode/FileNode) + 
 ### Task 2: `walk` and `resolve` path helpers
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt` (append helpers)
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt` (append cases)
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt` (append helpers)
+- Test: `src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt` (append cases)
 
 **Interfaces:**
 - Consumes: `FolderNode`, `FileNode`, `FileTreeNode`, `scanFolder` from Task 1.
@@ -191,7 +191,7 @@ git commit -m "feat(project): recursive file-tree model (FolderNode/FileNode) + 
 - [ ] **Step 1: Write the failing tests**
 
 Append these cases inside the existing `FileTreeTest` `FunSpec({ ... })` block in
-`src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt` (before the closing `})`):
+`src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt` (before the closing `})`):
 
 ```kotlin
     test("walk emits every node with its '/'-path, depth-first; root maps to empty string") {
@@ -240,7 +240,7 @@ Expected: FAIL — compilation error, `walk` / `resolve` unresolved on `FolderNo
 
 - [ ] **Step 3: Write the minimal implementation**
 
-Append to `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt`:
+Append to `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt`:
 
 ```kotlin
 /**
@@ -285,8 +285,8 @@ Expected: PASS — all 7 `FileTreeTest` cases green; other unit tests remain gre
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt \
+        src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt
 git commit -m "feat(project): walk/resolve path helpers for the file-tree model"
 ```
 

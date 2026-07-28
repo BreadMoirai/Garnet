@@ -5,7 +5,7 @@ description: Use when answering any question about this mod's own behavior, arch
 
 # Searching the docs
 
-`docs/` is indexed by [qmd](https://github.com/tobi/qmd) as the collection **`redstonespecs-docs`**
+`docs/` is indexed by [qmd](https://github.com/tobi/qmd) as the collection **`garnet-docs`**
 (49 live articles). Query it before grepping — articles are hyperspecialized and often describe a
 concept in different words than the question uses, which is exactly what lexical search misses.
 
@@ -15,7 +15,7 @@ them surfaces decisions that may since have been reversed. Read them by path whe
 ## Default query
 
 ```bash
-qmd query "<the user's question, in natural language>" -c redstonespecs-docs -n 8 --no-rerank --format md
+qmd query "<the user's question, in natural language>" -c garnet-docs -n 8 --no-rerank --format md
 ```
 
 Then **`Read` the files it names.** qmd returns excerpts; the article is the source of truth and the

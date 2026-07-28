@@ -1,5 +1,5 @@
 collections:
-  redstonespecs-docs:
+  garnet-docs:
     path: /mnt/h/Repo/RedstoneSpecs/docs
     pattern: "!(superpowers)/**/*.md"
     context:

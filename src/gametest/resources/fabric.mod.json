@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "id": "redstonespecs-gametest",
+  "id": "garnet-gametest",
   "version": "1.0.0",
-  "name": "RedstoneSpecs Server Testmod",
+  "name": "Garnet Server Testmod",
   "environment": "*",
   "entrypoints": {
     "fabric-gametest": [
-      "com.breadmoirai.redstonespecs.test.GametestSentinel"
+      "com.breadmoirai.garnet.test.GametestSentinel"
     ]
   },
   "depends": {
-    "redstonespecs": "*"
+    "garnet": "*"
   }
 }

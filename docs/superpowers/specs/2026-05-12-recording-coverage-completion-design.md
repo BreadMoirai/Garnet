@@ -32,14 +32,14 @@ From the recording coverage matrix:
 
 ## Plan 1 — clientTest sourceset
 
-**New file:** `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt`
+**New file:** `src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt`
 
 Base class: `ClientSpec`. Style mirrors `ClientNetworkSpec.kt`. Register in `ClientTestSentinel` (per `feedback_kotest_specs_must_be_registered`).
 
 **Tests:**
 
 1. **UC-REC-01.b/c — `openScreenFor` opens `RecorderScreen` with EditBoxes pre-populated**
-   - On server: place recorder, configure `specId`, `specStructure`, `specBounds`; call `RedstoneSpecRecorderBlock.openScreenFor(player, be)`.
+   - On server: place recorder, configure `specId`, `specStructure`, `specBounds`; call `GarnetRecorderBlock.openScreenFor(player, be)`.
    - `waitForClientScreen(RecorderScreen::class.java)`.
    - Assert `specIdBox.value`, `outPathBox.value`, `structureIdBox.value` equal the values configured server-side.
    - Note: existing `ClientNetworkSpec` test "UC-NET-01.c" already asserts the screen opens with the right `originPos`; this new test extends to the three EditBox fields, which is what UC-REC-01.b/c specifically claim.
@@ -55,17 +55,17 @@ Base class: `ClientSpec`. Style mirrors `ClientNetworkSpec.kt`. Register in `Cli
 - `setValue` fires responder synchronously — don't double-fire.
 - Use `onServer { … }` / `onClient { … }` / `FabricTestThreadPump.runOnTestThread` for thread hops.
 - Register the spec in `ClientTestSentinel`.
-- New spec base must be `ClientSpec`, not `RedstoneTestSpec`.
+- New spec base must be `ClientSpec`, not `GarnetTestSpec`.
 
 **Docs to update:**
 - `docs/use-cases/recording.md` — rows UC-REC-01.b/c/d and UC-REC-03.a now point to `RecorderScreenSpec.…`. Update `last_audited_commit`.
 
 ## Plan 2 — gametest sourceset
 
-**New file:** `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt`
-**Modified file:** `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/RecordingLifecycleSpec.kt`
+**New file:** `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt`
+**Modified file:** `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/RecordingLifecycleSpec.kt`
 
-Base class for new spec: `RedstoneTestSpec`. Register in `GametestSentinel` (per `feedback_kotest_specs_must_be_registered`).
+Base class for new spec: `GarnetTestSpec`. Register in `GametestSentinel` (per `feedback_kotest_specs_must_be_registered`).
 
 **Tests in `MarkerToolSpec`:**
 
@@ -74,7 +74,7 @@ Base class for new spec: `RedstoneTestSpec`. Register in `GametestSentinel` (per
    - Assert `InteractionResult.PASS` and no markers added anywhere.
 
 2. **UC-REC-02.b — guard rejects markers on runner blocks**
-   - `setBlock` a `RedstoneSpecRunnerBlock` at a fresh position; obtain its `SpecBlockEntity`; configure `specBounds` so `findFor` resolves a hit inside its region.
+   - `setBlock` a `GarnetRunnerBlock` at a fresh position; obtain its `SpecBlockEntity`; configure `specBounds` so `findFor` resolves a hit inside its region.
    - Call `useOn` with hit pos inside those bounds → assert `InteractionResult.PASS`, runner's `specMarkers` stays empty.
    - Use `ModRegistries.INPUT_SPEC_MARKER_ITEM` (per `feedback_item_construction_in_tests`).
 
@@ -112,7 +112,7 @@ For each plan:
 ## Out of scope
 
 - Production-code changes. If any test surfaces a bug, file it separately and continue.
-- New test infrastructure. Use existing helpers (`ClientSpec`, `onServer`, `FabricTestThreadPump`, `RedstoneTestSpec`, `McDispatchers.Server`).
+- New test infrastructure. Use existing helpers (`ClientSpec`, `onServer`, `FabricTestThreadPump`, `GarnetTestSpec`, `McDispatchers.Server`).
 - The covered-indirectly rows (UC-REC-04.e, UC-REC-05.f) — explicitly deferred.
 
 ## Execution

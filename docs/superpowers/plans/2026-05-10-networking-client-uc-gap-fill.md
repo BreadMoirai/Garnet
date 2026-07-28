@@ -24,8 +24,8 @@ cmd.exe /c "gradlew.bat :26.1:runClientTest"
 ## Task 1: Add `WorldHolder` for the active singleplayer test world
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/WorldHolder.kt`
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/testing/core/WorldHolder.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`
 
 The kotest worker runs on a separate thread from `ClientTestSentinel.runTest`. The worker can't see the local `world` variable inside the `use { }` block. Mirror the existing `ClientContextHolder` pattern.
 
@@ -40,7 +40,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 2: Create `WorldHolder.kt`**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.core
+package com.breadmoirai.garnet.testing.core
 
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
 
@@ -70,11 +70,11 @@ object WorldHolder {
 
 - [ ] **Step 3: Wire the holder into `ClientTestSentinel.runTest`**
 
-In `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`, update the `runTest` method. Find the `SpecTestContext.createWorld(context).use { }` block and change it to install + clear the world:
+In `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`, update the `runTest` method. Find the `SpecTestContext.createWorld(context).use { }` block and change it to install + clear the world:
 
 ```kotlin
 override fun runTest(context: ClientGameTestContext) {
-    RedstoneTestLifecycle.register()
+    GarnetTestLifecycle.register()
     ClientContextHolder.install(context)
     SpecTestContext.createWorld(context).use { world ->
         WorldHolder.install(world)
@@ -98,7 +98,7 @@ Note: the `use { it ->` parameter was previously unnamed. Rename to `use { world
 Add the import:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.testing.core.WorldHolder
+import com.breadmoirai.garnet.testing.core.WorldHolder
 ```
 
 - [ ] **Step 4: Verify build**
@@ -112,8 +112,8 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 5: Commit**
 
 ```
-git add src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/WorldHolder.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt
+git add src/main/kotlin/com/breadmoirai/garnet/testing/core/WorldHolder.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt
 git commit -m "test(client): add WorldHolder for kotest-worker world access
 
 Mirrors ClientContextHolder. Lets client-sourceset Kotest specs
@@ -128,21 +128,21 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 2: Create `ClientNetworkTestSupport.kt`
 
 **Files:**
-- Create: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt`
+- Create: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt`
 
 Four send helpers + two accessors. Each send helper schedules onto the server thread via `ServerPlayNetworking.send`. The integrated server's overworld player is the one to address — there's exactly one in this harness.
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
-import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
-import com.breadmoirai.redstonespecs.network.OverwritePromptS2CPayload
-import com.breadmoirai.redstonespecs.network.RunnerStatusS2C
-import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
-import com.breadmoirai.redstonespecs.testing.core.WorldHolder
+import com.breadmoirai.garnet.network.OpenRecorderScreenS2C
+import com.breadmoirai.garnet.network.OpenRunnerScreenS2C
+import com.breadmoirai.garnet.network.OverwritePromptS2CPayload
+import com.breadmoirai.garnet.network.RunnerStatusS2C
+import com.breadmoirai.garnet.testing.core.ClientContextHolder
+import com.breadmoirai.garnet.testing.core.WorldHolder
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -213,7 +213,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt
 git commit -m "test(client): add ClientNetworkTestSupport with send helpers
 
 Four ServerPlayNetworking.send helpers (open recorder/runner screen,
@@ -228,19 +228,19 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 3: Create `ClientNetworkSpec` scaffold and register in sentinel
 
 **Files:**
-- Create: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt`
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`
+- Create: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`
 
 A single throwaway test that proves the spec is wired through the sentinel and the world holder works. Subsequent tasks fill in the actual UC-NET tests.
 
 - [ ] **Step 1: Create the spec scaffold**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
-import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
+import com.breadmoirai.garnet.client.screen.RunnerScreen
+import com.breadmoirai.garnet.network.OpenRunnerScreenS2C
+import com.breadmoirai.garnet.testing.GarnetTestSpec
 import io.kotest.matchers.shouldNotBe
 import net.minecraft.core.BlockPos
 
@@ -250,7 +250,7 @@ import net.minecraft.core.BlockPos
  * `docs/use-cases/networking.md`. Server-side rows live in
  * `RecorderRunnerNetworkRegistrySpec` (gametest sourceset).
  */
-class ClientNetworkSpec : RedstoneTestSpec({
+class ClientNetworkSpec : GarnetTestSpec({
 
     test("scaffold: sendOpenRunnerScreen opens RunnerScreen") {
         val ctx = clientContext()
@@ -269,17 +269,17 @@ class ClientNetworkSpec : RedstoneTestSpec({
 
 - [ ] **Step 2: Register the spec in `ClientTestSentinel.runKotestOnWorker`**
 
-In `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`, find the `specs = listOf(...)` block inside `launchKotest(...)`. Change it from:
+In `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`, find the `specs = listOf(...)` block inside `launchKotest(...)`. Change it from:
 
 ```kotlin
-specs = listOf(RunRedstoneSpecSmokeTest::class),
+specs = listOf(RunGarnetSpecSmokeTest::class),
 ```
 
 to:
 
 ```kotlin
 specs = listOf(
-    RunRedstoneSpecSmokeTest::class,
+    RunGarnetSpecSmokeTest::class,
     ClientNetworkSpec::class,
 ),
 ```
@@ -300,8 +300,8 @@ This run also validates that:
 - [ ] **Step 4: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt
 git commit -m "test(client): scaffold ClientNetworkSpec and register in sentinel
 
 Single scaffold test proves the spec is wired and WorldHolder
@@ -316,7 +316,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 4: UC-NET-01.c — recorder open via real flow
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt`
 
 Place a configured recorder block on the server, right-click it from the client, observe `RecorderScreen` opens with the correct origin.
 
@@ -338,8 +338,8 @@ In `ClientNetworkSpec.kt`, replace the existing `test("scaffold: ...")` block wi
             object : org.apache.commons.lang3.function.FailableConsumer<net.minecraft.server.MinecraftServer, RuntimeException> {
                 override fun accept(server: net.minecraft.server.MinecraftServer) {
                     val level = server.overworld()
-                    level.setBlock(pos, com.breadmoirai.redstonespecs.ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
-                    val be = level.getBlockEntity(pos) as com.breadmoirai.redstonespecs.block.SpecBlockEntity
+                    level.setBlock(pos, com.breadmoirai.garnet.ModRegistries.GARNET_RECORDER_BLOCK.defaultBlockState(), 2)
+                    val be = level.getBlockEntity(pos) as com.breadmoirai.garnet.block.SpecBlockEntity
                     be.setSpecId(specId)
                     be.setStructure(structureId)
                     be.setSpecBounds(net.minecraft.core.Vec3i(3, 3, 3))
@@ -369,7 +369,7 @@ In `ClientNetworkSpec.kt`, replace the existing `test("scaffold: ...")` block wi
 Add the imports at the top of the file (merge with existing imports — do not duplicate):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
+import com.breadmoirai.garnet.client.screen.RecorderScreen
 import io.kotest.matchers.shouldBe
 ```
 
@@ -388,7 +388,7 @@ Expected: test count = previous + 0 (we replaced the scaffold, didn't add). All 
 - [ ] **Step 3: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt
 git commit -m "test(client): UC-NET-01.c recorder open via real flow
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -399,7 +399,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 5: UC-NET-03.e — `RunnerStatusS2C` origin guard
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt`
 
 Two tests covering positive and negative origin match. Both open a `RunnerScreen` first via `sendOpenRunnerScreen`, then assert `pushStatus` is/isn't applied.
 
@@ -450,10 +450,10 @@ After the UC-NET-01.c test inside the spec body, append:
 Add imports (merge with existing):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.client.screen.RunnerScreen
-import com.breadmoirai.redstonespecs.network.OpenRunnerScreenS2C
-import com.breadmoirai.redstonespecs.network.RunnerState
-import com.breadmoirai.redstonespecs.network.RunnerStatusS2C
+import com.breadmoirai.garnet.client.screen.RunnerScreen
+import com.breadmoirai.garnet.network.OpenRunnerScreenS2C
+import com.breadmoirai.garnet.network.RunnerState
+import com.breadmoirai.garnet.network.RunnerStatusS2C
 ```
 
 - [ ] **Step 2: Run client gametest**
@@ -467,7 +467,7 @@ Expected: both new tests pass. The negative test waits 5 ticks after the mismatc
 - [ ] **Step 3: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt
 git commit -m "test(client): UC-NET-03.e RunnerStatusS2C origin guard
 
 Two cases: matching origin updates statusText/statusState;
@@ -481,7 +481,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 6: UC-NET-04.a — `OverwritePromptS2C` opens `ConfirmScreen`
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt`
 
 Synthetic send (no producer in recorder/runner code paths) → assert `ConfirmScreen` opens with the right labels. Click-handler half stays out of scope (documented).
 
@@ -508,7 +508,7 @@ After the UC-NET-03.e tests in the spec body, append:
 Add imports (merge with existing):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.OverwritePromptS2CPayload
+import com.breadmoirai.garnet.network.OverwritePromptS2CPayload
 import io.kotest.matchers.string.shouldContain
 ```
 
@@ -523,7 +523,7 @@ Expected: all 4 UC-NET client tests pass. Final ClientNetworkSpec test count = 4
 - [ ] **Step 3: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt
 git commit -m "test(client): UC-NET-04.a OverwritePromptS2C opens ConfirmScreen
 
 Receiver-opens-screen half covered. Click->send half is exercised
@@ -634,12 +634,12 @@ Expected: `Kotest: All 41 tests passed`. No regression from the previous cycle.
 cmd.exe /c "gradlew.bat :26.1:runClientTest"
 ```
 
-Expected: Kotest summary shows 5 passing tests total (1 pre-existing `RunRedstoneSpecSmokeTest` + 4 new `ClientNetworkSpec` cases).
+Expected: Kotest summary shows 5 passing tests total (1 pre-existing `RunGarnetSpecSmokeTest` + 4 new `ClientNetworkSpec` cases).
 
 - [ ] **Step 4: Verify XML reports list the new tests**
 
 ```
-ls versions/26.1/build/reports/redstonespecs/clientTest/
+ls versions/26.1/build/reports/garnet/clientTest/
 ```
 
 Then inspect the most recent report to confirm `ClientNetworkSpec` is listed with 4 passing tests.

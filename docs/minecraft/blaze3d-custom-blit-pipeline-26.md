@@ -9,7 +9,7 @@ summary: How to build a RenderPipeline and record a RenderPass to blit a GpuText
 MC 26.2 replaced the old immediate-mode/`GlStateManager` blit path with an explicit
 GPU API (`RenderPipeline` + `CommandEncoder` + `RenderPass`). Our clean-room blit lives in
 `src/client/kotlin/.../client/viewport/BlitUvPipeline.kt` and `CompositeTarget.kt`, with
-shaders under `src/client/resources/assets/redstonespecs/shaders/core/blit_uv.{vsh,fsh}`.
+shaders under `src/client/resources/assets/garnet/shaders/core/blit_uv.{vsh,fsh}`.
 This article records what the code alone doesn't make obvious.
 
 ## Two ways to blit — and why we chose the harder one
@@ -55,8 +55,8 @@ uniforms vanilla uses: we feed positions already in NDC, so `gl_Position = vec4(
 
 ## Shader id → asset path, and lazy compilation
 
-`withVertexShader(Identifier.fromNamespaceAndPath("redstonespecs", "core/blit_uv"))` resolves
-to `assets/redstonespecs/shaders/core/blit_uv.vsh` (the `FileToIdConverter("shaders", ".vsh")`
+`withVertexShader(Identifier.fromNamespaceAndPath("garnet", "core/blit_uv"))` resolves
+to `assets/garnet/shaders/core/blit_uv.vsh` (the `FileToIdConverter("shaders", ".vsh")`
 in `ShaderType`). The custom pipeline needs **no explicit registration** — it compiles lazily
 the first time a `RenderPass` uses it. If the `.vsh`/`.fsh` are missing or malformed, the
 failure surfaces at that first use, not at `RenderPipeline.build()`.
@@ -102,7 +102,7 @@ MixinExtras `@WrapOperation` on the `blitFromTexture` call:
 ```java
 @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE",
     target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"))
-private void redstonespecs$compositePresent(GpuSurface surface, CommandEncoder encoder, GpuTextureView gameTexture, Operation<Void> original)
+private void garnet$compositePresent(GpuSurface surface, CommandEncoder encoder, GpuTextureView gameTexture, Operation<Void> original)
 ```
 
 The wrapped call is an instance method, so the callback receives the receiver (`GpuSurface`) plus

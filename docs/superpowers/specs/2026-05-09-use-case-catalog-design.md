@@ -2,7 +2,7 @@
 title: Use-case catalog and test-coverage audit (sub-project 1 of 3)
 date: 2026-05-09
 status: design
-sub_project_of: comprehensive use-cases + tests for RedstoneSpecs
+sub_project_of: comprehensive use-cases + tests for garnet
 ---
 
 # Use-case catalog and test-coverage audit
@@ -10,7 +10,7 @@ sub_project_of: comprehensive use-cases + tests for RedstoneSpecs
 ## Purpose
 
 Produce a single canonical, browsable catalog of every meaningful user journey
-and system interaction in the RedstoneSpecs mod, audited against the existing
+and system interaction in the garnet mod, audited against the existing
 test suites and annotated with coverage status. The catalog is the foundation
 for the next two sub-projects (gap-filling tests for golden paths, then for
 edge cases) — both will reference UC IDs declared here.
@@ -86,7 +86,7 @@ Prefix list (closed set):
 | `UC-PER` | Persistence: `.spec.kts` + `.nbt` save/load, scan, sidecar |
 | `UC-NET` | Networking: payloads, server-authority, handshakes |
 | `UC-MAN` | Managed worlds: void dim, grid, folder-tree, save-back |
-| `UC-CMD` | `/redstonespecs managed` command surface |
+| `UC-CMD` | `/garnet managed` command surface |
 | `UC-GT` | Gametest harness: fixtures, sentinels, replay infrastructure |
 
 Cross-cutting UCs reuse a parent prefix where dominant; if no single prefix
@@ -179,7 +179,7 @@ For each candidate UC sub-ID:
    function).
 2. `grep` test sources (`src/test/`, `src/gametest/`, `src/clientTest/`) for
    references to that class, mixin target, payload type, or
-   `redstoneSpec("…")` DSL id.
+   `garnetSpec("…")` DSL id.
 3. Read each matched test in source to confirm it actually exercises the UC's
    behavior, not just touches the same class.
 4. Assign one of `covered` / `GAP-PARTIAL` / `GAP` per the definitions above.
@@ -195,12 +195,12 @@ The implementation plan's read pass will visit, at minimum:
 
 | Article | Production sources to read |
 |---|---|
-| recording.md | `block/RedstoneSpecRecorderBlock*`, `runner/StateRecorder.kt`, `runner/RecordingDslEmitter.kt`, `event/SubTickPhaseEvents.kt`, `client/screen/recorder*`, `network/*Recording*` |
-| running.md | `block/RedstoneSpecRunnerBlock*`, `runner/runRedstoneSpec.kt`, `runner/StateRecording*View*`, `dsl/SpecRun*`, `client/screen/runner*` |
+| recording.md | `block/GarnetRecorderBlock*`, `runner/StateRecorder.kt`, `runner/RecordingDslEmitter.kt`, `event/SubTickPhaseEvents.kt`, `client/screen/recorder*`, `network/*Recording*` |
+| running.md | `block/GarnetRunnerBlock*`, `runner/runGarnetSpec.kt`, `runner/StateRecording*View*`, `dsl/SpecRun*`, `client/screen/runner*` |
 | persistence.md | `persistence/KtsSpecLoader*`, `persistence/Spec*`, `persistence/Recording*Sidecar*` |
 | networking.md | `network/*` (excluding `network/managed/`), payload classes |
 | managed-worlds.md | `managed/*`, `network/managed/*`, `client/managed/*` |
-| command.md | `/redstonespecs managed` dispatch wiring (likely `managed/*Command*`) |
+| command.md | `/garnet managed` dispatch wiring (likely `managed/*Command*`) |
 | gametest-harness.md | `testing/*`, `clientTest/.../SpecTestContext.kt`, `gametest/.../GametestSentinel.kt`, existing `Managed*Spec.kt` patterns |
 | cross-cutting.md | _(no new source reading; references parent UCs)_ |
 

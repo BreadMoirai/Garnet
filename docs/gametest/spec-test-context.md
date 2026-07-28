@@ -6,7 +6,7 @@ summary: The shared client-gametest fixture wrapping ClientGameTestContext + Tes
 
 # SpecTestContext fixture
 
-`SpecTestContext` (at `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt`)
+`SpecTestContext` (at `src/clientTest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt`)
 is the single fixture all `FabricClientGameTest` flows in this repo build on.
 It wraps the two contexts the Fabric client-gametest API hands you
 (`ClientGameTestContext` and `TestSingleplayerContext`) and adds the

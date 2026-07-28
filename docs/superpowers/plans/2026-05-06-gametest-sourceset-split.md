@@ -4,7 +4,7 @@
 
 **Goal:** Split today's combined `src/gametest/` sourceset into a server-side `gametest` sourceset and a new client-side `clientTest` sourceset, each with its own test mod-id, `fabric.mod.json`, and run task.
 
-**Architecture:** Keep `fabricApi.configureTests` for the server side (loom continues to manage the `gametest` sourceset and `runGameTest` task; only the mod-id is renamed and `enableClientGameTests` flips to `false`). The new `clientTest` sourceset is wired by hand: a manual sourceset declaration, a hand-written `runClientTest` `JavaExec` task whose config mirrors loom's existing `runClientGameTest`, and its own `fabric.mod.json`. `SpecTestContext` and `RedstonespecsClientTests` move into `src/clientTest/`; `RedstonespecsGameTests` and gametest structure data stay in `src/gametest/`.
+**Architecture:** Keep `fabricApi.configureTests` for the server side (loom continues to manage the `gametest` sourceset and `runGameTest` task; only the mod-id is renamed and `enableClientGameTests` flips to `false`). The new `clientTest` sourceset is wired by hand: a manual sourceset declaration, a hand-written `runClientTest` `JavaExec` task whose config mirrors loom's existing `runClientGameTest`, and its own `fabric.mod.json`. `SpecTestContext` and `garnetClientTests` move into `src/clientTest/`; `garnetGameTests` and gametest structure data stay in `src/gametest/`.
 
 **Tech Stack:** Kotlin 2.x, Gradle Kotlin DSL, Fabric Loom, fabric-api `configureTests`, JUnit-style Fabric `@GameTest` (server) and `FabricClientGameTest` (client).
 
@@ -20,12 +20,12 @@
 | File | State | Responsibility |
 |---|---|---|
 | `build.gradle.kts` | modify | `configureTests` flags + new `clientTest` sourceset, mod registration, configurations, and `runClientTest` task |
-| `src/gametest/resources/fabric.mod.json` | modify | Mod-id renames to `redstonespecs-gametest`; only `fabric-gametest` entrypoint remains |
-| `src/clientTest/resources/fabric.mod.json` | create | New manifest with mod-id `redstonespecs-clienttest`; only `fabric-client-gametest` entrypoint |
-| `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt` | move → `src/clientTest/kotlin/...` | Client gametest flow |
-| `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt` | move → `src/clientTest/kotlin/...` | Helper used only by `RedstonespecsClientTests` (verified by grep — no server-side reference) |
-| `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsGameTests.kt` | unchanged | Server `@GameTest` flow |
-| `src/gametest/resources/data/redstonespecs/structures/lever_lamp.snbt` | unchanged | Used by server `@GameTest` structures |
+| `src/gametest/resources/fabric.mod.json` | modify | Mod-id renames to `garnet-gametest`; only `fabric-gametest` entrypoint remains |
+| `src/clientTest/resources/fabric.mod.json` | create | New manifest with mod-id `garnet-clienttest`; only `fabric-client-gametest` entrypoint |
+| `src/gametest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt` | move → `src/clientTest/kotlin/...` | Client gametest flow |
+| `src/gametest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt` | move → `src/clientTest/kotlin/...` | Helper used only by `garnetClientTests` (verified by grep — no server-side reference) |
+| `src/gametest/kotlin/com/breadmoirai/garnet/test/garnetGameTests.kt` | unchanged | Server `@GameTest` flow |
+| `src/gametest/resources/data/garnet/structures/lever_lamp.snbt` | unchanged | Used by server `@GameTest` structures |
 | `docs/gametest/unit-vs-gametest-split.md` | modify | Decision rule grows from 2-way to 3-way; update file paths |
 | `docs/architecture/module-map.md` | modify | "Client and tests" subsection lists both gametest sourcesets |
 
@@ -59,7 +59,7 @@ sourceSets {
 }
 
 loom {
-    mods.register("redstonespecs-clienttest") {
+    mods.register("garnet-clienttest") {
         sourceSet("clientTest")
     }
 }
@@ -71,7 +71,7 @@ configurations {
 }
 ```
 
-Do NOT yet change `configureTests` flags or the `redstonespecs-test` mod-id — keep the existing combined gametest behaviour working until Task 3.
+Do NOT yet change `configureTests` flags or the `garnet-test` mod-id — keep the existing combined gametest behaviour working until Task 3.
 
 - [ ] **Step 3: Verify the build still configures**
 
@@ -175,11 +175,11 @@ Expected: `nothing to commit, working tree clean` for `build.gradle.kts`. (No co
 
 ## Task 3: Move client test sources into `clientTest` and split `fabric.mod.json`
 
-Goal: physically move `RedstonespecsClientTests` and `SpecTestContext` into `src/clientTest/`, give the client side its own manifest with a new mod-id, narrow the existing manifest to server-only entrypoints, and rename the server test mod-id. After this task, both `gametestClasses` and `clientTestClasses` compile, and `runGameTest` still passes.
+Goal: physically move `garnetClientTests` and `SpecTestContext` into `src/clientTest/`, give the client side its own manifest with a new mod-id, narrow the existing manifest to server-only entrypoints, and rename the server test mod-id. After this task, both `gametestClasses` and `clientTestClasses` compile, and `runGameTest` still passes.
 
 **Files:**
-- Move: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt` → `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt`
-- Move: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt` → `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt`
+- Move: `src/gametest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt` → `src/clientTest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt`
+- Move: `src/gametest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt` → `src/clientTest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt`
 - Modify: `src/gametest/resources/fabric.mod.json`
 - Create: `src/clientTest/resources/fabric.mod.json`
 - Modify: `build.gradle.kts:36-44` (`fabricApi.configureTests`)
@@ -188,7 +188,7 @@ Goal: physically move `RedstonespecsClientTests` and `SpecTestContext` into `src
 
 Run:
 ```bash
-grep -n "SpecTestContext" src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsGameTests.kt
+grep -n "SpecTestContext" src/gametest/kotlin/com/breadmoirai/garnet/test/garnetGameTests.kt
 ```
 Expected: no matches. (If there are matches, stop and re-evaluate the placement decision; the spec lists fallback options 2a/2b/2c.)
 
@@ -196,16 +196,16 @@ Expected: no matches. (If there are matches, stop and re-evaluate the placement 
 
 Run:
 ```bash
-mkdir -p src/clientTest/kotlin/com/breadmoirai/redstonespecs/test src/clientTest/resources
-git mv src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt
-git mv src/gametest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt
+mkdir -p src/clientTest/kotlin/com/breadmoirai/garnet/test src/clientTest/resources
+git mv src/gametest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt src/clientTest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt
+git mv src/gametest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt src/clientTest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt
 ```
 
 Verify:
 ```bash
-ls src/gametest/kotlin/com/breadmoirai/redstonespecs/test/ src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/
+ls src/gametest/kotlin/com/breadmoirai/garnet/test/ src/clientTest/kotlin/com/breadmoirai/garnet/test/
 ```
-Expected: `RedstonespecsGameTests.kt` only in the gametest dir; both `RedstonespecsClientTests.kt` and `SpecTestContext.kt` in the clientTest dir. The Kotlin package declarations stay `com.breadmoirai.redstonespecs.test` — no source edits required since the package is unchanged.
+Expected: `garnetGameTests.kt` only in the gametest dir; both `garnetClientTests.kt` and `SpecTestContext.kt` in the clientTest dir. The Kotlin package declarations stay `com.breadmoirai.garnet.test` — no source edits required since the package is unchanged.
 
 - [ ] **Step 3: Create the new client-test manifest**
 
@@ -214,17 +214,17 @@ Create `src/clientTest/resources/fabric.mod.json` with this exact content:
 ```json
 {
   "schemaVersion": 1,
-  "id": "redstonespecs-clienttest",
+  "id": "garnet-clienttest",
   "version": "1.0.0",
-  "name": "RedstoneSpecs Client Testmod",
+  "name": "garnet Client Testmod",
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "com.breadmoirai.redstonespecs.test.RedstonespecsClientTests"
+      "com.breadmoirai.garnet.test.garnetClientTests"
     ]
   },
   "depends": {
-    "redstonespecs": "*"
+    "garnet": "*"
   }
 }
 ```
@@ -236,22 +236,22 @@ Replace the contents of `src/gametest/resources/fabric.mod.json` with:
 ```json
 {
   "schemaVersion": 1,
-  "id": "redstonespecs-gametest",
+  "id": "garnet-gametest",
   "version": "1.0.0",
-  "name": "RedstoneSpecs Server Testmod",
+  "name": "garnet Server Testmod",
   "environment": "*",
   "entrypoints": {
     "fabric-gametest": [
-      "com.breadmoirai.redstonespecs.test.RedstonespecsGameTests"
+      "com.breadmoirai.garnet.test.garnetGameTests"
     ]
   },
   "depends": {
-    "redstonespecs": "*"
+    "garnet": "*"
   }
 }
 ```
 
-Note: the `id` field changes from `redstonespecs-test` to `redstonespecs-gametest`, and the `fabric-client-gametest` entrypoint is removed.
+Note: the `id` field changes from `garnet-test` to `garnet-gametest`, and the `fabric-client-gametest` entrypoint is removed.
 
 - [ ] **Step 5: Update `configureTests` to match: rename mod-id and disable client gametests**
 
@@ -261,7 +261,7 @@ In `build.gradle.kts`, change the `fabricApi.configureTests { … }` block (arou
 fabricApi {
     configureTests {
         createSourceSet = true
-        modId = "redstonespecs-gametest"
+        modId = "garnet-gametest"
         enableGameTests = true
         enableClientGameTests = false
         eula = true
@@ -285,11 +285,11 @@ cmd.exe /c "./gradlew.bat :26.1:runGameTest"
 ```
 Expected: BUILD SUCCESSFUL with the same set of `@GameTest` methods passing as before this plan started.
 
-- [ ] **Step 8: Confirm no stale `redstonespecs-test` references remain**
+- [ ] **Step 8: Confirm no stale `garnet-test` references remain**
 
 Run:
 ```bash
-grep -rn "redstonespecs-test" --include="*.kt" --include="*.kts" --include="*.json"
+grep -rn "garnet-test" --include="*.kt" --include="*.kts" --include="*.json"
 ```
 Expected: no matches. (If any match, replace it with the appropriate new mod-id and re-run Step 7.)
 
@@ -299,9 +299,9 @@ Expected: no matches. (If any match, replace it with the appropriate new mod-id 
 git add src/gametest/kotlin src/clientTest src/gametest/resources/fabric.mod.json build.gradle.kts
 git commit -m "build: move client gametests into dedicated clientTest sourceset
 
-- Move RedstonespecsClientTests and SpecTestContext to src/clientTest
-- Add src/clientTest/resources/fabric.mod.json (mod-id redstonespecs-clienttest)
-- Rename server gametest mod-id from redstonespecs-test to redstonespecs-gametest
+- Move garnetClientTests and SpecTestContext to src/clientTest
+- Add src/clientTest/resources/fabric.mod.json (mod-id garnet-clienttest)
+- Rename server gametest mod-id from garnet-test to garnet-gametest
 - Disable enableClientGameTests in configureTests; client side is now manual"
 ```
 
@@ -309,7 +309,7 @@ git commit -m "build: move client gametests into dedicated clientTest sourceset
 
 ## Task 4: Add a `runClientTest` task that mirrors loom's old `runClientGameTest`
 
-Goal: register a `JavaExec` task on `clientTest` that reproduces what loom did for `runClientGameTest` (mainClass, classpath, system properties, fabric run-config injection), so the relocated `RedstonespecsClientTests` can actually execute.
+Goal: register a `JavaExec` task on `clientTest` that reproduces what loom did for `runClientGameTest` (mainClass, classpath, system properties, fabric run-config injection), so the relocated `garnetClientTests` can actually execute.
 
 **Files:**
 - Modify: `build.gradle.kts` (append a `tasks.register<JavaExec>("runClientTest") { … }` block)
@@ -344,8 +344,8 @@ register<JavaExec>("runClientTest") {
     // …add the remaining systemProperty(...) calls captured in the dump…
 
     jvmArgs(
-        "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
-        "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+        "-Dlog4j2.logger.garnet.name=Garnet",
+        "-Dlog4j2.logger.garnet.level=DEBUG",
     )
 
     workingDir = project.file("run")
@@ -369,10 +369,10 @@ Run:
 ```bash
 cmd.exe /c "./gradlew.bat :26.1:runClientTest"
 ```
-Expected: BUILD SUCCESSFUL. The MC client launches, executes `RedstonespecsClientTests`, and exits with the same outcome it had when running under loom's `runClientGameTest` before the split.
+Expected: BUILD SUCCESSFUL. The MC client launches, executes `garnetClientTests`, and exits with the same outcome it had when running under loom's `runClientGameTest` before the split.
 
-If the client launches but tests fail because the `redstonespecs-clienttest` mod doesn't appear loaded, double-check that:
-- `src/clientTest/resources/fabric.mod.json` is on the runtime classpath (Task 1's `runtimeClasspath += …` plus loom's `mods.register("redstonespecs-clienttest") { sourceSet("clientTest") }`).
+If the client launches but tests fail because the `garnet-clienttest` mod doesn't appear loaded, double-check that:
+- `src/clientTest/resources/fabric.mod.json` is on the runtime classpath (Task 1's `runtimeClasspath += …` plus loom's `mods.register("garnet-clienttest") { sourceSet("clientTest") }`).
 - The dump's classpath entries for the `gametest` sourceset were translated to `clientTest`.
 
 If the client fails to launch with a missing system property, compare the running configuration to the Task 2 dump and add the missing property.
@@ -430,7 +430,7 @@ Run:
 ```bash
 cmd.exe /c "./gradlew.bat :26.1:runClientTest"
 ```
-Expected: BUILD SUCCESSFUL. Same `RedstonespecsClientTests` outcomes as the pre-split `runClientGameTest`.
+Expected: BUILD SUCCESSFUL. Same `garnetClientTests` outcomes as the pre-split `runClientGameTest`.
 
 - [ ] **Step 5: Confirm `runClientGameTest` is no longer registered**
 
@@ -483,10 +483,10 @@ keybinds, payload round-trips driven from the client — it belongs in
 `src/clientTest/`.
 ```
 
-Update the "Where the contracts actually live" section so the line for `RedstonespecsClientTests` reads:
+Update the "Where the contracts actually live" section so the line for `garnetClientTests` reads:
 
 ```
-- `RedstonespecsClientTests` (in `src/clientTest/`) — full client UI
+- `garnetClientTests` (in `src/clientTest/`) — full client UI
   flow (recorder screen → marker tool → editor screen → runner block).
   Drives screens, payloads, keybinds. Runs via `runClientTest`.
 ```
@@ -495,7 +495,7 @@ Update the "Practical guidance" bullet for client work:
 
 ```
 - New screen, widget, payload, or marker-tool flow? Add to
-  `RedstonespecsClientTests` in `src/clientTest/` (uses
+  `garnetClientTests` in `src/clientTest/` (uses
   `SpecTestContext`, which lives alongside it).
 ```
 
@@ -531,4 +531,4 @@ git commit -m "docs: update gametest-split and module-map for clientTest sources
 
 - **Spec coverage** — every section of the design doc maps to a task: sourceset layout (Tasks 1, 3), build config (Tasks 1, 3, 4), resource/entrypoint split (Task 3), file migration (Task 3), `SpecTestContext` placement (Task 3 Step 1 confirms option 1; documented in File Structure table), docs updates (Task 6), verification (Task 5), risks (`runClientTest` wiring → Tasks 2 + 4; mod-id rename audit → Task 3 Step 8; `SpecTestContext` coupling → Task 3 Step 1 with explicit fallback note).
 - **Placeholder scan** — the only intentional placeholders are inside the inline code block of Task 4 Step 2 (`/* mainClass from the dump in Task 2 */` and `…add the remaining systemProperty(...) calls captured in the dump…`); the step text explicitly tells the implementer to fill them in from the captured dump and not commit placeholders.
-- **Type/path consistency** — sourceset names (`test`, `gametest`, `clientTest`), mod-ids (`redstonespecs-gametest`, `redstonespecs-clienttest`), and run task names (`runGameTest`, `runClientTest`) are spelled the same way throughout. The `clientTestImplementation` configuration is registered in Task 1 and consumed implicitly via `sourceSets["clientTest"].runtimeClasspath` in Task 4.
+- **Type/path consistency** — sourceset names (`test`, `gametest`, `clientTest`), mod-ids (`garnet-gametest`, `garnet-clienttest`), and run task names (`runGameTest`, `runClientTest`) are spelled the same way throughout. The `clientTestImplementation` configuration is registered in Task 1 and consumed implicitly via `sourceSets["clientTest"].runtimeClasspath` in Task 4.

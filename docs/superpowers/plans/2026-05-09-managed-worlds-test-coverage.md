@@ -4,7 +4,7 @@
 
 **Goal:** Add unit + gametest coverage for every `managed/*` class that lacks it (one test file per class), per the spec at `docs/superpowers/specs/2026-05-09-managed-worlds-test-coverage-design.md`.
 
-**Architecture:** New unit tests under `src/test/kotlin/com/breadmoirai/redstonespecs/managed/` (Kotest `FunSpec`). New gametests under `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/` (extends `RedstoneTestSpec` from `src/main/.../testing/`). One shared fixtures file (`ManagedTestSupport.kt`) deduplicates harness boilerplate. `ManagedNetworkRegistry`'s handler bodies are extracted into `internal` functions so tests can drive them directly.
+**Architecture:** New unit tests under `src/test/kotlin/com/breadmoirai/garnet/managed/` (Kotest `FunSpec`). New gametests under `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/` (extends `GarnetTestSpec` from `src/main/.../testing/`). One shared fixtures file (`ManagedTestSupport.kt`) deduplicates harness boilerplate. `ManagedNetworkRegistry`'s handler bodies are extracted into `internal` functions so tests can drive them directly.
 
 **Tech Stack:** Kotlin, Kotest 5.x (`io.kotest.core.spec.style.FunSpec`, `io.kotest.matchers.*`), Fabric/Minecraft 26.1, Gradle via Stonecutter.
 
@@ -14,7 +14,7 @@
 
 - Unit-test compile only: `cmd.exe /c "./gradlew.bat :26.1:compileTestKotlin"`
 - Run unit tests: `cmd.exe /c "./gradlew.bat :26.1:test"`
-- Run a single unit test class: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.managed.ManagedSaveNamingTest'"`
+- Run a single unit test class: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.managed.ManagedSaveNamingTest'"`
 - Gametest compile only: `cmd.exe /c "./gradlew.bat :26.1:compileGametestKotlin"`
 - Run gametests: `cmd.exe /c "./gradlew.bat :26.1:runGametest"` (slow; see `docs/gametest/INDEX.md`)
 - Full verification before any final commit: `cmd.exe /c "./gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
@@ -30,15 +30,15 @@ git commit -m "test(managed): <task summary>"
 ## Task 1: Extract shared gametest fixtures into `ManagedTestSupport.kt`
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTestSupport.kt`
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedDimSpec.kt` (replace private helpers with imports)
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTestSupport.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedDimSpec.kt` (replace private helpers with imports)
 
 - [ ] **Step 1.1: Create `ManagedTestSupport.kt`**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.managed
+package com.breadmoirai.garnet.test.managed
 
-import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
+import com.breadmoirai.garnet.runner.RecordingDslEmitter
 import com.mojang.authlib.GameProfile
 import io.netty.channel.embedded.EmbeddedChannel
 import net.minecraft.core.BlockPos
@@ -114,9 +114,9 @@ Remove the private `makeMockServerPlayer` and `deleteRecursively` at the bottom 
 
 The top of the file's import block should now also import:
 ```kotlin
-import com.breadmoirai.redstonespecs.test.managed.makeMockServerPlayer
-import com.breadmoirai.redstonespecs.test.managed.deleteRecursively
-import com.breadmoirai.redstonespecs.test.managed.withTempRoot
+import com.breadmoirai.garnet.test.managed.makeMockServerPlayer
+import com.breadmoirai.garnet.test.managed.deleteRecursively
+import com.breadmoirai.garnet.test.managed.withTempRoot
 ```
 
 - [ ] **Step 1.3: Verify compile**
@@ -127,8 +127,8 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 1.4: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTestSupport.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedDimSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTestSupport.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedDimSpec.kt
 git commit -m "test(managed): extract shared gametest fixtures into ManagedTestSupport"
 ```
 
@@ -139,7 +139,7 @@ git commit -m "test(managed): extract shared gametest fixtures into ManagedTestS
 Each `registerGlobalReceiver` lambda body becomes an `internal` `handleX` function. Lambdas are reduced to `ctx.server().execute { handleX(...) }`.
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedNetworkRegistry.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedNetworkRegistry.kt`
 
 - [ ] **Step 2.1: Extract handlers**
 
@@ -245,7 +245,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 2.3: Commit**
 
 ```
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedNetworkRegistry.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedNetworkRegistry.kt
 git commit -m "refactor(managed): extract network handlers into internal handleX functions"
 ```
 
@@ -254,12 +254,12 @@ git commit -m "refactor(managed): extract network handlers into internal handleX
 ## Task 3: `ManagedSaveNamingTest.kt` (unit)
 
 **Files:**
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSaveNamingTest.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/managed/ManagedSaveNamingTest.kt`
 
 - [ ] **Step 3.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -314,13 +314,13 @@ class ManagedSaveNamingTest : FunSpec({
 
 - [ ] **Step 3.2: Run**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.managed.ManagedSaveNamingTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.managed.ManagedSaveNamingTest'"`
 Expected: all 7 tests pass.
 
 - [ ] **Step 3.3: Commit**
 
 ```
-git add src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSaveNamingTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/managed/ManagedSaveNamingTest.kt
 git commit -m "test(managed): cover ManagedSaveNaming sanitization and hash suffix"
 ```
 
@@ -329,12 +329,12 @@ git commit -m "test(managed): cover ManagedSaveNaming sanitization and hash suff
 ## Task 4: `ManagedCellTest.kt` (unit)
 
 **Files:**
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCellTest.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/managed/ManagedCellTest.kt`
 
 - [ ] **Step 4.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -362,11 +362,11 @@ class ManagedCellTest : FunSpec({
 
 - [ ] **Step 4.2: Run + commit**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.managed.ManagedCellTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.managed.ManagedCellTest'"`
 Expected: 2 tests pass.
 
 ```
-git add src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCellTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/managed/ManagedCellTest.kt
 git commit -m "test(managed): cover ManagedCell equality and copy"
 ```
 
@@ -375,14 +375,14 @@ git commit -m "test(managed): cover ManagedCell equality and copy"
 ## Task 5: `LoadedSpecTest.kt` (unit)
 
 **Files:**
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/LoadedSpecTest.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/managed/LoadedSpecTest.kt`
 
 - [ ] **Step 5.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
+import com.breadmoirai.garnet.dsl.GarnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
@@ -394,7 +394,7 @@ class LoadedSpecTest : FunSpec({
 
     test("copy with refreshed snapshot preserves other fields") {
         val cell = ManagedCell("id", BlockPos(0, 0, 0), Vec3i(5, 5, 5), "id.spec.kts")
-        val spec = RedstoneSpec(id = "id", bounds = Vec3i(5, 5, 5), lifespan = 20, structure = null, strict = false, block = {})
+        val spec = GarnetSpec(id = "id", bounds = Vec3i(5, 5, 5), lifespan = 20, structure = null, strict = false, block = {})
         val source = Path.of("/tmp/id.spec.kts")
         val snap1 = StructureTemplate()
         val snap2 = StructureTemplate()
@@ -410,11 +410,11 @@ class LoadedSpecTest : FunSpec({
 
 - [ ] **Step 5.2: Run + commit**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.managed.LoadedSpecTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.managed.LoadedSpecTest'"`
 Expected: 1 test passes.
 
 ```
-git add src/test/kotlin/com/breadmoirai/redstonespecs/managed/LoadedSpecTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/managed/LoadedSpecTest.kt
 git commit -m "test(managed): cover LoadedSpec.copy field preservation"
 ```
 
@@ -423,14 +423,14 @@ git commit -m "test(managed): cover LoadedSpec.copy field preservation"
 ## Task 6: `ManagedSessionTest.kt` (unit)
 
 **Files:**
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSessionTest.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/managed/ManagedSessionTest.kt`
 
 > Note: `ManagedSession.sessions` is a process-global `ConcurrentHashMap`. Each test must use fresh UUIDs and clean up the UUIDs it creates.
 
 - [ ] **Step 6.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
@@ -517,11 +517,11 @@ class ManagedSessionTest : FunSpec({
 
 - [ ] **Step 6.2: Run + commit**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.managed.ManagedSessionTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.managed.ManagedSessionTest'"`
 Expected: 6 tests pass.
 
 ```
-git add src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSessionTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/managed/ManagedSessionTest.kt
 git commit -m "test(managed): cover ManagedSession set/get/clear/all"
 ```
 
@@ -530,12 +530,12 @@ git commit -m "test(managed): cover ManagedSession set/get/clear/all"
 ## Task 7: `ManagedNewSpecTest.kt` (unit)
 
 **Files:**
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedNewSpecTest.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/managed/ManagedNewSpecTest.kt`
 
 - [ ] **Step 7.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
@@ -597,11 +597,11 @@ class ManagedNewSpecTest : FunSpec({
 
 - [ ] **Step 7.2: Run + commit**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.managed.ManagedNewSpecTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.managed.ManagedNewSpecTest'"`
 Expected: 4 tests pass.
 
 ```
-git add src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedNewSpecTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/managed/ManagedNewSpecTest.kt
 git commit -m "test(managed): cover ManagedNewSpec validation and stub write"
 ```
 
@@ -628,9 +628,9 @@ Run: `grep -r "mockito\|mockk" build.gradle*` (use Bash). If neither is present 
 - [ ] **Step 9.2 (only if a mocking lib is present): write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.config.SharedSettings
+import com.breadmoirai.garnet.config.SharedSettings
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -677,11 +677,11 @@ class ManagedDimRegistryTest : FunSpec({
 
 - [ ] **Step 9.3: Run + commit (only if Step 9.2 was executed)**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.managed.ManagedDimRegistryTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.managed.ManagedDimRegistryTest'"`
 Expected: 4 tests pass.
 
 ```
-git add src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimRegistryTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/managed/ManagedDimRegistryTest.kt
 git commit -m "test(managed): cover ManagedDimRegistry region math"
 ```
 
@@ -692,7 +692,7 @@ git commit -m "test(managed): cover ManagedDimRegistry region math"
 Network gametests need to read `ManagedErrorS2C` / `ManagedFolderLoadedS2C` / etc. that handlers send via `ServerPlayNetworking.send(player, payload)`. These go through the player's `Connection`, which is backed by `EmbeddedChannel` in our mock player. The channel records outbound messages.
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTestSupport.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTestSupport.kt`
 
 - [ ] **Step 10.1: Add a capture helper**
 
@@ -729,7 +729,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 10.3: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTestSupport.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTestSupport.kt
 git commit -m "test(managed): add drainPayloads helper for capturing S2C in tests"
 ```
 
@@ -738,19 +738,19 @@ git commit -m "test(managed): add drainPayloads helper for capturing S2C in test
 ## Task 11: `ManagedCellSaverSpec.kt` (gametest)
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedCellSaverSpec.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedCellSaverSpec.kt`
 
 - [ ] **Step 11.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.managed
+package com.breadmoirai.garnet.test.managed
 
-import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
-import com.breadmoirai.redstonespecs.managed.ManagedDimRegistry
-import com.breadmoirai.redstonespecs.managed.ManagedRoot
-import com.breadmoirai.redstonespecs.managed.ManagedWorld
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.managed.ManagedDimLifecycle
+import com.breadmoirai.garnet.managed.ManagedDimRegistry
+import com.breadmoirai.garnet.managed.ManagedRoot
+import com.breadmoirai.garnet.managed.ManagedWorld
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.Vec3i
@@ -758,7 +758,7 @@ import net.minecraft.world.level.block.Blocks
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 
-class ManagedCellSaverSpec : RedstoneTestSpec({
+class ManagedCellSaverSpec : GarnetTestSpec({
 
     test("no mutation -> not saved") {
         withTempRoot("managed-saver-clean") { tmp ->
@@ -880,7 +880,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 11.3: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedCellSaverSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedCellSaverSpec.kt
 git commit -m "test(managed): cover ManagedCellSaver dirty diff scenarios"
 ```
 
@@ -889,29 +889,29 @@ git commit -m "test(managed): cover ManagedCellSaver dirty diff scenarios"
 ## Task 12: `ManagedTeleportSpec.kt` (gametest)
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTeleportSpec.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTeleportSpec.kt`
 
 - [ ] **Step 12.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.managed
+package com.breadmoirai.garnet.test.managed
 
-import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
-import com.breadmoirai.redstonespecs.managed.ManagedDimRegistry
-import com.breadmoirai.redstonespecs.managed.ManagedRoot
-import com.breadmoirai.redstonespecs.managed.ManagedSession
-import com.breadmoirai.redstonespecs.managed.ManagedTeleport
-import com.breadmoirai.redstonespecs.managed.ManagedWorld
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.managed.ManagedDimLifecycle
+import com.breadmoirai.garnet.managed.ManagedDimRegistry
+import com.breadmoirai.garnet.managed.ManagedRoot
+import com.breadmoirai.garnet.managed.ManagedSession
+import com.breadmoirai.garnet.managed.ManagedTeleport
+import com.breadmoirai.garnet.managed.ManagedWorld
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlin.io.path.createDirectories
 import kotlin.math.abs
 
-class ManagedTeleportSpec : RedstoneTestSpec({
+class ManagedTeleportSpec : GarnetTestSpec({
 
     test("toFolder returns false for unknown subpath and does not change session") {
         withTempRoot("managed-tp-unknown") { _ ->
@@ -957,7 +957,7 @@ Run: `cmd.exe /c "./gradlew.bat :26.1:compileGametestKotlin"`
 Expected: BUILD SUCCESSFUL.
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTeleportSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTeleportSpec.kt
 git commit -m "test(managed): cover ManagedTeleport.toFolder success and unknown-subpath"
 ```
 
@@ -968,29 +968,29 @@ git commit -m "test(managed): cover ManagedTeleport.toFolder success and unknown
 Drives the `internal` `handleX` functions added in Task 2 directly. Asserts on `drainPayloads(player)`.
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedNetworkRegistrySpec.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedNetworkRegistrySpec.kt`
 
 - [ ] **Step 13.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.managed
+package com.breadmoirai.garnet.test.managed
 
-import com.breadmoirai.redstonespecs.managed.ManagedDimLifecycle
-import com.breadmoirai.redstonespecs.managed.ManagedFolderTree
-import com.breadmoirai.redstonespecs.managed.ManagedRoot
-import com.breadmoirai.redstonespecs.managed.ManagedServerContext
-import com.breadmoirai.redstonespecs.managed.ManagedSession
-import com.breadmoirai.redstonespecs.managed.ManagedWorld
-import com.breadmoirai.redstonespecs.network.managed.ListManagedTreeC2S
-import com.breadmoirai.redstonespecs.network.managed.LoadManagedFolderC2S
-import com.breadmoirai.redstonespecs.network.managed.ManagedErrorS2C
-import com.breadmoirai.redstonespecs.network.managed.ManagedFolderLoadedS2C
-import com.breadmoirai.redstonespecs.network.managed.ManagedNetworkRegistry
-import com.breadmoirai.redstonespecs.network.managed.ManagedSaveReportS2C
-import com.breadmoirai.redstonespecs.network.managed.ManagedTreeSnapshotS2C
-import com.breadmoirai.redstonespecs.network.managed.NewManagedSpecC2S
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.managed.ManagedDimLifecycle
+import com.breadmoirai.garnet.managed.ManagedFolderTree
+import com.breadmoirai.garnet.managed.ManagedRoot
+import com.breadmoirai.garnet.managed.ManagedServerContext
+import com.breadmoirai.garnet.managed.ManagedSession
+import com.breadmoirai.garnet.managed.ManagedWorld
+import com.breadmoirai.garnet.network.managed.ListManagedTreeC2S
+import com.breadmoirai.garnet.network.managed.LoadManagedFolderC2S
+import com.breadmoirai.garnet.network.managed.ManagedErrorS2C
+import com.breadmoirai.garnet.network.managed.ManagedFolderLoadedS2C
+import com.breadmoirai.garnet.network.managed.ManagedNetworkRegistry
+import com.breadmoirai.garnet.network.managed.ManagedSaveReportS2C
+import com.breadmoirai.garnet.network.managed.ManagedTreeSnapshotS2C
+import com.breadmoirai.garnet.network.managed.NewManagedSpecC2S
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -998,7 +998,7 @@ import io.kotest.matchers.string.shouldContain
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 
-class ManagedNetworkRegistrySpec : RedstoneTestSpec({
+class ManagedNetworkRegistrySpec : GarnetTestSpec({
 
     test("handleLoadFolder rejects path traversal with ManagedErrorS2C") {
         withTempRoot("managed-net-traversal") { tmp ->
@@ -1059,7 +1059,7 @@ class ManagedNetworkRegistrySpec : RedstoneTestSpec({
                 ManagedDimLifecycle.placeAll(this, root)
                 val world = ManagedWorld.get(this).shouldNotBeNull()
                 val abs = world.absoluteCellOrigin(this, "set", "a").shouldNotBeNull()
-                val level = com.breadmoirai.redstonespecs.managed.ManagedDimRegistry.of(this).managedLevel()
+                val level = com.breadmoirai.garnet.managed.ManagedDimRegistry.of(this).managedLevel()
                 val bounds = world.perFolder["set"]!!["a"]!!.spec.bounds
                 clearCellVolume(level, abs, bounds)
                 ManagedDimLifecycle.placeFolder(this, root, "set")
@@ -1167,7 +1167,7 @@ Run: `cmd.exe /c "./gradlew.bat :26.1:compileGametestKotlin"`
 Expected: BUILD SUCCESSFUL.
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedNetworkRegistrySpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedNetworkRegistrySpec.kt
 git commit -m "test(managed): cover ManagedNetworkRegistry handleX server-authority paths"
 ```
 
@@ -1176,28 +1176,28 @@ git commit -m "test(managed): cover ManagedNetworkRegistry handleX server-author
 ## Task 14: `ManagedCommandSpec.kt` (gametest)
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedCommandSpec.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedCommandSpec.kt`
 
 - [ ] **Step 14.1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.managed
+package com.breadmoirai.garnet.test.managed
 
-import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.managed.ManagedCommand
-import com.breadmoirai.redstonespecs.managed.ManagedRoot
-import com.breadmoirai.redstonespecs.managed.ManagedServerContext
-import com.breadmoirai.redstonespecs.network.managed.ManagedTreeSnapshotS2C
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.managed.ManagedCommand
+import com.breadmoirai.garnet.managed.ManagedRoot
+import com.breadmoirai.garnet.managed.ManagedServerContext
+import com.breadmoirai.garnet.network.managed.ManagedTreeSnapshotS2C
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import com.mojang.brigadier.CommandDispatcher
 import io.kotest.matchers.shouldBe
 import net.minecraft.commands.CommandSourceStack
 import kotlin.io.path.createDirectories
 
-class ManagedCommandSpec : RedstoneTestSpec({
+class ManagedCommandSpec : GarnetTestSpec({
 
-    test("/redstonespecs managed without root configured sends an error message") {
+    test("/garnet managed without root configured sends an error message") {
         // Save and restore the global SharedSettings.managedRootPath since the gametest server is shared.
         val prior = SharedSettings.managedRootPath
         SharedSettings.managedRootPath = ""
@@ -1209,7 +1209,7 @@ class ManagedCommandSpec : RedstoneTestSpec({
                 ManagedCommand.register(dispatcher)
 
                 val source = player.createCommandSourceStack()
-                val rc = dispatcher.execute("redstonespecs managed", source)
+                val rc = dispatcher.execute("garnet managed", source)
                 rc shouldBe 0
                 // No tree snapshot should have been sent.
                 val payloads = drainPayloads(player)
@@ -1220,7 +1220,7 @@ class ManagedCommandSpec : RedstoneTestSpec({
         }
     }
 
-    test("/redstonespecs managed with context sends a ManagedTreeSnapshotS2C") {
+    test("/garnet managed with context sends a ManagedTreeSnapshotS2C") {
         withTempRoot("managed-cmd-ok") { tmp ->
             val folder = tmp.resolve("set").also { it.createDirectories() }
             writeStub(folder, "a")
@@ -1232,7 +1232,7 @@ class ManagedCommandSpec : RedstoneTestSpec({
                 ManagedCommand.register(dispatcher)
 
                 val source = player.createCommandSourceStack()
-                val rc = dispatcher.execute("redstonespecs managed", source)
+                val rc = dispatcher.execute("garnet managed", source)
                 (rc > 0) shouldBe true
 
                 val snap = drainPayloads(player).filterIsInstance<ManagedTreeSnapshotS2C>().single()
@@ -1245,7 +1245,7 @@ class ManagedCommandSpec : RedstoneTestSpec({
 })
 ```
 
-> If `SharedSettings.managedRootPath` is a `val`, change the assignment lines to whatever the actual config setter is, or skip the no-root test variant. Confirm via `grep -n "managedRootPath" src/main/kotlin/com/breadmoirai/redstonespecs/config/SharedSettings.kt` before writing.
+> If `SharedSettings.managedRootPath` is a `val`, change the assignment lines to whatever the actual config setter is, or skip the no-root test variant. Confirm via `grep -n "managedRootPath" src/main/kotlin/com/breadmoirai/garnet/config/SharedSettings.kt` before writing.
 
 - [ ] **Step 14.2: Compile + commit**
 
@@ -1253,8 +1253,8 @@ Run: `cmd.exe /c "./gradlew.bat :26.1:compileGametestKotlin"`
 Expected: BUILD SUCCESSFUL.
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedCommandSpec.kt
-git commit -m "test(managed): cover ManagedCommand /redstonespecs managed dispatch"
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedCommandSpec.kt
+git commit -m "test(managed): cover ManagedCommand /garnet managed dispatch"
 ```
 
 ---
@@ -1262,9 +1262,9 @@ git commit -m "test(managed): cover ManagedCommand /redstonespecs managed dispat
 ## Task 15: Extend `ManagedDimSpec.kt` with lifecycle edge cases
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedDimSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedDimSpec.kt`
 
-Add these tests inside the existing `RedstoneTestSpec({ ... })` body:
+Add these tests inside the existing `GarnetTestSpec({ ... })` body:
 
 - [ ] **Step 15.1: Add `placeFolder` for unknown subpath throws**
 
@@ -1456,7 +1456,7 @@ Run: `cmd.exe /c "./gradlew.bat :26.1:compileGametestKotlin"`
 Expected: BUILD SUCCESSFUL.
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedDimSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedDimSpec.kt
 git commit -m "test(managed): extend ManagedDimSpec with 7 lifecycle edge cases"
 ```
 

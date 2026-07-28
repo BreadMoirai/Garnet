@@ -7,16 +7,16 @@ summary: .spec.kts files in the world directory; JSON is network-only; structure
 # Spec on-disk format
 
 Specs live as **`.spec.kts` Kotlin script files** in
-`<world>/redstonespecs/<id>.spec.kts`.
+`<world>/garnet/<id>.spec.kts`.
 
-Each file evaluates (via `KtsSpecLoader`) to a `RedstoneSpec`. The standard
+Each file evaluates (via `KtsSpecLoader`) to a `GarnetSpec`. The standard
 form is:
 
 ```kotlin
-redstoneSpec("door_latch") {
+garnetSpec("door_latch") {
     bounds(5, 4, 5)
     lifespan = 40
-    structure = "redstonespecs:door_latch"
+    structure = "garnet:door_latch"
 
     input(2, 0, 2, label = "lever", color = 0xFFFF4444.toInt()) {
         atStart { powered() }

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Author `docs/use-cases/` — a layered user-journey + system-interaction catalog of every meaningful scenario in RedstoneSpecs, with a per-article test-coverage matrix mapping each UC to existing tests in `src/test/`, `src/gametest/`, and `src/clientTest/`.
+**Goal:** Author `docs/use-cases/` — a layered user-journey + system-interaction catalog of every meaningful scenario in garnet, with a per-article test-coverage matrix mapping each UC to existing tests in `src/test/`, `src/gametest/`, and `src/clientTest/`.
 
 **Architecture:** Eight markdown articles under `docs/use-cases/` (one per journey + cross-cutting), each with parent UC entries (`UC-<PREFIX>-NN`), system-interaction sub-IDs (`.a`–`.f`, capped at six per parent), and a coverage table at the foot. Documentation-only — no production code changes, no new tests, no gradle invocations. Catalog is the foundation for two follow-up sub-projects that will fill GAP / GAP-PARTIAL entries.
 
@@ -54,7 +54,7 @@ The prefix list is closed: `REC` (recording), `RUN` (running), `PER` (persistenc
 - [Persistence](persistence.md) — `.spec.kts` + `.nbt` save/load, directory scan, sidecar handling. Tags: storage, kts, sidecar.
 - [Networking](networking.md) — C2S/S2C payloads, server-authority, origin-pos lookup. Tags: payloads, sync, authority.
 - [Managed worlds](managed-worlds.md) — Datapack-driven void dim, grid placement, folder-tree, save-back. Tags: managed, dimensions, grid.
-- [Command surface](command.md) — `/redstonespecs managed` dispatcher. Tags: command, dispatch.
+- [Command surface](command.md) — `/garnet managed` dispatcher. Tags: command, dispatch.
 - [Gametest harness](gametest-harness.md) — Test infrastructure use-cases: fixtures, sentinels, replay. Tags: gametest, harness, fixtures.
 - [Cross-cutting](cross-cutting.md) — End-to-end journeys spanning ≥3 subsystems. Tags: e2e, integration, regression.
 ```
@@ -91,15 +91,15 @@ git commit -m "docs(use-cases): scaffold catalog folder and INDEX"
 - Create: `docs/use-cases/recording.md`
 
 **Sources to read** (informs UC enumeration; do not modify):
-- `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRecorderBlock.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/StateRecorder.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/StateRecording.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingDslEmitter.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/event/SubTickPhaseEvents.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderScreen.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/item/SpecMarkerTool.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/item/UndoStack.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRecorderBlock.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/StateRecorder.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/StateRecording.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/RecordingDslEmitter.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/event/SubTickPhaseEvents.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/screen/RecorderScreen.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/item/SpecMarkerTool.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/item/UndoStack.kt`
 - `docs/architecture/recording-pipeline.md` (existing context)
 
 - [ ] **Step 1: Read sources and enumerate parent UCs**
@@ -186,18 +186,18 @@ git commit -m "docs(use-cases): draft recording journey UCs"
 - Create: `docs/use-cases/running.md`
 
 **Sources to read:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRunnerBlock.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/runRedstoneSpec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecSnapshot.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/StateRecordingView.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/StateRecordingStorage.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/PlayerInteractionDispatch.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/SpecRun.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/RedstoneSpec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/ConditionEvaluator.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerScreen.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/state/ClientRunnerState.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/widget/TimelineSliderWidget.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRunnerBlock.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/runGarnetSpec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/SpecSnapshot.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/StateRecordingView.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/StateRecordingStorage.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/PlayerInteractionDispatch.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/dsl/SpecRun.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/dsl/GarnetSpec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/dsl/ConditionEvaluator.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerScreen.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/state/ClientRunnerState.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/widget/TimelineSliderWidget.kt`
 - `docs/runner/engine-driven-verification.md`
 - `docs/runner/player-interaction-dispatch.md`
 
@@ -255,12 +255,12 @@ git commit -m "docs(use-cases): draft running journey UCs"
 - Create: `docs/use-cases/persistence.md`
 
 **Sources to read:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/KtsSpecLoader.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/SpecScript.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/SpecPersistence.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/SpecDirectoryScan.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/RecordingSidecar.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructurePersistence.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/KtsSpecLoader.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/SpecScript.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/SpecPersistence.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/SpecDirectoryScan.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/RecordingSidecar.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/persistence/StructurePersistence.kt`
 - `docs/persistence/spec-on-disk-format.md`
 - `docs/persistence/kts-script-host.md`
 - `docs/persistence/spec-data-model-invariants.md`
@@ -319,9 +319,9 @@ git commit -m "docs(use-cases): draft persistence journey UCs"
 - Create: `docs/use-cases/networking.md`
 
 **Sources to read:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt`
 - `docs/persistence/network-payload-contract.md`
 - (Do NOT include `network/managed/*` here; those belong in `managed-worlds.md`.)
 
@@ -379,27 +379,27 @@ git commit -m "docs(use-cases): draft networking journey UCs"
 - Create: `docs/use-cases/managed-worlds.md`
 
 **Sources to read:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedRoot.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedRootsConfig.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedFolderTree.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimRegistry.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimLifecycle.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedWorld.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSession.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedServerContext.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCell.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCellSaver.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedNewSpec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedTeleport.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSaveNaming.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/GridLayout.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/LoadedSpec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedNetworkRegistry.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedPackets.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedClientNetworking.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedIntegratedBoot.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedRootListScreen.kt`
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedScreen.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedRoot.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedRootsConfig.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedFolderTree.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimRegistry.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimLifecycle.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedWorld.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedSession.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedServerContext.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCell.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCellSaver.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedNewSpec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedTeleport.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedSaveNaming.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/GridLayout.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/managed/LoadedSpec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedNetworkRegistry.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedPackets.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedClientNetworking.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedIntegratedBoot.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedRootListScreen.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedScreen.kt`
 - `docs/architecture/managed-redstone-worlds.md`
 
 - [ ] **Step 1: Read sources and enumerate parent UCs**
@@ -456,12 +456,12 @@ git commit -m "docs(use-cases): draft managed-worlds journey UCs"
 - Create: `docs/use-cases/command.md`
 
 **Sources to read:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCommand.kt`
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedCommandSpec.kt` (existing test surface; informs UCs)
+- `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCommand.kt`
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedCommandSpec.kt` (existing test surface; informs UCs)
 
 - [ ] **Step 1: Read sources and enumerate parent UCs**
 
-Target ~3–4 parent UCs covering the `/redstonespecs managed` subcommands actually implemented. Read `ManagedCommand.kt` for the dispatch tree; the gametest spec lists the expected externally-visible behaviors.
+Target ~3–4 parent UCs covering the `/garnet managed` subcommands actually implemented. Read `ManagedCommand.kt` for the dispatch tree; the gametest spec lists the expected externally-visible behaviors.
 
 - [ ] **Step 2: Write the article skeleton**
 
@@ -469,13 +469,13 @@ Target ~3–4 parent UCs covering the `/redstonespecs managed` subcommands actua
 ---
 title: Command-surface use-cases
 tags: [command, dispatch, use-cases]
-summary: `/redstonespecs managed` subcommand dispatcher and its observable effects.
+summary: `/garnet managed` subcommand dispatcher and its observable effects.
 last_audited_commit: PENDING
 ---
 
 # Command-surface use-cases
 
-The mod exposes server-side subcommands under `/redstonespecs managed`. Each parent UC below is one subcommand path with its observable outcome.
+The mod exposes server-side subcommands under `/garnet managed`. Each parent UC below is one subcommand path with its observable outcome.
 
 ## UC-CMD-01 — <title>
 ...
@@ -513,27 +513,27 @@ git commit -m "docs(use-cases): draft command-surface UCs"
 - Create: `docs/use-cases/gametest-harness.md`
 
 **Sources to read:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/RedstoneTestSpec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/RedstoneTestSpecContext.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/KotestLauncher.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/DiagnosticRecorderListener.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/ResultCollector.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RecordingHolder.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RunRedstoneSpec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/server/Suspending.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/server/Structures.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Lifecycle.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/gametest/.../GametestSentinel.kt` (read via `find` if path differs)
-- `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt`
-- `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/GarnetTestSpec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/GarnetTestSpecContext.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/launcher/KotestLauncher.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/launcher/DiagnosticRecorderListener.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/launcher/ResultCollector.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/runner/RecordingHolder.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/runner/RunGarnetSpec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/server/Suspending.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/server/Structures.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/core/Lifecycle.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/gametest/.../GametestSentinel.kt` (read via `find` if path differs)
+- `src/clientTest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt`
+- `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`
 - `docs/gametest/kotest-bridge.md`
 - `docs/gametest/spec-test-context.md`
 - `docs/gametest/unit-vs-gametest-split.md`
 
 - [ ] **Step 1: Read sources and enumerate parent UCs**
 
-Target ~3–4 parent UCs covering: register a new Kotest spec in `GametestSentinel`, drive a spec via `runRedstoneSpec` from a Kotest body, use `SpecTestContext` for client-gametest UI assertions, capture diagnostic recordings on failure.
+Target ~3–4 parent UCs covering: register a new Kotest spec in `GametestSentinel`, drive a spec via `runGarnetSpec` from a Kotest body, use `SpecTestContext` for client-gametest UI assertions, capture diagnostic recordings on failure.
 
 - [ ] **Step 2: Write the article skeleton**
 
@@ -541,7 +541,7 @@ Target ~3–4 parent UCs covering: register a new Kotest spec in `GametestSentin
 ---
 title: Gametest-harness use-cases
 tags: [gametest, harness, fixtures, kotest, use-cases]
-summary: Test infrastructure scenarios: spec registration, runRedstoneSpec dispatch, client-gametest fixtures, diagnostic recording.
+summary: Test infrastructure scenarios: spec registration, runGarnetSpec dispatch, client-gametest fixtures, diagnostic recording.
 last_audited_commit: PENDING
 ---
 
@@ -585,9 +585,9 @@ git commit -m "docs(use-cases): draft gametest-harness UCs"
 - Modify: `docs/use-cases/recording.md`, `running.md`, `persistence.md`, `networking.md`, `managed-worlds.md`, `command.md`, `gametest-harness.md`
 
 **Test sources to scan (read-only):**
-- `src/test/kotlin/com/breadmoirai/redstonespecs/**` (all files; ~25 unit Kotest specs)
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/**` (`GametestSentinel.kt`, `SmokeSpec.kt`, `managed/Managed*Spec.kt`, `ManagedTestSupport.kt`)
-- `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/**` (`ClientTestSentinel.kt`, `RunRedstoneSpecSmokeTest.kt`, `SpecTestContext.kt`)
+- `src/test/kotlin/com/breadmoirai/garnet/**` (all files; ~25 unit Kotest specs)
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/**` (`GametestSentinel.kt`, `SmokeSpec.kt`, `managed/Managed*Spec.kt`, `ManagedTestSupport.kt`)
+- `src/clientTest/kotlin/com/breadmoirai/garnet/test/**` (`ClientTestSentinel.kt`, `RunGarnetSpecSmokeTest.kt`, `SpecTestContext.kt`)
 
 - [ ] **Step 1: Capture audit-commit anchor**
 
@@ -673,7 +673,7 @@ Target ~4–5 cross-cutting UCs that span ≥3 subsystems. Candidate journeys:
 - Author records on a dedicated server, client receives confirmation, server saves to disk, second client loads via runner.
 - Author authors a `.spec.kts` by hand, places it in a managed root, dim regenerates and projects it into the grid, edits cell, save-back overwrites the file.
 - Spec authored on commit A, replayed on commit B with refactored mixin — invariant docs (DiodeBlock.FACING etc.) gate behavior.
-- Test author registers a new Kotest spec in `GametestSentinel`, runs `:26.1:test`, harness drives `runRedstoneSpec`, diagnostic recording surfaces on failure.
+- Test author registers a new Kotest spec in `GametestSentinel`, runs `:26.1:test`, harness drives `runGarnetSpec`, diagnostic recording surfaces on failure.
 
 Cross-cutting UCs do **not** introduce new test gaps — their coverage rows reference parent UC IDs from other articles.
 

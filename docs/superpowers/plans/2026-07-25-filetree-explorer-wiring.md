@@ -14,7 +14,7 @@
 - Unit tests (Kotest, `src/test`): `cmd.exe /c "gradlew.bat :26.1:test"` — run **unfiltered** (`--tests` gives false "No tests found"). Read pass/fail from console summary or `build/test-results/test/*.xml`. `src/test` specs autoscan.
 - Client tests (`src/clientTest`): `cmd.exe /c "gradlew.bat :26.1:runClientTest"`. New clientTest specs must be registered in `ClientTestSentinel.kt` (autoscan OFF) — the Explorer spec is already registered.
 - Full 5-sourceset compile: `cmd.exe /c "gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`.
-- Do NOT modify `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt` (model is complete).
+- Do NOT modify `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt` (model is complete).
 - Do NOT touch world/placement machinery (`ProjectDimLifecycle`, `ProjectCellSaver`, `GridLayout`, region assignment). `ProjectFolderTree` stays — still used by `ProjectDimLifecycle.placeFolder`.
 - Commit directly to `main`. Conventional-commit messages. NO `Co-Authored-By` / "Generated with Claude Code" trailer.
 - ARGB gotcha: use `-1` / `0xFFFFFFFF` for opaque white text; `0xFFFFFF` renders invisible (alpha=0).
@@ -23,15 +23,15 @@
 
 ## File Structure
 
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt` — **modify**: delete `ProjectLeafEntry`, add recursive `FILE_TREE_STREAM_CODEC`, rewrite `ProjectTreeSnapshotS2C`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt` — **modify**: `sendTree` builds the new payload from `scanFolder`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectCommand.kt` — **modify**: second sender, same swap.
-- `src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt` — **create**: codec round-trip unit test.
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt` — **modify**: add `selectedPath`/`select`.
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt` — **modify**: recursive tree render.
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectNetworkRegistrySpec.kt` — **modify**: assert against `snap.root`.
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectCommandSpec.kt` — **modify**: assert against `snap.root`.
-- `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ProjectExplorerSpec.kt` — **modify**: feed a real `FolderNode`, content-based assertions.
+- `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt` — **modify**: delete `ProjectLeafEntry`, add recursive `FILE_TREE_STREAM_CODEC`, rewrite `ProjectTreeSnapshotS2C`.
+- `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt` — **modify**: `sendTree` builds the new payload from `scanFolder`.
+- `src/main/kotlin/com/breadmoirai/garnet/project/ProjectCommand.kt` — **modify**: second sender, same swap.
+- `src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt` — **create**: codec round-trip unit test.
+- `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt` — **modify**: add `selectedPath`/`select`.
+- `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt` — **modify**: recursive tree render.
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectNetworkRegistrySpec.kt` — **modify**: assert against `snap.root`.
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectCommandSpec.kt` — **modify**: assert against `snap.root`.
+- `src/clientTest/kotlin/com/breadmoirai/garnet/test/ProjectExplorerSpec.kt` — **modify**: feed a real `FolderNode`, content-based assertions.
 - `docs/architecture/redstone-project.md`, `docs/ui/dock-framework.md`, `docs/use-cases/*` — **modify**: doc sync.
 
 ---
@@ -39,27 +39,27 @@
 ### Task 1: Recursive wire codec + payload + server senders
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt:122-134` (`sendTree`)
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectCommand.kt:1-46`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt:122-134` (`sendTree`)
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/project/ProjectCommand.kt:1-46`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt`
 
 **Interfaces:**
-- Consumes: `FolderNode(name, children)`, `FileNode(name, extension)`, `FileTreeNode` (sealed) from `com.breadmoirai.redstonespecs.project`; `scanFolder(path): FolderNode`.
+- Consumes: `FolderNode(name, children)`, `FileNode(name, extension)`, `FileTreeNode` (sealed) from `com.breadmoirai.garnet.project`; `scanFolder(path): FolderNode`.
 - Produces:
-  - `FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode>` (top-level public in package `com.breadmoirai.redstonespecs.network.project`).
+  - `FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode>` (top-level public in package `com.breadmoirai.garnet.network.project`).
   - `ProjectTreeSnapshotS2C(val root: FolderNode, val currentSubpath: String?)` — same `TYPE` / packet id `"tree_snapshot"`.
   - `ProjectLeafEntry` **removed**.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt`:
+Create `src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.network.project
+package com.breadmoirai.garnet.network.project
 
-import com.breadmoirai.redstonespecs.project.FileNode
-import com.breadmoirai.redstonespecs.project.FolderNode
+import com.breadmoirai.garnet.project.FileNode
+import com.breadmoirai.garnet.project.FolderNode
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.netty.buffer.Unpooled
@@ -97,9 +97,9 @@ Expected: FAIL — compilation error, `FILE_TREE_STREAM_CODEC` unresolved.
 In `ProjectPackets.kt`, add these imports near the top (after existing imports):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.project.FileNode
-import com.breadmoirai.redstonespecs.project.FileTreeNode
-import com.breadmoirai.redstonespecs.project.FolderNode
+import com.breadmoirai.garnet.project.FileNode
+import com.breadmoirai.garnet.project.FileTreeNode
+import com.breadmoirai.garnet.project.FolderNode
 ```
 
 Replace the entire `// === Tree listing ===` section (the `ProjectLeafEntry` data class AND the `ProjectTreeSnapshotS2C` data class, currently lines 11–47) with:
@@ -187,14 +187,14 @@ In `ProjectNetworkRegistry.kt`, replace the body of `sendTree` (lines 122–134)
     }
 ```
 
-(`scanFolder` and `FolderNode` resolve via the existing `import com.breadmoirai.redstonespecs.project.*` wildcard.)
+(`scanFolder` and `FolderNode` resolve via the existing `import com.breadmoirai.garnet.project.*` wildcard.)
 
 - [ ] **Step 5: Update `ProjectCommand` (the second sender)**
 
 In `ProjectCommand.kt`, remove the now-dead import line:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.project.ProjectLeafEntry
+import com.breadmoirai.garnet.network.project.ProjectLeafEntry
 ```
 
 Replace lines 37–43 (the `val tree = ProjectFolderTree.scan(root)` block through the `ServerPlayNetworking.send(...)` call) with:
@@ -207,7 +207,7 @@ Replace lines 37–43 (the `val tree = ProjectFolderTree.scan(root)` block throu
         ))
 ```
 
-(`ProjectCommand` is in package `com.breadmoirai.redstonespecs.project`, so `scanFolder` needs no import.)
+(`ProjectCommand` is in package `com.breadmoirai.garnet.project`, so `scanFolder` needs no import.)
 
 - [ ] **Step 6: Run test to verify it passes and main compiles**
 
@@ -217,7 +217,7 @@ Expected: BUILD SUCCESSFUL. `FileTreeCodecTest` passes (check console summary / 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectCommand.kt src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt src/main/kotlin/com/breadmoirai/garnet/project/ProjectCommand.kt src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt
 git commit -m "feat(project): ship recursive FileTree over the tree-snapshot payload"
 ```
 
@@ -226,8 +226,8 @@ git commit -m "feat(project): ship recursive FileTree over the tree-snapshot pay
 ### Task 2: Client state + recursive panel render
 
 **Files:**
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt`
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt`
 
 **Interfaces:**
 - Consumes: `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` from Task 1; `FileTreeNode`/`FolderNode`/`FileNode`; existing `ProjectTreeState.expanded` + `toggleExpanded(path)`.
@@ -267,7 +267,7 @@ In `reset()`, add `selectedPath = null` alongside the existing resets:
 Replace the entire body of `ProjectExplorerPanel.kt` (imports + composables) with:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ide
+package com.breadmoirai.garnet.client.ide
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -287,12 +287,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
-import com.breadmoirai.redstonespecs.network.project.ListProjectTreeC2S
-import com.breadmoirai.redstonespecs.network.project.LoadProjectFolderC2S
-import com.breadmoirai.redstonespecs.project.FileNode
-import com.breadmoirai.redstonespecs.project.FileTreeNode
-import com.breadmoirai.redstonespecs.project.FolderNode
+import com.breadmoirai.garnet.client.ui.compose.dock.Panel
+import com.breadmoirai.garnet.network.project.ListProjectTreeC2S
+import com.breadmoirai.garnet.network.project.LoadProjectFolderC2S
+import com.breadmoirai.garnet.project.FileNode
+import com.breadmoirai.garnet.project.FileTreeNode
+import com.breadmoirai.garnet.project.FolderNode
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 
 private val TEXT = Color(0xFFDDE3EC)
@@ -300,7 +300,7 @@ private val TEXT_DIM = Color(0xFF8FA0B5)
 private val SELECTED_BG = Color(0x334A90E2)
 
 /** The Explorer tab for DockState.leftPanels. */
-fun explorerPanel(): Panel = Panel("redstonespecs.explorer", "Explorer") { ProjectExplorer() }
+fun explorerPanel(): Panel = Panel("garnet.explorer", "Explorer") { ProjectExplorer() }
 
 @Composable
 private fun ProjectExplorer() {
@@ -376,7 +376,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt
 git commit -m "feat(ui): render the recursive project tree with expand/collapse and file select"
 ```
 
@@ -385,11 +385,11 @@ git commit -m "feat(ui): render the recursive project tree with expand/collapse 
 ### Task 3: Update gametest specs to the tree payload
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectNetworkRegistrySpec.kt:184-206`
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectCommandSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectNetworkRegistrySpec.kt:184-206`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectCommandSpec.kt`
 
 **Interfaces:**
-- Consumes: `ProjectTreeSnapshotS2C.root: FolderNode`; `FolderNode.walk(): Sequence<Pair<String, FileTreeNode>>` from `com.breadmoirai.redstonespecs.project`.
+- Consumes: `ProjectTreeSnapshotS2C.root: FolderNode`; `FolderNode.walk(): Sequence<Pair<String, FileTreeNode>>` from `com.breadmoirai.garnet.project`.
 
 Reminder: `writeStub(folder, "x")` writes `x.spec.kts` into `folder`, so `scanFolder`'s `walk()` paths are relative to the root (e.g. `"set-a/x.spec.kts"`).
 
@@ -398,13 +398,13 @@ Reminder: `writeStub(folder, "x")` writes `x.spec.kts` into `folder`, so `scanFo
 In `ProjectNetworkRegistrySpec.kt`, remove the now-unused import:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.project.ProjectFolderTree
+import com.breadmoirai.garnet.project.ProjectFolderTree
 ```
 
 Add these imports (alongside the other `io.kotest` / project imports):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.project.walk
+import com.breadmoirai.garnet.project.walk
 import io.kotest.matchers.collections.shouldContainAll
 ```
 
@@ -427,7 +427,7 @@ Also rename the test label to reflect the new source of truth:
 In `ProjectCommandSpec.kt`, add these imports:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.project.walk
+import com.breadmoirai.garnet.project.walk
 import io.kotest.matchers.collections.shouldContain
 ```
 
@@ -480,7 +480,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectNetworkRegistrySpec.kt src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectCommandSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectNetworkRegistrySpec.kt src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectCommandSpec.kt
 git commit -m "test(project): assert the recursive tree payload in gametest specs"
 ```
 
@@ -489,7 +489,7 @@ git commit -m "test(project): assert the recursive tree payload in gametest spec
 ### Task 4: Update the Explorer client test
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ProjectExplorerSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ProjectExplorerSpec.kt`
 
 **Interfaces:**
 - Consumes: `ProjectTreeSnapshotS2C(root, currentSubpath)`; `FolderNode`/`FileNode`; `FolderNode.walk()`; `ProjectTreeState.onSnapshot`/`toggleExpanded`/`reset`.
@@ -499,20 +499,20 @@ git commit -m "test(project): assert the recursive tree payload in gametest spec
 Replace the whole file with:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ide.ProjectTreeState
-import com.breadmoirai.redstonespecs.client.ide.explorerPanel
-import com.breadmoirai.redstonespecs.client.ui.compose.ComposeOverlay
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
-import com.breadmoirai.redstonespecs.client.viewport.ViewportState
-import com.breadmoirai.redstonespecs.client.viewport.WindowViewportExt
-import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.redstonespecs.project.FileNode
-import com.breadmoirai.redstonespecs.project.FolderNode
-import com.breadmoirai.redstonespecs.project.walk
-import com.breadmoirai.redstonespecs.testing.ClientSpec
+import com.breadmoirai.garnet.client.ide.ProjectTreeState
+import com.breadmoirai.garnet.client.ide.explorerPanel
+import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
+import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
+import com.breadmoirai.garnet.client.ui.compose.dock.DockState
+import com.breadmoirai.garnet.client.viewport.ViewportState
+import com.breadmoirai.garnet.client.viewport.WindowViewportExt
+import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.garnet.project.FileNode
+import com.breadmoirai.garnet.project.FolderNode
+import com.breadmoirai.garnet.project.walk
+import com.breadmoirai.garnet.testing.ClientSpec
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
@@ -553,7 +553,7 @@ class ProjectExplorerSpec : ClientSpec({
             DockState.setVisible(DockRegion.LEFT, true)
             DockState.setSize(DockRegion.LEFT, 300)
             ViewportState.active = true; ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(12)
         val paths = ProjectTreeState.snapshot!!.root.walk().map { it.first }.toList()
@@ -567,7 +567,7 @@ class ProjectExplorerSpec : ClientSpec({
 
         runOnClient { mc ->
             ComposeOverlay.enabled = false; ViewportState.active = false; DockState.reset()
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(6)
     }
@@ -587,7 +587,7 @@ Expected: BUILD SUCCESSFUL — `ProjectExplorerSpec` passes (walk-path assertion
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ProjectExplorerSpec.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ProjectExplorerSpec.kt
 git commit -m "test(ui): assert the Explorer renders the recursive nested tree"
 ```
 

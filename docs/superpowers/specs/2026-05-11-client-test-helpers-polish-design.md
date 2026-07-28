@@ -13,11 +13,11 @@ Two small cleanups on the client-test infrastructure shipped over the prior cycl
 1. **Split `ClientNetworkTestSupport.kt`** so its name matches its contents. The file accreted non-network helpers (`onClient`, `runOnClient`, `waitForClientScreen`, `closeClientScreen`, `takeClientScreenshot`, `waitClientTicks`) during the rapid iteration of the multi-cycle networking effort. Move those into a new `ClientTestSupport.kt`. The remaining `ClientNetworkTestSupport.kt` keeps the send helpers and `drainClientPayloads`.
 2. **Fix stale or misleading KDoc** in several places. No code-behavior change.
 
-Same-package resolution handles the move: both files live in `package com.breadmoirai.redstonespecs.test`, so call sites (`ClientNetworkSpec`, `RunRedstoneSpecSmokeTest`) need no import edits.
+Same-package resolution handles the move: both files live in `package com.breadmoirai.garnet.test`, so call sites (`ClientNetworkSpec`, `RunGarnetSpecSmokeTest`) need no import edits.
 
 ## File split
 
-**New `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSupport.kt`** (general client-test helpers; not network-specific):
+**New `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSupport.kt`** (general client-test helpers; not network-specific):
 
 - `clientContext(): ClientGameTestContext` and `currentWorld(): TestSingleplayerContext` (the holder accessors).
 - `onClient { mc -> ... }` and `runOnClient { mc -> ... }` (render-thread hop via pump + `ctx.computeOnClient`/`runOnClient`).
@@ -28,7 +28,7 @@ Same-package resolution handles the move: both files live in `package com.breadm
 
 Each function moves with its existing KDoc; doc fixes (next section) apply at the same time.
 
-**Slimmed `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt`** (network only):
+**Slimmed `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt`** (network only):
 
 - `sendToLocalPlayer` (private) + its `import java.util.concurrent.CountDownLatch`.
 - `sendOpenRecorderScreen` / `sendOpenRunnerScreen` / `sendRunnerStatus` / `sendOverwritePrompt`.
@@ -42,13 +42,13 @@ Five tightening edits. All in the new/moved files; no logic change.
 
 ### 1. `sendToLocalPlayer` KDoc (in `ClientNetworkTestSupport.kt`)
 
-Current text references `RedstoneTestSpec` and claims "we are usually already on the server thread". That's no longer true — consumers extend `ClientSpec`, which dispatches onto `Dispatchers.Default`, not the server thread. The same-thread fast path is effectively dead code today but stays as a safety net.
+Current text references `GarnetTestSpec` and claims "we are usually already on the server thread". That's no longer true — consumers extend `ClientSpec`, which dispatches onto `Dispatchers.Default`, not the server thread. The same-thread fast path is effectively dead code today but stays as a safety net.
 
 New text:
 
 > Synchronously sends an S2C payload to the integrated server's first overworld player.
 >
-> Hops to the server thread via `MinecraftServer.execute` and waits on a `CountDownLatch`. The `isSameThread` fast path is a safety net for callers that already happen to be on the server thread (e.g. a future `RedstoneTestSpec`-based caller); `ClientSpec` runs test bodies on `Dispatchers.Default`, so in normal use we always take the post-and-wait path.
+> Hops to the server thread via `MinecraftServer.execute` and waits on a `CountDownLatch`. The `isSameThread` fast path is a safety net for callers that already happen to be on the server thread (e.g. a future `GarnetTestSpec`-based caller); `ClientSpec` runs test bodies on `Dispatchers.Default`, so in normal use we always take the post-and-wait path.
 
 ### 2. `onClient` / `runOnClient` ordering and KDoc (in `ClientTestSupport.kt`)
 
@@ -91,11 +91,11 @@ Misleading — we explicitly install `Dispatchers.Default` in the factory, which
 
 New text:
 
-> Test bodies run on `Dispatchers.Default` (a kotlinx-coroutines pool), not on the server thread. This is the key difference from [RedstoneTestSpec], which is server-thread-first (correct for gametest, wrong for client tests):
+> Test bodies run on `Dispatchers.Default` (a kotlinx-coroutines pool), not on the server thread. This is the key difference from [GarnetTestSpec], which is server-thread-first (correct for gametest, wrong for client tests):
 >
 > - A worker-pool thread can sleep freely without blocking server ticks or client ticks, so polling helpers like `waitForClientScreen` work without deadlock.
 > - Server-side mutations hop explicitly via `onServer { … }`.
-> - Calls that already wrap themselves (e.g. `runRedstoneSpec`) switch threads internally — call them directly.
+> - Calls that already wrap themselves (e.g. `runGarnetSpec`) switch threads internally — call them directly.
 
 ### 5. `waitClientTicks` doc tightening (in `ClientTestSupport.kt`)
 

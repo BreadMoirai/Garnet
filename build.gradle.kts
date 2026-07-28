@@ -30,19 +30,19 @@ val clientTestSourceSet = sourceSets.create("clientTest")
 
 loom {
     // Widens the package-private com.mojang.blaze3d.opengl GL-backend classes the Compose-in-MC spike
-    // needs to fetch a raw GL framebuffer id (see redstonespecs.accesswidener + ComposeSurface.kt).
+    // needs to fetch a raw GL framebuffer id (see garnet.accesswidener + ComposeSurface.kt).
     // rootProject.file: Stonecutter's per-version subproject shares the root `src/`, so resolve the
     // widener against the repo root, not versions/<v>/.
-    accessWidenerPath.set(rootProject.file("src/main/resources/redstonespecs.classtweaker"))
+    accessWidenerPath.set(rootProject.file("src/main/resources/garnet.classtweaker"))
 
     splitEnvironmentSourceSets()
 
     mods {
-        register("redstonespecs") {
+        register("garnet") {
             sourceSet("main")
             sourceSet("client")
         }
-        register("redstonespecs-clienttest") {
+        register("garnet-clienttest") {
             sourceSet(clientTestSourceSet)
         }
     }
@@ -52,8 +52,8 @@ loom {
             client()
             source(clientTestSourceSet)
             property("fabric.client.gametest", "true")
-            vmArg("-Dlog4j2.logger.redstonespecs.name=Redstone Specs")
-            vmArg("-Dlog4j2.logger.redstonespecs.level=DEBUG")
+            vmArg("-Dlog4j2.logger.garnet.name=Garnet")
+            vmArg("-Dlog4j2.logger.garnet.level=DEBUG")
             vmArg("--sun-misc-unsafe-memory-access=allow")
             vmArg("--enable-native-access=ALL-UNNAMED")
         }
@@ -63,7 +63,7 @@ loom {
 fabricApi {
     configureTests {
         createSourceSet = true
-        modId = "redstonespecs-gametest"
+        modId = "garnet-gametest"
         enableGameTests = true
         enableClientGameTests = false
         eula = true
@@ -153,7 +153,7 @@ dependencies {
     implementation(kotlin("scripting-jvm"))
     implementation(kotlin("scripting-jvm-host"))
 
-    // KotlinPoet for emitting .spec.kts source from RedstoneSpec (data/serial/KtsSpecEmitter.kt)
+    // KotlinPoet for emitting .spec.kts source from GarnetSpec (data/serial/KtsSpecEmitter.kt)
     implementation("com.squareup:kotlinpoet:1.18.1")
 
     implementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
@@ -261,8 +261,8 @@ tasks {
     test {
         useJUnitPlatform()
         jvmArgs(
-            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
-            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+            "-Dlog4j2.logger.garnet.name=Garnet",
+            "-Dlog4j2.logger.garnet.level=DEBUG",
             // Mockito 5.x bundles Byte Buddy which only officially supports up to Java 24.
             // Java 25 is used here; this flag lets Byte Buddy instrument Java 25 classes experimentally.
             "-Dnet.bytebuddy.experimental=true",
@@ -273,8 +273,8 @@ tasks {
 
     named<JavaExec>("runGameTest") {
         jvmArgs(
-            "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
-            "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+            "-Dlog4j2.logger.garnet.name=Garnet",
+            "-Dlog4j2.logger.garnet.level=DEBUG",
             "--sun-misc-unsafe-memory-access=allow",
             "--enable-native-access=ALL-UNNAMED",
         )

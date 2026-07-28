@@ -73,14 +73,14 @@ One `KeyMapping` on `1`; the Alt/Shift distinction is read from live GLFW modifi
 - **Alt+1** — toggle focus of LEFT (Explorer): focus + cursor-release, or `clearFocus()` if already
   focused.
 - **Shift+1** — toggle LEFT visibility; if hiding a focused region, also `clearFocus()`, then
-  `redstonespecs$updateScaledFramebuffer(true)` so the world inset resizes immediately.
+  `garnet$updateScaledFramebuffer(true)` so the world inset resizes immediately.
 - Bare `1` falls through to the vanilla hotbar slot.
 
 Both branches also call `syncDockViewport()` (defined in `DockKeybinds.kt`) right after mutating
 `DockState` and before the framebuffer-resize call — see "Render enablement is derived from
 DockState" below for what it does and why it makes the dock reachable on its own.
 
-Registered from `RedstonespecsClient.onInitializeClient()` next to `registerViewportToggle()`.
+Registered from `GarnetClient.onInitializeClient()` next to `registerViewportToggle()`.
 
 ## Render enablement is derived from `DockState`, not a separate toggle
 
@@ -94,7 +94,7 @@ in-world. `DockState.anyActive()` reports whether the dock has anything to show 
 
 `syncDockViewport()` is intentionally free of any `Window` dependency (it only flips the two
 flags) so it can be exercised by a clientTest without GLFW; the keybind handler calls
-`redstonespecs$updateScaledFramebuffer(true)` separately, right after, to apply the shrink using
+`garnet$updateScaledFramebuffer(true)` separately, right after, to apply the shrink using
 the live window.
 
 The `V`/`C` keybinds in `ViewportToggle.kt` remain independent debug toggles for the viewport

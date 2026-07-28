@@ -25,7 +25,7 @@ Close the 4 client-side rows in `docs/use-cases/networking.md` that were deferre
 
 ### New test-support file
 
-`src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt` provides four payload-send helpers plus two accessors:
+`src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt` provides four payload-send helpers plus two accessors:
 
 ```
 fun clientContext(): ClientGameTestContext
@@ -42,13 +42,13 @@ Each send helper invokes `world.getServer().runOnServer { server -> server.overw
 
 ### New Kotest spec
 
-`src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt` is a `RedstoneTestSpec` with 4 tests (described below). Each test resets `RunnerScreen.active = null` and closes any open screen at the start to avoid bleed from earlier tests.
+`src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt` is a `GarnetTestSpec` with 4 tests (described below). Each test resets `RunnerScreen.active = null` and closes any open screen at the start to avoid bleed from earlier tests.
 
-**Critical:** the spec must be added to `ClientTestSentinel.runKotestOnWorker`'s `specs = listOf(...)` block. The list currently contains only `RunRedstoneSpecSmokeTest::class` — autoscan is off (same model as the gametest sentinel), so unregistered specs silently don't run.
+**Critical:** the spec must be added to `ClientTestSentinel.runKotestOnWorker`'s `specs = listOf(...)` block. The list currently contains only `RunGarnetSpecSmokeTest::class` — autoscan is off (same model as the gametest sentinel), so unregistered specs silently don't run.
 
 ### Existing production code under test
 
-`src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt` registers four `ClientPlayNetworking.registerGlobalReceiver` callbacks for `OverwritePromptS2CPayload`, `OpenRecorderScreenS2C`, `OpenRunnerScreenS2C`, and `RunnerStatusS2C`. All callbacks call `mc.execute { ... }` to hop to the client main thread before mutating screen state. The tests observe the screen state via `Minecraft.getInstance().screen` and `RunnerScreen.active` after a `waitForScreen(...)` / `waitTicks(...)` synchronization.
+`src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt` registers four `ClientPlayNetworking.registerGlobalReceiver` callbacks for `OverwritePromptS2CPayload`, `OpenRecorderScreenS2C`, `OpenRunnerScreenS2C`, and `RunnerStatusS2C`. All callbacks call `mc.execute { ... }` to hop to the client main thread before mutating screen state. The tests observe the screen state via `Minecraft.getInstance().screen` and `RunnerScreen.active` after a `waitForScreen(...)` / `waitTicks(...)` synchronization.
 
 No production-side changes required.
 
@@ -136,7 +136,7 @@ Partial: the receiver-opens-screen half is covered. The `BooleanConsumer` half (
 
 ### Setup hygiene per test
 
-- Each test runs in a `RedstoneTestSpec` block on the kotest worker thread; UI work is hopped to the client main thread by Minecraft itself (`mc.execute`).
+- Each test runs in a `GarnetTestSpec` block on the kotest worker thread; UI work is hopped to the client main thread by Minecraft itself (`mc.execute`).
 - Reset state at start: `Minecraft.getInstance().execute { Minecraft.getInstance().setScreen(null) }`; clear `RunnerScreen.active = null`.
 - Per-test position offsets stay above y=64 and within the test world's chunk loaded by the integrated server (positions starting at x=100 stay clear of the spawn area).
 - After the spec finishes, the world is closed by `ClientTestSentinel.runTest`'s `use { }` block; no per-test cleanup required for the world itself.
@@ -172,8 +172,8 @@ Final footnote set in the article: ⁴ (be.startRun hang) and ⁵ (UC-NET-04.a p
 
 ## Deliverables
 
-1. New `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt` (4 send helpers + 2 accessors).
-2. New `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkSpec.kt` (4 tests).
+1. New `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt` (4 send helpers + 2 accessors).
+2. New `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkSpec.kt` (4 tests).
 3. `ClientNetworkSpec::class` added to `ClientTestSentinel.runKotestOnWorker`'s `specs` list.
 4. Updated `docs/use-cases/networking.md` coverage matrix and footnotes; `last_audited_commit:` bumped.
 5. Full build verification: `cmd.exe /c "gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"` clean.

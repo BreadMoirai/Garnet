@@ -12,7 +12,7 @@ All gameplay-state mutations flow through `network/Packets.kt`. The contract is 
 
 The client never mutates spec state and never writes to disk. Even the file browser is a request: `RequestFileBrowserC2SPayload` -> `OpenFileBrowserS2CPayload(files: List<SpecFileInfo>)`. The client has no view of the save directory.
 
-`SpecFileInfo` is a denormalised projection (`id`, `mode`, `lifespan`, `inputCount`, `outputCount`, `structure`) computed on the server by `SpecPersistence.listSpecsInfo` — it loads each spec, extracts the summary, and sends a list. The client never reconstructs a full `RedstoneSpec` from `SpecFileInfo`; if it wants the body, it sends `LoadFromFileC2SPayload`.
+`SpecFileInfo` is a denormalised projection (`id`, `mode`, `lifespan`, `inputCount`, `outputCount`, `structure`) computed on the server by `SpecPersistence.listSpecsInfo` — it loads each spec, extracts the summary, and sends a list. The client never reconstructs a full `GarnetSpec` from `SpecFileInfo`; if it wants the body, it sends `LoadFromFileC2SPayload`.
 
 ## Invariant 2: every payload carries `originPos`
 
@@ -25,7 +25,7 @@ val be = player.level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?:
 This is the *only* sanctioned way to find the target BE in a network handler. There is no session, no handle, no token. Consequences:
 
 - **Stale references are silent no-ops.** If the spec block was broken/replaced between client send and server execute, the cast fails and the handler returns. There is no error feedback to the client.
-- **Block kind is re-validated** for state-changing transforms. The `transformToRunner`/`transformToRecorder`/`transformToEditor` handlers check `level.getBlockState(originPos).block is RedstoneSpecXBlock` because the underlying BE is shared across all three blocks — without the check, a `TransformToEditorC2SPayload` could be applied to a recorder.
+- **Block kind is re-validated** for state-changing transforms. The `transformToRunner`/`transformToRecorder`/`transformToEditor` handlers check `level.getBlockState(originPos).block is GarnetXBlock` because the underlying BE is shared across all three blocks — without the check, a `TransformToEditorC2SPayload` could be applied to a recorder.
 
 ## Invariant 3: entry coordinates are origin-relative
 

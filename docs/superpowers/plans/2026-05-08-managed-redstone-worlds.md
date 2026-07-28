@@ -15,7 +15,7 @@
 - Mixins on inherited methods must target the declaring class with an `instanceof` guard inside the inject body.
 - Use `-1` (0xFFFFFFFF) for white text — `0xFFFFFF` has alpha=0 and renders invisible in MC 26.1.
 - Render-state extraction uses `extractWidgetRenderState` / `GuiGraphicsExtractor` (NOT `renderWidget` / `GuiGraphics`).
-- All file paths in this plan use forward slashes; the project lives at `/mnt/h/Repo/RedstoneSpecs/`.
+- All file paths in this plan use forward slashes; the project lives at `/mnt/h/Repo/garnet/`.
 
 ---
 
@@ -26,14 +26,14 @@ These tasks are TDD-friendly and don't touch MC. They go in `src/main/kotlin/...
 ### Task 1: `ManagedRoot` value type + path-traversal guard
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedRoot.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedRootTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedRoot.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/managed/ManagedRootTest.kt`
 
 - [ ] **Step 1: Write failing tests**
 
 ```kotlin
 // ManagedRootTest.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -78,14 +78,14 @@ class ManagedRootTest {
 
 - [ ] **Step 2: Verify tests fail**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.ManagedRootTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.ManagedRootTest"`
 Expected: compile error (`ManagedRoot` not found).
 
 - [ ] **Step 3: Implement**
 
 ```kotlin
 // ManagedRoot.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -123,14 +123,14 @@ data class ManagedRoot(val path: Path) {
 
 - [ ] **Step 4: Verify tests pass**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.ManagedRootTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.ManagedRootTest"`
 Expected: 5 tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedRoot.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedRootTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedRoot.kt \
+        src/test/kotlin/com/breadmoirai/garnet/managed/ManagedRootTest.kt
 git commit -m "managed: ManagedRoot value type with traversal guard"
 ```
 
@@ -139,14 +139,14 @@ git commit -m "managed: ManagedRoot value type with traversal guard"
 ### Task 2: `ManagedFolderTree` filesystem scanner
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedFolderTree.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedFolderTreeTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedFolderTree.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/managed/ManagedFolderTreeTest.kt`
 
 - [ ] **Step 1: Write failing tests**
 
 ```kotlin
 // ManagedFolderTreeTest.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -205,14 +205,14 @@ class ManagedFolderTreeTest {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.ManagedFolderTreeTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.ManagedFolderTreeTest"`
 Expected: compile error.
 
 - [ ] **Step 3: Implement**
 
 ```kotlin
 // ManagedFolderTree.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -265,14 +265,14 @@ data class ManagedFolderTree(
 
 - [ ] **Step 4: Verify tests pass**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.ManagedFolderTreeTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.ManagedFolderTreeTest"`
 Expected: 5 pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedFolderTree.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/managed/ManagedFolderTreeTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedFolderTree.kt \
+        src/test/kotlin/com/breadmoirai/garnet/managed/ManagedFolderTreeTest.kt
 git commit -m "managed: ManagedFolderTree filesystem scanner"
 ```
 
@@ -281,17 +281,17 @@ git commit -m "managed: ManagedFolderTree filesystem scanner"
 ### Task 3: `GridLayout` pure layout function
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCell.kt`
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/GridLayout.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/GridLayoutTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCell.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/GridLayout.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/managed/GridLayoutTest.kt`
 
 - [ ] **Step 1: Write failing tests**
 
 ```kotlin
 // GridLayoutTest.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.garnet.data.GarnetSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import org.junit.jupiter.api.Test
@@ -305,9 +305,9 @@ class GridLayoutTest {
     private val yBase = 64
 
     private fun spec(id: String, size: Vec3i = Vec3i(5, 5, 5)) =
-        RedstoneSpec(id = id, bounds = size, lifespan = 20, structure = null, entries = emptyList())
+        GarnetSpec(id = id, bounds = size, lifespan = 20, structure = null, entries = emptyList())
 
-    private fun fileNamed(name: String, spec: RedstoneSpec) = LayoutInput(filename = name, spec = spec)
+    private fun fileNamed(name: String, spec: GarnetSpec) = LayoutInput(filename = name, spec = spec)
 
     @Test fun `single spec lands at origin`() {
         val out = GridLayout.compute(
@@ -365,14 +365,14 @@ class GridLayoutTest {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.GridLayoutTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.GridLayoutTest"`
 Expected: compile error.
 
 - [ ] **Step 3: Implement `ManagedCell.kt`**
 
 ```kotlin
 // ManagedCell.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
@@ -389,13 +389,13 @@ data class ManagedCell(
 
 ```kotlin
 // GridLayout.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.garnet.data.GarnetSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 
-data class LayoutInput(val filename: String, val spec: RedstoneSpec)
+data class LayoutInput(val filename: String, val spec: GarnetSpec)
 data class LayoutError(val specId: String, val filename: String, val reason: String)
 data class LayoutResult(
     val cells: Map<String, ManagedCell>,           // by spec id
@@ -450,15 +450,15 @@ object GridLayout {
 
 - [ ] **Step 5: Verify tests pass**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.GridLayoutTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.GridLayoutTest"`
 Expected: 5 pass.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCell.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/managed/GridLayout.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/managed/GridLayoutTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCell.kt \
+        src/main/kotlin/com/breadmoirai/garnet/managed/GridLayout.kt \
+        src/test/kotlin/com/breadmoirai/garnet/managed/GridLayoutTest.kt
 git commit -m "managed: GridLayout pure layout function"
 ```
 
@@ -467,14 +467,14 @@ git commit -m "managed: GridLayout pure layout function"
 ### Task 4: Subpath sanitization → dim id
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/DimIdSanitizer.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/managed/DimIdSanitizerTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/DimIdSanitizer.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/managed/DimIdSanitizerTest.kt`
 
 - [ ] **Step 1: Write failing tests**
 
 ```kotlin
 // DimIdSanitizerTest.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -501,21 +501,21 @@ class DimIdSanitizerTest {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.DimIdSanitizerTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.DimIdSanitizerTest"`
 Expected: compile error.
 
 - [ ] **Step 3: Implement**
 
 ```kotlin
 // DimIdSanitizer.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 object DimIdSanitizer {
     private val ALLOWED = Regex("[a-z0-9_/.\\-]")
 
     /**
      * Sanitizes a folder subpath (relative to the managed root) into the path component of a
-     * Minecraft `ResourceLocation`. The base prefix is `managed`; full id is `redstonespecs:<this>`.
+     * Minecraft `ResourceLocation`. The base prefix is `managed`; full id is `garnet:<this>`.
      * Rules: lowercase; chars outside `[a-z0-9_/.-]` become `_`. Empty → `managed`.
      */
     fun toPath(subpath: String): String {
@@ -530,14 +530,14 @@ object DimIdSanitizer {
 
 - [ ] **Step 4: Verify tests pass**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.managed.DimIdSanitizerTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.managed.DimIdSanitizerTest"`
 Expected: 5 pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/DimIdSanitizer.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/managed/DimIdSanitizerTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/DimIdSanitizer.kt \
+        src/test/kotlin/com/breadmoirai/garnet/managed/DimIdSanitizerTest.kt
 git commit -m "managed: subpath sanitization for dim ids"
 ```
 
@@ -548,14 +548,14 @@ git commit -m "managed: subpath sanitization for dim ids"
 ### Task 5: Managed void chunk generator + dimension type registration
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimensions.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt` (call `ManagedDimensions.bootstrap()` in mod init)
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimensions.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/garnet.kt` (call `ManagedDimensions.bootstrap()` in mod init)
 
 - [ ] **Step 1: Implement `ManagedDimensions.kt`**
 
 ```kotlin
 // ManagedDimensions.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import com.mojang.serialization.MapCodec
 import net.minecraft.core.Holder
@@ -586,12 +586,12 @@ import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings
 object ManagedDimensions {
     val DIMENSION_TYPE_KEY: ResourceKey<DimensionType> = ResourceKey.create(
         Registries.DIMENSION_TYPE,
-        Identifier.fromNamespaceAndPath("redstonespecs", "managed_void"),
+        Identifier.fromNamespaceAndPath("garnet", "managed_void"),
     )
 
     fun levelKey(sanitizedPath: String): ResourceKey<Level> = ResourceKey.create(
         Registries.DIMENSION,
-        Identifier.fromNamespaceAndPath("redstonespecs", sanitizedPath),
+        Identifier.fromNamespaceAndPath("garnet", sanitizedPath),
     )
 
     /** Builds an empty-flat ChunkGenerator using the server's biome registry. */
@@ -614,7 +614,7 @@ object ManagedDimensions {
 > **Implementer notes for this task:**
 >
 > 1. The exact constructor signatures of `FlatLevelGeneratorSettings`, `FlatLevelSource`, and `Biomes.THE_VOID` may vary per MC version. Consult `docs/minecraft/INDEX.md` and the decompiled MC sources (paths in `feedback_mc_sources` memory). The shape above matches MC 26.1; if the build fails, inspect `net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings` directly.
-> 2. The dimension *type* is **not** registered here at runtime. Instead, register it via a vanilla data-pack JSON resource at `src/main/resources/data/redstonespecs/dimension_type/managed_void.json` so MC bootstrap picks it up from the registry. JSON contents:
+> 2. The dimension *type* is **not** registered here at runtime. Instead, register it via a vanilla data-pack JSON resource at `src/main/resources/data/garnet/dimension_type/managed_void.json` so MC bootstrap picks it up from the registry. JSON contents:
 >
 >    ```json
 >    {
@@ -643,11 +643,11 @@ object ManagedDimensions {
 
 - [ ] **Step 2: Create the dimension-type JSON**
 
-Create `src/main/resources/data/redstonespecs/dimension_type/managed_void.json` with the JSON above.
+Create `src/main/resources/data/garnet/dimension_type/managed_void.json` with the JSON above.
 
-- [ ] **Step 3: Wire in `Redstonespecs.kt`**
+- [ ] **Step 3: Wire in `garnet.kt`**
 
-Read the current `onInitialize` body and call `ManagedDimensions` only if it has any side-effecting bootstrap (currently it doesn't). For now, no edit to `Redstonespecs.kt` is needed at this task; `ManagedDimRegistry` (Task 6) will pull the codec on demand.
+Read the current `onInitialize` body and call `ManagedDimensions` only if it has any side-effecting bootstrap (currently it doesn't). For now, no edit to `garnet.kt` is needed at this task; `ManagedDimRegistry` (Task 6) will pull the codec on demand.
 
 - [ ] **Step 4: Build verification**
 
@@ -657,8 +657,8 @@ Expected: BUILD SUCCESSFUL. (Unit tests don't cover this — it requires an MC b
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimensions.kt \
-        src/main/resources/data/redstonespecs/dimension_type/managed_void.json
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimensions.kt \
+        src/main/resources/data/garnet/dimension_type/managed_void.json
 git commit -m "managed: void DimensionType registration + flat-void generator helper"
 ```
 
@@ -667,13 +667,13 @@ git commit -m "managed: void DimensionType registration + flat-void generator he
 ### Task 6: `ManagedDimRegistry` — dynamic level registration
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimRegistry.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimRegistry.kt`
 
 - [ ] **Step 1: Implement**
 
 ```kotlin
 // ManagedDimRegistry.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import net.fabricmc.fabric.api.dimension.v1.FabricDimensions
 import net.minecraft.core.BlockPos
@@ -686,7 +686,7 @@ import net.minecraft.world.level.dimension.LevelStem
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 /**
  * One per `MinecraftServer`. Owns:
@@ -802,7 +802,7 @@ Expected: BUILD SUCCESSFUL. If `FabricDimensions` doesn't resolve, add `fabric-d
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimRegistry.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimRegistry.kt
 git commit -m "managed: ManagedDimRegistry for dynamic level registration"
 ```
 
@@ -811,7 +811,7 @@ git commit -m "managed: ManagedDimRegistry for dynamic level registration"
 ### Task 7: `ManagedSession` — loaded-folder state
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSession.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedSession.kt`
 
 A `ManagedSession` is the in-memory state for "the currently loaded folder for player X." It owns the layout, the loaded-snapshot of each cell (for dirty diff), and the source-file paths.
 
@@ -819,9 +819,9 @@ A `ManagedSession` is the in-memory state for "the currently loaded folder for p
 
 ```kotlin
 // ManagedSession.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
+import com.breadmoirai.garnet.data.GarnetSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import java.nio.file.Path
@@ -836,7 +836,7 @@ import java.util.UUID
  */
 data class LoadedSpec(
     val cell: ManagedCell,
-    val spec: RedstoneSpec,
+    val spec: GarnetSpec,
     val sourceFile: Path,           // absolute path to the .spec.kts on disk
     val loadedSnapshot: StructureTemplate,
 )
@@ -870,7 +870,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedSession.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedSession.kt
 git commit -m "managed: ManagedSession state (loaded folder per player)"
 ```
 
@@ -879,17 +879,17 @@ git commit -m "managed: ManagedSession state (loaded folder per player)"
 ### Task 8: `ManagedCellSaver` — capture & write back
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCellSaver.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCellSaver.kt`
 
 - [ ] **Step 1: Implement**
 
 ```kotlin
 // ManagedCellSaver.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
-import com.breadmoirai.redstonespecs.persistence.StructurePersistence
+import com.breadmoirai.garnet.data.GarnetSpec
+import com.breadmoirai.garnet.data.serial.KtsSpecEmitter
+import com.breadmoirai.garnet.persistence.StructurePersistence
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.level.ServerLevel
@@ -899,7 +899,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.writeText
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 data class CellSaveResult(val specId: String, val saved: Boolean, val error: String? = null)
 
@@ -923,7 +923,7 @@ object ManagedCellSaver {
 
         return runCatching {
             // .spec.kts: rewrite to source path; preserve `structure` field.
-            val newSpec: RedstoneSpec = loaded.spec  // structure-id reference and entries unchanged here
+            val newSpec: GarnetSpec = loaded.spec  // structure-id reference and entries unchanged here
             loaded.sourceFile.writeText(KtsSpecEmitter.emit(newSpec))
             // structure NBT: write next to .spec.kts using `<structureId>.nbt`.
             val structureId = newSpec.structure ?: newSpec.id
@@ -938,7 +938,7 @@ object ManagedCellSaver {
         }
     }
 
-    private fun RedstoneSpec.specIdSafe(): String = id
+    private fun GarnetSpec.specIdSafe(): String = id
 }
 ```
 
@@ -952,7 +952,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCellSaver.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCellSaver.kt
 git commit -m "managed: ManagedCellSaver writes per-spec changes back to disk"
 ```
 
@@ -961,19 +961,19 @@ git commit -m "managed: ManagedCellSaver writes per-spec changes back to disk"
 ### Task 9: `ManagedDimLifecycle.load` — open a folder
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimLifecycle.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimLifecycle.kt`
 
 - [ ] **Step 1: Implement (load flow)**
 
 ```kotlin
 // ManagedDimLifecycle.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader
+import com.breadmoirai.garnet.ModRegistries
+import com.breadmoirai.garnet.block.SpecBlockEntity
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.data.GarnetSpec
+import com.breadmoirai.garnet.data.serial.KtsSpecLoader
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtAccounter
@@ -991,7 +991,7 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 data class LoadFolderReport(
     val subpath: String,
@@ -1015,11 +1015,11 @@ object ManagedDimLifecycle {
 
         // 1. Parse all .spec.kts under the folder (one level).
         val files = folder.listDirectoryEntries("*.spec.kts").sortedBy { it.name }
-        val parsed = mutableListOf<Pair<String, RedstoneSpec>>()  // (filename, spec)
+        val parsed = mutableListOf<Pair<String, GarnetSpec>>()  // (filename, spec)
         val parseErrors = mutableListOf<ParseError>()
         for (f in files) {
             try {
-                parsed.add(f.name to KtsSpecLoader.loadFileAsRedstoneSpec(f))
+                parsed.add(f.name to KtsSpecLoader.loadFileAsGarnetSpec(f))
             } catch (e: Exception) {
                 parseErrors.add(ParseError(f.name, e.message ?: e::class.simpleName ?: "unknown"))
             }
@@ -1079,7 +1079,7 @@ object ManagedDimLifecycle {
         level: ServerLevel,
         folder: Path,
         filename: String,
-        spec: RedstoneSpec,
+        spec: GarnetSpec,
         cell: ManagedCell,
     ): StructureTemplate? {
         val structureFile = folder.resolve("${spec.structure ?: spec.id}.nbt")
@@ -1099,9 +1099,9 @@ object ManagedDimLifecycle {
         // Place runner block (or recorder for new spec) at cell origin's +X edge.
         val auxPos = cell.origin.offset(spec.bounds.x, 0, 0)
         val anchorBlock = if (structureFile.exists()) {
-            ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK
+            ModRegistries.GARNET_RUNNER_BLOCK
         } else {
-            ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK
+            ModRegistries.GARNET_RECORDER_BLOCK
         }
         level.setBlock(auxPos, anchorBlock.defaultBlockState(), 2)
         val be = level.getBlockEntity(auxPos) as? SpecBlockEntity
@@ -1117,7 +1117,7 @@ object ManagedDimLifecycle {
 ```
 
 > **Implementer notes:**
-> - `KtsSpecLoader.loadFileAsRedstoneSpec(Path)` is the existing API (see `SpecPersistence.load`).
+> - `KtsSpecLoader.loadFileAsGarnetSpec(Path)` is the existing API (see `SpecPersistence.load`).
 > - The runner block is placed at `cell.origin + (bounds.x, 0, 0)` — this lands one block past the +X face of the structure, *outside* the spec's bounds AABB. This means it's also outside the save scan, so changing it doesn't dirty the spec.
 > - The "snapshot includes runner" choice differs from the spec doc but is simpler and the runner block isn't inside `bounds` so there's no actual difference in semantics; `bounds` defines what's saved.
 > - Re-read the design doc Section 6 if confused.
@@ -1130,7 +1130,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimLifecycle.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimLifecycle.kt
 git commit -m "managed: ManagedDimLifecycle.load opens a folder into its dim"
 ```
 
@@ -1139,7 +1139,7 @@ git commit -m "managed: ManagedDimLifecycle.load opens a folder into its dim"
 ### Task 10: `ManagedDimLifecycle.unload` and `saveNow`
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimLifecycle.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimLifecycle.kt`
 
 - [ ] **Step 1: Add unload + saveNow**
 
@@ -1183,7 +1183,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimLifecycle.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimLifecycle.kt
 git commit -m "managed: saveNow + unload flows"
 ```
 
@@ -1192,22 +1192,22 @@ git commit -m "managed: saveNow + unload flows"
 ### Task 11: New-spec creator
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedNewSpec.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedNewSpec.kt`
 
 - [ ] **Step 1: Implement**
 
 ```kotlin
 // ManagedNewSpec.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
+import com.breadmoirai.garnet.data.GarnetSpec
+import com.breadmoirai.garnet.data.serial.KtsSpecEmitter
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 object ManagedNewSpec {
     /**
@@ -1222,7 +1222,7 @@ object ManagedNewSpec {
         }
         val file = folder.resolve("$name.spec.kts")
         require(!file.exists()) { "spec file already exists: $file" }
-        val stub = RedstoneSpec.new(name)
+        val stub = GarnetSpec.new(name)
         file.writeText(KtsSpecEmitter.emit(stub))
         LOGGER.info("[ManagedNewSpec] created stub '{}'", file)
         return file
@@ -1238,7 +1238,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedNewSpec.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedNewSpec.kt
 git commit -m "managed: ManagedNewSpec stub creator"
 ```
 
@@ -1249,20 +1249,20 @@ git commit -m "managed: ManagedNewSpec stub creator"
 ### Task 12: Extend `SharedSettings` with grid + root config
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/config/SharedSettings.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/config/SharedSettings.kt`
 
 - [ ] **Step 1: Edit**
 
 Replace the file with:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.config
+package com.breadmoirai.garnet.config
 
 import net.minecraft.core.Vec3i
 
 object SharedSettings {
     // Existing
-    var specSaveDir: String = "redstonespecs"
+    var specSaveDir: String = "garnet"
 
     // Managed-worlds: grid layout
     var managedCellSize: Vec3i = Vec3i(32, 32, 32)
@@ -1284,7 +1284,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/config/SharedSettings.kt
+git add src/main/kotlin/com/breadmoirai/garnet/config/SharedSettings.kt
 git commit -m "config: managed-worlds grid + root settings"
 ```
 
@@ -1293,13 +1293,13 @@ git commit -m "config: managed-worlds grid + root settings"
 ### Task 13: Client-side managed-roots registry file
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedRootsConfig.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedRootsConfigTest.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedRootsConfig.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/client/managed/ManagedRootsConfigTest.kt`
 
 - [ ] **Step 1: Write failing test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.managed
+package com.breadmoirai.garnet.client.managed
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -1321,14 +1321,14 @@ class ManagedRootsConfigTest {
 
 - [ ] **Step 2: Verify failure**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.client.managed.ManagedRootsConfigTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.client.managed.ManagedRootsConfigTest"`
 Expected: compile error.
 
 - [ ] **Step 3: Implement**
 
 ```kotlin
 // ManagedRootsConfig.kt
-package com.breadmoirai.redstonespecs.client.managed
+package com.breadmoirai.garnet.client.managed
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -1357,14 +1357,14 @@ object ManagedRootsConfig {
 
 - [ ] **Step 4: Verify tests pass**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.client.managed.ManagedRootsConfigTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.client.managed.ManagedRootsConfigTest"`
 Expected: 2 pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedRootsConfig.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedRootsConfigTest.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedRootsConfig.kt \
+        src/test/kotlin/com/breadmoirai/garnet/client/managed/ManagedRootsConfigTest.kt
 git commit -m "client/managed: persistent managed-roots list"
 ```
 
@@ -1375,7 +1375,7 @@ git commit -m "client/managed: persistent managed-roots list"
 ### Task 14: Define managed payloads
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedPackets.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedPackets.kt`
 
 - [ ] **Step 1: Implement**
 
@@ -1383,7 +1383,7 @@ Write the payloads following the exact pattern of `network/Packets.kt` (data cla
 
 ```kotlin
 // ManagedPackets.kt
-package com.breadmoirai.redstonespecs.network.managed
+package com.breadmoirai.garnet.network.managed
 
 import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
@@ -1391,7 +1391,7 @@ import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.Identifier
 
-private fun id(p: String) = Identifier.fromNamespaceAndPath("redstonespecs", "managed_$p")
+private fun id(p: String) = Identifier.fromNamespaceAndPath("garnet", "managed_$p")
 
 // === Tree listing ===
 
@@ -1524,7 +1524,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedPackets.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedPackets.kt
 git commit -m "network/managed: payloads for tree, load, save, new-spec, errors"
 ```
 
@@ -1533,16 +1533,16 @@ git commit -m "network/managed: payloads for tree, load, save, new-spec, errors"
 ### Task 15: Server handlers + payload registration
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedNetworkRegistry.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt` (call into managed registration)
+- Create: `src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedNetworkRegistry.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt` (call into managed registration)
 
 - [ ] **Step 1: Implement `ManagedNetworkRegistry.kt`**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.network.managed
+package com.breadmoirai.garnet.network.managed
 
-import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.managed.*
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.managed.*
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
@@ -1550,7 +1550,7 @@ import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 object ManagedNetworkRegistry {
 
@@ -1680,15 +1680,15 @@ object ManagedNetworkRegistry {
 Append at the end of `NetworkRegistry.kt`'s `registerNetworking()` function:
 
 ```kotlin
-    com.breadmoirai.redstonespecs.network.managed.ManagedNetworkRegistry.register()
+    com.breadmoirai.garnet.network.managed.ManagedNetworkRegistry.register()
 ```
 
 - [ ] **Step 3: Create `ManagedServerContext`** — a server attachment for the active managed root (referenced above)
 
-Create `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedServerContext.kt`:
+Create `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedServerContext.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import net.minecraft.server.MinecraftServer
 
@@ -1715,9 +1715,9 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedServerContext.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/ManagedNetworkRegistry.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedServerContext.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/managed/ManagedNetworkRegistry.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt
 git commit -m "network/managed: server handlers + ManagedServerContext"
 ```
 
@@ -1728,13 +1728,13 @@ git commit -m "network/managed: server handlers + ManagedServerContext"
 ### Task 16: Wire `SpecBlockEntity` to consult registry on load
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`
 
 The current BE binds its spec from on-disk `.spec.kts` via the explicit network packets. In a managed dim, the BE should additionally accept the spec injected by `ManagedDimLifecycle.placeCell` (already done via `be.setSpec(spec)`) and remember its source path. The minimal change is to add a single optional field `managedSourcePath: Path?` to the BE that the lifecycle sets after `setSpec`. This lets `RecordingFinalizer` write back to the source file.
 
 - [ ] **Step 1: Read the existing BE**
 
-Run: `cat src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt | head -80`
+Run: `cat src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt | head -80`
 
 Identify where `setSpec` is defined.
 
@@ -1765,8 +1765,8 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedDimLifecycle.kt
+git add src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt \
+        src/main/kotlin/com/breadmoirai/garnet/managed/ManagedDimLifecycle.kt
 git commit -m "managed: thread source-file path through SpecBlockEntity"
 ```
 
@@ -1775,14 +1775,14 @@ git commit -m "managed: thread source-file path through SpecBlockEntity"
 ### Task 17: Make recorder finalize write back to managed source
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingFinalizer.kt` *(or whichever file currently calls `SpecPersistence.save` after a recording ends)*
-- Read first: `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt:stopRecordingAndFinalize`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/runner/RecordingFinalizer.kt` *(or whichever file currently calls `SpecPersistence.save` after a recording ends)*
+- Read first: `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt:stopRecordingAndFinalize`
 
-The existing finalize path computes a fresh `RedstoneSpec` and saves it via `SpecPersistence.save(saveDir, spec, recording)` to the world's central `redstonespecs/` directory. In a managed dim we want to write back to `be.managedSourcePath` instead.
+The existing finalize path computes a fresh `GarnetSpec` and saves it via `SpecPersistence.save(saveDir, spec, recording)` to the world's central `garnet/` directory. In a managed dim we want to write back to `be.managedSourcePath` instead.
 
 - [ ] **Step 1: Locate the call site**
 
-Run: `grep -n "SpecPersistence.save" src/main/kotlin/com/breadmoirai/redstonespecs/`
+Run: `grep -n "SpecPersistence.save" src/main/kotlin/com/breadmoirai/garnet/`
 
 Read the call sites.
 
@@ -1795,10 +1795,10 @@ In whatever method finalizes (likely `SpecBlockEntity.stopRecordingAndFinalize` 
         if (src != null) {
             // Managed dim: write back to source file directly. Structure NBT is written by
             // ManagedCellSaver on save-now / unload, not here.
-            src.writeText(com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter.emit(spec))
+            src.writeText(com.breadmoirai.garnet.data.serial.KtsSpecEmitter.emit(spec))
             LOGGER.debug("[finalize] managed: wrote back to {}", src)
         } else {
-            com.breadmoirai.redstonespecs.persistence.SpecPersistence.save(saveDir, spec, recording)
+            com.breadmoirai.garnet.persistence.SpecPersistence.save(saveDir, spec, recording)
         }
 ```
 
@@ -1812,7 +1812,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/...  # whichever file
+git add src/main/kotlin/com/breadmoirai/garnet/...  # whichever file
 git commit -m "runner: finalize writes back to managed source path when set"
 ```
 
@@ -1823,7 +1823,7 @@ git commit -m "runner: finalize writes back to managed source path when set"
 ### Task 18: `ManagedScreen` — folder browser
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedScreen.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedScreen.kt`
 
 Read existing screens for the patterns (`SpecEditorScreen`, file-browser screen) before writing.
 
@@ -1837,9 +1837,9 @@ Identify the existing screen class hierarchy and the `Screen` API in use. Then i
 
 ```kotlin
 // ManagedScreen.kt
-package com.breadmoirai.redstonespecs.client.managed
+package com.breadmoirai.garnet.client.managed
 
-import com.breadmoirai.redstonespecs.network.managed.*
+import com.breadmoirai.garnet.network.managed.*
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
@@ -1953,7 +1953,7 @@ Expected: BUILD SUCCESSFUL. (Adjust imports — e.g. `CommonComponents` location
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedScreen.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedScreen.kt
 git commit -m "client/managed: ManagedScreen folder browser"
 ```
 
@@ -1962,15 +1962,15 @@ git commit -m "client/managed: ManagedScreen folder browser"
 ### Task 19: Client-side payload receivers
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedClientNetworking.kt`
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/RedstonespecsClient.kt` (call `ManagedClientNetworking.register()` from `onInitializeClient`)
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedClientNetworking.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/GarnetClient.kt` (call `ManagedClientNetworking.register()` from `onInitializeClient`)
 
 - [ ] **Step 1: Implement**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.managed
+package com.breadmoirai.garnet.client.managed
 
-import com.breadmoirai.redstonespecs.network.managed.*
+import com.breadmoirai.garnet.network.managed.*
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 
@@ -2002,10 +2002,10 @@ object ManagedClientNetworking {
 
 - [ ] **Step 2: Wire**
 
-In `RedstonespecsClient.onInitializeClient()`, append:
+In `GarnetClient.onInitializeClient()`, append:
 
 ```kotlin
-        com.breadmoirai.redstonespecs.client.managed.ManagedClientNetworking.register()
+        com.breadmoirai.garnet.client.managed.ManagedClientNetworking.register()
 ```
 
 - [ ] **Step 3: Build verification**
@@ -2016,8 +2016,8 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedClientNetworking.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/RedstonespecsClient.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedClientNetworking.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/GarnetClient.kt
 git commit -m "client/managed: payload receivers + wiring"
 ```
 
@@ -2026,20 +2026,20 @@ git commit -m "client/managed: payload receivers + wiring"
 ### Task 20: `ManagedRootListScreen` and SelectWorldScreen mixin
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedRootListScreen.kt`
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/mixin/SelectWorldScreenMixin.kt`
-- Modify: `src/client/resources/redstonespecs.client.mixins.json` (add the mixin)
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedRootListScreen.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/mixin/SelectWorldScreenMixin.kt`
+- Modify: `src/client/resources/garnet.client.mixins.json` (add the mixin)
 
 - [ ] **Step 1: Read the project's existing client mixin file**
 
-Run: `cat src/client/resources/redstonespecs.client.mixins.json`
+Run: `cat src/client/resources/garnet.client.mixins.json`
 
 Confirm the mixin file location and structure. (If it doesn't exist yet, find the existing mixins json under `src/main/resources` and study its format.)
 
 - [ ] **Step 2: Implement `ManagedRootListScreen.kt`**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.managed
+package com.breadmoirai.garnet.client.managed
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
@@ -2054,7 +2054,7 @@ class ManagedRootListScreen(private val parent: Screen) :
 
     private val configPath: Path =
         net.fabricmc.loader.api.FabricLoader.getInstance().configDir
-            .resolve("redstonespecs/managed-roots.json")
+            .resolve("garnet/managed-roots.json")
     private var roots: MutableList<String> = ManagedRootsConfig.load(configPath).toMutableList()
     private var newRootInput: String = ""
 
@@ -2120,9 +2120,9 @@ class ManagedRootListScreen(private val parent: Screen) :
 
 ```kotlin
 // SelectWorldScreenMixin.kt
-package com.breadmoirai.redstonespecs.client.mixin
+package com.breadmoirai.garnet.client.mixin
 
-import com.breadmoirai.redstonespecs.client.managed.ManagedRootListScreen
+import com.breadmoirai.garnet.client.managed.ManagedRootListScreen
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
@@ -2137,7 +2137,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 abstract class SelectWorldScreenMixin : Screen(Component.empty()) {
 
     @Inject(method = ["init"], at = [At("TAIL")])
-    private fun redstonespecs_addManagedButton(ci: CallbackInfo) {
+    private fun garnet_addManagedButton(ci: CallbackInfo) {
         val self = (this as Any) as Screen
         val w = self.width
         val h = self.height
@@ -2156,7 +2156,7 @@ abstract class SelectWorldScreenMixin : Screen(Component.empty()) {
 
 - [ ] **Step 4: Register the mixin**
 
-Add `"client.mixin.SelectWorldScreenMixin"` to the `mixins` array in the client mixin JSON. (Or add a new `redstonespecs.client.mixins.json` if it doesn't exist; reference an existing mixin JSON in the repo for the package layout.)
+Add `"client.mixin.SelectWorldScreenMixin"` to the `mixins` array in the client mixin JSON. (Or add a new `garnet.client.mixins.json` if it doesn't exist; reference an existing mixin JSON in the repo for the package layout.)
 
 - [ ] **Step 5: Build verification**
 
@@ -2166,9 +2166,9 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedRootListScreen.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/mixin/SelectWorldScreenMixin.kt \
-        src/client/resources/redstonespecs.client.mixins.json
+git add src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedRootListScreen.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/mixin/SelectWorldScreenMixin.kt \
+        src/client/resources/garnet.client.mixins.json
 git commit -m "client/managed: world-list button + ManagedRootListScreen"
 ```
 
@@ -2177,16 +2177,16 @@ git commit -m "client/managed: world-list button + ManagedRootListScreen"
 ### Task 21: `ManagedIntegratedBoot` — boot an integrated server pinned to a root
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedIntegratedBoot.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedIntegratedBoot.kt`
 
 This is the trickiest client-side piece. The cleanest path is:
 
-1. Pre-create or reuse a stub vanilla world directory under `<.minecraft>/saves/redstonespecs-managed-session/<rootHash>/`.
+1. Pre-create or reuse a stub vanilla world directory under `<.minecraft>/saves/garnet-managed-session/<rootHash>/`.
 2. Use `Minecraft.createWorldOpenFlows().createFreshLevel(...)` (or whatever the MC 26.1 entry point is — see the decompiled sources for `CreateWorldScreen` to find the call) to boot the integrated server with that save directory.
 3. Before the server starts ticking, call `ManagedServerContext.set(server, ManagedServerContext(ManagedRoot(rootPath)))` via a `ServerLifecycleEvents.SERVER_STARTING` callback.
 4. After the player has joined, automatically open `ManagedScreen` on the client via `Minecraft.getInstance().setScreen(ManagedScreen())`.
 
-Implementer note: this involves MC's world-creation flow which is involved. A simpler, equally valid v1 approach: have the user create a normal singleplayer world themselves, and inside it open `ManagedScreen` via a command (`/redstonespecs managed`). The world-list button then navigates to a screen that explains "Open any world and run /redstonespecs managed" or directly creates a world via the standard flow first. **Decide based on how complex the createFreshLevel path turns out to be when read.**
+Implementer note: this involves MC's world-creation flow which is involved. A simpler, equally valid v1 approach: have the user create a normal singleplayer world themselves, and inside it open `ManagedScreen` via a command (`/garnet managed`). The world-list button then navigates to a screen that explains "Open any world and run /garnet managed" or directly creates a world via the standard flow first. **Decide based on how complex the createFreshLevel path turns out to be when read.**
 
 - [ ] **Step 1: Read MC's `CreateWorldScreen.createNewWorld` (or equivalent)**
 
@@ -2198,16 +2198,16 @@ Open the file. Identify the public entry that creates and starts a fresh integra
 
 ```kotlin
 // ManagedIntegratedBoot.kt
-package com.breadmoirai.redstonespecs.client.managed
+package com.breadmoirai.garnet.client.managed
 
-import com.breadmoirai.redstonespecs.managed.ManagedRoot
-import com.breadmoirai.redstonespecs.managed.ManagedServerContext
+import com.breadmoirai.garnet.managed.ManagedRoot
+import com.breadmoirai.garnet.managed.ManagedServerContext
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 object ManagedIntegratedBoot {
     /**
@@ -2245,7 +2245,7 @@ object ManagedIntegratedBoot {
 
 > **Implementer note:** The `TODO(implementer)` above is intentional — Section 14 of the spec lists this as an open question (cheapest way to skip world generation cost on a throwaway integrated server). Resolve it during this task by reading `CreateWorldScreen` and either:
 >   1. Calling its create-fresh-level path with a flat preset and the configured root-derived save name, OR
->   2. Documenting in the GUI "you must enter any singleplayer world first" and using the in-world `/redstonespecs managed` command flow.
+>   2. Documenting in the GUI "you must enter any singleplayer world first" and using the in-world `/garnet managed` command flow.
 >
 > Either is acceptable for v1. Pick whichever is shorter to implement and update this task's commit message accordingly.
 
@@ -2257,25 +2257,25 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/ManagedIntegratedBoot.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/managed/ManagedIntegratedBoot.kt
 git commit -m "client/managed: integrated-server boot pinning ManagedServerContext"
 ```
 
 ---
 
-### Task 22: `/redstonespecs managed` command
+### Task 22: `/garnet managed` command
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCommand.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt` (register on `CommandRegistrationCallback`)
+- Create: `src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCommand.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/garnet.kt` (register on `CommandRegistrationCallback`)
 
-A command path is the safest in-world entry point; the GUI button approach can fall back to "join any world, run /redstonespecs managed".
+A command path is the safest in-world entry point; the GUI button approach can fall back to "join any world, run /garnet managed".
 
 - [ ] **Step 1: Implement**
 
 ```kotlin
 // ManagedCommand.kt
-package com.breadmoirai.redstonespecs.managed
+package com.breadmoirai.garnet.managed
 
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.Command
@@ -2287,7 +2287,7 @@ import net.minecraft.network.chat.Component
 object ManagedCommand {
     fun register(dispatcher: CommandDispatcher<CommandSourceStack>) {
         dispatcher.register(
-            Commands.literal("redstonespecs")
+            Commands.literal("garnet")
                 .then(Commands.literal("managed").executes(::open))
         )
     }
@@ -2303,7 +2303,7 @@ object ManagedCommand {
             player,
             // We need a "open managed screen" S2C. Reusing TreeSnapshot works only if a screen is already open.
             // Add a tiny S2C: OpenManagedScreenS2C below in a follow-up if needed. For now, send tree:
-            com.breadmoirai.redstonespecs.network.managed.ManagedTreeSnapshotS2C(emptyList(), emptyList(), null)
+            com.breadmoirai.garnet.network.managed.ManagedTreeSnapshotS2C(emptyList(), emptyList(), null)
         )
         src.sendSystemMessage(Component.literal("Open the managed screen via the world-select button (or the in-game keybind)."))
         return Command.SINGLE_SUCCESS
@@ -2315,23 +2315,23 @@ object ManagedCommand {
 
 - [ ] **Step 2: Wire registration**
 
-In `Redstonespecs.kt`'s `onInitialize`, add:
+In `garnet.kt`'s `onInitialize`, add:
 
 ```kotlin
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTING.register { server ->
             // dedicated server: pin from config
-            val cfg = com.breadmoirai.redstonespecs.config.SharedSettings.managedRootPath
+            val cfg = com.breadmoirai.garnet.config.SharedSettings.managedRootPath
             if (cfg.isNotBlank()) {
-                com.breadmoirai.redstonespecs.managed.ManagedServerContext.set(
+                com.breadmoirai.garnet.managed.ManagedServerContext.set(
                     server,
-                    com.breadmoirai.redstonespecs.managed.ManagedServerContext(
-                        com.breadmoirai.redstonespecs.managed.ManagedRoot(java.nio.file.Path.of(cfg).toAbsolutePath())
+                    com.breadmoirai.garnet.managed.ManagedServerContext(
+                        com.breadmoirai.garnet.managed.ManagedRoot(java.nio.file.Path.of(cfg).toAbsolutePath())
                     ),
                 )
             }
         }
         net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-            com.breadmoirai.redstonespecs.managed.ManagedCommand.register(dispatcher)
+            com.breadmoirai.garnet.managed.ManagedCommand.register(dispatcher)
         }
 ```
 
@@ -2343,9 +2343,9 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/managed/ManagedCommand.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt
-git commit -m "managed: /redstonespecs managed command + dedicated-server context pin"
+git add src/main/kotlin/com/breadmoirai/garnet/managed/ManagedCommand.kt \
+        src/main/kotlin/com/breadmoirai/garnet/garnet.kt
+git commit -m "managed: /garnet managed command + dedicated-server context pin"
 ```
 
 ---
@@ -2355,22 +2355,22 @@ git commit -m "managed: /redstonespecs managed command + dedicated-server contex
 ### Task 23: Gametest — load + save-back
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/gametest/managed/ManagedDimGameTest.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/gametest/managed/ManagedDimGameTest.kt`
 
 - [ ] **Step 1: Read existing gametest harness**
 
-Run: `ls src/gametest/kotlin/com/breadmoirai/redstonespecs/`
+Run: `ls src/gametest/kotlin/com/breadmoirai/garnet/`
 
 Open one existing `@GameTest` class to see how the harness is invoked, what `TestContext` looks like, and how `runGameTest` is wired.
 
 - [ ] **Step 2: Implement**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.gametest.managed
+package com.breadmoirai.garnet.gametest.managed
 
-import com.breadmoirai.redstonespecs.managed.*
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.serial.KtsSpecEmitter
+import com.breadmoirai.garnet.managed.*
+import com.breadmoirai.garnet.data.GarnetSpec
+import com.breadmoirai.garnet.data.serial.KtsSpecEmitter
 import net.fabricmc.fabric.api.gametest.v1.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
 import net.minecraft.core.Vec3i
@@ -2381,13 +2381,13 @@ import kotlin.io.path.writeText
 
 class ManagedDimGameTest {
 
-    @GameTest(template = "redstonespecs:empty")  // a 16x16 empty platform; create if missing
+    @GameTest(template = "garnet:empty")  // a 16x16 empty platform; create if missing
     fun loadFolderPlacesCells(helper: GameTestHelper) {
         val server = helper.level.server
         val root = Files.createTempDirectory("managed-test")
         val folder = root.resolve("set-a").also { it.createDirectories() }
-        val a = RedstoneSpec(id = "a", bounds = Vec3i(3, 3, 3), lifespan = 5, structure = null, entries = emptyList())
-        val b = RedstoneSpec(id = "b", bounds = Vec3i(2, 2, 2), lifespan = 5, structure = null, entries = emptyList())
+        val a = GarnetSpec(id = "a", bounds = Vec3i(3, 3, 3), lifespan = 5, structure = null, entries = emptyList())
+        val b = GarnetSpec(id = "b", bounds = Vec3i(2, 2, 2), lifespan = 5, structure = null, entries = emptyList())
         folder.resolve("a.spec.kts").writeText(KtsSpecEmitter.emit(a))
         folder.resolve("b.spec.kts").writeText(KtsSpecEmitter.emit(b))
 
@@ -2403,13 +2403,13 @@ class ManagedDimGameTest {
         helper.succeed()
     }
 
-    @GameTest(template = "redstonespecs:empty")
+    @GameTest(template = "garnet:empty")
     fun saveBackOnlyWritesDirtySpecs(helper: GameTestHelper) {
         val server = helper.level.server
         val root = Files.createTempDirectory("managed-test")
         val folder = root.resolve("set-b").also { it.createDirectories() }
-        val a = RedstoneSpec(id = "a", bounds = Vec3i(3, 3, 3), lifespan = 5, structure = null, entries = emptyList())
-        val b = RedstoneSpec(id = "b", bounds = Vec3i(2, 2, 2), lifespan = 5, structure = null, entries = emptyList())
+        val a = GarnetSpec(id = "a", bounds = Vec3i(3, 3, 3), lifespan = 5, structure = null, entries = emptyList())
+        val b = GarnetSpec(id = "b", bounds = Vec3i(2, 2, 2), lifespan = 5, structure = null, entries = emptyList())
         val aFile = folder.resolve("a.spec.kts").also { it.writeText(KtsSpecEmitter.emit(a)) }
         val bFile = folder.resolve("b.spec.kts").also { it.writeText(KtsSpecEmitter.emit(b)) }
         val aBefore = Files.getLastModifiedTime(aFile)
@@ -2435,7 +2435,7 @@ class ManagedDimGameTest {
         helper.succeed()
     }
 
-    @GameTest(template = "redstonespecs:empty")
+    @GameTest(template = "garnet:empty")
     fun newSpecCreatesStubFile(helper: GameTestHelper) {
         val server = helper.level.server
         val root = Files.createTempDirectory("managed-test")
@@ -2450,7 +2450,7 @@ class ManagedDimGameTest {
 ```
 
 > **Implementer notes:**
-> - The `redstonespecs:empty` structure template must exist under `src/gametest/resources/data/redstonespecs/structure/empty.snbt`. If the project already has a similar empty template, reuse it. Otherwise create a 16×16 empty platform (existing gametests should have an example).
+> - The `garnet:empty` structure template must exist under `src/gametest/resources/data/garnet/structure/empty.snbt`. If the project already has a similar empty template, reuse it. Otherwise create a 16×16 empty platform (existing gametests should have an example).
 > - `helper.makeMockPlayer` may not exist verbatim on this MC version; check `GameTestHelper`'s API and use whatever the existing gametests use to obtain a `ServerPlayer`.
 > - Method signatures (`assertTrue`/`assertFalse`) come from the existing harness — match them.
 
@@ -2462,8 +2462,8 @@ Expected: 3 new tests pass alongside the existing suite.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/gametest/managed/ \
-        src/gametest/resources/data/redstonespecs/structure/empty.snbt
+git add src/gametest/kotlin/com/breadmoirai/garnet/gametest/managed/ \
+        src/gametest/resources/data/garnet/structure/empty.snbt
 git commit -m "managed: gametests for load, save-back diff, new-spec stub"
 ```
 
@@ -2535,7 +2535,7 @@ See `docs/superpowers/specs/2026-05-08-managed-redstone-worlds-design.md` for th
   discarded on unload. Decoration in the cell margin does not persist.
 - **Server-authoritative.** The same model as `network/Packets.kt`: clients propose, server
   validates against `ManagedRoot.resolveSubpath` (path traversal guard) and acts.
-- **Dim id = `redstonespecs:managed/<sanitized-subpath>`.** Sanitization replaces non-allowed
+- **Dim id = `garnet:managed/<sanitized-subpath>`.** Sanitization replaces non-allowed
   chars with `_`. Two distinct subpaths sanitizing to the same id is a load-time error.
 - **`SpecBlockEntity.managedSourcePath`** is the binding from a runner/recorder block in a
   managed cell back to the source `.spec.kts`. Not persisted to NBT — managed dims rebuild

@@ -108,7 +108,7 @@ raw CPU→GPU texture upload sharing Blaze3D's context must neutralize the unpac
   `implementation` (which every source set extends), not `clientImplementation`; only `ui`/`foundation`
   (actually used by the composables) stay client-scoped. A production setup would scope the plugin to the
   client compilation instead.
-- A **`classTweaker`** (`src/main/resources/redstonespecs.classtweaker`) opens the package-private
+- A **`classTweaker`** (`src/main/resources/garnet.classtweaker`) opens the package-private
   `com.mojang.blaze3d.opengl` GL-backend classes needed to fetch the raw GL FBO id (see Task 1).
 
 ## Guarding invariant

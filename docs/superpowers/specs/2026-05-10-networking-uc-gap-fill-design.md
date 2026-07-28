@@ -38,7 +38,7 @@ Behavior must not change. This is a test-coverage and refactor cycle.
 
 ### Production refactor (no behavior change)
 
-`src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt` is restructured so each C2S handler body becomes a top-level function in the file:
+`src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt` is restructured so each C2S handler body becomes a top-level function in the file:
 
 ```
 fun handleRunSpec(server: MinecraftServer, player: ServerPlayer, payload: RunSpecC2SPayload)
@@ -63,7 +63,7 @@ Why `(server, player, payload)` parameters instead of `Context`: lets tests call
 ### Test support
 
 **Helper promotion:**
-- New file `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/NetworkTestSupport.kt`. Move from `test/managed/ManagedTestSupport.kt`:
+- New file `src/gametest/kotlin/com/breadmoirai/garnet/test/NetworkTestSupport.kt`. Move from `test/managed/ManagedTestSupport.kt`:
   - `makeMockServerPlayer(server)`
   - `drainPayloads(player)`
   - `deleteRecursively(path)`
@@ -82,14 +82,14 @@ Each places the appropriate block, fetches the BE, applies setters (`setSpecId`,
 
 ### New Kotest spec
 
-`src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt` extends `RedstoneTestSpec` and contains the cases below. **Must be registered in `GametestSentinel.runAll`** — autoscan is off; an unregistered spec silently does not run.
+`src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt` extends `GarnetTestSpec` and contains the cases below. **Must be registered in `GametestSentinel.runAll`** — autoscan is off; an unregistered spec silently does not run.
 
 ## Test coverage map
 
 Each test name uses the convention `"UC-NET-XX.y: <one-line>"` so coverage-matrix backreferences are unambiguous and grep-able.
 
 ### UC-NET-01 (server-initiated recorder open)
-- **01.a** "server resolves BE and builds OpenRecorderScreenS2C payload" — invoke the server-side recorder open path (`RedstoneSpecRecorderBlock.useWithoutItem` or its extracted helper, depending on what's reachable from a test); drain `OpenRecorderScreenS2C` and assert origin/specId/state match BE.
+- **01.a** "server resolves BE and builds OpenRecorderScreenS2C payload" — invoke the server-side recorder open path (`GarnetRecorderBlock.useWithoutItem` or its extracted helper, depending on what's reachable from a test); drain `OpenRecorderScreenS2C` and assert origin/specId/state match BE.
 - **01.d** structurally inside 01.a — the test sends no C2S; the S2C alone proves server-initiated. Add a single comment in the test pointing this out; no separate test method.
 
 ### UC-NET-02 (origin guard)
@@ -143,7 +143,7 @@ After tests pass, edit `docs/use-cases/networking.md`:
 
 2. **Silent sentinel registration.** Forgetting to add `RecorderRunnerNetworkRegistrySpec::class` to `GametestSentinel.runAll` makes the spec a no-op with no warning. Plan must include this step explicitly and verify by tail of test output.
 
-3. **Block-kind guard tests (05.a/b) require both block types registered.** Confirm `RedstoneSpecRecorderBlock` and `RedstoneSpecRunnerBlock` are both available in the gametest classpath at the spec position.
+3. **Block-kind guard tests (05.a/b) require both block types registered.** Confirm `GarnetRecorderBlock` and `GarnetRunnerBlock` are both available in the gametest classpath at the spec position.
 
 4. **`saveDir` / `SharedSettings.specSaveDir`.** Tests must not pollute the real save directory; verify whether `saveDir(server)` for a gametest server resolves under the gametest temp world (likely yes) before relying on cleanup.
 

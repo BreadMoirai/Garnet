@@ -10,10 +10,10 @@ summary: Split the combined `src/gametest/` sourceset into a server-side `gamete
 
 `src/gametest/` currently holds two distinct kinds of tests:
 
-- Server-side `@GameTest` flows (`RedstonespecsGameTests`).
-- Full-client `FabricClientGameTest` flows (`RedstonespecsClientTests`), plus shared helpers (`SpecTestContext`).
+- Server-side `@GameTest` flows (`garnetGameTests`).
+- Full-client `FabricClientGameTest` flows (`garnetClientTests`), plus shared helpers (`SpecTestContext`).
 
-They share one fabric-loom-managed sourceset, one test mod-id (`redstonespecs-test`), and one `fabric.mod.json`. This conflates two layers that have different runtimes (server vs client), different entrypoints, and different failure modes. It also blocks per-feature test specs that want to tag behaviors `[server-gametest]` vs `[client-gametest]` against actual sourcesets, not conventions.
+They share one fabric-loom-managed sourceset, one test mod-id (`garnet-test`), and one `fabric.mod.json`. This conflates two layers that have different runtimes (server vs client), different entrypoints, and different failure modes. It also blocks per-feature test specs that want to tag behaviors `[server-gametest]` vs `[client-gametest]` against actual sourcesets, not conventions.
 
 ## Goal
 
@@ -51,7 +51,7 @@ Two alternatives were considered and rejected:
 fabricApi {
     configureTests {
         createSourceSet = true
-        modId = "redstonespecs-gametest"   // was "redstonespecs-test"
+        modId = "garnet-gametest"   // was "garnet-test"
         enableGameTests = true
         enableClientGameTests = false      // was true; client tests move out
         eula = true
@@ -66,7 +66,7 @@ sourceSets {
 }
 
 loom {
-    mods.register("redstonespecs-clienttest") {
+    mods.register("garnet-clienttest") {
         sourceSet("clientTest")
     }
 }
@@ -85,8 +85,8 @@ dependencies {
 tasks.register<JavaExec>("runClientTest") {
     group = "fabric"
     jvmArgs(
-        "-Dlog4j2.logger.redstonespecs.name=Redstone Specs",
-        "-Dlog4j2.logger.redstonespecs.level=DEBUG",
+        "-Dlog4j2.logger.garnet.name=Garnet",
+        "-Dlog4j2.logger.garnet.level=DEBUG",
     )
     // mainClass / args / run-config injection mirror loom's runClientGameTest;
     // see implementation plan for the exact wiring.
@@ -97,10 +97,10 @@ The existing `runGameTest` task block keeps its current jvmArgs unchanged.
 
 ## Resource and entrypoint split
 
-Today's single `src/gametest/resources/fabric.mod.json` (mod-id `redstonespecs-test`) is split:
+Today's single `src/gametest/resources/fabric.mod.json` (mod-id `garnet-test`) is split:
 
-- `src/gametest/resources/fabric.mod.json` — mod-id `redstonespecs-gametest`. Server `@GameTest` registration entrypoints only.
-- `src/clientTest/resources/fabric.mod.json` — mod-id `redstonespecs-clienttest`. `FabricClientGameTest` entrypoints only.
+- `src/gametest/resources/fabric.mod.json` — mod-id `garnet-gametest`. Server `@GameTest` registration entrypoints only.
+- `src/clientTest/resources/fabric.mod.json` — mod-id `garnet-clienttest`. `FabricClientGameTest` entrypoints only.
 
 Each manifest declares only the entrypoints relevant to its runtime. This keeps server-side gametest runs from loading client-only entrypoints and vice versa.
 
@@ -108,8 +108,8 @@ Each manifest declares only the entrypoints relevant to its runtime. This keeps 
 
 Mechanical:
 
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt` → `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt`.
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsGameTests.kt` — stays.
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt` → `src/clientTest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt`.
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/garnetGameTests.kt` — stays.
 
 ### `SpecTestContext` placement (decision deferred to implementation)
 
@@ -143,10 +143,10 @@ Pass criteria:
 - All four commands exit 0.
 - The exact same set of tests that ran under the old combined `gametest` sourceset still run, just relocated; no test is dropped or skipped.
 - No regressions in `runGameTest` (server tests still pass with the same outcomes as before the split).
-- `runClientTest` runs the relocated `RedstonespecsClientTests` with the same outcomes as it had under the old `runClientGameTest`.
+- `runClientTest` runs the relocated `garnetClientTests` with the same outcomes as it had under the old `runClientGameTest`.
 
 ## Risks
 
 - **`runClientTest` wiring drift** — manually-registered task may diverge from what loom does in `runClientGameTest`. Mitigation: at implementation time, inspect loom's task config (`tasks.named("runClientGameTest").get()` properties: mainClass, args, classpath, system properties, run-config injection) and mirror them rather than guessing. Document any non-trivial mirrored properties as code comments only where the *why* isn't obvious.
-- **Test mod-id rename breaking existing fabric.mod.json references** — the rename from `redstonespecs-test` to `redstonespecs-gametest` is a contract change visible in any place that names the test mod-id (e.g. resource lookups, integration with test discovery). Audit grep for `redstonespecs-test` before merging.
+- **Test mod-id rename breaking existing fabric.mod.json references** — the rename from `garnet-test` to `garnet-gametest` is a contract change visible in any place that names the test mod-id (e.g. resource lookups, integration with test discovery). Audit grep for `garnet-test` before merging.
 - **`SpecTestContext` coupling worse than expected** — if many helpers turn out to be shared, option (c) (`gametestShared` sourceset) may be required, expanding scope. Acceptable: still smaller than refactoring tests themselves.

@@ -7,7 +7,7 @@ summary: Why the runner dispatches button-style inputs through ButtonBlock.press
 # Replaying player-interaction inputs through the runner
 
 The runner replay (`tryApplyAsPlayerInteraction` in
-`src/main/kotlin/com/breadmoirai/redstonespecs/runner/PlayerInteractionDispatch.kt`)
+`src/main/kotlin/com/breadmoirai/garnet/runner/PlayerInteractionDispatch.kt`)
 has two paths for applying an input block-state change:
 
 1. The **generic path** — `level.setBlock(pos, target, 3)`.
@@ -44,7 +44,7 @@ collapse into a no-op `setBlock`.
 
 ## How to write a gametest input that exercises this
 
-In `RedstonespecsGameTests.kt`, scenarios drive the world with
+In a `src/gametest/` spec, scenarios drive the world with
 `helper.useBlock(buttonPos)`. That call goes through the same code path
 a player would, so the recording captures both edges. The replay then
 takes the player-interaction path on the rising edge and the no-op
@@ -81,9 +81,9 @@ Even with `ButtonBlock.press`, replay timing drifts ~1 tick from the
 original recording for player-driven circuits. The recording's press
 fires from gametest's `thenExecute` — which runs in
 `MinecraftServer.tick` *after* all level phases of that tick — while
-the `runRedstoneSpec` tick loop fires `START_OF_TICK` inputs before
+the `runGarnetSpec` tick loop fires `START_OF_TICK` inputs before
 `awaitTickEnd()`. Aligning the press phase exactly is non-trivial;
 relevant code paths are `MinecraftServer.tick` (gametest tick is last),
-`SubTickPhaseEvents`, and the `runRedstoneSpec` loop. Until that's
+`SubTickPhaseEvents`, and the `runGarnetSpec` loop. Until that's
 solved, scenarios should tolerate a 1-tick offset on player-driven
 edges if you write exact-time assertions.

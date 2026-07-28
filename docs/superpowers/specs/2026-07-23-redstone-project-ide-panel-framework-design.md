@@ -8,7 +8,7 @@ summary: Clean-slate, retained-mode, panel-based UI framework with a live shrunk
 
 ## 1. Context & vision
 
-We are expanding RedstoneSpecs from a redstone **testing** tool (record → emit → run →
+We are expanding garnet from a redstone **testing** tool (record → emit → run →
 verify) into an **integrated development environment** for building and testing Minecraft
 contraptions. That vision decomposes into independent sub-projects, each with its own
 spec → plan → build cycle:
@@ -77,10 +77,10 @@ A dedicated, mechanical first milestone, kept isolated so its churn does not tan
 the framework diff.
 
 Scope (~70 files):
-- Server package `com.breadmoirai.redstonespecs.managed` → `…redstonespecs.project`; all
+- Server package `com.breadmoirai.garnet.managed` → `…garnet.project`; all
   `Managed*` classes renamed (`ManagedCell`, `ManagedFolderTree`, `ManagedSession`, …).
 - Network payload package `network/managed` → `network/project`; `Managed*` payloads.
-- Command `/redstonespecs managed` → `/redstonespecs project`.
+- Command `/garnet managed` → `/garnet project`.
 - ~15 unit/gametest/clientTest specs; registrations in `GametestSentinel` /
   `ClientTestSentinel`.
 - Docs: `architecture/managed-redstone-worlds.md` → `redstone-project.md`; INDEX titles,
@@ -141,7 +141,7 @@ re-invents it.
 `Element` base (named to avoid colliding with MC's text `Component`), `Label`, `Button`,
 `IconButton`, `ScrollPane`, `Row`/`Column`/`Stack` containers (YACL-inspired
 fill/fixed/weighted sizing, plain arithmetic — no constraint solver), `TreeView<T>`, tab
-strip, splitter. Assembly via a Kotlin DSL matching the existing `redstoneSpec { }` idiom:
+strip, splitter. Assembly via a Kotlin DSL matching the existing `garnetSpec { }` idiom:
 
 ```kotlin
 ideOverlay {
@@ -229,7 +229,7 @@ build the dock on top.
 ## 8. Hard-cut & documentation changes
 
 **Delete (client screens):** `RecorderScreen`, `RunnerScreen`, `ManagedScreen`,
-`ManagedRootListScreen`, plus their orphaned widgets (`IntEditBox`, `RedstoneIconButton`,
+`ManagedRootListScreen`, plus their orphaned widgets (`IntEditBox`, `GarnetIconButton`,
 `TimelineSliderWidget` — each verified unused before deletion). Server-side recording /
 running / project engines remain; their UIs return later as panels (A/B).
 
@@ -269,7 +269,7 @@ Add UI-framework use-cases.
 ## 11. Package layout
 
 ```
-src/client/kotlin/com/breadmoirai/redstonespecs/client/
+src/client/kotlin/com/breadmoirai/garnet/client/
   ui/core/      Element, Layout, PanelSlot, PanelView, Splitter, OverlayManager, FocusManager, IdeHost
   ui/widget/    Label, Button, IconButton, ScrollPane, Row/Column/Stack, TreeView, TabStrip
   ide/          IdeOverlay, ProjectExplorerPanel

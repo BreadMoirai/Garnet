@@ -66,10 +66,10 @@ No new upward dependencies.
 
 **Original design** specified one void dimension per folder via `FabricDimensions.add(...)`. **That API was removed in fabric-api v5 (MC 26.1)** — verified from the v5.1.4 jar contents.
 
-**Revised approach:** one statically-registered managed void dim (`redstonespecs:managed`); each loaded folder occupies a distinct **region** within that dim. Multiple folders coexist spatially; the GUI tracks which is "active" for save / new-spec purposes.
+**Revised approach:** one statically-registered managed void dim (`garnet:managed`); each loaded folder occupies a distinct **region** within that dim. Multiple folders coexist spatially; the GUI tracks which is "active" for save / new-spec purposes.
 
 ```
-<root>/pistons/doors/2x2/  →  region #N inside dim redstonespecs:managed
+<root>/pistons/doors/2x2/  →  region #N inside dim garnet:managed
 ```
 
 **Region assignment.** Counter-based, in-memory, per-server. On first load of a new folder, `ManagedDimRegistry` assigns it `regionIndex = next++`; the region's origin is `(regionIndex * REGION_SPACING_X, Y_BASE, 0)` where `REGION_SPACING_X` is `cellSize.x * rowMax + cellGap * (rowMax + 1) + REGION_PAD` — guaranteed wider than any folder's grid plus a buffer. Resets on server restart (ephemeral).
@@ -182,7 +182,7 @@ All payloads in `network/managed/`. Server-authoritative; clients propose. Same 
 ### Singleplayer (client)
 
 - A `ManagedRootListScreen` button is injected into `SelectWorldScreen` via mixin.
-- The screen lists known managed roots (stored at `<configDir>/redstonespecs/managed-roots.json`) with add/remove.
+- The screen lists known managed roots (stored at `<configDir>/garnet/managed-roots.json`) with add/remove.
 - Picking a root calls `ManagedIntegratedBoot.boot(rootPath)`:
   - Save name is `managed-<root-tail>-<8-hex-pathHash>` (path hash disambiguates roots with the same tail).
   - If the save exists, `WorldOpenFlows.openWorld` reopens it; otherwise `WorldOpenFlows.createFreshLevel` creates it as a flat-void singleplayer world (`FlatLevelGeneratorPresets.THE_VOID`, creative, peaceful, allow-commands).
@@ -193,7 +193,7 @@ All payloads in `network/managed/`. Server-authoritative; clients propose. Same 
 ### Dedicated server
 
 - Server config: `managedRoot=<absolute path>`, `enableManaged=true`. No world-selection UI involved.
-- Connected clients open `ManagedScreen` via `/redstonespecs managed` or a key bind.
+- Connected clients open `ManagedScreen` via `/garnet managed` or a key bind.
 - Same authority model.
 
 ## 11. Error Handling Summary
@@ -224,7 +224,7 @@ All payloads in `network/managed/`. Server-authoritative; clients propose. Same 
 ## 13. File Layout
 
 ```
-src/main/kotlin/com/breadmoirai/redstonespecs/managed/
+src/main/kotlin/com/breadmoirai/garnet/managed/
   ManagedRoot.kt
   ManagedFolderTree.kt
   GridLayout.kt
@@ -242,21 +242,21 @@ src/main/kotlin/com/breadmoirai/redstonespecs/managed/
   ManagedServerContext.kt
   ManagedCommand.kt
 
-src/main/kotlin/com/breadmoirai/redstonespecs/network/managed/
+src/main/kotlin/com/breadmoirai/garnet/network/managed/
   ManagedPackets.kt
   ManagedNetworkRegistry.kt
 
-src/client/kotlin/com/breadmoirai/redstonespecs/client/managed/
+src/client/kotlin/com/breadmoirai/garnet/client/managed/
   ManagedScreen.kt
   ManagedRootListScreen.kt
   ManagedClientNetworking.kt
   ManagedIntegratedBoot.kt
 
-src/client/java/com/breadmoirai/redstonespecs/mixin/client/
+src/client/java/com/breadmoirai/garnet/mixin/client/
   SelectWorldScreenMixin.java
 ```
 
-Existing files extended (small touches): `SharedSettings.kt` (new fields), `Redstonespecs.kt` (registry wiring + DISCONNECT cleanup), `SpecBlockEntity.kt` (managed source-path field), `RecordingFinalizer.kt` (write-back-to-source path).
+Existing files extended (small touches): `SharedSettings.kt` (new fields), `garnet.kt` (registry wiring + DISCONNECT cleanup), `SpecBlockEntity.kt` (managed source-path field), `RecordingFinalizer.kt` (write-back-to-source path).
 
 ## 14. Open Questions (resolve during planning)
 

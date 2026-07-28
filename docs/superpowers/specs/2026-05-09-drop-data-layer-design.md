@@ -1,7 +1,7 @@
 ---
 title: Drop the data layer; DSL becomes the spec
 tags: [refactor, dsl, runner, persistence, scope-reduction]
-summary: Replace the RedstoneSpec/SpecEntry data model with a deferred-closure DSL; delete the in-world editor; keep slim recorder/runner block UIs.
+summary: Replace the GarnetSpec/SpecEntry data model with a deferred-closure DSL; delete the in-world editor; keep slim recorder/runner block UIs.
 date: 2026-05-09
 ---
 
@@ -9,11 +9,11 @@ date: 2026-05-09
 
 ## Goal
 
-Eliminate the intermediate `data/` package (`RedstoneSpec`, `SpecEntry`, JSON codec, etc.) and the in-world spec editor. The `.spec.kts` DSL becomes the canonical spec form: it directly drives inputs into the world and verifies outputs against the live `StateRecording`. Two block kinds remain — recorder (captures world → emits DSL) and runner (loads DSL, places structure, runs, verifies) — each with a slim config screen.
+Eliminate the intermediate `data/` package (`GarnetSpec`, `SpecEntry`, JSON codec, etc.) and the in-world spec editor. The `.spec.kts` DSL becomes the canonical spec form: it directly drives inputs into the world and verifies outputs against the live `StateRecording`. Two block kinds remain — recorder (captures world → emits DSL) and runner (loads DSL, places structure, runs, verifies) — each with a slim config screen.
 
 ## Why
 
-The data layer (`RedstoneSpec` + `SpecEntry` flat list + JSON codec + emitter/loader round-trip + the in-world editor that mutates it) is overhead the project no longer benefits from. Specs are authored or auto-emitted as `.spec.kts`; tests and the in-world Runner block both consume them; the editor GUI's structural editing is unused in practice. By collapsing the data model into the DSL itself we remove ~5 files of data classes, the JSON codec, `RecordingFinalizer`, `KtsSpecEmitter`, `SpecRunner`/`Coordinator`/`EngineDrivenRun`, the entire editor screen and its widget tree, and the half-dozen edit packets in `network/`.
+The data layer (`GarnetSpec` + `SpecEntry` flat list + JSON codec + emitter/loader round-trip + the in-world editor that mutates it) is overhead the project no longer benefits from. Specs are authored or auto-emitted as `.spec.kts`; tests and the in-world Runner block both consume them; the editor GUI's structural editing is unused in practice. By collapsing the data model into the DSL itself we remove ~5 files of data classes, the JSON codec, `RecordingFinalizer`, `KtsSpecEmitter`, `SpecRunner`/`Coordinator`/`EngineDrivenRun`, the entire editor screen and its widget tree, and the half-dozen edit packets in `network/`.
 
 ## Non-goals
 
@@ -26,11 +26,11 @@ The data layer (`RedstoneSpec` + `SpecEntry` flat list + JSON codec + emitter/lo
 
 ```kotlin
 // foo.spec.kts
-redstoneSpec(
+garnetSpec(
     id        = "foo",
     bounds    = Vec3i(5, 5, 5),
     lifespan  = 20,
-    structure = "redstonespecs:foo",
+    structure = "garnet:foo",
     strict    = true,
 ) {
     input(0, 0, 0, label = "A") {
@@ -45,7 +45,7 @@ redstoneSpec(
 }
 ```
 
-Configuration (id, bounds, lifespan, structure id, strict flag) lives on the `redstoneSpec(...)` argument list — not inside the lambda. The lambda's only job is to register tick-keyed input applications and tick-keyed output assertions.
+Configuration (id, bounds, lifespan, structure id, strict flag) lives on the `garnetSpec(...)` argument list — not inside the lambda. The lambda's only job is to register tick-keyed input applications and tick-keyed output assertions.
 
 **Inputs are direct setters.** `setPowered(true)` / `setLit(true)` / `setProp("facing", "east")` / `setBlock(state)` produce a target `BlockState` and schedule its application at the matching `SimTime`. No condition→state inversion.
 
@@ -54,8 +54,8 @@ Configuration (id, bounds, lifespan, structure id, strict flag) lives on the `re
 ## Core types
 
 ```kotlin
-// dsl/RedstoneSpec.kt — the only surviving "data" class
-data class RedstoneSpec(
+// dsl/GarnetSpec.kt — the only surviving "data" class
+data class GarnetSpec(
     val id: String,
     val bounds: Vec3i,
     val lifespan: Int,
@@ -86,7 +86,7 @@ class SpecRun internal constructor(
 ## Execution loop
 
 ```kotlin
-suspend fun runRedstoneSpec(level: ServerLevel, origin: BlockPos, spec: RedstoneSpec): StateRecording {
+suspend fun runGarnetSpec(level: ServerLevel, origin: BlockPos, spec: GarnetSpec): StateRecording {
     val snapshot = SpecSnapshot.capture(level, origin, spec.bounds)
     val recorder = StateRecorder.forSpec(UUID.randomUUID(), origin, spec.bounds)
     val recording: StateRecording
@@ -131,12 +131,12 @@ When `strict = true`, after the loop the engine walks each declared output posit
 
 ## Recorder block: world → DSL text
 
-`RecordingDslEmitter` replaces `RecordingFinalizer` (recording → `RedstoneSpec`) plus `KtsSpecEmitter` (`RedstoneSpec` → text). It walks the `StateRecording` and emits `.spec.kts` text in one pass:
+`RecordingDslEmitter` replaces `RecordingFinalizer` (recording → `GarnetSpec`) plus `KtsSpecEmitter` (`GarnetSpec` → text). It walks the `StateRecording` and emits `.spec.kts` text in one pass:
 
 1. Read `(pos, kind, label, color)` markers off the BE state at finalize time.
 2. For each input position, find the change-ticks in the recording and emit `at(tick) { setProp(...) }` lines (or `setPowered`/`setLit` when applicable).
 3. For each output position, find the change-ticks and emit `at(tick) { <derived predicate> }` lines.
-4. Wrap with the `redstoneSpec(id = …, bounds = …, lifespan = …, structure = …) { … }` shell, with meta values pulled from BE config.
+4. Wrap with the `garnetSpec(id = …, bounds = …, lifespan = …, structure = …) { … }` shell, with meta values pulled from BE config.
 
 The condition-derivation rules used by `RecordingFinalizer` carry over directly (e.g. `RedstoneTorch.LIT` → `lit()`, `DiodeBlock.POWERED` → `powered()`, generic property → `prop("name", "value")`).
 
@@ -146,12 +146,12 @@ Two slim screens, one per block kind. Both are config screens, not editors.
 
 **RecorderScreen** (right-click recorder block):
 - Read-only: bounds (set by marker tool), recording state.
-- Editable text fields: `specId`, `outPath` (default `redstonespecs/<id>.spec.kts`), `structureId` (default `redstonespecs:<id>`).
+- Editable text fields: `specId`, `outPath` (default `garnet/<id>.spec.kts`), `structureId` (default `garnet:<id>`).
 - Buttons: `Start recording`, `Stop & emit`, `Discard`.
 
 **RunnerScreen** (right-click runner block):
-- Spec picker: dropdown populated from a server-side scan of `<world>/redstonespecs/*.spec.kts`. Server pushes the list when the screen opens; client selects.
-- Read-only after-load: id, bounds, lifespan, structure (read directly off the loaded `RedstoneSpec` properties — these are plain fields, not derived from a list of entries).
+- Spec picker: dropdown populated from a server-side scan of `<world>/garnet/*.spec.kts`. Server pushes the list when the screen opens; client selects.
+- Read-only after-load: id, bounds, lifespan, structure (read directly off the loaded `GarnetSpec` properties — these are plain fields, not derived from a list of entries).
 - Buttons: `Place structure`, `Run`, `Restore snapshot`. Place and Run are deliberately separate (place → inspect → run is a useful debug flow).
 - Result area: pass/fail + first failure line. Full failure list goes to server log; `RunnerStatus` S2C carries the summary.
 
@@ -172,12 +172,12 @@ All `originPos`-bearing payloads validate through the existing BE-lookup pivot (
 ## Package layout
 
 ```
-com.breadmoirai.redstonespecs/
-├── Redstonespecs.kt
+com.breadmoirai.garnet/
+├── garnet.kt
 ├── ModRegistries.kt
 │
 ├── dsl/                              # NEW (the DSL is the spec)
-│   ├── RedstoneSpec.kt               # data class { id, bounds, lifespan, structure, strict, block }
+│   ├── GarnetSpec.kt               # data class { id, bounds, lifespan, structure, strict, block }
 │   ├── SpecRun.kt                    # execution context with input()/output() schedulers
 │   ├── InputScope.kt                 # setPowered/setLit/setProp/setBlock + at(tick)
 │   ├── OutputScope.kt                # at(tick) { <ConditionScope> }
@@ -188,7 +188,7 @@ com.breadmoirai.redstonespecs/
 │   └── Phase.kt                      # MOVED from data/
 │
 ├── runner/                           # ENGINE only
-│   ├── runRedstoneSpec.kt            # the loop — replaces SpecRunner + Coordinator + EngineDrivenRun
+│   ├── runGarnetSpec.kt            # the loop — replaces SpecRunner + Coordinator + EngineDrivenRun
 │   ├── StateRecorder.kt              # unchanged
 │   ├── StateRecording.kt             # unchanged
 │   ├── StateRecordingView.kt         # unchanged
@@ -196,15 +196,15 @@ com.breadmoirai.redstonespecs/
 │   └── RecordingDslEmitter.kt        # NEW — replaces RecordingFinalizer + KtsSpecEmitter
 │
 ├── persistence/
-│   ├── SpecPersistence.kt            # save/load .spec.kts (script returns RedstoneSpec)
+│   ├── SpecPersistence.kt            # save/load .spec.kts (script returns GarnetSpec)
 │   ├── SpecScript.kt                 # MOVED from data/serial/
-│   ├── KtsSpecLoader.kt              # MOVED from data/serial/, return type now new RedstoneSpec
+│   ├── KtsSpecLoader.kt              # MOVED from data/serial/, return type now new GarnetSpec
 │   ├── StructurePersistence.kt       # unchanged
 │   └── SpecDirectoryScan.kt          # NEW — list .spec.kts files for runner picker
 │
 ├── block/
-│   ├── RedstoneSpecRecorderBlock.kt
-│   ├── RedstoneSpecRunnerBlock.kt
+│   ├── GarnetRecorderBlock.kt
+│   ├── GarnetRunnerBlock.kt
 │   └── SpecBlockEntity.kt            # holds {specPath, structureId, bounds, label} — no editor branch
 │
 ├── network/
@@ -230,11 +230,11 @@ dsl/  ←  runner/  ←  persistence/  ←  block/  ←  network/  ←  client/
 ## What gets deleted
 
 **Files:**
-- `data/RedstoneSpec.kt`, `SpecEntry.kt`, `EntryKind.kt`, `TestResult.kt`
-- `data/dsl/SpecDsl.kt`, `EntryDsl.kt` (old "build a `RedstoneSpec`" form)
+- `data/GarnetSpec.kt`, `SpecEntry.kt`, `EntryKind.kt`, `TestResult.kt`
+- `data/dsl/SpecDsl.kt`, `EntryDsl.kt` (old "build a `GarnetSpec`" form)
 - `data/serial/SpecJsonCodec.kt`, `KtsSpecEmitter.kt`
 - `runner/RecordingFinalizer.kt`, `SpecRunner.kt`, `SpecRunnerCoordinator.kt`, `EngineDrivenRun.kt`
-- `block/RedstoneSpecEditorBlock.kt`, `block/SpecBlockKind.kt`
+- `block/GarnetEditorBlock.kt`, `block/SpecBlockKind.kt`
 - The entire `client/screen/SpecEditorScreen.kt` and every widget under it that exists only for the editor (per-tick row, condition dropdowns, entry-list panel, etc.)
 - All edit-related payloads in `network/Packets.kt`
 
@@ -248,16 +248,16 @@ Each phase ends with a clean build (`clientClasses classes gametestClasses clien
 Move `SimTime`, `Phase`, `StateCondition`, `ConditionEvaluator`, `ConditionDsl` into a new `dsl/` package. Update imports project-wide. No behavior change.
 
 **Phase 2 — New imperative DSL alongside the old.**
-Add `dsl/RedstoneSpec.kt` (new shape with `block` field), `dsl/SpecRun.kt`, `InputScope`, `OutputScope`, `runner/runRedstoneSpec.kt`. Old `data/RedstoneSpec` and old DSL stay untouched. Add unit tests for the new DSL: scheduler population, ordering, strict mode.
+Add `dsl/GarnetSpec.kt` (new shape with `block` field), `dsl/SpecRun.kt`, `InputScope`, `OutputScope`, `runner/runGarnetSpec.kt`. Old `data/GarnetSpec` and old DSL stay untouched. Add unit tests for the new DSL: scheduler population, ordering, strict mode.
 
 **Phase 3 — Cutover to the new DSL.**
-Flip the `runRedstoneSpec` testing-runner suspend fn to drive the new engine. Add `RecordingDslEmitter`; recorder block calls it instead of `RecordingFinalizer` + `KtsSpecEmitter`. Runner block invokes `runRedstoneSpec` directly (no coordinator). `KtsSpecLoader`'s script type returns the new `RedstoneSpec`. After this phase the old code is dead but still compiled.
+Flip the `runGarnetSpec` testing-runner suspend fn to drive the new engine. Add `RecordingDslEmitter`; recorder block calls it instead of `RecordingFinalizer` + `KtsSpecEmitter`. Runner block invokes `runGarnetSpec` directly (no coordinator). `KtsSpecLoader`'s script type returns the new `GarnetSpec`. After this phase the old code is dead but still compiled.
 
 **Phase 4 — Slim block UI.**
 Add `RecorderScreen`, `RunnerScreen`, the 7 new payloads, `SpecDirectoryScan`. Replace `SpecEditorScreen` open-on-rightclick with the kind-specific screens. Old editor screen + packets still present but unreachable.
 
 **Phase 5 — Delete the editor stack.**
-Remove `RedstoneSpecEditorBlock`, `SpecEditorScreen` and its widget tree, the dead packets in `Packets.kt`, `SpecBlockKind`, the editor branch in `SpecBlockEntity`. Subtractive only.
+Remove `GarnetEditorBlock`, `SpecEditorScreen` and its widget tree, the dead packets in `Packets.kt`, `SpecBlockKind`, the editor branch in `SpecBlockEntity`. Subtractive only.
 
 **Phase 6 — Delete `data/` and the dead engine code.**
 Remove the entire `data/` package, `SpecRunner`/`Coordinator`/`EngineDrivenRun`, `RecordingFinalizer`. Final clean state.
@@ -266,7 +266,7 @@ Remove the entire `data/` package, `SpecRunner`/`Coordinator`/`EngineDrivenRun`,
 
 - **Phase 3 is the only "flip" step.** If it regresses gametests, revert the cutover commits; old code is still present.
 - **Phases 5 and 6 are pure deletions** and can be split per-file if review pressure demands.
-- **`KtsSpecLoader` script-type change in Phase 3** is a wire-format change for any existing `.spec.kts` files: the new script must return the new `RedstoneSpec` shape. Existing in-tree gametest specs are placeholder stubs (per `gametest/INDEX.md`'s retirement note) so the migration cost is low; any user-authored `.spec.kts` files in saves get a one-time migration note.
+- **`KtsSpecLoader` script-type change in Phase 3** is a wire-format change for any existing `.spec.kts` files: the new script must return the new `GarnetSpec` shape. Existing in-tree gametest specs are placeholder stubs (per `gametest/INDEX.md`'s retirement note) so the migration cost is low; any user-authored `.spec.kts` files in saves get a one-time migration note.
 
 ## Testing
 

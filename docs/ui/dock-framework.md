@@ -1,13 +1,13 @@
 ---
-title: RedstoneDock — full-window Compose dock over the world composite
+title: GarnetDock — full-window Compose dock over the world composite
 tags: [compose, dock, layout, panels, input, rendering]
-summary: How RedstoneDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real framebuffer pixels via ComposeSceneHost, why the center is transparent by omission, and two Compose 1.12 API gotchas.
+summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real framebuffer pixels via ComposeSceneHost, why the center is transparent by omission, and two Compose 1.12 API gotchas.
 ---
 
-# RedstoneDock — full-window Compose dock
+# GarnetDock — full-window Compose dock
 
-The dock is a single `@Composable` (`RedstoneDock(realW, realH)`,
-`src/client/kotlin/.../ui/compose/dock/RedstoneDock.kt`) hosted full-window by
+The dock is a single `@Composable` (`GarnetDock(realW, realH)`,
+`src/client/kotlin/.../ui/compose/dock/GarnetDock.kt`) hosted full-window by
 `ComposeSceneHost` and blitted over the world composite by `ComposeSurface`. It replaced the
 feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was deleted.
 
@@ -18,7 +18,7 @@ feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was 
 raster `org.jetbrains.skia.Image` each frame (`render(nanos)`) and exposes pointer/scroll/key
 forwarders (`pointerMove/Press/Release`, `scroll`, `sendKey`) driven by `DockInputRouter`
 (see `dock-input-routing.md`).
-`ComposeSurface.ensureHost(w, h)` recreates it on window-size change and hosts `RedstoneDock(w, h)`.
+`ComposeSurface.ensureHost(w, h)` recreates it on window-size change and hosts `GarnetDock(w, h)`.
 
 ## Layout is in **real framebuffer pixels**
 
@@ -32,7 +32,7 @@ spans the full width and owns the bottom-left/right corners.
 
 ## The center is transparent **by omission**, not by clear-color
 
-`RedstoneDock`'s root `Box(Modifier.fillMaxSize())` has **no** `background` modifier. Only the visible
+`GarnetDock`'s root `Box(Modifier.fillMaxSize())` has **no** `background` modifier. Only the visible
 edge regions paint an opaque `PANEL_BG`; the CENTER paints nothing unless a center panel exists. Skia's
 canvas is pre-cleared to `0x00000000` in `ComposeSurface`, so every un-painted pixel stays fully
 transparent and the composited world shows through. Do not add a background to the root Box — it would
@@ -44,7 +44,7 @@ these transparent pixels.)
 Each of the four `DockRegion`s (LEFT/RIGHT/BOTTOM/CENTER) holds an independent
 `SnapshotStateList<Panel>` (`DockState.leftPanels`/`rightPanels`/`bottomPanels`/`centerPanels`) plus an
 `activeTab: Int` index. `Panel(id, title, content)` is a plain data holder — the "tab" concept has no
-separate type; a region with 2+ panels renders a tab strip (`RegionColumn` in `RedstoneDock.kt`) above
+separate type; a region with 2+ panels renders a tab strip (`RegionColumn` in `GarnetDock.kt`) above
 the active panel's `content`, and clicking a tab writes the region's `activeTab` index. LEFT/RIGHT/
 BOTTOM are hidden by default (`DockState.leftVisible` etc. all start `false`); CENTER's visibility is
 derived (`centerPanels.isNotEmpty()`) rather than an independent flag, since an empty CENTER must stay
@@ -88,11 +88,11 @@ and the template future panels (debugger, timeline) should copy. The pattern:
   handlers; the panel `@Composable` reads `ProjectTreeState` during composition and recomposes on
   change. Keep the state object separate from the `Panel` so packet handlers never touch Compose
   internals.
-- **`explorerPanel(): Panel`** returns the tab (`Panel("redstonespecs.explorer", "Explorer") { … }`);
-  it is seeded once into `DockState.leftPanels` at client init (`RedstonespecsClient`). LEFT stays
+- **`explorerPanel(): Panel`** returns the tab (`Panel("garnet.explorer", "Explorer") { … }`);
+  it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT stays
   hidden by default (Shift+1 reveals it).
 - **The tree renders recursively.** `snapshot.root` is a `FolderNode` (package
-  `com.breadmoirai.redstonespecs.project`); a private `TreeNode(node, path, depth, currentSubpath)`
+  `com.breadmoirai.garnet.project`); a private `TreeNode(node, path, depth, currentSubpath)`
   composable recurses over `FolderNode`/`FileNode` (sealed `FileTreeNode`). Paths are `/`-joined
   relative to root (`child.name` at depth 0, `"$path/${child.name}"` deeper) to match the server's
   `FolderNode.walk()` keys and `currentSubpath`. A folder only recurses into its children when

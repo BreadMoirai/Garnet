@@ -33,14 +33,14 @@ This spec delivers the Compose-based panel **framework** (docking) plus **one** 
 ## 1. Architecture — one full-window ComposeScene, transparent center
 
 The spike's single left-strip `ComposeScenePanel` generalizes into a **full-window
-`RedstoneDock`** composable. Compose composes the whole `realW × realH` scene each frame:
+`GarnetDock`** composable. Compose composes the whole `realW × realH` scene each frame:
 panels draw in the reserved edge regions; the center content-rect is `Color.Transparent`.
 
 **Decision (D-A, brainstormed):** one full-window scene, not one-scene-per-edge. Pointer
 coordinates equal window coordinates (no per-region remap), there is a single Compose focus
 tree, and overlays / tooltips / an occupied Center panel can cross the world region.
 
-**Present pipeline change** (`MinecraftPresentMixin#redstonespecs$compositePresent`):
+**Present pipeline change** (`MinecraftPresentMixin#garnet$compositePresent`):
 
 1. Prime the composite with the opaque edge fill (unchanged).
 2. Blit the shrunk world into the center content sub-rect, **opaque** (unchanged).
@@ -66,7 +66,7 @@ sizes (splitter positions), active-tab index, and focus — held as Compose **sn
 state** (`mutableStateOf`) so the composition recomposes on change. It is mutated by input
 handlers (splitter drag, Alt/Shift+N) and read by **both** consumers:
 
-- **`RedstoneDock`** composition — recomposes to lay out panels in the current region rects.
+- **`GarnetDock`** composition — recomposes to lay out panels in the current region rects.
 - **`ViewportState`** — the hard-coded `RESERVED_LEFT` / `RESERVED_BOTTOM` constants are
   **replaced** by a `DockInsets` value derived from `DockState`
   (`{left, right, bottom, top}`). `contentRect(realW, realH)` becomes pure arithmetic over
@@ -78,22 +78,22 @@ Because the insets are current before present, and only change during input hand
 world resizes correctly. A 1-frame lag while dragging a splitter is imperceptible.
 
 **Frame-ordering guarantee:** the shrink depends only on `DockState` values (plain), never
-on a Compose render pass. Rendering `RedstoneDock` happens at present time and only *draws*
+on a Compose render pass. Rendering `GarnetDock` happens at present time and only *draws*
 into the already-known region rects.
 
 ## 3. Components & package layout
 
 ```
-src/client/kotlin/com/breadmoirai/redstonespecs/client/
+src/client/kotlin/com/breadmoirai/garnet/client/
   ui/compose/
-    ComposeSurface.kt          (generalized: hosts the full-window RedstoneDock scene)
+    ComposeSurface.kt          (generalized: hosts the full-window GarnetDock scene)
     ComposeOverlay.kt          (generalized: full-window alpha-blend into the composite)
     dock/
       DockRegion.kt            enum LEFT / RIGHT / BOTTOM / CENTER
       DockState.kt             snapshot-state source of truth (visibility, sizes, tabs, focus)
       DockInsets.kt            pure DockState -> {left,right,bottom,top} + region-rect math
       Panel.kt                 id + title + @Composable body (NOT named Component)
-      RedstoneDock.kt          @Composable root: region layout, tab strips, drag splitters
+      GarnetDock.kt          @Composable root: region layout, tab strips, drag splitters
     input/
       DockInputRouter.kt       focus/capture state; forwards events to the scene
   ide/
@@ -171,7 +171,7 @@ modest and inert on the server. Timeboxed — do not rabbit-hole into a submodul
 
 ## 5. Project entry rewrite (keep the main-menu button)
 
-`TitleScreenMixin` keeps its "Redstone Projects…" button (via `RedstoneIconButton`,
+`TitleScreenMixin` keeps its "Redstone Projects…" button (via `GarnetIconButton`,
 **retained** — not orphaned). The click handler is **retargeted** from
 `setScreen(ProjectRootListScreen(...))` to **booting a void workspace world directly**:
 reuse `ProjectIntegratedBoot`'s open-or-create flat-void machinery, root-agnostic (root
@@ -188,7 +188,7 @@ UI is cut; verify `ProjectRootsConfig`'s remaining users before deciding delete-
   `client/screen/RecorderScreen`, `client/screen/RunnerScreen`.
 - **Orphan widgets:** `client/widget/TimelineSliderWidget` (true orphan);
   `client/screen/IntEditBox` (**and** its `src/test/.../IntEditBoxLogicTest`).
-  `client/screen/RedstoneIconButton` is **kept** (title button).
+  `client/screen/GarnetIconButton` is **kept** (title button).
 - **`ClientNetworkHandler`:** `OpenRecorderScreenS2C` / `OpenRunnerScreenS2C` receivers
   become logged no-ops; `RunnerScreen.active` references removed. (Recorder/runner UIs
   return as panels in sub-projects A/B.)
@@ -241,7 +241,7 @@ UI is cut; verify `ProjectRootsConfig`'s remaining users before deciding delete-
 0. Compose runtime scoping investigation → `docs/build/` finding.
 1. `BlitUvPipeline` alpha-blend variant + transparent-center present composite.
 2. `DockState` + `DockInsets`; `ViewportState` reads insets (replace constants).
-3. `RedstoneDock` composable: regions + tab strips + drag splitters; `ComposeSurface` hosts
+3. `GarnetDock` composable: regions + tab strips + drag splitters; `ComposeSurface` hosts
    it full-window.
 4. Input routing (mouse/keyboard mixins + `DockInputRouter`, Alt/Shift+N focus/toggle).
 5. `ProjectExplorerPanel` + `ProjectTreeState`, wired to project networking.

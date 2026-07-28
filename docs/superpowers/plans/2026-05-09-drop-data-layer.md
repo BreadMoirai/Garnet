@@ -4,7 +4,7 @@
 
 **Goal:** Replace the `data/` package and in-world editor with a deferred-closure DSL that *is* the spec; keep slim recorder/runner block UIs.
 
-**Architecture:** A new `dsl/` package replaces `data/`. `redstoneSpec(id, bounds, lifespan, structure, strict) { … }` returns a value class wrapping a `SpecRun.() -> Unit` lambda. `runRedstoneSpec(level, origin, spec)` snapshots, restores, runs the lambda once to populate per-tick scheduler maps, then drives the tick loop dispatching inputs (direct setters → `BlockState`) at `START_OF_TICK` and assertions (condition-AST predicates) at `END_OF_TICK`. Recorder block emits `.spec.kts` text directly from `StateRecording` (no `RedstoneSpec` intermediate). Editor block, JSON codec, and ~half of `network/Packets.kt` are deleted.
+**Architecture:** A new `dsl/` package replaces `data/`. `garnetSpec(id, bounds, lifespan, structure, strict) { … }` returns a value class wrapping a `SpecRun.() -> Unit` lambda. `runGarnetSpec(level, origin, spec)` snapshots, restores, runs the lambda once to populate per-tick scheduler maps, then drives the tick loop dispatching inputs (direct setters → `BlockState`) at `START_OF_TICK` and assertions (condition-AST predicates) at `END_OF_TICK`. Recorder block emits `.spec.kts` text directly from `StateRecording` (no `GarnetSpec` intermediate). Editor block, JSON codec, and ~half of `network/Packets.kt` are deleted.
 
 **Tech Stack:** Kotlin (multi-version Stonecutter), Fabric, Kotest (JVM unit tests under `src/test/`), Fabric gametest (`src/gametest/`, `src/clientTest/`).
 
@@ -31,32 +31,32 @@ Move shared primitives out of `data/` into a new `dsl/` package. No behavior cha
 ### Task 1: Move `SimTime` and `Phase` from `data/` to `dsl/`
 
 **Files:**
-- Move: `src/main/kotlin/com/breadmoirai/redstonespecs/data/SimTime.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/SpecTime.kt` (file rename for clarity; classes unchanged)
+- Move: `src/main/kotlin/com/breadmoirai/garnet/data/SimTime.kt` → `src/main/kotlin/com/breadmoirai/garnet/dsl/SpecTime.kt` (file rename for clarity; classes unchanged)
 
 - [ ] **Step 1: Move file with `git mv`**
 
 ```bash
-mkdir -p src/main/kotlin/com/breadmoirai/redstonespecs/dsl
-git mv src/main/kotlin/com/breadmoirai/redstonespecs/data/SimTime.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/dsl/SpecTime.kt
+mkdir -p src/main/kotlin/com/breadmoirai/garnet/dsl
+git mv src/main/kotlin/com/breadmoirai/garnet/data/SimTime.kt \
+       src/main/kotlin/com/breadmoirai/garnet/dsl/SpecTime.kt
 ```
 
 - [ ] **Step 2: Edit the package declaration**
 
 In the moved file, change line 1:
 ```kotlin
-package com.breadmoirai.redstonespecs.data
+package com.breadmoirai.garnet.data
 ```
 to:
 ```kotlin
-package com.breadmoirai.redstonespecs.dsl
+package com.breadmoirai.garnet.dsl
 ```
 
 - [ ] **Step 3: Update all imports project-wide**
 
 ```bash
-grep -rl "com.breadmoirai.redstonespecs.data.SimTime\|com.breadmoirai.redstonespecs.data.Phase" src/ | \
-  xargs sed -i 's/com\.breadmoirai\.redstonespecs\.data\.SimTime/com.breadmoirai.redstonespecs.dsl.SimTime/g; s/com\.breadmoirai\.redstonespecs\.data\.Phase/com.breadmoirai.redstonespecs.dsl.Phase/g'
+grep -rl "com.breadmoirai.garnet.data.SimTime\|com.breadmoirai.garnet.data.Phase" src/ | \
+  xargs sed -i 's/com\.breadmoirai\.garnet\.data\.SimTime/com.breadmoirai.garnet.dsl.SimTime/g; s/com\.breadmoirai\.garnet\.data\.Phase/com.breadmoirai.garnet.dsl.Phase/g'
 ```
 
 - [ ] **Step 4: Run the build**
@@ -74,24 +74,24 @@ git commit -m "refactor(dsl): move SimTime/Phase from data/ into dsl/"
 ### Task 2: Move `StateCondition` from `data/` to `dsl/`
 
 **Files:**
-- Move: `src/main/kotlin/com/breadmoirai/redstonespecs/data/StateCondition.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/StateCondition.kt`
+- Move: `src/main/kotlin/com/breadmoirai/garnet/data/StateCondition.kt` → `src/main/kotlin/com/breadmoirai/garnet/dsl/StateCondition.kt`
 
 - [ ] **Step 1: Move file**
 
 ```bash
-git mv src/main/kotlin/com/breadmoirai/redstonespecs/data/StateCondition.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/dsl/StateCondition.kt
+git mv src/main/kotlin/com/breadmoirai/garnet/data/StateCondition.kt \
+       src/main/kotlin/com/breadmoirai/garnet/dsl/StateCondition.kt
 ```
 
 - [ ] **Step 2: Update package declaration in the moved file**
 
-Change `package com.breadmoirai.redstonespecs.data` → `package com.breadmoirai.redstonespecs.dsl`.
+Change `package com.breadmoirai.garnet.data` → `package com.breadmoirai.garnet.dsl`.
 
 - [ ] **Step 3: Update all imports**
 
 ```bash
-grep -rl "com.breadmoirai.redstonespecs.data.StateCondition" src/ | \
-  xargs sed -i 's/com\.breadmoirai\.redstonespecs\.data\.StateCondition/com.breadmoirai.redstonespecs.dsl.StateCondition/g'
+grep -rl "com.breadmoirai.garnet.data.StateCondition" src/ | \
+  xargs sed -i 's/com\.breadmoirai\.garnet\.data\.StateCondition/com.breadmoirai.garnet.dsl.StateCondition/g'
 ```
 
 - [ ] **Step 4: Run the build**
@@ -109,24 +109,24 @@ git commit -m "refactor(dsl): move StateCondition from data/ into dsl/"
 ### Task 3: Move `ConditionEvaluator` from `runner/` to `dsl/`
 
 **Files:**
-- Move: `src/main/kotlin/com/breadmoirai/redstonespecs/runner/ConditionEvaluator.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/ConditionEvaluator.kt`
+- Move: `src/main/kotlin/com/breadmoirai/garnet/runner/ConditionEvaluator.kt` → `src/main/kotlin/com/breadmoirai/garnet/dsl/ConditionEvaluator.kt`
 
 - [ ] **Step 1: Move file**
 
 ```bash
-git mv src/main/kotlin/com/breadmoirai/redstonespecs/runner/ConditionEvaluator.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/dsl/ConditionEvaluator.kt
+git mv src/main/kotlin/com/breadmoirai/garnet/runner/ConditionEvaluator.kt \
+       src/main/kotlin/com/breadmoirai/garnet/dsl/ConditionEvaluator.kt
 ```
 
 - [ ] **Step 2: Update package declaration**
 
-Change `package com.breadmoirai.redstonespecs.runner` → `package com.breadmoirai.redstonespecs.dsl`.
+Change `package com.breadmoirai.garnet.runner` → `package com.breadmoirai.garnet.dsl`.
 
 - [ ] **Step 3: Update all imports**
 
 ```bash
-grep -rl "com.breadmoirai.redstonespecs.runner.ConditionEvaluator\|com.breadmoirai.redstonespecs.runner.evaluateConditionOnState\|com.breadmoirai.redstonespecs.runner.describeCondition\|com.breadmoirai.redstonespecs.runner.describeStateForCondition\|com.breadmoirai.redstonespecs.runner.anchorTime" src/ | \
-  xargs sed -i 's/com\.breadmoirai\.redstonespecs\.runner\.\(evaluateConditionOnState\|describeCondition\|describeStateForCondition\|anchorTime\|ConditionEvaluator\)/com.breadmoirai.redstonespecs.dsl.\1/g'
+grep -rl "com.breadmoirai.garnet.runner.ConditionEvaluator\|com.breadmoirai.garnet.runner.evaluateConditionOnState\|com.breadmoirai.garnet.runner.describeCondition\|com.breadmoirai.garnet.runner.describeStateForCondition\|com.breadmoirai.garnet.runner.anchorTime" src/ | \
+  xargs sed -i 's/com\.breadmoirai\.garnet\.runner\.\(evaluateConditionOnState\|describeCondition\|describeStateForCondition\|anchorTime\|ConditionEvaluator\)/com.breadmoirai.garnet.dsl.\1/g'
 ```
 
 - [ ] **Step 4: Build and commit**
@@ -142,24 +142,24 @@ git commit -m "refactor(dsl): move ConditionEvaluator from runner/ into dsl/"
 ### Task 4: Move `ConditionDsl` from `data/dsl/` to `dsl/`
 
 **Files:**
-- Move: `src/main/kotlin/com/breadmoirai/redstonespecs/data/dsl/ConditionDsl.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/ConditionScope.kt`
+- Move: `src/main/kotlin/com/breadmoirai/garnet/data/dsl/ConditionDsl.kt` → `src/main/kotlin/com/breadmoirai/garnet/dsl/ConditionScope.kt`
 
 - [ ] **Step 1: Move file**
 
 ```bash
-git mv src/main/kotlin/com/breadmoirai/redstonespecs/data/dsl/ConditionDsl.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/dsl/ConditionScope.kt
+git mv src/main/kotlin/com/breadmoirai/garnet/data/dsl/ConditionDsl.kt \
+       src/main/kotlin/com/breadmoirai/garnet/dsl/ConditionScope.kt
 ```
 
 - [ ] **Step 2: Update package declaration**
 
-Change `package com.breadmoirai.redstonespecs.data.dsl` → `package com.breadmoirai.redstonespecs.dsl`.
+Change `package com.breadmoirai.garnet.data.dsl` → `package com.breadmoirai.garnet.dsl`.
 
 - [ ] **Step 3: Update all imports**
 
 ```bash
-grep -rl "com.breadmoirai.redstonespecs.data.dsl.ConditionScope\|com.breadmoirai.redstonespecs.data.dsl.SpecDslMarker" src/ | \
-  xargs sed -i 's/com\.breadmoirai\.redstonespecs\.data\.dsl\.ConditionScope/com.breadmoirai.redstonespecs.dsl.ConditionScope/g; s/com\.breadmoirai\.redstonespecs\.data\.dsl\.SpecDslMarker/com.breadmoirai.redstonespecs.dsl.SpecDslMarker/g'
+grep -rl "com.breadmoirai.garnet.data.dsl.ConditionScope\|com.breadmoirai.garnet.data.dsl.SpecDslMarker" src/ | \
+  xargs sed -i 's/com\.breadmoirai\.garnet\.data\.dsl\.ConditionScope/com.breadmoirai.garnet.dsl.ConditionScope/g; s/com\.breadmoirai\.garnet\.data\.dsl\.SpecDslMarker/com.breadmoirai.garnet.dsl.SpecDslMarker/g'
 ```
 
 (Note: `SpecDslMarker` annotation may live inside `ConditionDsl.kt` — read the file before moving and pull the annotation along; if it's in a separate file, leave it for Task 5 but ensure the import-rewrite treats it consistently.)
@@ -178,27 +178,27 @@ git commit -m "refactor(dsl): move ConditionDsl from data/dsl/ into dsl/"
 
 ## Phase 2 — New imperative DSL alongside the old
 
-Add the new DSL surface (no integration with existing code yet). Old `data/RedstoneSpec`, old `data/dsl/SpecDsl`, and old `runner/SpecRunner` stay untouched and reachable. New unit tests cover the new types.
+Add the new DSL surface (no integration with existing code yet). Old `data/GarnetSpec`, old `data/dsl/SpecDsl`, and old `runner/SpecRunner` stay untouched and reachable. New unit tests cover the new types.
 
-### Task 5: Add `dsl/RedstoneSpec.kt` (the new value class)
+### Task 5: Add `dsl/GarnetSpec.kt` (the new value class)
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/RedstoneSpec.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/dsl/GarnetSpec.kt`
 
-(The old `data/RedstoneSpec.kt` stays for now — they live in different packages so no name collision.)
+(The old `data/GarnetSpec.kt` stays for now — they live in different packages so no name collision.)
 
 - [ ] **Step 1: Create the new file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.dsl
+package com.breadmoirai.garnet.dsl
 
 import net.minecraft.core.Vec3i
 
 /**
  * The DSL-level spec value. Holds metadata in plain fields and the user's
- * [block] lambda; no entry list. Construction is via [redstoneSpec].
+ * [block] lambda; no entry list. Construction is via [garnetSpec].
  */
-class RedstoneSpec(
+class GarnetSpec(
     val id: String,
     val bounds: Vec3i,
     val lifespan: Int,
@@ -218,14 +218,14 @@ class RedstoneSpec(
     }
 }
 
-fun redstoneSpec(
+fun garnetSpec(
     id: String,
-    bounds: Vec3i = RedstoneSpec.DEFAULT_BOUNDS,
+    bounds: Vec3i = GarnetSpec.DEFAULT_BOUNDS,
     lifespan: Int = 20,
     structure: String? = null,
     strict: Boolean = false,
     block: SpecRun.() -> Unit,
-): RedstoneSpec = RedstoneSpec(id, bounds, lifespan, structure, strict, block)
+): GarnetSpec = GarnetSpec(id, bounds, lifespan, structure, strict, block)
 ```
 
 - [ ] **Step 2: Build (will fail — `SpecRun` not yet defined)**
@@ -235,12 +235,12 @@ Skip — proceed to Task 6 which adds `SpecRun`.
 ### Task 6: Add `dsl/SpecRun.kt` (execution context with scheduler maps)
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/SpecRun.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/dsl/SpecRun.kt`
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.dsl
+package com.breadmoirai.garnet.dsl
 
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -252,7 +252,7 @@ data class SpecFailure(val label: String, val time: SimTime, val message: String
 }
 
 /**
- * Execution context for a single [RedstoneSpec.block] invocation.
+ * Execution context for a single [GarnetSpec.block] invocation.
  *
  * The user's lambda runs **once** before the tick loop; calls to [input] and
  * [output] register tick-keyed callbacks into [inputActions] / [assertions].
@@ -321,10 +321,10 @@ interface StateRecordingViewLike {
 
 - [ ] **Step 2: Add `SpecDslMarker` annotation if not already in `dsl/`**
 
-If Task 4 left `SpecDslMarker` outside `dsl/`, create `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/SpecDslMarker.kt`:
+If Task 4 left `SpecDslMarker` outside `dsl/`, create `src/main/kotlin/com/breadmoirai/garnet/dsl/SpecDslMarker.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.dsl
+package com.breadmoirai.garnet.dsl
 
 @DslMarker
 annotation class SpecDslMarker
@@ -338,14 +338,14 @@ Expected: BUILD SUCCESSFUL.
 ### Task 7: Add `dsl/InputScope.kt` (direct setters)
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/InputScope.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/dsl/InputScope.kt`
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.dsl
+package com.breadmoirai.garnet.dsl
 
-import com.breadmoirai.redstonespecs.runner.tryApplyAsPlayerInteraction
+import com.breadmoirai.garnet.runner.tryApplyAsPlayerInteraction
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.LeverBlock
@@ -445,12 +445,12 @@ Skip until Task 9.
 ### Task 8: Add `dsl/OutputScope.kt` (assertion predicates)
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/OutputScope.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/dsl/OutputScope.kt`
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.dsl
+package com.breadmoirai.garnet.dsl
 
 import net.minecraft.core.BlockPos
 
@@ -510,17 +510,17 @@ class OutputScope internal constructor(
 ### Task 9: Lift player-interaction dispatch out of `SpecRunner`
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecRunner.kt:1-130` — extract `tryApplyAsPlayerInteraction` into a free function
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/runner/PlayerInteractionDispatch.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/runner/SpecRunner.kt:1-130` — extract `tryApplyAsPlayerInteraction` into a free function
+- Create: `src/main/kotlin/com/breadmoirai/garnet/runner/PlayerInteractionDispatch.kt`
 
 - [ ] **Step 1: Read the existing implementation**
 
-Read `src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecRunner.kt`. Locate `tryApplyAsPlayerInteraction` (it dispatches buttons via `ButtonBlock.press`, levers, etc.).
+Read `src/main/kotlin/com/breadmoirai/garnet/runner/SpecRunner.kt`. Locate `tryApplyAsPlayerInteraction` (it dispatches buttons via `ButtonBlock.press`, levers, etc.).
 
 - [ ] **Step 2: Create the new file with the function lifted as `internal fun`**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.runner
+package com.breadmoirai.garnet.runner
 
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -557,18 +557,18 @@ Expected: BUILD SUCCESSFUL.
 
 ```bash
 git add -A
-git commit -m "feat(dsl): add new RedstoneSpec / SpecRun / Input/OutputScope alongside old DSL"
+git commit -m "feat(dsl): add new GarnetSpec / SpecRun / Input/OutputScope alongside old DSL"
 ```
 
 ### Task 10: Add unit tests for the new DSL
 
 **Files:**
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/dsl/SpecRunSchedulerTest.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/dsl/SpecRunSchedulerTest.kt`
 
 - [ ] **Step 1: Write the failing tests**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.dsl
+package com.breadmoirai.garnet.dsl
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -576,9 +576,9 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 
 class SpecRunSchedulerTest : FunSpec({
-    test("redstoneSpec carries args; lambda is not executed at construction") {
+    test("garnetSpec carries args; lambda is not executed at construction") {
         var ran = false
-        val spec = redstoneSpec(
+        val spec = garnetSpec(
             id = "t",
             bounds = Vec3i(3, 3, 3),
             lifespan = 5,
@@ -601,7 +601,7 @@ class SpecRunSchedulerTest : FunSpec({
     }
 
     test("strict flag round-trips through the value class") {
-        val spec = redstoneSpec(id = "s", strict = true) { }
+        val spec = garnetSpec(id = "s", strict = true) { }
         spec.strict shouldBe true
     }
 })
@@ -609,7 +609,7 @@ class SpecRunSchedulerTest : FunSpec({
 
 - [ ] **Step 2: Run tests; expect compile or fail**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.dsl.SpecRunSchedulerTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.dsl.SpecRunSchedulerTest'"`
 Expected: at least the scheduler test fails (no test harness yet).
 
 - [ ] **Step 3: Add a test harness**
@@ -634,7 +634,7 @@ internal fun specRunForTest(): SpecRun {
 
 - [ ] **Step 4: Run tests; pass**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.dsl.SpecRunSchedulerTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.dsl.SpecRunSchedulerTest'"`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -644,25 +644,25 @@ git add -A
 git commit -m "test(dsl): SpecRun scheduler unit tests"
 ```
 
-### Task 11: Add `runner/runRedstoneSpec.kt` (the new tick loop)
+### Task 11: Add `runner/runGarnetSpec.kt` (the new tick loop)
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/runner/runRedstoneSpec.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/runner/runGarnetSpec.kt`
 
-This replaces the testing-runner `RunRedstoneSpec.kt` and the in-mod `SpecRunner` + `SpecRunnerCoordinator` + `EngineDrivenRun` flow, but is added alongside them; cutover happens in Task 12.
+This replaces the testing-runner `RunGarnetSpec.kt` and the in-mod `SpecRunner` + `SpecRunnerCoordinator` + `EngineDrivenRun` flow, but is added alongside them; cutover happens in Task 12.
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.runner
+package com.breadmoirai.garnet.runner
 
-import com.breadmoirai.redstonespecs.dsl.Phase
-import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
-import com.breadmoirai.redstonespecs.dsl.SimTime
-import com.breadmoirai.redstonespecs.dsl.SpecRun
-import com.breadmoirai.redstonespecs.dsl.StateRecordingViewLike
-import com.breadmoirai.redstonespecs.testing.core.McDispatchers
-import com.breadmoirai.redstonespecs.testing.server.awaitTickEnd
+import com.breadmoirai.garnet.dsl.Phase
+import com.breadmoirai.garnet.dsl.GarnetSpec
+import com.breadmoirai.garnet.dsl.SimTime
+import com.breadmoirai.garnet.dsl.SpecRun
+import com.breadmoirai.garnet.dsl.StateRecordingViewLike
+import com.breadmoirai.garnet.testing.core.McDispatchers
+import com.breadmoirai.garnet.testing.server.awaitTickEnd
 import kotlinx.coroutines.withContext
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -685,10 +685,10 @@ import java.util.UUID
  *  6. Restore the snapshot, deactivate the recorder.
  *  7. Throw [AssertionError] if any failures were collected.
  */
-suspend fun runRedstoneSpec(
+suspend fun runGarnetSpec(
     level: ServerLevel,
     origin: BlockPos,
-    spec: RedstoneSpec,
+    spec: GarnetSpec,
 ): StateRecording = withContext(McDispatchers.Server) {
     val snapshot = SpecSnapshot.capture(level, origin, spec.bounds)
     val recorderId = UUID.randomUUID()
@@ -745,7 +745,7 @@ private fun recorderLiveView(recorder: StateRecorder): StateRecordingViewLike {
     // on StateRecorder. Until that exists, fall back to building a recording
     // snapshot on each call (slower but correct for short tests).
     return object : StateRecordingViewLike {
-        override fun stateAt(pos: net.minecraft.core.BlockPos, time: com.breadmoirai.redstonespecs.dsl.SimTime) =
+        override fun stateAt(pos: net.minecraft.core.BlockPos, time: com.breadmoirai.garnet.dsl.SimTime) =
             StateRecordingView.of(recorder.toRecording()).stateAt(pos, time)
 
         override fun initialAt(pos: net.minecraft.core.BlockPos) =
@@ -768,7 +768,7 @@ private fun scanForUnexpectedChanges(
             val cur = view.stateAt(pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
             if (cur != prev && t !in declaredTicks) {
                 run.reportFailure(
-                    com.breadmoirai.redstonespecs.dsl.SpecFailure(
+                    com.breadmoirai.garnet.dsl.SpecFailure(
                         label = pos.toString(),
                         time = SimTime(t, Phase.END_OF_TICK),
                         message = "unexpected change (expected no change, got changed)",
@@ -790,7 +790,7 @@ Expected: BUILD SUCCESSFUL.
 
 ```bash
 git add -A
-git commit -m "feat(runner): add runRedstoneSpec for the new DSL"
+git commit -m "feat(runner): add runGarnetSpec for the new DSL"
 ```
 
 ---
@@ -799,30 +799,30 @@ git commit -m "feat(runner): add runRedstoneSpec for the new DSL"
 
 Flip every consumer (testing harness, recorder block, runner block, kts loader) to the new DSL. The old code becomes dead but stays compiled until Phase 6 deletes it.
 
-### Task 12: Switch `testing/runner/RunRedstoneSpec.kt` to use the new engine
+### Task 12: Switch `testing/runner/RunGarnetSpec.kt` to use the new engine
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RunRedstoneSpec.kt`
-- Modify (or replace): `src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RedstoneSpecAssertions.kt` — its job is now done inside the new engine, so drop the function or keep as a thin wrapper that throws if called with the old type.
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/testing/runner/RunGarnetSpec.kt`
+- Modify (or replace): `src/main/kotlin/com/breadmoirai/garnet/testing/runner/GarnetAssertions.kt` — its job is now done inside the new engine, so drop the function or keep as a thin wrapper that throws if called with the old type.
 
-- [ ] **Step 1: Read the current `RunRedstoneSpec.kt`**
+- [ ] **Step 1: Read the current `RunGarnetSpec.kt`**
 
-The existing function takes the old `data.RedstoneSpec` and runs it via the old `SpecRunnerCoordinator`. Replace its implementation to take the new `dsl.RedstoneSpec` and delegate to the new `runner.runRedstoneSpec`.
+The existing function takes the old `data.GarnetSpec` and runs it via the old `SpecRunnerCoordinator`. Replace its implementation to take the new `dsl.GarnetSpec` and delegate to the new `runner.runGarnetSpec`.
 
 - [ ] **Step 2: Update the suspend function signature and body**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.runner
+package com.breadmoirai.garnet.testing.runner
 
-import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
-import com.breadmoirai.redstonespecs.runner.StateRecording
-import com.breadmoirai.redstonespecs.runner.runRedstoneSpec as runEngine
+import com.breadmoirai.garnet.dsl.GarnetSpec
+import com.breadmoirai.garnet.runner.StateRecording
+import com.breadmoirai.garnet.runner.runGarnetSpec as runEngine
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import kotlin.coroutines.coroutineContext
 
-suspend fun runRedstoneSpec(
-    spec: RedstoneSpec,
+suspend fun runGarnetSpec(
+    spec: GarnetSpec,
     originPos: BlockPos,
     level: ServerLevel,
 ): StateRecording {
@@ -837,7 +837,7 @@ suspend fun runRedstoneSpec(
 - [ ] **Step 3: Build**
 
 Run: `cmd.exe /c "./gradlew.bat :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses"`
-Expected: BUILD SUCCESSFUL. Existing gametests will fail to compile if any still use the old `data.RedstoneSpec` type — fix call-sites by pointing at the new DSL.
+Expected: BUILD SUCCESSFUL. Existing gametests will fail to compile if any still use the old `data.GarnetSpec` type — fix call-sites by pointing at the new DSL.
 
 - [ ] **Step 4: Run tests + gametests**
 
@@ -854,13 +854,13 @@ git commit -m "feat(runner): testing-harness uses new DSL engine"
 ### Task 13: Add `runner/RecordingDslEmitter.kt`
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingDslEmitter.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/runner/RecordingDslEmitter.kt`
 
 Replaces the `RecordingFinalizer` → `KtsSpecEmitter` two-step. Walks a `StateRecording` directly and emits `.spec.kts` text.
 
 - [ ] **Step 1: Read the current finalizer + emitter for the derivation rules**
 
-Read `src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingFinalizer.kt` and `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecEmitter.kt`. Identify:
+Read `src/main/kotlin/com/breadmoirai/garnet/runner/RecordingFinalizer.kt` and `src/main/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecEmitter.kt`. Identify:
 - How input change-ticks are detected.
 - How condition derivation maps `RedstoneTorch.LIT` → `lit()`, `DiodeBlock.POWERED` → `powered()`, fallthrough to `prop("name", "value")`.
 - The `(pos, kind, label, color)` markers read off the BE.
@@ -868,9 +868,9 @@ Read `src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingFinalizer.kt
 - [ ] **Step 2: Write the emitter**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.runner
+package com.breadmoirai.garnet.runner
 
-import com.breadmoirai.redstonespecs.dsl.RedstoneSpec
+import com.breadmoirai.garnet.dsl.GarnetSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 
@@ -902,7 +902,7 @@ object RecordingDslEmitter {
         markers: List<EntryMarker>,
         recording: StateRecording,
     ): String {
-        // 1. Header line: redstoneSpec(id = ..., bounds = Vec3i(...), ...)
+        // 1. Header line: garnetSpec(id = ..., bounds = Vec3i(...), ...)
         // 2. For each marker:
         //    - If INPUT: emit input(x, y, z, label = ...) { at(t) { setX(...) } }
         //      where `setX(...)` is derived from the change between (t-1) and (t)
@@ -914,7 +914,7 @@ object RecordingDslEmitter {
         TODO(
             "Implement using the same change-detection + condition-derivation " +
                     "rules as the old RecordingFinalizer + KtsSpecEmitter. The output " +
-                    "must be a valid .spec.kts that re-loads to an equivalent RedstoneSpec."
+                    "must be a valid .spec.kts that re-loads to an equivalent GarnetSpec."
         )
     }
 }
@@ -924,16 +924,16 @@ object RecordingDslEmitter {
 
 - [ ] **Step 3: Add a unit test asserting the emitter output round-trips**
 
-Create `src/test/kotlin/com/breadmoirai/redstonespecs/runner/RecordingDslEmitterTest.kt` with:
+Create `src/test/kotlin/com/breadmoirai/garnet/runner/RecordingDslEmitterTest.kt` with:
 - A hand-rolled fake `StateRecording` covering: lever input, comparator output, redstone torch output.
 - Call `RecordingDslEmitter.emit(...)`.
-- Assert key substrings are present (`redstoneSpec(`, `setPowered(true)`, `at(2) { lit() }`, etc.).
+- Assert key substrings are present (`garnetSpec(`, `setPowered(true)`, `at(2) { lit() }`, etc.).
 
 (The full round-trip via `KtsSpecLoader` requires an active script host — defer that to a gametest.)
 
 - [ ] **Step 4: Build + test**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.redstonespecs.runner.RecordingDslEmitterTest'"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests 'com.breadmoirai.garnet.runner.RecordingDslEmitterTest'"`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -943,11 +943,11 @@ git add -A
 git commit -m "feat(runner): RecordingDslEmitter — recording → .spec.kts text"
 ```
 
-### Task 14: Switch `RedstoneSpecRecorderBlock` to call `RecordingDslEmitter`
+### Task 14: Switch `GarnetRecorderBlock` to call `RecordingDslEmitter`
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRecorderBlock.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/SpecPersistence.kt` if needed — add a `writeSpecKts(path, source)` that takes raw text instead of a `RedstoneSpec`.
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRecorderBlock.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/persistence/SpecPersistence.kt` if needed — add a `writeSpecKts(path, source)` that takes raw text instead of a `GarnetSpec`.
 
 - [ ] **Step 1: Read the recorder block's finalize path**
 
@@ -969,20 +969,20 @@ git add -A
 git commit -m "feat(block): recorder block emits .spec.kts via RecordingDslEmitter"
 ```
 
-### Task 15: Switch `KtsSpecLoader` and the `.spec.kts` script type to return new `RedstoneSpec`
+### Task 15: Switch `KtsSpecLoader` and the `.spec.kts` script type to return new `GarnetSpec`
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/SpecScript.kt` — change `@KotlinScript` `provided` imports to `dsl/`; change return type bound.
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecLoader.kt` — return `dsl.RedstoneSpec`.
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/data/serial/SpecScript.kt` — change `@KotlinScript` `provided` imports to `dsl/`; change return type bound.
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecLoader.kt` — return `dsl.GarnetSpec`.
 - (Phase 4 will move both files into `persistence/`.)
 
 - [ ] **Step 1: Update `SpecScript.kt`**
 
-Change the script's `defaultImports` to point to `com.breadmoirai.redstonespecs.dsl.*` (and `net.minecraft.core.Vec3i` for bounds). The script body now invokes the new top-level `redstoneSpec(...)` function.
+Change the script's `defaultImports` to point to `com.breadmoirai.garnet.dsl.*` (and `net.minecraft.core.Vec3i` for bounds). The script body now invokes the new top-level `garnetSpec(...)` function.
 
 - [ ] **Step 2: Update `KtsSpecLoader.kt`**
 
-Change return type from `data.RedstoneSpec` to `dsl.RedstoneSpec`. Update the cast that unwraps the script result accordingly.
+Change return type from `data.GarnetSpec` to `dsl.GarnetSpec`. Update the cast that unwraps the script result accordingly.
 
 - [ ] **Step 3: Build**
 
@@ -992,28 +992,28 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Run kts loader tests**
 
 Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests '*KtsSpec*'"`
-Expected: PASS or — if the existing tests pin the old `data.RedstoneSpec` return — update those tests to assert against the new shape.
+Expected: PASS or — if the existing tests pin the old `data.GarnetSpec` return — update those tests to assert against the new shape.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add -A
-git commit -m "feat(persistence): .spec.kts now returns the new dsl.RedstoneSpec"
+git commit -m "feat(persistence): .spec.kts now returns the new dsl.GarnetSpec"
 ```
 
-### Task 16: Switch `RedstoneSpecRunnerBlock` to call `runRedstoneSpec` directly
+### Task 16: Switch `GarnetRunnerBlock` to call `runGarnetSpec` directly
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRunnerBlock.kt`
-- Possibly modify: `src/main/kotlin/com/breadmoirai/redstonespecs/event/SubTickPhaseEvents.kt` — if the runner block was relying on `SpecRunnerCoordinator`, drop that dependency.
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRunnerBlock.kt`
+- Possibly modify: `src/main/kotlin/com/breadmoirai/garnet/event/SubTickPhaseEvents.kt` — if the runner block was relying on `SpecRunnerCoordinator`, drop that dependency.
 
 - [ ] **Step 1: Read the current runner-block run path**
 
 Identify how the runner block currently kicks off a run (likely via `SpecRunnerCoordinator.register(...)`).
 
-- [ ] **Step 2: Replace with direct `runRedstoneSpec` call**
+- [ ] **Step 2: Replace with direct `runGarnetSpec` call**
 
-Launch `runRedstoneSpec(level, origin, spec)` from a server-side coroutine. On completion or `AssertionError`, push a result summary to the client via `RunnerStatus` (Phase 4 will add this packet — for now log to server console).
+Launch `runGarnetSpec(level, origin, spec)` from a server-side coroutine. On completion or `AssertionError`, push a result summary to the client via `RunnerStatus` (Phase 4 will add this packet — for now log to server console).
 
 - [ ] **Step 3: Full build**
 
@@ -1024,7 +1024,7 @@ Expected: BUILD SUCCESSFUL. The old coordinator + SpecRunner are now unreference
 
 ```bash
 git add -A
-git commit -m "feat(block): runner block calls runRedstoneSpec directly"
+git commit -m "feat(block): runner block calls runGarnetSpec directly"
 ```
 
 ---
@@ -1036,12 +1036,12 @@ Add the new screens, new packets, directory scan. Replace the editor screen's op
 ### Task 17: Add `persistence/SpecDirectoryScan.kt`
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/SpecDirectoryScan.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/persistence/SpecDirectoryScan.kt`
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.persistence
+package com.breadmoirai.garnet.persistence
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -1069,7 +1069,7 @@ object SpecDirectoryScan {
 
 - [ ] **Step 2: Add a JVM unit test**
 
-Create `src/test/kotlin/com/breadmoirai/redstonespecs/persistence/SpecDirectoryScanTest.kt`:
+Create `src/test/kotlin/com/breadmoirai/garnet/persistence/SpecDirectoryScanTest.kt`:
 - Use `kotlin.io.path.createTempDirectory`.
 - Create three files: `a.spec.kts`, `z.spec.kts`, `not-a-spec.txt`.
 - Assert `list(...)` returns `["a.spec.kts", "z.spec.kts"]`.
@@ -1087,8 +1087,8 @@ git commit -m "feat(persistence): SpecDirectoryScan for runner picker"
 ### Task 18: Add the new packets to `network/Packets.kt`
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt`
 
 - [ ] **Step 1: Add 7 new payloads**
 
@@ -1162,8 +1162,8 @@ git commit -m "feat(network): add slim recorder/runner config + command packets"
 ### Task 19: Add `client/screen/RecorderScreen.kt`
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderScreen.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRecorderBlock.kt` — on `useWithoutItem`, fire `OpenRecorderScreenS2C`.
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/screen/RecorderScreen.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRecorderBlock.kt` — on `useWithoutItem`, fire `OpenRecorderScreenS2C`.
 - Modify: client-side network handler to open the screen on receipt.
 
 - [ ] **Step 1: Build the screen**
@@ -1178,7 +1178,7 @@ Server receives `SetRecorderConfigC2S` → validates BE at `originPos` → updat
 
 - [ ] **Step 3: Wire the right-click path**
 
-In `RedstoneSpecRecorderBlock.useWithoutItem`, send `OpenRecorderScreenS2C` to the player; client handler opens the screen.
+In `GarnetRecorderBlock.useWithoutItem`, send `OpenRecorderScreenS2C` to the player; client handler opens the screen.
 
 - [ ] **Step 4: Manual smoke test in dev**
 
@@ -1198,8 +1198,8 @@ git commit -m "feat(client): RecorderScreen + open-on-rightclick"
 ### Task 20: Add `client/screen/RunnerScreen.kt`
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerScreen.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRunnerBlock.kt` — on `useWithoutItem`, scan dir, fire `OpenRunnerScreenS2C`.
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerScreen.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRunnerBlock.kt` — on `useWithoutItem`, scan dir, fire `OpenRunnerScreenS2C`.
 - Modify: client-side network handler to open the screen.
 
 - [ ] **Step 1: Build the screen**
@@ -1210,7 +1210,7 @@ For the dropdown: prefer `CycleButton<String>` over a custom dropdown widget (av
 
 - [ ] **Step 2: Server handler**
 
-Server receives `SetRunnerConfigC2S` → validates BE → loads `.spec.kts` via `KtsSpecLoader` → stores spec on BE → pushes `OpenRunnerScreenS2C` (or a meta-only update payload) with the new meta. Receives `RunnerCommandC2S(PLACE_STRUCTURE)` → `StructurePersistence.load(spec.structure).place(level, origin)`. `RUN` → launch `runRedstoneSpec` server-side coroutine; on completion push `RunnerStatusS2C`. `RESTORE` → snapshot restore.
+Server receives `SetRunnerConfigC2S` → validates BE → loads `.spec.kts` via `KtsSpecLoader` → stores spec on BE → pushes `OpenRunnerScreenS2C` (or a meta-only update payload) with the new meta. Receives `RunnerCommandC2S(PLACE_STRUCTURE)` → `StructurePersistence.load(spec.structure).place(level, origin)`. `RUN` → launch `runGarnetSpec` server-side coroutine; on completion push `RunnerStatusS2C`. `RESTORE` → snapshot restore.
 
 - [ ] **Step 3: Build + smoke test**
 
@@ -1228,12 +1228,12 @@ git commit -m "feat(client): RunnerScreen + place/run/restore flow"
 
 **Files:**
 - Verify Tasks 19 + 20 already removed the old `OpenSpecEditorScreen` payload trigger from those blocks.
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt` — drop the editor branch from BE state if Phase 3 didn't.
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt` — drop the editor branch from BE state if Phase 3 didn't.
 
 - [ ] **Step 1: Search for any remaining editor-open paths from the recorder/runner blocks**
 
 ```bash
-grep -rn "SpecEditor\|OpenSpecEditor" src/main/kotlin/com/breadmoirai/redstonespecs/block/
+grep -rn "SpecEditor\|OpenSpecEditor" src/main/kotlin/com/breadmoirai/garnet/block/
 ```
 
 - [ ] **Step 2: Remove or redirect any hits**
@@ -1261,19 +1261,19 @@ Pure subtraction. After this phase, the only block kinds are recorder and runner
 ### Task 22: Delete the editor block + editor screens + editor packets
 
 **Files:**
-- Delete: `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecEditorBlock.kt`
-- Delete: `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockKind.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecEditorScreen.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecOverviewScreen.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecBoundsScreen.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecFileBrowserScreen.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerTimelineScreen.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerSpecPickerScreen.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderSetupScreen.kt`
-- Delete: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/DropdownButton.kt`, `IntEditBox.kt`, `IntStepper.kt`, `FlatRow.kt`, `ColorSwatchWidget.kt` (if not referenced by RecorderScreen/RunnerScreen — verify with grep first)
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt` — remove every payload that carried `RedstoneSpec`/`SpecEntry`/`StateCondition`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt` — drop the corresponding registrations
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt` and `ModRegistries.kt` — drop the editor block registration
+- Delete: `src/main/kotlin/com/breadmoirai/garnet/block/GarnetEditorBlock.kt`
+- Delete: `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockKind.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecEditorScreen.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecOverviewScreen.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecBoundsScreen.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecFileBrowserScreen.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerTimelineScreen.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerSpecPickerScreen.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/RecorderSetupScreen.kt`
+- Delete: `src/client/kotlin/com/breadmoirai/garnet/client/screen/DropdownButton.kt`, `IntEditBox.kt`, `IntStepper.kt`, `FlatRow.kt`, `ColorSwatchWidget.kt` (if not referenced by RecorderScreen/RunnerScreen — verify with grep first)
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt` — remove every payload that carried `GarnetSpec`/`SpecEntry`/`StateCondition`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt` — drop the corresponding registrations
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/garnet.kt` and `ModRegistries.kt` — drop the editor block registration
 
 - [ ] **Step 1: Identify which client-side widgets are still referenced**
 
@@ -1286,29 +1286,29 @@ Keep the ones still referenced by `RecorderScreen`/`RunnerScreen`; delete the re
 - [ ] **Step 2: Delete the editor block + its registration**
 
 ```bash
-git rm src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecEditorBlock.kt
-git rm src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockKind.kt
+git rm src/main/kotlin/com/breadmoirai/garnet/block/GarnetEditorBlock.kt
+git rm src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockKind.kt
 ```
 
-Edit `ModRegistries.kt` and `Redstonespecs.kt`: remove every reference to `RedstoneSpecEditorBlock` and `SpecBlockKind`. Adjust `SpecBlockEntity` if it switched on `SpecBlockKind` — collapse to two-block kinds inline (the BE itself is shared by both remaining blocks).
+Edit `ModRegistries.kt` and `garnet.kt`: remove every reference to `GarnetEditorBlock` and `SpecBlockKind`. Adjust `SpecBlockEntity` if it switched on `SpecBlockKind` — collapse to two-block kinds inline (the BE itself is shared by both remaining blocks).
 
 - [ ] **Step 3: Delete editor screens**
 
 ```bash
-git rm src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecEditorScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecOverviewScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecBoundsScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/SpecFileBrowserScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerTimelineScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerSpecPickerScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderSetupScreen.kt
+git rm src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecEditorScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecOverviewScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecBoundsScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/SpecFileBrowserScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerTimelineScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerSpecPickerScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/RecorderSetupScreen.kt
 ```
 
 (Plus the unreferenced widgets from Step 1.)
 
 - [ ] **Step 4: Delete editor packets**
 
-In `Packets.kt`: remove every payload data class that carries `RedstoneSpec`, `SpecEntry`, `StateCondition`, `SimTime` (the data-bearing edit/sync packets). Leave only the slim recorder/runner packets from Task 18 and any non-spec payloads (managed-worlds packets are in `network/managed/` and are out of scope).
+In `Packets.kt`: remove every payload data class that carries `GarnetSpec`, `SpecEntry`, `StateCondition`, `SimTime` (the data-bearing edit/sync packets). Leave only the slim recorder/runner packets from Task 18 and any non-spec payloads (managed-worlds packets are in `network/managed/` and are out of scope).
 
 In `NetworkRegistry.kt`: drop the registrations for the deleted payloads.
 
@@ -1333,41 +1333,41 @@ Final clean state.
 ### Task 23: Delete the `data/` package
 
 **Files (all to delete):**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/RedstoneSpec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/SpecEntry.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/EntryKind.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/TestResult.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/dsl/SpecDsl.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/dsl/EntryDsl.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/SpecJsonCodec.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecEmitter.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/SpecLiteralCapture.kt` (no longer used after editor removal)
+- `src/main/kotlin/com/breadmoirai/garnet/data/GarnetSpec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/SpecEntry.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/EntryKind.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/TestResult.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/dsl/SpecDsl.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/dsl/EntryDsl.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/serial/SpecJsonCodec.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecEmitter.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/serial/SpecLiteralCapture.kt` (no longer used after editor removal)
 
 **Files to move out of `data/`:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecLoader.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/KtsSpecLoader.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/SpecScript.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/SpecScript.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecLoader.kt` → `src/main/kotlin/com/breadmoirai/garnet/persistence/KtsSpecLoader.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/data/serial/SpecScript.kt` → `src/main/kotlin/com/breadmoirai/garnet/persistence/SpecScript.kt`
 
 - [ ] **Step 1: Move the kept files**
 
 ```bash
-git mv src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecLoader.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/persistence/KtsSpecLoader.kt
-git mv src/main/kotlin/com/breadmoirai/redstonespecs/data/serial/SpecScript.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/persistence/SpecScript.kt
+git mv src/main/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecLoader.kt \
+       src/main/kotlin/com/breadmoirai/garnet/persistence/KtsSpecLoader.kt
+git mv src/main/kotlin/com/breadmoirai/garnet/data/serial/SpecScript.kt \
+       src/main/kotlin/com/breadmoirai/garnet/persistence/SpecScript.kt
 ```
 
 Update package declarations in both moved files: `data.serial` → `persistence`.
 
 Update consumers' imports:
 ```bash
-grep -rl "com.breadmoirai.redstonespecs.data.serial.KtsSpecLoader\|com.breadmoirai.redstonespecs.data.serial.SpecScript" src/ | \
-  xargs sed -i 's/com\.breadmoirai\.redstonespecs\.data\.serial\.KtsSpecLoader/com.breadmoirai.redstonespecs.persistence.KtsSpecLoader/g; s/com\.breadmoirai\.redstonespecs\.data\.serial\.SpecScript/com.breadmoirai.redstonespecs.persistence.SpecScript/g'
+grep -rl "com.breadmoirai.garnet.data.serial.KtsSpecLoader\|com.breadmoirai.garnet.data.serial.SpecScript" src/ | \
+  xargs sed -i 's/com\.breadmoirai\.garnet\.data\.serial\.KtsSpecLoader/com.breadmoirai.garnet.persistence.KtsSpecLoader/g; s/com\.breadmoirai\.garnet\.data\.serial\.SpecScript/com.breadmoirai.garnet.persistence.SpecScript/g'
 ```
 
 - [ ] **Step 2: Delete the rest of `data/`**
 
 ```bash
-git rm -r src/main/kotlin/com/breadmoirai/redstonespecs/data/
+git rm -r src/main/kotlin/com/breadmoirai/garnet/data/
 ```
 
 (`git rm -r` will fail if anything is left — that's a feature; investigate any leftovers.)
@@ -1387,28 +1387,28 @@ git commit -m "refactor: delete data/ package; KtsSpecLoader/SpecScript move to 
 ### Task 24: Delete the dead engine code
 
 **Files to delete:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecRunner.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecRunnerCoordinator.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/EngineDrivenRun.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingFinalizer.kt`
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RedstoneSpecAssertions.kt` (its function is inlined into the new engine)
+- `src/main/kotlin/com/breadmoirai/garnet/runner/SpecRunner.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/SpecRunnerCoordinator.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/EngineDrivenRun.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/runner/RecordingFinalizer.kt`
+- `src/main/kotlin/com/breadmoirai/garnet/testing/runner/GarnetAssertions.kt` (its function is inlined into the new engine)
 
 - [ ] **Step 1: Verify no remaining references**
 
 ```bash
-grep -rn "SpecRunner\|SpecRunnerCoordinator\|EngineDrivenRun\|RecordingFinalizer\|assertOutputsMatch" src/ | grep -v "runRedstoneSpec.kt"
+grep -rn "SpecRunner\|SpecRunnerCoordinator\|EngineDrivenRun\|RecordingFinalizer\|assertOutputsMatch" src/ | grep -v "runGarnetSpec.kt"
 ```
 
-Expected: only references inside the to-be-deleted files themselves, plus the renamed `runRedstoneSpec`. Any other references must be cleaned up first.
+Expected: only references inside the to-be-deleted files themselves, plus the renamed `runGarnetSpec`. Any other references must be cleaned up first.
 
 - [ ] **Step 2: Delete files**
 
 ```bash
-git rm src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecRunner.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/runner/SpecRunnerCoordinator.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/runner/EngineDrivenRun.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingFinalizer.kt \
-       src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RedstoneSpecAssertions.kt
+git rm src/main/kotlin/com/breadmoirai/garnet/runner/SpecRunner.kt \
+       src/main/kotlin/com/breadmoirai/garnet/runner/SpecRunnerCoordinator.kt \
+       src/main/kotlin/com/breadmoirai/garnet/runner/EngineDrivenRun.kt \
+       src/main/kotlin/com/breadmoirai/garnet/runner/RecordingFinalizer.kt \
+       src/main/kotlin/com/breadmoirai/garnet/testing/runner/GarnetAssertions.kt
 ```
 
 - [ ] **Step 3: Full build + tests**
@@ -1429,19 +1429,19 @@ git commit -m "refactor(runner): delete SpecRunner / Coordinator / EngineDrivenR
 **Files:**
 - Modify: `docs/architecture/module-map.md` — replace the `data/` section with `dsl/`; replace the runner section to drop the per-runner trio; update the dependency-direction diagram.
 - Modify: `docs/architecture/INDEX.md` if any article title changed.
-- Modify: `docs/runner/INDEX.md` — drop the engine-driven-verification reference if its article became stale, or update the article to point at `runRedstoneSpec`.
+- Modify: `docs/runner/INDEX.md` — drop the engine-driven-verification reference if its article became stale, or update the article to point at `runGarnetSpec`.
 - Modify: `docs/persistence/INDEX.md` — note `KtsSpecLoader`/`SpecScript` now live in `persistence/`.
 - Modify: `docs/ui/INDEX.md` — drop editor-screen references; add RecorderScreen / RunnerScreen entries.
 - Modify: `docs/gametest/INDEX.md` — note that gametests now author against the new DSL.
 
 - [ ] **Step 1: Update each INDEX.md and the affected articles**
 
-For each article that referenced a deleted/moved type, update the path and prose. For deleted articles (e.g. anything specifically about `SpecEntry` or the old `RedstoneSpec`), remove or rewrite.
+For each article that referenced a deleted/moved type, update the path and prose. For deleted articles (e.g. anything specifically about `SpecEntry` or the old `GarnetSpec`), remove or rewrite.
 
 - [ ] **Step 2: Verify no broken links**
 
 ```bash
-grep -rn "data/RedstoneSpec\|data/SpecEntry\|SpecRunnerCoordinator\|RecordingFinalizer\|SpecEditorScreen" docs/
+grep -rn "data/GarnetSpec\|data/SpecEntry\|SpecRunnerCoordinator\|RecordingFinalizer\|SpecEditorScreen" docs/
 ```
 
 Expected: only references in `docs/superpowers/specs/` (historical specs are immutable) and in this plan file itself.
@@ -1459,8 +1459,8 @@ git commit -m "docs: sync architecture/UI/runner indexes with the new DSL-only s
 
 After Task 25:
 - `data/` package gone.
-- DSL is the single source of truth: `redstoneSpec(...) { … }` from `.spec.kts` files; the `SpecRun.() -> Unit` lambda *is* the spec.
+- DSL is the single source of truth: `garnetSpec(...) { … }` from `.spec.kts` files; the `SpecRun.() -> Unit` lambda *is* the spec.
 - Recorder block emits `.spec.kts` text directly via `RecordingDslEmitter`.
-- Runner block calls `runRedstoneSpec(level, origin, spec)` directly.
+- Runner block calls `runGarnetSpec(level, origin, spec)` directly.
 - Two slim screens — RecorderScreen, RunnerScreen — replace the editor.
 - ~1500 lines of `data/` + dead engine + editor UI deleted.

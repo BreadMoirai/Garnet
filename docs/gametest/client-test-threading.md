@@ -11,7 +11,7 @@ summary: Four-thread layering of `clientTest` specs, where to do each kind of wo
 ## The threads in play
 
 - **Fabric test thread.** The thread `FabricClientGameTest.runTest` is invoked on. Methods like `ClientGameTestContext.waitTick`, `waitFor`, `waitForScreen`, `takeScreenshot`, and `TestSingleplayerContext.runOnServer` assert via `ThreadingImpl.checkOnGametestThread(...)` and throw `IllegalStateException` from any other thread. To touch `Minecraft.getInstance()`, use `ctx.runOnClient` / `computeOnClient` from this thread; those internally hop to the render thread.
-- **Kotest worker thread.** `ClientTestSentinel.runKotestOnWorker` spawns a daemon (`redstonespecs-kotest-worker`) and runs `launchKotest` on it. The Fabric test thread loops on `context.waitTick()` until the worker signals done. This is the only way to drive client ticks while a Kotest spec executes — calling `launchKotest` synchronously from the Fabric test thread would block tick advancement and deadlock any suspending primitive.
+- **Kotest worker thread.** `ClientTestSentinel.runKotestOnWorker` spawns a daemon (`garnet-kotest-worker`) and runs `launchKotest` on it. The Fabric test thread loops on `context.waitTick()` until the worker signals done. This is the only way to drive client ticks while a Kotest spec executes — calling `launchKotest` synchronously from the Fabric test thread would block tick advancement and deadlock any suspending primitive.
 - **Server thread.** The integrated server's main loop. `onServer { … }` (`withContext(McDispatchers.Server)`) hops the calling coroutine here.
 - **Render thread.** Minecraft's main thread. Owns `Minecraft.getInstance()`, the screen field, and any UI mutation. `ctx.runOnClient`/`computeOnClient` runs work here.
 
@@ -21,12 +21,12 @@ Two base classes; they dispatch test bodies differently.
 
 | Spec base | Default thread | Use for |
 |---|---|---|
-| `RedstoneTestSpec` | Server thread (via `withContext(McDispatchers.Server)`) | Gametest sourceset — `level.setBlock`, BE queries, `awaitTicks`, etc. |
+| `GarnetTestSpec` | Server thread (via `withContext(McDispatchers.Server)`) | Gametest sourceset — `level.setBlock`, BE queries, `awaitTicks`, etc. |
 | `ClientSpec` | Kotest worker thread (no special dispatcher) | ClientTest sourceset — UI assertions, packet round-trips, screenshots. |
 
-A `RecordingHolder` is installed in both, so `runRedstoneSpec` works from either base.
+A `RecordingHolder` is installed in both, so `runGarnetSpec` works from either base.
 
-`clientTest` specs should extend `ClientSpec`. `RedstoneTestSpec` in the clientTest sourceset puts test bodies on the server thread, which prevents the local network channel from pumping (you can't observe client-side screen state when you hold the server thread).
+`clientTest` specs should extend `ClientSpec`. `GarnetTestSpec` in the clientTest sourceset puts test bodies on the server thread, which prevents the local network channel from pumping (you can't observe client-side screen state when you hold the server thread).
 
 ## Helpers for crossing threads
 
@@ -66,7 +66,7 @@ The drain happens after each tick, which means any worker call to `onClient` add
 
 ## See also
 
-- `docs/gametest/kotest-bridge.md` — the `RedstoneTestSpec` dispatcher and `awaitTicks`/`onServer` cookbook (server-side counterpart).
+- `docs/gametest/kotest-bridge.md` — the `GarnetTestSpec` dispatcher and `awaitTicks`/`onServer` cookbook (server-side counterpart).
 - `docs/gametest/spec-test-context.md` — `SpecTestContext` helpers (note: those assert the Fabric test thread, so they're only legal inside `onClient`/`runOnClient` closures or via the pump).
 - `src/main/kotlin/.../testing/ClientSpec.kt` — base class.
 - `src/main/kotlin/.../testing/core/FabricTestThreadPump.kt` — the pump.

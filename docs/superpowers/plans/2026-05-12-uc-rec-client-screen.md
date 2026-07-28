@@ -13,24 +13,24 @@
 ### Task 1: Add `RecorderScreenSpec.kt` skeleton and register it
 
 **Files:**
-- Create: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt`
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`
+- Create: `src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`
 
 - [ ] **Step 1: Create the skeleton spec file**
 
-Create `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt` with:
+Create `src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt` with:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
-import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.client.screen.RecorderScreen
-import com.breadmoirai.redstonespecs.network.SetRecorderConfigC2S
-import com.breadmoirai.redstonespecs.testing.ClientSpec
-import com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.ModRegistries
+import com.breadmoirai.garnet.block.GarnetRecorderBlock
+import com.breadmoirai.garnet.block.SpecBlockEntity
+import com.breadmoirai.garnet.client.screen.RecorderScreen
+import com.breadmoirai.garnet.network.SetRecorderConfigC2S
+import com.breadmoirai.garnet.testing.ClientSpec
+import com.breadmoirai.garnet.testing.core.FabricTestThreadPump
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import net.minecraft.client.gui.components.EditBox
@@ -68,11 +68,11 @@ private fun RecorderScreen.setEditBoxValue(fieldName: String, value: String) {
 
 - [ ] **Step 2: Register the spec in `ClientTestSentinel`**
 
-Edit `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`. In the `specs = listOf(...)` block of `runKotestOnWorker`, append `RecorderScreenSpec::class` after `ClientNetworkSpec::class`:
+Edit `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`. In the `specs = listOf(...)` block of `runKotestOnWorker`, append `RecorderScreenSpec::class` after `ClientNetworkSpec::class`:
 
 ```kotlin
 specs = listOf(
-    RunRedstoneSpecSmokeTest::class,
+    RunGarnetSpecSmokeTest::class,
     ClientNetworkSpec::class,
     RecorderScreenSpec::class,
 ),
@@ -88,8 +88,8 @@ Expected: BUILD SUCCESSFUL with no compilation errors. (Spec is empty; no test w
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt
 git commit -m "test(client): add RecorderScreenSpec scaffold for UC-REC client coverage"
 ```
 
@@ -98,7 +98,7 @@ git commit -m "test(client): add RecorderScreenSpec scaffold for UC-REC client c
 ### Task 2: UC-REC-01.b/c — screen opens with EditBoxes pre-populated
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt`
 
 - [ ] **Step 1: Add the test inside the `ClientSpec({ ... })` body**
 
@@ -113,12 +113,12 @@ Insert the test inside the `ClientSpec({ ... })` block (replacing the placeholde
         onServer {
             val level = this.overworld()
             val player = level.players().firstOrNull() ?: error("no overworld player")
-            level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
+            level.setBlock(pos, ModRegistries.GARNET_RECORDER_BLOCK.defaultBlockState(), 2)
             val be = level.getBlockEntity(pos) as SpecBlockEntity
             be.setSpecId(expectedSpecId)
             be.setStructure(expectedStructure)
             be.setSpecBounds(Vec3i(3, 3, 3))
-            RedstoneSpecRecorderBlock.openScreenFor(player, be)
+            GarnetRecorderBlock.openScreenFor(player, be)
         }
 
         waitForClientScreen(RecorderScreen::class.java)
@@ -150,14 +150,14 @@ Expected: BUILD SUCCESSFUL.
 
 Run: `cmd.exe /c "gradlew.bat :26.1:runClientGametest"`
 
-(If task name differs, look it up: `cmd.exe /c "gradlew.bat :26.1:tasks --all | grep -i ClientGametest"`. Per `feedback_kotest_test_filter`, do not use `--tests`; read the XML report at `build/reports/redstonespecs/clientTest/` after the run.)
+(If task name differs, look it up: `cmd.exe /c "gradlew.bat :26.1:tasks --all | grep -i ClientGametest"`. Per `feedback_kotest_test_filter`, do not use `--tests`; read the XML report at `build/reports/garnet/clientTest/` after the run.)
 
-Expected: the test passes. If it fails on the `outPathVal` check, open `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderScreen.kt` and read `init()` to see what string the third EditBox is seeded with, then tighten the assertion.
+Expected: the test passes. If it fails on the `outPathVal` check, open `src/client/kotlin/com/breadmoirai/garnet/client/screen/RecorderScreen.kt` and read `init()` to see what string the third EditBox is seeded with, then tighten the assertion.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt
 git commit -m "test(client): UC-REC-01.b/c — RecorderScreen pre-populates EditBoxes from BE"
 ```
 
@@ -166,7 +166,7 @@ git commit -m "test(client): UC-REC-01.b/c — RecorderScreen pre-populates Edit
 ### Task 3: UC-REC-01.d / 03.a — keystroke fires `SetRecorderConfigC2S`
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt`
 
 - [ ] **Step 1: Append the keystroke test**
 
@@ -181,12 +181,12 @@ Add this test directly below the test from Task 2, still inside the `ClientSpec(
         onServer {
             val level = this.overworld()
             val player = level.players().firstOrNull() ?: error("no overworld player")
-            level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
+            level.setBlock(pos, ModRegistries.GARNET_RECORDER_BLOCK.defaultBlockState(), 2)
             val be = level.getBlockEntity(pos) as SpecBlockEntity
             be.setSpecId(initialSpecId)
             be.setStructure(initialStructure)
             be.setSpecBounds(Vec3i(3, 3, 3))
-            RedstoneSpecRecorderBlock.openScreenFor(player, be)
+            GarnetRecorderBlock.openScreenFor(player, be)
         }
 
         waitForClientScreen(RecorderScreen::class.java)
@@ -243,7 +243,7 @@ Common failure modes:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt
 git commit -m "test(client): UC-REC-01.d/03.a — EditBox edit fires SetRecorderConfigC2S"
 ```
 
@@ -313,7 +313,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 2: Run client tests one more time**
 
 Run: `cmd.exe /c "gradlew.bat :26.1:runClientGametest"` (or your project's client-test launch task).
-Expected: `RecorderScreenSpec`'s two tests pass; no regressions in `ClientNetworkSpec` or `RunRedstoneSpecSmokeTest`.
+Expected: `RecorderScreenSpec`'s two tests pass; no regressions in `ClientNetworkSpec` or `RunGarnetSpecSmokeTest`.
 
 - [ ] **Step 3: Verify the docs**
 

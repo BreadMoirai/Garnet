@@ -16,7 +16,7 @@
 - **Clean-room:** if any rendering technique is cross-checked against `../Flashback` (its `compositeOnTop` real-size-UI-on-top approach is the analog), study only — copy nothing. `../Flashback` is all-rights-reserved.
 - **Element base is named `Element`**, never `Component` (collides with MC text `Component`).
 - **Single MC version** (`:26.1:` task, MC 26.2). No version-gating.
-- **Build (5 source sets):** `cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"` (≤600000ms).
+- **Build (5 source sets):** `cmd.exe /c "cd /d H:\\Repo\\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"` (≤600000ms).
 - **Runtime verify:** `cmd.exe /c "gradlew.bat :26.1:runClientTest"`; new `ClientSpec`s registered in `ClientTestSentinel`; visual proof via the composite-capture path (`ViewportState.compositeCaptureRequest` → PNG, as the spike does).
 
 ---
@@ -26,13 +26,13 @@
 **Goal:** Draw arbitrary MC-GUI content (a filled rect + a line of text) into the composite target at REAL window dimensions, positioned in the reserved LEFT edge — proving panels can render over the composited world. This is the load-bearing unknown; resolve the exact mechanism here before any dock work.
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ui/PanelRenderLayer.kt` — `render(composite: RenderTarget, realW: Int, realH: Int)` that draws into `composite` at real dims. For this task, hard-code a single filled rect + text label in the left reserved strip.
-- Modify: `src/client/java/com/breadmoirai/redstonespecs/mixin/client/MinecraftPresentMixin.java` — after the world-texture blit into the content rect (line ~90) and before `original.call(composite)`, call `PanelRenderLayer.render(composite, realWidth, realHeight)` (only when active). The solid `clearColor` edge fill stays as the panel-layer background for now.
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/ui/PanelRenderLayer.kt` — `render(composite: RenderTarget, realW: Int, realH: Int)` that draws into `composite` at real dims. For this task, hard-code a single filled rect + text label in the left reserved strip.
+- Modify: `src/client/java/com/breadmoirai/garnet/mixin/client/MinecraftPresentMixin.java` — after the world-texture blit into the content rect (line ~90) and before `original.call(composite)`, call `PanelRenderLayer.render(composite, realWidth, realHeight)` (only when active). The solid `clearColor` edge fill stays as the panel-layer background for now.
 
 **Interfaces:**
 - Produces: `PanelRenderLayer.render(composite, realW, realH)`.
 
-- [ ] **Step 1 — investigate the 26.2 GUI render path.** Determine how to record + submit MC GUI draws (fill, text via `Font`) into a chosen `RenderTarget` at explicit dimensions while `Window` reports shrunk dims. Extract/read `net.minecraft.client.gui.GuiGraphics`, `GuiRenderer`, `GuiRenderState`, and `GuiGraphicsExtractor` from the sources jar (`/mnt/h/Repo/RedstoneSpecs/.gradle/loom-cache/.../minecraft-clientOnly-*-sources.jar`; extract with `cmd.exe /c "jar xf s.jar <path>"`). Identify how `Minecraft` normally constructs a `GuiGraphics` and renders the GUI to the main target, and whether we can (a) build a `GuiGraphics` with explicit real width/height and submit its render state to the composite target, or (b) temporarily clear the `WindowMixin` override for the duration of the pass, or (c) drive `GuiGraphicsExtractor` fill/text directly. Document the chosen mechanism in a new `docs/ui/panel-render-layer-26.md`.
+- [ ] **Step 1 — investigate the 26.2 GUI render path.** Determine how to record + submit MC GUI draws (fill, text via `Font`) into a chosen `RenderTarget` at explicit dimensions while `Window` reports shrunk dims. Extract/read `net.minecraft.client.gui.GuiGraphics`, `GuiRenderer`, `GuiRenderState`, and `GuiGraphicsExtractor` from the sources jar (`/mnt/h/Repo/garnet/.gradle/loom-cache/.../minecraft-clientOnly-*-sources.jar`; extract with `cmd.exe /c "jar xf s.jar <path>"`). Identify how `Minecraft` normally constructs a `GuiGraphics` and renders the GUI to the main target, and whether we can (a) build a `GuiGraphics` with explicit real width/height and submit its render state to the composite target, or (b) temporarily clear the `WindowMixin` override for the duration of the pass, or (c) drive `GuiGraphicsExtractor` fill/text directly. Document the chosen mechanism in a new `docs/ui/panel-render-layer-26.md`.
 - [ ] **Step 2 — implement `PanelRenderLayer.render`** using the chosen mechanism: fill a rect at real coords in the left strip (e.g. `(8, 8)`–`(RESERVED_LEFT-8, 200)`) with a panel background, and draw a text label ("Explorer" placeholder) via `Minecraft.getInstance().font`. Use `-1` (0xFFFFFFFF) for white text (0xFFFFFF is invisible — see `docs/ui/argb-color-pitfalls.md`).
 - [ ] **Step 3 — wire into the composite** (mixin edit); build all 5 source sets → SUCCESSFUL.
 - [ ] **Step 4 (runtime, required):** capture a composite PNG (reuse the spike's `compositeCaptureRequest` flow in a `ClientSpec`, registered in `ClientTestSentinel`) with the viewport active. **Expected:** the world in the centered sub-rect, and in the left reserved strip a filled panel rect with readable "Explorer" text — proving real-size GUI content composites over the world. Report the screenshot path.
@@ -43,7 +43,7 @@
 **Goal:** Replace `ViewportState`'s hard-coded `RESERVED_LEFT/BOTTOM` with a `Dock` of `PanelSlot`s that computes reservations, so adding/sizing a panel changes the world's content rect. One placeholder panel occupies the LEFT slot.
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ui/Element.kt` — minimal retained base: `var bounds: Rect`, `fun render(layer)`, no-op input for now. `data class Rect(x, y, w, h)`.
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/ui/Element.kt` — minimal retained base: `var bounds: Rect`, `fun render(layer)`, no-op input for now. `data class Rect(x, y, w, h)`.
 - Create: `.../ui/PanelSlot.kt` — `enum SlotPos { LEFT, RIGHT, BOTTOM, CENTER }`; a `PanelSlot(pos, var sizePx, var visible)` holding an ordered list of `Panel`s (tabs; one for now).
 - Create: `.../ui/Panel.kt` — `Panel(title: String, content: Element)`.
 - Create: `.../ui/Dock.kt` — holds the four slots; `contentRect(realW, realH): ContentRect` computed from visible non-CENTER slots' sizes; `layout(realW, realH)` assigns each slot/panel a `Rect`; `render(layer, realW, realH)` draws visible slots.
@@ -69,11 +69,11 @@
 - Modify: input routing — add a client mouse hook (a `MouseHandler` mixin or a Fabric client mouse event) that, when the viewport is active, hit-tests the splitter at REAL coords and routes drag to it; **must not** consume input when the viewport is inactive or when the cursor is over the content rect (that goes to the game).
 
 **Interfaces:**
-- Consumes: `Dock`/`PanelSlot` (Task 2), `WindowMixin`'s `redstonespecs$updateScaledFramebuffer`.
+- Consumes: `Dock`/`PanelSlot` (Task 2), `WindowMixin`'s `garnet$updateScaledFramebuffer`.
 - Produces: `Splitter`; the drag→resize→content-rect-update loop.
 
 - [ ] **Step 1:** implement `Splitter` drag math (unit-test the clamp: dragging past min/max/window clamps the slot size) in `src/test`; `:26.1:test` green.
-- [ ] **Step 2:** implement input routing (hit-test at real coords, active-only); on drag, update slot size + call `redstonespecs$updateScaledFramebuffer(true)` so the content rect and world resize. Build 5 source sets → SUCCESSFUL.
+- [ ] **Step 2:** implement input routing (hit-test at real coords, active-only); on drag, update slot size + call `garnet$updateScaledFramebuffer(true)` so the content rect and world resize. Build 5 source sets → SUCCESSFUL.
 - [ ] **Step 3 (runtime):** with the viewport active, drag the splitter; capture before/after PNGs showing the panel widened and the world content rect shrunk to match. Report both paths.
 - [ ] **Step 4 — commit** `feat(ui): splitter resizes slot and world content rect live`.
 

@@ -15,7 +15,7 @@
 - `src/main/kotlin/.../project/FileTree.kt` (the model) is **not** modified.
 - Compose in the dock is **foundation-only**; **no** Material `DropdownMenu`/`Popup` (a `Popup` spawns a separate desktop window the embedded scene cannot host). Dropdown is a hand-rolled z-layered overlay.
 - The native folder dialog **blocks** — it must run on a worker thread, never the render/client thread. Result marshals back to the client thread via `Minecraft.getInstance().execute {}`.
-- Persistence is **client-side** via `ModConfig` (writes `<configDir>/redstonespecs.json`); the main-sourceset server handler cannot reach it.
+- Persistence is **client-side** via `ModConfig` (writes `<configDir>/garnet.json`); the main-sourceset server handler cannot reach it.
 - WSL build/test invocation is `cmd.exe /c "gradlew.bat ..."` (no `./`). Gradle task paths are `:26.1:...`. Kotest runs **unfiltered** (`--tests` gives false "No tests found").
 - Git: direct commits to `main`, conventional-commit messages, **no** `Co-Authored-By` / "Generated with Claude Code" trailer.
 
@@ -24,11 +24,11 @@
 ### Task 1: `SetProjectRootC2S` payload + codec round-trip
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt`
 
 **Interfaces:**
-- Produces: `data class SetProjectRootC2S(val path: String) : CustomPacketPayload` with `companion object { val TYPE; val STREAM_CODEC }` in package `com.breadmoirai.redstonespecs.network.project`.
+- Produces: `data class SetProjectRootC2S(val path: String) : CustomPacketPayload` with `companion object { val TYPE; val STREAM_CODEC }` in package `com.breadmoirai.garnet.network.project`.
 
 - [ ] **Step 1: Write the failing round-trip test**
 
@@ -76,8 +76,8 @@ Expected: PASS (check console summary or `build/26.1/test-results/test/*.xml`).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/network/project/FileTreeCodecTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt \
+        src/test/kotlin/com/breadmoirai/garnet/network/project/FileTreeCodecTest.kt
 git commit -m "feat(project): add SetProjectRootC2S payload with round-trip codec"
 ```
 
@@ -86,8 +86,8 @@ git commit -m "feat(project): add SetProjectRootC2S payload with round-trip code
 ### Task 2: Server `handleSetRoot` + registration + gametest
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt`
-- Test: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectNetworkRegistrySpec.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt`
+- Test: `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectNetworkRegistrySpec.kt`
 
 **Interfaces:**
 - Consumes: `SetProjectRootC2S` (Task 1); existing `ProjectRoot`, `ProjectServerContext`, `ProjectDimLifecycle.placeAll(server, root)`, `SharedSettings.projectRootPath`, `sendTree(server, player)`.
@@ -98,12 +98,12 @@ git commit -m "feat(project): add SetProjectRootC2S payload with round-trip code
 Add these imports at the top of `ProjectNetworkRegistrySpec.kt`:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.network.project.SetProjectRootC2S
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.network.project.SetProjectRootC2S
 import kotlin.io.path.writeText
 ```
 
-Append these two tests inside the `RedstoneTestSpec({ ... })` block:
+Append these two tests inside the `GarnetTestSpec({ ... })` block:
 
 ```kotlin
     test("handleSetRoot switches root, persists it, and sends a snapshot of the new folder") {
@@ -205,8 +205,8 @@ Expected: PASS — both new tests green. Confirm in `build/26.1/test-results/tes
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectNetworkRegistrySpec.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectNetworkRegistrySpec.kt
 git commit -m "feat(project): handleSetRoot swaps the project root and re-snapshots"
 ```
 
@@ -215,10 +215,10 @@ git commit -m "feat(project): handleSetRoot swaps the project root and re-snapsh
 ### Task 3: `FolderPicker` seam, `RootPickerController`, and client persistence
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/FolderPicker.kt`
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/RootPickerController.kt`
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/config/ModConfig.kt`
-- Create + Register: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RootPickerSpec.kt`, `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/ide/FolderPicker.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/ide/RootPickerController.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/config/ModConfig.kt`
+- Create + Register: `src/clientTest/kotlin/com/breadmoirai/garnet/test/RootPickerSpec.kt`, `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`
 
 **Interfaces:**
 - Consumes: `SetProjectRootC2S` (Task 1); `ClientPlayNetworking.send`; `Minecraft.getInstance()`; `ModConfig`.
@@ -228,15 +228,15 @@ git commit -m "feat(project): handleSetRoot swaps the project root and re-snapsh
 
 - [ ] **Step 1: Write the failing controller tests**
 
-Create `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RootPickerSpec.kt`:
+Create `src/clientTest/kotlin/com/breadmoirai/garnet/test/RootPickerSpec.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ide.FolderPicker
-import com.breadmoirai.redstonespecs.client.ide.RootPickerController
-import com.breadmoirai.redstonespecs.network.project.SetProjectRootC2S
-import com.breadmoirai.redstonespecs.testing.ClientSpec
+import com.breadmoirai.garnet.client.ide.FolderPicker
+import com.breadmoirai.garnet.client.ide.RootPickerController
+import com.breadmoirai.garnet.network.project.SetProjectRootC2S
+import com.breadmoirai.garnet.testing.ClientSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -291,7 +291,7 @@ Expected: compile failure — `FolderPicker` / `RootPickerController` unresolved
 - [ ] **Step 3: Create `FolderPicker.kt`**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ide
+package com.breadmoirai.garnet.client.ide
 
 import org.lwjgl.util.tinyfd.TinyFileDialogs
 
@@ -310,13 +310,13 @@ object TinyfdFolderPicker : FolderPicker {
 - [ ] **Step 4: Create `RootPickerController.kt`**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ide
+package com.breadmoirai.garnet.client.ide
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.redstonespecs.client.config.ModConfig
-import com.breadmoirai.redstonespecs.network.project.SetProjectRootC2S
+import com.breadmoirai.garnet.client.config.ModConfig
+import com.breadmoirai.garnet.network.project.SetProjectRootC2S
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -331,7 +331,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
  */
 object RootPickerController {
     var picker: FolderPicker = TinyfdFolderPicker
-    var runner: (Runnable) -> Unit = { Thread(it, "redstonespecs-folder-picker").start() }
+    var runner: (Runnable) -> Unit = { Thread(it, "garnet-folder-picker").start() }
     var executor: (Runnable) -> Unit = { Minecraft.getInstance().execute(it) }
     var sender: (CustomPacketPayload) -> Unit = { ClientPlayNetworking.send(it) }
     var persist: (String) -> Unit = { path -> ModConfig.projectRootPath = path; ModConfig.save() }
@@ -365,7 +365,7 @@ object RootPickerController {
     /** Restore default seams + flags between tests. */
     fun resetForTest() {
         picker = TinyfdFolderPicker
-        runner = { Thread(it, "redstonespecs-folder-picker").start() }
+        runner = { Thread(it, "garnet-folder-picker").start() }
         executor = { Minecraft.getInstance().execute(it) }
         sender = { ClientPlayNetworking.send(it) }
         persist = { path -> ModConfig.projectRootPath = path; ModConfig.save() }
@@ -415,11 +415,11 @@ Expected: PASS — `RootPickerSpec`'s two tests green (they run fully synchronou
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/FolderPicker.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/RootPickerController.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/config/ModConfig.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RootPickerSpec.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/ide/FolderPicker.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/ide/RootPickerController.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/config/ModConfig.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/RootPickerSpec.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt
 git commit -m "feat(ui): RootPickerController + native FolderPicker + client-side root persistence"
 ```
 
@@ -428,8 +428,8 @@ git commit -m "feat(ui): RootPickerController + native FolderPicker + client-sid
 ### Task 4: Explorer header bar + dropdown overlay
 
 **Files:**
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt`
-- Test: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ProjectExplorerSpec.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt`
+- Test: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ProjectExplorerSpec.kt`
 
 **Interfaces:**
 - Consumes: `RootPickerController` (Task 3), `ProjectTreeState`, `ListProjectTreeC2S.INSTANCE`.
@@ -447,21 +447,21 @@ Append this test inside the existing `ProjectExplorerSpec` `ClientSpec({ ... })`
         ))
         runOnClient { mc ->
             DockState.reset(); ProjectTreeState.reset()
-            com.breadmoirai.redstonespecs.client.ide.RootPickerController.resetForTest()
+            com.breadmoirai.garnet.client.ide.RootPickerController.resetForTest()
             ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root = tree, currentSubpath = null))
-            com.breadmoirai.redstonespecs.client.ide.RootPickerController.toggleMenu()
+            com.breadmoirai.garnet.client.ide.RootPickerController.toggleMenu()
             DockState.leftPanels.add(explorerPanel())
             DockState.setVisible(DockRegion.LEFT, true); DockState.setSize(DockRegion.LEFT, 300)
             ViewportState.active = true; ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(12)
-        com.breadmoirai.redstonespecs.client.ide.RootPickerController.menuOpen shouldBe true
+        com.breadmoirai.garnet.client.ide.RootPickerController.menuOpen shouldBe true
         capture("explorer_root_menu.png")
         runOnClient { mc ->
-            com.breadmoirai.redstonespecs.client.ide.RootPickerController.resetForTest()
+            com.breadmoirai.garnet.client.ide.RootPickerController.resetForTest()
             ComposeOverlay.enabled = false; ViewportState.active = false; DockState.reset()
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(6)
     }
@@ -477,7 +477,7 @@ Expected: FAIL — `RootPickerController` is not yet wired into the panel, so no
 Replace the whole file with:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ide
+package com.breadmoirai.garnet.client.ide
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -498,12 +498,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
-import com.breadmoirai.redstonespecs.network.project.ListProjectTreeC2S
-import com.breadmoirai.redstonespecs.network.project.LoadProjectFolderC2S
-import com.breadmoirai.redstonespecs.project.FileNode
-import com.breadmoirai.redstonespecs.project.FileTreeNode
-import com.breadmoirai.redstonespecs.project.FolderNode
+import com.breadmoirai.garnet.client.ui.compose.dock.Panel
+import com.breadmoirai.garnet.network.project.ListProjectTreeC2S
+import com.breadmoirai.garnet.network.project.LoadProjectFolderC2S
+import com.breadmoirai.garnet.project.FileNode
+import com.breadmoirai.garnet.project.FileTreeNode
+import com.breadmoirai.garnet.project.FolderNode
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 
 private val TEXT = Color(0xFFDDE3EC)
@@ -513,7 +513,7 @@ private val SELECTED_BG = Color(0x334A90E2)
 private val MENU_BG = Color(0xF01A2130)
 
 /** The Explorer tab for DockState.leftPanels. */
-fun explorerPanel(): Panel = Panel("redstonespecs.explorer", "Explorer") { ProjectExplorer() }
+fun explorerPanel(): Panel = Panel("garnet.explorer", "Explorer") { ProjectExplorer() }
 
 @Composable
 private fun ProjectExplorer() {
@@ -618,8 +618,8 @@ Expected: PASS — `menuOpen` is `true` and `screenshots/explorer_root_menu.png`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ProjectExplorerSpec.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/ProjectExplorerSpec.kt
 git commit -m "feat(ui): Explorer header bar with root-picker option-button dropdown"
 ```
 
@@ -708,7 +708,7 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   which runs the injectable `FolderPicker` (default `TinyfdFolderPicker` →
   `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
 - **UC-MAN-09.b** On a non-null pick, the controller persists the path client-side
-  (`ModConfig.projectRootPath` → `redstonespecs.json`, also mirrored to
+  (`ModConfig.projectRootPath` → `garnet.json`, also mirrored to
   `SharedSettings.projectRootPath`) and sends `SetProjectRootC2S(path)` on the client thread via
   `Minecraft.execute`. A cancel (null) sends nothing.
 - **UC-MAN-09.c** `ProjectNetworkRegistry.handleSetRoot` rejects a non-directory / invalid path

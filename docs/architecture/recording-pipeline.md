@@ -11,7 +11,7 @@ This is the system's spine. Every other concern (UI, persistence, networking) fe
 ```
    world          recorder            dsl emitter           runner              assertions
     │                │                     │                   │                    │
-    │  StateRecorder │  StateRecording  → .spec.kts  →  runRedstoneSpec  →  inline Kotest shouldBe
+    │  StateRecorder │  StateRecording  → .spec.kts  →  runGarnetSpec  →  inline Kotest shouldBe
     │   .start       │   (per-phase        (DSL source    (invokes spec        (failures thrown at
     │   .onPhaseStart│    snapshots)        text derived   lambda, fires        end of run as
     │                │                     from changes)  inputs, asserts)     AssertionError)
@@ -20,7 +20,7 @@ This is the system's spine. Every other concern (UI, persistence, networking) fe
 
 ## Stage 1 — Record (capture)
 
-**Owner:** `runner/StateRecorder.kt`, driven by `RedstoneSpecRecorderBlock` + `event/SubTickPhaseEvents.kt`.
+**Owner:** `runner/StateRecorder.kt`, driven by `GarnetRecorderBlock` + `event/SubTickPhaseEvents.kt`.
 
 Per server tick, for each `Phase` of interest, the recorder samples block states inside its bounding region and appends them to a `StateRecording`. Output is in-memory; nothing is written to disk yet.
 
@@ -36,16 +36,16 @@ Per server tick, for each `Phase` of interest, the recorder samples block states
 Walks the recording, diffs adjacent snapshots, and emits `input(…) { … }` / `output(…) { … }` DSL blocks — one call-to `at(tick)` per change-tick at each I/O position.
 
 **Invariants leaving this stage:**
-- The emitted `.spec.kts` evaluates to a `RedstoneSpec` whose `block` lambda, when invoked by the runner, registers the same inputs and assertions as the recording observed.
+- The emitted `.spec.kts` evaluates to a `GarnetSpec` whose `block` lambda, when invoked by the runner, registers the same inputs and assertions as the recording observed.
 - Bounds remain `Vec3i` size; positions are origin-local in all emitted coordinates.
 
 This is the point where the in-flight `StateRecording` becomes a persistable `.spec.kts` file. After emit, the recording is no longer needed for replay.
 
 ## Stage 3 — Run (replay)
 
-**Owner:** `runner/runRedstoneSpec.kt`.
+**Owner:** `runner/runGarnetSpec.kt`.
 
-`runRedstoneSpec(level, origin, spec)` is a suspend fun that:
+`runGarnetSpec(level, origin, spec)` is a suspend fun that:
 1. Takes a `SpecSnapshot` of the region, then restores it so the run starts from a known state.
 2. Invokes `spec.block` once with a `SpecRun` receiver — this populates `inputActions` and `assertions` callback maps.
 3. Loops `0 until spec.lifespan` ticks, firing `START_OF_TICK` input callbacks then `awaitTickEnd()` then `END_OF_TICK` assertion callbacks.
@@ -60,7 +60,7 @@ Button-style inputs route through `ButtonBlock.press` via `tryApplyAsPlayerInter
 
 ## Stage 4 — Verify (assert)
 
-Verification is **inline** in Stage 3 — there is no separate verify stage. Assertion callbacks registered by `output(…) { … }` blocks execute inside the tick loop. If `runRedstoneSpec` throws, the caller (runner block or gametest) sees it as a test failure.
+Verification is **inline** in Stage 3 — there is no separate verify stage. Assertion callbacks registered by `output(…) { … }` blocks execute inside the tick loop. If `runGarnetSpec` throws, the caller (runner block or gametest) sees it as a test failure.
 
 **Output:** `AssertionError` on failure, or a `StateRecording` of the replay on success — consumed by the runner block's UI feedback and the HTML/JUnit reports.
 
@@ -69,7 +69,7 @@ Verification is **inline** in Stage 3 — there is no separate verify stage. Ass
 | Stage | In memory | On disk | Over the network |
 |---|---|---|---|
 | Record | `StateRecording` | _(transient)_ | _(server-only)_ |
-| Emit | `String` (DSL text) → `RedstoneSpec` | `<id>.spec.kts` + `<id>.nbt` (see [persistence/spec-on-disk-format.md](../persistence/spec-on-disk-format.md)) | _(server-only save)_ |
+| Emit | `String` (DSL text) → `GarnetSpec` | `<id>.spec.kts` + `<id>.nbt` (see [persistence/spec-on-disk-format.md](../persistence/spec-on-disk-format.md)) | _(server-only save)_ |
 | Run | `StateRecording` (replay) | _(transient)_ | _(server-only)_ |
 | Verify | `AssertionError` / `StateRecording` | _(transient)_ | _(displayed via S2C)_ |
 

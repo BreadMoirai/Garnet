@@ -11,14 +11,14 @@
 ## Global Constraints
 
 - **Decision D10/D11 (from the spec):** full rename now, **break compat** — rename identity strings too (`project_*` channels, `projectRootPath` config key, `project-<name>` disk prefix). No migration shim.
-- **NEVER rename `managedBlock`** — `server.managedBlock { … }` in `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt` is a Minecraft `MinecraftServer` API method. The scoped replacements below are designed to miss it; a blanket `s/managed/project/g` is **forbidden**.
+- **NEVER rename `managedBlock`** — `server.managedBlock { … }` in `src/main/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt` is a Minecraft `MinecraftServer` API method. The scoped replacements below are designed to miss it; a blanket `s/managed/project/g` is **forbidden**.
 - **Do NOT touch `docs/superpowers/plans/` or `docs/superpowers/specs/`** — CLAUDE.md declares them historical artifacts.
 - **Build command (all 5 source sets):**
   ```sh
-  cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
+  cmd.exe /c "cd /d H:\\Repo\\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
   ```
 - **Unit-test command:** `cmd.exe /c "gradlew.bat :26.1:test"` — Kotest/JUnit `--tests` filters are unreliable in this project; run unfiltered and read `build/test-results/test/*.xml` for pass/fail.
-- All file edits (git mv, sed) run in WSL bash from the repo root `/mnt/h/Repo/RedstoneSpecs`.
+- All file edits (git mv, sed) run in WSL bash from the repo root `/mnt/h/Repo/garnet`.
 
 ## Symbol Mapping (authoritative)
 
@@ -70,25 +70,25 @@ Lowercase identity strings — replaced with **scoped** patterns (never bare `ma
 **Files:**
 - Rename (git mv) the four `managed` package directories and every `Managed*.kt` file within them (server, network, client, test, gametest), plus the standalone `ManagedEntryFlowSpec.kt`.
 - Modify: every `.kt`/`.java` under `src/` that references a renamed symbol or the `.managed` package path (import fix-ups happen via the sed pass).
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/config/SharedSettings.kt`, `src/main/kotlin/com/breadmoirai/redstonespecs/Redstonespecs.kt`, `src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt`, `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`, `src/main/kotlin/com/breadmoirai/redstonespecs/runner/RecordingDslEmitter.kt` (KDoc ref).
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`, `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt` (import + `::class` registrations — handled by the sed pass).
-- **Must not touch:** `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt` (`managedBlock`).
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/config/SharedSettings.kt`, `src/main/kotlin/com/breadmoirai/garnet/garnet.kt`, `src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt`, `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`, `src/main/kotlin/com/breadmoirai/garnet/runner/RecordingDslEmitter.kt` (KDoc ref).
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`, `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt` (import + `::class` registrations — handled by the sed pass).
+- **Must not touch:** `src/main/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt` (`managedBlock`).
 
 **Interfaces:**
 - Consumes: nothing (first task).
-- Produces: renamed public symbols per the mapping table. Later tasks and Phase 1 rely on `ProjectTreeSnapshotS2C`, `ProjectClientNetworking`, `ProjectCommand`, `ProjectSaveNaming`, `projectRootPath`, and package `com.breadmoirai.redstonespecs.project` / `…network.project` / `…client.project`.
+- Produces: renamed public symbols per the mapping table. Later tasks and Phase 1 rely on `ProjectTreeSnapshotS2C`, `ProjectClientNetworking`, `ProjectCommand`, `ProjectSaveNaming`, `projectRootPath`, and package `com.breadmoirai.garnet.project` / `…network.project` / `…client.project`.
 
 - [ ] **Step 1: Move the package directories (git mv)**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 base=src
 for root in \
-  main/kotlin/com/breadmoirai/redstonespecs/managed \
-  main/kotlin/com/breadmoirai/redstonespecs/network/managed \
-  client/kotlin/com/breadmoirai/redstonespecs/client/managed \
-  test/kotlin/com/breadmoirai/redstonespecs/managed \
-  gametest/kotlin/com/breadmoirai/redstonespecs/test/managed ; do
+  main/kotlin/com/breadmoirai/garnet/managed \
+  main/kotlin/com/breadmoirai/garnet/network/managed \
+  client/kotlin/com/breadmoirai/garnet/client/managed \
+  test/kotlin/com/breadmoirai/garnet/managed \
+  gametest/kotlin/com/breadmoirai/garnet/test/managed ; do
     git mv "$base/$root" "$base/${root%managed}project"
 done
 ```
@@ -96,10 +96,10 @@ done
 - [ ] **Step 2: Rename the `Managed*` files (git mv)**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 # ManagedEntryFlowSpec lives directly under the clientTest `test` package, not a subdir
-git mv src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ManagedEntryFlowSpec.kt \
-       src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ProjectEntryFlowSpec.kt
+git mv src/clientTest/kotlin/com/breadmoirai/garnet/test/ManagedEntryFlowSpec.kt \
+       src/clientTest/kotlin/com/breadmoirai/garnet/test/ProjectEntryFlowSpec.kt
 # All Managed*.kt now living under a renamed `project/` dir
 find src -type f -name 'Managed*.kt' | while read -r f; do
   git mv "$f" "$(dirname "$f")/$(basename "$f" | sed 's/^Managed/Project/')"
@@ -110,7 +110,7 @@ done
 
 Run:
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 find src -name 'Managed*.kt' -o -path '*/managed/*' | grep . && echo "LEFTOVERS" || echo "clean"
 ```
 Expected: `clean`
@@ -118,7 +118,7 @@ Expected: `clean`
 - [ ] **Step 4: Apply the PascalCase symbol rename across all sources**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 grep -rlZ 'Managed' src --include='*.kt' --include='*.java' \
   | xargs -0 sed -i 's/Managed/Project/g'
 ```
@@ -126,7 +126,7 @@ grep -rlZ 'Managed' src --include='*.kt' --include='*.java' \
 - [ ] **Step 5: Apply the scoped lowercase identity-string renames**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 files=$(grep -rlE '\.managed\b|managedRootPath|"managed_|"managed-|literal\("managed"\)|\[managed/' src --include='*.kt' --include='*.java')
 for f in $files; do
   sed -i -E \
@@ -144,13 +144,13 @@ done
 
 The blunt rename leaves player-visible strings reading "Project Specs"/"Managed". Fix them by hand to the rebrand wording. Edit each occurrence:
 - `ProjectCommand.kt` — the `§cManaged root not configured…` message → `§cRedstone Project root not configured. Use the world-list 'Redstone Projects…' button (singleplayer) or set 'projectRootPath' in config (dedicated server).`
-- `TitleScreenMixin.java` — the title-screen button label "Managed Specs..." → "Redstone Projects...".
+- `TitleScreenMixin.java` — the title-screen button label "Managed Specs..." → "Garnet Projects...".
 - `ProjectScreen.kt` / `ProjectRootListScreen.kt` — screen titles and headers "Managed Specs" / "Managed Spec Roots" → "Redstone Projects" / "Redstone Project Roots"; the "📁" leaf rows and status text keep their format.
 - `SpecBlockEntity.kt` — log `"[finalize] managed: wrote…"` → `"[finalize] project: wrote…"`.
 
 Find remaining player-facing "Managed"/"managed" mentions to curate:
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 grep -rniE '\bmanaged\b' src --include='*.kt' --include='*.java' | grep -v 'managedBlock'
 ```
 Curate any player-facing hit; leave `managedBlock`.
@@ -159,9 +159,9 @@ Curate any player-facing hit; leave `managedBlock`.
 
 Run:
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
-grep -rn 'managedBlock' src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt   # must still print 2 hits
-grep -rnE 'Managed|redstonespecs\.managed' src --include='*.kt' --include='*.java'             # must print nothing
+cd /mnt/h/Repo/garnet
+grep -rn 'managedBlock' src/main/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt   # must still print 2 hits
+grep -rnE 'Managed|garnet\.managed' src --include='*.kt' --include='*.java'             # must print nothing
 ```
 Expected: `Ticks.kt` still shows `server.managedBlock`; the second grep prints nothing.
 
@@ -169,7 +169,7 @@ Expected: `Ticks.kt` still shows `server.managedBlock`; the second grep prints n
 
 Run:
 ```sh
-cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
+cmd.exe /c "cd /d H:\\Repo\\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
 ```
 Expected: `BUILD SUCCESSFUL`. If a source set fails, it is almost always a missed reference — re-run Step 7's second grep and fix.
 
@@ -184,7 +184,7 @@ Expected: `BUILD SUCCESSFUL`. If Gradle reports failures, read `build/test-resul
 - [ ] **Step 10: Commit**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 git add -A
 git commit -m "refactor(project): rename managed worlds subsystem to redstone project
 
@@ -204,13 +204,13 @@ left untouched. Behavior unchanged; existing tests are the safety net."
 - **Must not touch:** anything under `docs/superpowers/`.
 
 **Interfaces:**
-- Consumes: the renamed symbols from Task 1 (docs cite `Project*` class names and `redstonespecs.project` paths).
+- Consumes: the renamed symbols from Task 1 (docs cite `Project*` class names and `garnet.project` paths).
 - Produces: nothing code depends on.
 
 - [ ] **Step 1: Move the two renamed articles**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 git mv docs/architecture/managed-redstone-worlds.md docs/architecture/redstone-project.md
 git mv docs/use-cases/managed-worlds.md docs/use-cases/redstone-project.md
 ```
@@ -219,12 +219,12 @@ git mv docs/use-cases/managed-worlds.md docs/use-cases/redstone-project.md
 
 Apply the code-symbol map and update prose/titles/tags in living docs only (exclude `docs/superpowers`):
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 files=$(grep -rlE 'Managed|managed' docs --include='*.md' | grep -v '^docs/superpowers/')
 for f in $files; do
   sed -i -E \
     -e 's/Managed/Project/g' \
-    -e 's/redstonespecs\.managed/redstonespecs.project/g' \
+    -e 's/garnet\.managed/garnet.project/g' \
     -e 's/managed-redstone-worlds\.md/redstone-project.md/g' \
     -e 's/managed-worlds\.md/redstone-project.md/g' \
     "$f"
@@ -236,15 +236,15 @@ Then hand-edit for readable rebrand wording (headings, `summary:` frontmatter, I
 
 Run:
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
-grep -rnE 'managed-redstone-worlds|managed-worlds\.md|redstonespecs\.managed|\bManaged[A-Z]' docs --include='*.md' | grep -v '^docs/superpowers/'
+cd /mnt/h/Repo/garnet
+grep -rnE 'managed-redstone-worlds|managed-worlds\.md|garnet\.managed|\bManaged[A-Z]' docs --include='*.md' | grep -v '^docs/superpowers/'
 ```
 Expected: prints nothing.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 git add -A
 git commit -m "docs: rebrand managed-worlds articles to redstone-project"
 ```
@@ -263,13 +263,13 @@ git commit -m "docs: rebrand managed-worlds articles to redstone-project"
 
 Run:
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 echo "--- code ---"
-grep -rnE 'Managed|redstonespecs\.managed' src --include='*.kt' --include='*.java'
+grep -rnE 'Managed|garnet\.managed' src --include='*.kt' --include='*.java'
 echo "--- living docs ---"
-grep -rnE '\bManaged[A-Z]|redstonespecs\.managed|managed-worlds\.md|managed-redstone-worlds' docs --include='*.md' | grep -v '^docs/superpowers/'
+grep -rnE '\bManaged[A-Z]|garnet\.managed|managed-worlds\.md|managed-redstone-worlds' docs --include='*.md' | grep -v '^docs/superpowers/'
 echo "--- managedBlock intact ---"
-grep -rn 'managedBlock' src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt
+grep -rn 'managedBlock' src/main/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt
 ```
 Expected: the first two sections print nothing; the third prints the two `server.managedBlock` lines.
 
@@ -277,7 +277,7 @@ Expected: the first two sections print nothing; the third prints the two `server
 
 Run:
 ```sh
-cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
+cmd.exe /c "cd /d H:\\Repo\\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
 cmd.exe /c "gradlew.bat :26.1:test"
 ```
 Expected: both `BUILD SUCCESSFUL`.
@@ -295,7 +295,7 @@ Expected: `BUILD SUCCESSFUL`. (The `Project*Spec` gametests and `ProjectEntryFlo
 
 If Steps 1–2 surfaced fixes, commit them:
 ```bash
-cd /mnt/h/Repo/RedstoneSpecs
+cd /mnt/h/Repo/garnet
 git add -A && git commit -m "refactor(project): mop up residual managed references" || echo "nothing to fix"
 ```
 

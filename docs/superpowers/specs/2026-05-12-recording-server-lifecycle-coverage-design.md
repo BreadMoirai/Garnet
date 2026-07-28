@@ -34,12 +34,12 @@ Net: ~15 new tests in one new gametest spec file. Updates the coverage matrix in
 One new file:
 
 ```
-src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/RecordingLifecycleSpec.kt
+src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/RecordingLifecycleSpec.kt
 ```
 
-Style mirrors `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`:
+Style mirrors `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`:
 
-- `class RecordingLifecycleSpec : RedstoneTestSpec({ ... })`
+- `class RecordingLifecycleSpec : GarnetTestSpec({ ... })`
 - Each `test("UC-REC-XX.y: …")` name embeds the UC ID for traceability.
 - Uses existing helpers: `withTempRoot`, `placeRecorderBE`, `onServer`, `makeMockServerPlayer`, `drainPayloads`.
 

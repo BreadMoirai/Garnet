@@ -6,5 +6,5 @@ Spec execution engine: how specs are run against the world, how conditions are e
 
 ## Articles
 
-- [runRedstoneSpec — inline verification](engine-driven-verification.md) — How runRedstoneSpec drives the tick loop from inside a Kotest test body and asserts via inline shouldBe callbacks in the spec lambda. Tags: execution, kotest, verification.
+- [runGarnetSpec — inline verification](engine-driven-verification.md) — How runGarnetSpec drives the tick loop from inside a Kotest test body and asserts via inline shouldBe callbacks in the spec lambda. Tags: execution, kotest, verification.
 - [Player-Interaction Dispatch](player-interaction-dispatch.md) — why button replay routes through ButtonBlock.press, and how to extend for new input blocks. Tags: execution, replay, mc-api, scheduling.

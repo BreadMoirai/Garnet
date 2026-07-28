@@ -24,13 +24,13 @@ This builds all five source sets — `compileKotlin` alone misses the others.
 
 **Files:**
 - Modify: `build.gradle.kts` (root, lines ~37-119)
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/.gitkeep`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/.gitkeep`
 
 - [ ] **Step 1: Create the package directory**
 
 ```bash
-mkdir -p src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/{core,server,launcher}
-touch src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/.gitkeep
+mkdir -p src/testBridge/kotlin/com/breadmoirai/garnet/testing/{core,server,launcher}
+touch src/testBridge/kotlin/com/breadmoirai/garnet/testing/.gitkeep
 ```
 
 - [ ] **Step 2: Register the source set in root `build.gradle.kts`**
@@ -132,12 +132,12 @@ git commit -m "build: add testBridge source set with Kotest + Kensa + coroutines
 ### Task 2: Tick event flows (`Ticks.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.core
+package com.breadmoirai.garnet.testing.core
 
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -184,26 +184,26 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt
 git commit -m "feat(testBridge): add server tick SharedFlow producers"
 ```
 
 ### Task 3: Server-thread dispatcher (`Dispatchers.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Dispatchers.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Dispatchers.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.core
+package com.breadmoirai.garnet.testing.core
 
 import kotlinx.coroutines.CoroutineDispatcher
 import net.minecraft.server.MinecraftServer
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.CoroutineContext
 
-private val logger = LoggerFactory.getLogger("Redstone Specs")
+private val logger = LoggerFactory.getLogger("Garnet")
 
 /** Threshold: log a warning if a server-thread Runnable runs longer than this. */
 private const val WATCHDOG_THRESHOLD_MS = 100L
@@ -278,14 +278,14 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Dispatchers.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Dispatchers.kt
 git commit -m "feat(testBridge): add ServerThreadDispatcher with 100ms watchdog"
 ```
 
 ### Task 4a: Add executor drain to tick emitters
 
 **Files:**
-- Modify: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt`
+- Modify: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt`
 
 After Task 2 shipped, the design unified on `ServerThreadDispatcher` (no separate `TickDispatcher`). Same-tick semantics now come from calling `server.runAllTasks()` inside the emitter to drain woken consumer continuations on the server thread before returning to MC.
 
@@ -323,19 +323,19 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt
 git commit -m "feat(testBridge): drain executor in tick emitters for same-tick semantics"
 ```
 
 ### Task 4: Lifecycle wiring (`Lifecycle.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Lifecycle.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Lifecycle.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.core
+package com.breadmoirai.garnet.testing.core
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
@@ -383,22 +383,22 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Lifecycle.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Lifecycle.kt
 git commit -m "feat(testBridge): add TestBridgeLifecycle with idempotent event registration"
 ```
 
 ### Task 5: Suspending primitives (`Suspending.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Suspending.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Suspending.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.server
+package com.breadmoirai.garnet.testing.server
 
-import com.breadmoirai.redstonespecs.testing.core.McDispatchers
-import com.breadmoirai.redstonespecs.testing.core.serverTickEnd
+import com.breadmoirai.garnet.testing.core.McDispatchers
+import com.breadmoirai.garnet.testing.core.serverTickEnd
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.take
@@ -434,24 +434,24 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Suspending.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Suspending.kt
 git commit -m "feat(testBridge): add awaitTicks/awaitTickWhere/onServer primitives"
 ```
 
 ### Task 6: Unit tests for the suspending primitives
 
 **Files:**
-- Create: `src/testBridge/test/kotlin/com/breadmoirai/redstonespecs/testing/server/SuspendingTest.kt`
+- Create: `src/testBridge/test/kotlin/com/breadmoirai/garnet/testing/server/SuspendingTest.kt`
 - Modify: `build.gradle.kts` (add a `testBridgeTest` source set or run these via root `test` task)
 
 Decision: rather than create a separate `testBridgeTest` source set (more Gradle plumbing), put bridge unit tests in `src/test/kotlin/` under a `testing/` package. They're plain Kotlin/coroutines tests; no MC dependency.
 
 - [ ] **Step 1: Create the test file**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/testing/server/SuspendingTest.kt`
+Path: `src/test/kotlin/com/breadmoirai/garnet/testing/server/SuspendingTest.kt`
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.server
+package com.breadmoirai.garnet.testing.server
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -543,19 +543,19 @@ If the Kotest engine isn't picked up, verify `useJUnitPlatform()` is still in `t
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/test/kotlin/com/breadmoirai/redstonespecs/testing build.gradle.kts
+git add src/test/kotlin/com/breadmoirai/garnet/testing build.gradle.kts
 git commit -m "test(testBridge): add SuspendingTest for awaitTicks/awaitTickWhere"
 ```
 
 ### Task 7: Client context holder (`ClientContextHolder.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/ClientContextHolder.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/ClientContextHolder.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.core
+package com.breadmoirai.garnet.testing.core
 
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 
@@ -597,7 +597,7 @@ If `ClientGameTestContext` doesn't resolve at compile time, `testBridge` doesn't
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/ClientContextHolder.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/ClientContextHolder.kt
 # include build.gradle.kts in the commit if step 2 required the dep addition
 git commit -m "feat(testBridge): add ClientContextHolder for client specs"
 ```
@@ -605,16 +605,16 @@ git commit -m "feat(testBridge): add ClientContextHolder for client specs"
 ### Task 7a: ServerTestSpec base class (`ServerTestSpec.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/ServerTestSpec.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/ServerTestSpec.kt`
 
 Tests extending `ServerTestSpec` get `McDispatchers.Server` as the default dispatcher for both test bodies and lifecycle hooks. Combined with the executor drain (Task 4a), test bodies run synchronously on the server thread inside the tick window.
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing
+package com.breadmoirai.garnet.testing
 
-import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import com.breadmoirai.garnet.testing.core.McDispatchers
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.concurrency.SpecExecutionMode
 import io.kotest.engine.concurrency.TestExecutionMode
@@ -684,23 +684,23 @@ Expected: BUILD SUCCESSFUL. If compile fails on Kotest API symbols, iterate per 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/ServerTestSpec.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/ServerTestSpec.kt
 git commit -m "feat(testBridge): add ServerTestSpec base class"
 ```
 
 ### Task 8: Structure spawning (`Structures.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Structures.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Structures.kt`
 
 The `StructureGrid` allocates fresh chunk-aligned regions and tears them down between tests. Sequential mode = always slot 0; concurrent mode allocates slot N at offset (32·N, 64, 0). Templates loaded from `data/<ns>/structures/*.nbt` via MC's `StructureManager`.
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.server
+package com.breadmoirai.garnet.testing.server
 
-import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import com.breadmoirai.garnet.testing.core.McDispatchers
 import kotlinx.coroutines.withContext
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.ResourceLocation
@@ -809,19 +809,19 @@ If imports for `StructurePlaceSettings` or `BoundingBox` fail, extract the sourc
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Structures.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Structures.kt
 git commit -m "feat(testBridge): add StructureGrid, StructureHandle, spawnStructure"
 ```
 
 ### Task 9: Result collector (`ResultCollector.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/ResultCollector.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/ResultCollector.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.launcher
+package com.breadmoirai.garnet.testing.launcher
 
 import io.kotest.core.listeners.TestListener
 import io.kotest.core.test.TestCase
@@ -882,19 +882,19 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/ResultCollector.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/ResultCollector.kt
 git commit -m "feat(testBridge): add ResultCollector and LauncherResult"
 ```
 
 ### Task 10: Kotest launcher (`KotestLauncher.kt`)
 
 **Files:**
-- Create: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/KotestLauncher.kt`
+- Create: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/KotestLauncher.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.launcher
+package com.breadmoirai.garnet.testing.launcher
 
 import io.kotest.engine.TestEngineLauncher
 import io.kotest.core.config.AbstractProjectConfig
@@ -910,7 +910,7 @@ import kotlin.io.path.createDirectories
  * built-in classpath scan.
  *
  * @param sourceSet "gametest" | "clientTest" | "test" — used to scope report directories.
- * @param reportsDir Base directory for reports (e.g., `build/reports/redstonespecs/<sourceSet>`).
+ * @param reportsDir Base directory for reports (e.g., `build/reports/garnet/<sourceSet>`).
  */
 fun launchKotest(sourceSet: String, reportsDir: Path): LauncherResult {
     reportsDir.createDirectories()
@@ -952,7 +952,7 @@ If `TestEngineLauncher` isn't found, the `kotest-runner-junit5` dep may not tran
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/KotestLauncher.kt
+git add src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/KotestLauncher.kt
 git commit -m "feat(testBridge): add Kotest engine launcher"
 ```
 
@@ -963,7 +963,7 @@ git commit -m "feat(testBridge): add Kotest engine launcher"
 ### Task 11: Empty platform structure for the gametest sentinel
 
 **Files:**
-- Create: `src/gametest/resources/data/redstonespecs/structures/empty_platform.snbt`
+- Create: `src/gametest/resources/data/garnet/structures/empty_platform.snbt`
 
 - [ ] **Step 1: Write the SNBT file**
 
@@ -994,22 +994,22 @@ A 3x1x3 stone platform — a valid minimal structure for MC's gametest framework
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/gametest/resources/data/redstonespecs/structures/empty_platform.snbt
+git add src/gametest/resources/data/garnet/structures/empty_platform.snbt
 git commit -m "test(gametest): add empty_platform structure for Kotest sentinel"
 ```
 
 ### Task 12: Gametest sentinel (`GametestSentinel.kt`)
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.testing.core.TestBridgeLifecycle
-import com.breadmoirai.redstonespecs.testing.launcher.launchKotest
+import com.breadmoirai.garnet.testing.core.TestBridgeLifecycle
+import com.breadmoirai.garnet.testing.launcher.launchKotest
 import net.fabricmc.fabric.api.gametest.v1.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
 import org.slf4j.LoggerFactory
@@ -1024,9 +1024,9 @@ import java.nio.file.Path
  */
 class GametestSentinel {
 
-    private val logger = LoggerFactory.getLogger("Redstone Specs")
+    private val logger = LoggerFactory.getLogger("Garnet")
 
-    @GameTest(template = "redstonespecs:empty_platform", timeoutTicks = 12000)
+    @GameTest(template = "garnet:empty_platform", timeoutTicks = 12000)
     fun runAll(helper: GameTestHelper) {
         TestBridgeLifecycle.register()
 
@@ -1041,7 +1041,7 @@ class GametestSentinel {
                 val result = runCatching {
                     launchKotest(
                         sourceSet = "gametest",
-                        reportsDir = Path.of("build/reports/redstonespecs/gametest"),
+                        reportsDir = Path.of("build/reports/garnet/gametest"),
                     )
                 }
                 server.execute {
@@ -1077,23 +1077,23 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt
 git commit -m "test(gametest): add Kotest sentinel"
 ```
 
 ### Task 13: Client sentinel (`ClientTestSentinel.kt`)
 
 **Files:**
-- Create: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt`
+- Create: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt`
 
 - [ ] **Step 1: Write the file**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
-import com.breadmoirai.redstonespecs.testing.core.TestBridgeLifecycle
-import com.breadmoirai.redstonespecs.testing.launcher.launchKotest
+import com.breadmoirai.garnet.testing.core.ClientContextHolder
+import com.breadmoirai.garnet.testing.core.TestBridgeLifecycle
+import com.breadmoirai.garnet.testing.launcher.launchKotest
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import org.slf4j.LoggerFactory
@@ -1102,7 +1102,7 @@ import java.nio.file.Path
 @Suppress("UnstableApiUsage")
 class ClientTestSentinel : FabricClientGameTest {
 
-    private val logger = LoggerFactory.getLogger("Redstone Specs")
+    private val logger = LoggerFactory.getLogger("Garnet")
 
     override fun runTest(context: ClientGameTestContext) {
         TestBridgeLifecycle.register()
@@ -1110,7 +1110,7 @@ class ClientTestSentinel : FabricClientGameTest {
         try {
             val result = launchKotest(
                 sourceSet = "clientTest",
-                reportsDir = Path.of("build/reports/redstonespecs/clientTest"),
+                reportsDir = Path.of("build/reports/garnet/clientTest"),
             )
             if (result.failed > 0) {
                 logger.error(result.summary())
@@ -1135,7 +1135,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt
 git commit -m "test(clientTest): add Kotest sentinel"
 ```
 
@@ -1151,13 +1151,13 @@ git commit -m "test(clientTest): add Kotest sentinel"
 cat src/gametest/resources/fabric.mod.json
 ```
 
-The file has an `"entrypoints"` block with a `"fabric-gametest"` key listing the test class. Replace any existing `RedstonespecsGameTests` entry with `com.breadmoirai.redstonespecs.test.GametestSentinel`.
+The file has an `"entrypoints"` block with a `"fabric-gametest"` key listing the test class. Replace any existing `garnetGameTests` entry with `com.breadmoirai.garnet.test.GametestSentinel`.
 
 - [ ] **Step 2: Edit gametest fabric.mod.json**
 
-Replace the `RedstonespecsGameTests` entry under `entrypoints["fabric-gametest"]` with:
+Replace the `garnetGameTests` entry under `entrypoints["fabric-gametest"]` with:
 ```
-"com.breadmoirai.redstonespecs.test.GametestSentinel"
+"com.breadmoirai.garnet.test.GametestSentinel"
 ```
 
 - [ ] **Step 3: Read the existing clientTest fabric.mod.json**
@@ -1166,7 +1166,7 @@ Replace the `RedstonespecsGameTests` entry under `entrypoints["fabric-gametest"]
 cat src/clientTest/resources/fabric.mod.json
 ```
 
-Replace any existing `RedstonespecsClientTests` entry with `com.breadmoirai.redstonespecs.test.ClientTestSentinel`.
+Replace any existing `garnetClientTests` entry with `com.breadmoirai.garnet.test.ClientTestSentinel`.
 
 - [ ] **Step 4: Verify both still parse and compile**
 
@@ -1186,7 +1186,7 @@ git commit -m "test: point fabric.mod.json entrypoints to Kotest sentinels"
 ### Task 15: Smoke gametest spec
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/SmokeSpec.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/SmokeSpec.kt`
 
 This is the first actual Kotest spec in the gametest source set. It exercises `awaitTicks`, `onServer`, and `spawnStructure` against the empty_platform structure.
 
@@ -1195,11 +1195,11 @@ This is the first actual Kotest spec in the gametest source set. It exercises `a
 The spec extends `ServerTestSpec` so the body runs on the server thread directly — no `onServer { }` boilerplate, same-tick guaranteed via the executor drain.
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.testing.ServerTestSpec
-import com.breadmoirai.redstonespecs.testing.core.McDispatchers
-import com.breadmoirai.redstonespecs.testing.server.awaitTicks
+import com.breadmoirai.garnet.testing.ServerTestSpec
+import com.breadmoirai.garnet.testing.core.McDispatchers
+import com.breadmoirai.garnet.testing.server.awaitTicks
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 
@@ -1234,14 +1234,14 @@ Expected: BUILD SUCCESSFUL.
 cmd.exe /c "./gradlew.bat :26.1:runGameTest"
 ```
 
-Expected: BUILD SUCCESSFUL. The gametest log shows "All 2 tests passed" (or similar from `LauncherResult.summary()`). Kotest's report appears under `versions/26.1/build/reports/redstonespecs/gametest/`.
+Expected: BUILD SUCCESSFUL. The gametest log shows "All 2 tests passed" (or similar from `LauncherResult.summary()`). Kotest's report appears under `versions/26.1/build/reports/garnet/gametest/`.
 
 If the run fails: read `versions/26.1/build/gametest/logs/` for MC server logs; the most likely failure modes are (a) structure NBT can't be loaded (data version mismatch — see Task 11), (b) `TestBridgeLifecycle` event registration timing wrong, or (c) Kotest classpath scan fails to find `SmokeSpec` (verify `discoveryRoot` config or pass an explicit class via `withSpecs(SmokeSpec::class)`).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/SmokeSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/SmokeSpec.kt
 git commit -m "test(gametest): add SmokeSpec exercising awaitTicks and onServer"
 ```
 
@@ -1287,15 +1287,15 @@ git commit -m "build: add Kotest engine to src/test/, alongside existing JUnit"
 ### Task 17: Migrate `IntEditBoxLogicTest`
 
 **Files:**
-- Modify: `src/test/kotlin/com/breadmoirai/redstonespecs/data/IntEditBoxLogicTest.kt`
+- Modify: `src/test/kotlin/com/breadmoirai/garnet/data/IntEditBoxLogicTest.kt`
 
 - [ ] **Step 1: Replace the file content**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.data
+package com.breadmoirai.garnet.data
 
-import com.breadmoirai.redstonespecs.client.screen.formatIntValue
-import com.breadmoirai.redstonespecs.client.screen.parseIntValue
+import com.breadmoirai.garnet.client.screen.formatIntValue
+import com.breadmoirai.garnet.client.screen.parseIntValue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 
@@ -1354,21 +1354,21 @@ Expected: BUILD SUCCESSFUL, 10 tests passed.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/test/kotlin/com/breadmoirai/redstonespecs/data/IntEditBoxLogicTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/data/IntEditBoxLogicTest.kt
 git commit -m "test: migrate IntEditBoxLogicTest to Kotest"
 ```
 
 ### Task 18: Migrate `SimTimeTest`
 
 **Files:**
-- Modify: `src/test/kotlin/com/breadmoirai/redstonespecs/data/SimTimeTest.kt`
+- Modify: `src/test/kotlin/com/breadmoirai/garnet/data/SimTimeTest.kt`
 
 The migration template: `@BeforeAll` → `beforeSpec`, `assertEquals(a, b)` → `b shouldBe a`, `assertTrue(cond)` → `cond shouldBe true`. The `Bootstrap.bootStrap()` lives in `beforeSpec`.
 
 - [ ] **Step 1: Replace the file content**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.data
+package com.breadmoirai.garnet.data
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -1455,7 +1455,7 @@ If `Bootstrap.bootStrap()` fails with classpath issues, the dropped `fabric-load
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/test/kotlin/com/breadmoirai/redstonespecs/data/SimTimeTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/data/SimTimeTest.kt
 git commit -m "test: migrate SimTimeTest to Kotest"
 ```
 
@@ -1467,35 +1467,35 @@ For each file, do steps Read → Convert → Run → Commit. One commit per file
 
 - [ ] **Step 1: Migrate `StateConditionTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/data/StateConditionTest.kt`. Read the file, convert assertions, run `:26.1:test --tests *StateConditionTest`, commit.
+Path: `src/test/kotlin/com/breadmoirai/garnet/data/StateConditionTest.kt`. Read the file, convert assertions, run `:26.1:test --tests *StateConditionTest`, commit.
 
 - [ ] **Step 2: Migrate `SpecPersistenceTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/persistence/SpecPersistenceTest.kt`. Note: uses `@TempDir Path` parameter. Replace with `val tmp = kotlin.io.path.createTempDirectory("specPersistence")` inside the test body. (Avoids depending on Kotest's `tempdir()` API surface, which has shifted between minor versions.) Run, commit. The temp dir won't auto-clean — acceptable for a unit test that produces a single small file.
+Path: `src/test/kotlin/com/breadmoirai/garnet/persistence/SpecPersistenceTest.kt`. Note: uses `@TempDir Path` parameter. Replace with `val tmp = kotlin.io.path.createTempDirectory("specPersistence")` inside the test body. (Avoids depending on Kotest's `tempdir()` API surface, which has shifted between minor versions.) Run, commit. The temp dir won't auto-clean — acceptable for a unit test that produces a single small file.
 
 - [ ] **Step 3: Migrate `StateRecordingStorageTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/runner/StateRecordingStorageTest.kt`. Convert, run, commit.
+Path: `src/test/kotlin/com/breadmoirai/garnet/runner/StateRecordingStorageTest.kt`. Convert, run, commit.
 
 - [ ] **Step 4: Migrate `StateRecordingViewTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/runner/StateRecordingViewTest.kt`. Convert, run, commit.
+Path: `src/test/kotlin/com/breadmoirai/garnet/runner/StateRecordingViewTest.kt`. Convert, run, commit.
 
 - [ ] **Step 5: Migrate `SpecDslTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/data/dsl/SpecDslTest.kt`. Convert, run, commit.
+Path: `src/test/kotlin/com/breadmoirai/garnet/data/dsl/SpecDslTest.kt`. Convert, run, commit.
 
 - [ ] **Step 6: Migrate `KtsSpecEmitterTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecEmitterTest.kt`. Convert, run, commit.
+Path: `src/test/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecEmitterTest.kt`. Convert, run, commit.
 
 - [ ] **Step 7: Migrate `KtsSpecLoaderTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecLoaderTest.kt`. Convert, run, commit.
+Path: `src/test/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecLoaderTest.kt`. Convert, run, commit.
 
 - [ ] **Step 8: Migrate `SpecJsonCodecTest.kt`**
 
-Path: `src/test/kotlin/com/breadmoirai/redstonespecs/data/serial/SpecJsonCodecTest.kt`. Convert, run, commit.
+Path: `src/test/kotlin/com/breadmoirai/garnet/data/serial/SpecJsonCodecTest.kt`. Convert, run, commit.
 
 - [ ] **Step 9: Run the full unit-test suite end-to-end to catch any cross-file regression**
 
@@ -1512,16 +1512,16 @@ Expected: BUILD SUCCESSFUL, all migrated specs pass.
 ### Task 20: Delete placeholder gametest and clientTest stubs
 
 **Files:**
-- Delete: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsGameTests.kt`
-- Delete: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt`
+- Delete: `src/gametest/kotlin/com/breadmoirai/garnet/test/garnetGameTests.kt`
+- Delete: `src/clientTest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt`
 
 The pre-existing `lever_lamp.snbt` resource stays — it's the structure for the first real spec.
 
 - [ ] **Step 1: Delete the stubs**
 
 ```bash
-git rm src/gametest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsGameTests.kt
-git rm src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RedstonespecsClientTests.kt
+git rm src/gametest/kotlin/com/breadmoirai/garnet/test/garnetGameTests.kt
+git rm src/clientTest/kotlin/com/breadmoirai/garnet/test/garnetClientTests.kt
 ```
 
 - [ ] **Step 2: Verify the build still passes**
@@ -1575,7 +1575,7 @@ Design rationale lives in `docs/superpowers/specs/2026-05-07-kotest-coroutine-te
 ```kotlin
 class ComparatorSpec : FunSpec({
     test("comparator latches after 4 ticks") {
-        val s = spawnStructure(ResourceLocation.fromNamespaceAndPath("redstonespecs", "basic"))
+        val s = spawnStructure(ResourceLocation.fromNamespaceAndPath("garnet", "basic"))
         try {
             onServer { /* press button at s.absolute(BlockPos(2, 2, 1)) */ }
             awaitTicks(4)
@@ -1603,10 +1603,10 @@ hops to the server thread for any block-state mutation or read.
 
 ## Reports
 
-- `build/reports/redstonespecs/<sourceSet>/kensa/` — Kensa HTML, literate test
+- `build/reports/garnet/<sourceSet>/kensa/` — Kensa HTML, literate test
   documentation. Auto-registers via ServiceLoader.
 - `build/test-results/<sourceSet>/` — JUnit XML for CI consumption.
-- `build/reports/redstonespecs/<sourceSet>/` — Kotest's own console + HTML.
+- `build/reports/garnet/<sourceSet>/` — Kotest's own console + HTML.
 ```
 
 - [ ] **Step 2: Register in INDEX.md**
@@ -1726,7 +1726,7 @@ Expected: BUILD SUCCESSFUL, all migrated tests pass.
 cmd.exe /c "./gradlew.bat :26.1:runGameTest"
 ```
 
-Expected: BUILD SUCCESSFUL. Console output includes "All N tests passed" from `LauncherResult.summary()`. Reports under `versions/26.1/build/reports/redstonespecs/gametest/`.
+Expected: BUILD SUCCESSFUL. Console output includes "All N tests passed" from `LauncherResult.summary()`. Reports under `versions/26.1/build/reports/garnet/gametest/`.
 
 - [ ] **Step 4: Run client gametest** (if a `ClientContext`-using spec exists; smoke spec is server-only)
 
@@ -1736,4 +1736,4 @@ cmd.exe /c "./gradlew.bat :26.1:runClientTest"
 
 Expected: BUILD SUCCESSFUL or graceful "no specs found" if no client specs are written yet.
 
-If all four steps pass, the bridge is functional end-to-end. Subsequent test authoring (re-authoring `RedstonespecsGameTests` and `RedstonespecsClientTests` against the flat SpecEntry model, per the data-layer redesign) is out of scope for this plan.
+If all four steps pass, the bridge is functional end-to-end. Subsequent test authoring (re-authoring `garnetGameTests` and `garnetClientTests` against the flat SpecEntry model, per the data-layer redesign) is out of scope for this plan.

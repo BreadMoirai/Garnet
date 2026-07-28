@@ -18,13 +18,13 @@ See `docs/superpowers/specs/2026-05-08-managed-redstone-worlds-design.md` for th
 
 The mod creates the singleplayer save itself. From the main menu, the "Redstone Projects…"
 button calls `ProjectIntegratedBoot.bootWorkspace()`, which opens (or creates) a single
-shared flat-void workspace save named `redstonespecs-workspace` — root-agnostic; project
+shared flat-void workspace save named `garnet-workspace` — root-agnostic; project
 folders are loaded/unloaded in-world. `bootWorkspace()` uses the private `openOrCreateWorld`
 helper: either re-open the existing save, or create a fresh flat-void singleplayer save
 (creative, peaceful, allow-commands) via `WorldOpenFlows.createFreshLevel` with
 `FlatLevelGeneratorPresets.THE_VOID`.
 
-The workspace save name is the fixed `redstonespecs-workspace`. The save is **persistent
+The workspace save name is the fixed `garnet-workspace`. The save is **persistent
 across sessions** — re-opening reuses the same save and any user-placed scratch outside spec
 bounds is preserved between opens. Spec contents are re-placed from disk on each `placeAll`.
 
@@ -54,7 +54,7 @@ Pure data:
 - `ProjectFolderTree` — leaves vs intermediates scan; used by `ProjectDimLifecycle.placeAll` for
   region placement. Separate concern from the Explorer's tree model (below).
 - `FileTree` — recursive tree model (`FolderNode`/`FileNode` under sealed `FileTreeNode`, package
-  `com.breadmoirai.redstonespecs.project`) built by `scanFolder(path)`; mirrors the whole folder
+  `com.breadmoirai.garnet.project`) built by `scanFolder(path)`; mirrors the whole folder
   (all files/folders, incl. empty), folders-first ordering. Paths are **computed, not stored** —
   `FolderNode.walk()` (node→path) and `FolderNode.resolve(path)` (path→node), both relative to
   whichever folder is the root, so re-rooting is free. This is the tree carried by
@@ -84,7 +84,7 @@ Server state and lifecycle:
 - `ProjectTeleport` — `toFolder(server, player, subpath)`. Separate concern from placement.
 - `ProjectNewSpec` — stub `.spec.kts` writer.
 - `ProjectServerContext` — per-server pin for the active root.
-- `ProjectCommand` — `/redstonespecs project`.
+- `ProjectCommand` — `/garnet project`.
 
 Network:
 - `network/project/ProjectPackets` + `ProjectNetworkRegistry` — same authority pattern as
@@ -120,7 +120,7 @@ Client:
   `r.message` (place/save/new-structure outcomes all surface through the same status line as
   folder load/save results).
 - `client/project/ProjectIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
-  the UI via `TitleScreenMixin`) opens/creates the single shared `redstonespecs-workspace` save
+  the UI via `TitleScreenMixin`) opens/creates the single shared `garnet-workspace` save
   with no root pinned. The dormant `pendingRoot`/`ProjectServerContext` pinning machinery is
   retained for programmatic use, but no caller sets `pendingRoot`, so the SERVER_STARTING listener
   is a no-op.

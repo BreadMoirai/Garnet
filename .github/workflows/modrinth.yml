@@ -42,7 +42,7 @@ jobs:
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-token: ${{ secrets.M_TOKEN }}
-          files: build/libs/${{ env.MOD_VERSION }}/redstonespecs-${{ env.MOD_VERSION }}+26.2*.jar
+          files: build/libs/${{ env.MOD_VERSION }}/garnet-${{ env.MOD_VERSION }}+26.2*.jar
           name: "${{ env.MOD_VERSION }}+26.2"
           version: "${{ env.MOD_VERSION }}+26.2"
           version-type: release

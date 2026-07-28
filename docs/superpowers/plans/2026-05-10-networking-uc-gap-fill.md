@@ -27,7 +27,7 @@ cmd.exe /c "./gradlew.bat :26.1:runGameTestServer"
 ## Task 1: Refactor NetworkRegistry — extract handler functions
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt`
 
 This is a behavior-preserving refactor. Each lambda body inside `context.server().execute { … }` becomes a top-level function `handleX(server, player, payload)`. The lambda becomes a one-liner delegation.
 
@@ -44,16 +44,16 @@ Expected: BUILD SUCCESSFUL.
 Replace the entire file with:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.network
+package com.breadmoirai.garnet.network
 
-import com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock
-import com.breadmoirai.redstonespecs.block.RedstoneSpecRunnerBlock
-import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.persistence.SpecDirectoryScan
-import com.breadmoirai.redstonespecs.persistence.SpecPersistence
-import com.breadmoirai.redstonespecs.persistence.StructurePersistence
-import com.breadmoirai.redstonespecs.runner.SpecSnapshot
+import com.breadmoirai.garnet.block.GarnetRecorderBlock
+import com.breadmoirai.garnet.block.GarnetRunnerBlock
+import com.breadmoirai.garnet.block.SpecBlockEntity
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.persistence.SpecDirectoryScan
+import com.breadmoirai.garnet.persistence.SpecPersistence
+import com.breadmoirai.garnet.persistence.StructurePersistence
+import com.breadmoirai.garnet.runner.SpecSnapshot
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
@@ -62,7 +62,7 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.level.storage.LevelResource
 import org.slf4j.LoggerFactory
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 internal fun saveDir(server: MinecraftServer): java.nio.file.Path =
     server.getWorldPath(LevelResource.ROOT)
@@ -78,7 +78,7 @@ fun handleRunSpec(server: MinecraftServer, player: ServerPlayer, payload: RunSpe
     LOGGER.debug("[NetworkRegistry#runSpec] auto-saved structure '{}' before run", structureId)
     val dslSpec = SpecPersistence.load(dir, be.specId)
     if (dslSpec == null) {
-        LOGGER.warn("[NetworkRegistry#runSpec] could not load dsl.RedstoneSpec for '{}' — aborting run", be.specId)
+        LOGGER.warn("[NetworkRegistry#runSpec] could not load dsl.GarnetSpec for '{}' — aborting run", be.specId)
         return
     }
     be.startRun(dslSpec, level)
@@ -113,7 +113,7 @@ fun handleSetRecorderConfig(server: MinecraftServer, player: ServerPlayer, paylo
     LOGGER.debug("[NetworkRegistry#setRecorderConfig] originPos={} specId={}", payload.originPos, payload.specId)
     val level = player.level()
     val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return
-    if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return
+    if (level.getBlockState(payload.originPos).block !is GarnetRecorderBlock) return
     if (payload.specId.isNotBlank()) be.setSpecId(payload.specId)
     if (payload.structureId.isNotBlank()) be.setStructure(payload.structureId)
 }
@@ -122,7 +122,7 @@ fun handleRecorderCommand(server: MinecraftServer, player: ServerPlayer, payload
     LOGGER.debug("[NetworkRegistry#recorderCommand] originPos={} cmd={}", payload.originPos, payload.cmd)
     val level = player.level()
     val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return
-    if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return
+    if (level.getBlockState(payload.originPos).block !is GarnetRecorderBlock) return
     when (payload.cmd) {
         RecorderCmd.START -> be.startRecording()
         RecorderCmd.STOP -> be.stopRecordingAndFinalize()
@@ -134,7 +134,7 @@ fun handleSetRunnerConfig(server: MinecraftServer, player: ServerPlayer, payload
     LOGGER.debug("[NetworkRegistry#setRunnerConfig] originPos={} specPath={}", payload.originPos, payload.specPath)
     val level = player.level()
     val be = level.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return
-    if (level.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return
+    if (level.getBlockState(payload.originPos).block !is GarnetRunnerBlock) return
     val dir = saveDir(server)
     val specId = payload.specPath.removeSuffix(".spec.kts")
     val dslSpec = SpecPersistence.load(dir, specId)
@@ -162,7 +162,7 @@ fun handleRunnerCommand(server: MinecraftServer, player: ServerPlayer, payload: 
     LOGGER.debug("[NetworkRegistry#runnerCommand] originPos={} cmd={}", payload.originPos, payload.cmd)
     val serverLevel = player.level() as ServerLevel
     val be = serverLevel.getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return
-    if (serverLevel.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return
+    if (serverLevel.getBlockState(payload.originPos).block !is GarnetRunnerBlock) return
     val dir = saveDir(server)
 
     when (payload.cmd) {
@@ -270,7 +270,7 @@ fun registerNetworking() {
         ctx.server().execute { handleRunnerCommand(ctx.server(), ctx.player(), payload) }
     }
 
-    com.breadmoirai.redstonespecs.network.managed.ManagedNetworkRegistry.register()
+    com.breadmoirai.garnet.network.managed.ManagedNetworkRegistry.register()
 }
 ```
 
@@ -285,7 +285,7 @@ Expected: BUILD SUCCESSFUL across all 5 sourcesets.
 - [ ] **Step 4: Commit**
 
 ```
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt
 git commit -m "refactor(network): extract C2S handlers to top-level handleX functions
 
 Mirrors ManagedNetworkRegistry's shape so handlers can be invoked
@@ -300,19 +300,19 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 2: Promote shared test helpers to NetworkTestSupport.kt
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/NetworkTestSupport.kt`
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTestSupport.kt`
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedNetworkRegistrySpec.kt` (imports only)
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/NetworkTestSupport.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTestSupport.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedNetworkRegistrySpec.kt` (imports only)
 
 The helpers `makeMockServerPlayer`, `drainPayloads`, `deleteRecursively`, `withTempRoot` are not managed-specific; promote them so the new networking spec can reuse them.
 
 - [ ] **Step 1: Create the new NetworkTestSupport.kt with promoted helpers**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.mixin.ConnectionAccessor
-import com.breadmoirai.redstonespecs.mixin.ServerCommonPacketListenerImplAccessor
+import com.breadmoirai.garnet.mixin.ConnectionAccessor
+import com.breadmoirai.garnet.mixin.ServerCommonPacketListenerImplAccessor
 import com.mojang.authlib.GameProfile
 import io.netty.channel.embedded.EmbeddedChannel
 import net.minecraft.network.Connection
@@ -372,8 +372,8 @@ inline fun withTempRoot(prefix: String, block: (Path) -> Unit) {
  */
 fun drainPayloads(player: ServerPlayer): List<CustomPacketPayload> {
     val listener = player.connection
-    val conn = (listener as ServerCommonPacketListenerImplAccessor).`redstonespecs$getConnection`()
-    val ch = (conn as ConnectionAccessor).`redstonespecs$getChannel`() as? EmbeddedChannel
+    val conn = (listener as ServerCommonPacketListenerImplAccessor).`garnet$getConnection`()
+    val ch = (conn as ConnectionAccessor).`garnet$getChannel`() as? EmbeddedChannel
         ?: return emptyList()
     val out = mutableListOf<CustomPacketPayload>()
     while (true) {
@@ -389,9 +389,9 @@ fun drainPayloads(player: ServerPlayer): List<CustomPacketPayload> {
 Replace the file with:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.managed
+package com.breadmoirai.garnet.test.managed
 
-import com.breadmoirai.redstonespecs.runner.RecordingDslEmitter
+import com.breadmoirai.garnet.runner.RecordingDslEmitter
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
@@ -415,12 +415,12 @@ fun clearCellVolume(level: ServerLevel, origin: BlockPos, size: Vec3i) {
 
 - [ ] **Step 3: Update ManagedNetworkRegistrySpec imports**
 
-In `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedNetworkRegistrySpec.kt`, replace the existing helper-related imports (which previously came from the same package) with explicit imports from the new package. Find and edit so the imports include both:
+In `src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedNetworkRegistrySpec.kt`, replace the existing helper-related imports (which previously came from the same package) with explicit imports from the new package. Find and edit so the imports include both:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
-import com.breadmoirai.redstonespecs.test.drainPayloads
-import com.breadmoirai.redstonespecs.test.withTempRoot
+import com.breadmoirai.garnet.test.makeMockServerPlayer
+import com.breadmoirai.garnet.test.drainPayloads
+import com.breadmoirai.garnet.test.withTempRoot
 ```
 
 …and keep the existing `clearCellVolume` / `writeStub` references resolving via same-package access. (No import line needed for same-package helpers.)
@@ -428,10 +428,10 @@ import com.breadmoirai.redstonespecs.test.withTempRoot
 Note: also check `ManagedDimSpec.kt`, `ManagedCellSaverSpec.kt`, `ManagedTeleportSpec.kt`, `ManagedCommandSpec.kt` for usages of any moved helper and add explicit imports as needed. Run a grep:
 
 ```
-grep -rln "withTempRoot\|makeMockServerPlayer\|drainPayloads\|deleteRecursively" src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/
+grep -rln "withTempRoot\|makeMockServerPlayer\|drainPayloads\|deleteRecursively" src/gametest/kotlin/com/breadmoirai/garnet/test/managed/
 ```
 
-For each file in the result, add the relevant `import com.breadmoirai.redstonespecs.test.*` lines.
+For each file in the result, add the relevant `import com.breadmoirai.garnet.test.*` lines.
 
 - [ ] **Step 4: Verify build**
 
@@ -452,9 +452,9 @@ Expected: gametest passes (Kotest summary shows previous managed specs all green
 - [ ] **Step 6: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/NetworkTestSupport.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/ManagedTestSupport.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/managed/
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/NetworkTestSupport.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/managed/ManagedTestSupport.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/managed/
 git commit -m "refactor(test): promote shared network test helpers
 
 Move makeMockServerPlayer, drainPayloads, deleteRecursively, and
@@ -470,7 +470,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 3: Add SpecBlockEntity placement helpers
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/NetworkTestSupport.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/NetworkTestSupport.kt`
 
 Add helpers used by every networking test to set up a configured BE at a known position.
 
@@ -479,8 +479,8 @@ Add helpers used by every networking test to set up a configured BE at a known p
 Append to `NetworkTestSupport.kt`:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.SpecBlockEntity
+import com.breadmoirai.garnet.ModRegistries
+import com.breadmoirai.garnet.block.SpecBlockEntity
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
@@ -496,7 +496,7 @@ fun placeRecorderBE(
     structureId: String? = null,
     bounds: Vec3i = Vec3i(3, 3, 3),
 ): SpecBlockEntity {
-    level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RECORDER_BLOCK.defaultBlockState(), 2)
+    level.setBlock(pos, ModRegistries.GARNET_RECORDER_BLOCK.defaultBlockState(), 2)
     val be = level.getBlockEntity(pos) as SpecBlockEntity
     be.setSpecId(specId)
     if (structureId != null) be.setStructure(structureId)
@@ -515,7 +515,7 @@ fun placeRunnerBE(
     structureId: String? = null,
     bounds: Vec3i = Vec3i(3, 3, 3),
 ): SpecBlockEntity {
-    level.setBlock(pos, ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK.defaultBlockState(), 2)
+    level.setBlock(pos, ModRegistries.GARNET_RUNNER_BLOCK.defaultBlockState(), 2)
     val be = level.getBlockEntity(pos) as SpecBlockEntity
     be.setSpecId(specId)
     if (structureId != null) be.setStructure(structureId)
@@ -530,12 +530,12 @@ fun placeRunnerBE(
 cmd.exe /c "./gradlew.bat :26.1:gametestClasses"
 ```
 
-Expected: BUILD SUCCESSFUL. If `SpecBlockEntity` is not imported correctly or `setSpecBounds` has a different signature, fix per the actual API in `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`.
+Expected: BUILD SUCCESSFUL. If `SpecBlockEntity` is not imported correctly or `setSpecBounds` has a different signature, fix per the actual API in `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`.
 
 - [ ] **Step 3: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/NetworkTestSupport.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/NetworkTestSupport.kt
 git commit -m "test(network): add placeRecorderBE / placeRunnerBE helpers
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -546,24 +546,24 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 4: Create RecorderRunnerNetworkRegistrySpec scaffold + register sentinel
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`
 
 **Critical:** per project memory, autoscan is OFF; specs not registered in `GametestSentinel.runAll` silently do not run.
 
 - [ ] **Step 1: Create the spec scaffold with a single throw-away test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.network
+package com.breadmoirai.garnet.test.network
 
-import com.breadmoirai.redstonespecs.network.handleRecorderCommand
-import com.breadmoirai.redstonespecs.network.RecorderCmd
-import com.breadmoirai.redstonespecs.network.RecorderCommandC2S
-import com.breadmoirai.redstonespecs.test.drainPayloads
-import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
-import com.breadmoirai.redstonespecs.test.withTempRoot
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.network.handleRecorderCommand
+import com.breadmoirai.garnet.network.RecorderCmd
+import com.breadmoirai.garnet.network.RecorderCommandC2S
+import com.breadmoirai.garnet.test.drainPayloads
+import com.breadmoirai.garnet.test.makeMockServerPlayer
+import com.breadmoirai.garnet.test.withTempRoot
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.collections.shouldBeEmpty
 import net.minecraft.core.BlockPos
 
@@ -575,7 +575,7 @@ import net.minecraft.core.BlockPos
  * Client-side rows (UC-NET-01.b/c, UC-NET-03.e, UC-NET-04.a) are deferred to
  * a future client-gametest cycle.
  */
-class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
+class RecorderRunnerNetworkRegistrySpec : GarnetTestSpec({
 
     test("UC-NET-02.b: handleRecorderCommand on null BE is a silent no-op") {
         withTempRoot("net-rr-scaffold") {
@@ -594,10 +594,10 @@ class RecorderRunnerNetworkRegistrySpec : RedstoneTestSpec({
 
 - [ ] **Step 2: Register the spec in GametestSentinel.runAll**
 
-Edit `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`. Add the import:
+Edit `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`. Add the import:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.test.network.RecorderRunnerNetworkRegistrySpec
+import com.breadmoirai.garnet.test.network.RecorderRunnerNetworkRegistrySpec
 ```
 
 In the `specs = listOf(...)` block, append `RecorderRunnerNetworkRegistrySpec::class,`. The list should look like:
@@ -620,15 +620,15 @@ specs = listOf(
 cmd.exe /c "./gradlew.bat :26.1:runGameTestServer"
 ```
 
-Expected: Kotest summary line in the log shows the new spec ran and its single test passed. Open the report at `build/reports/redstonespecs/gametest/` to confirm `RecorderRunnerNetworkRegistrySpec` is listed.
+Expected: Kotest summary line in the log shows the new spec ran and its single test passed. Open the report at `build/reports/garnet/gametest/` to confirm `RecorderRunnerNetworkRegistrySpec` is listed.
 
 If the spec does not appear in the report, the registration step failed — re-check `GametestSentinel.runAll`.
 
 - [ ] **Step 4: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt
 git commit -m "test(network): scaffold RecorderRunnerNetworkRegistrySpec
 
 Single UC-NET-02.b case proves the spec is wired through the sentinel.
@@ -642,7 +642,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 5: UC-NET-02 — origin-guard tests
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`
 
 Adds the rest of UC-NET-02 coverage: stale-ref silent no-op (the scaffold case is renamed), and structural notes on UC-NET-02.a / 02.c.
 
@@ -687,9 +687,9 @@ In `RecorderRunnerNetworkRegistrySpec.kt`, replace the existing single test with
 Add imports as needed:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.handleRunnerCommand
-import com.breadmoirai.redstonespecs.network.RunnerCmd
-import com.breadmoirai.redstonespecs.network.RunnerCommandC2S
+import com.breadmoirai.garnet.network.handleRunnerCommand
+import com.breadmoirai.garnet.network.RunnerCmd
+import com.breadmoirai.garnet.network.RunnerCommandC2S
 ```
 
 - [ ] **Step 2: Run gametest**
@@ -698,12 +698,12 @@ import com.breadmoirai.redstonespecs.network.RunnerCommandC2S
 cmd.exe /c "./gradlew.bat :26.1:runGameTestServer"
 ```
 
-Expected: both UC-NET-02 cases pass. Inspect the XML report at `build/reports/redstonespecs/gametest/` if the console summary is unclear.
+Expected: both UC-NET-02 cases pass. Inspect the XML report at `build/reports/garnet/gametest/` if the console summary is unclear.
 
 - [ ] **Step 3: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt
 git commit -m "test(network): UC-NET-02 origin-guard coverage
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -714,26 +714,26 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 6: UC-NET-03 — runner status S2C tests
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`
 
 Seven tests covering `PLACE_STRUCTURE`, `RUN`, and `RESTORE` flows.
 
 - [ ] **Step 1: Probe `SpecBlockEntity.startRun` semantics for UC-NET-03.c**
 
-Read `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt` around `fun startRun` (line ~171). Confirm whether two consecutive calls within the same tick can both return `true`. If a second call cannot return `false` synchronously, the UC-NET-03.c test below must instead force the "in-flight" state via whatever flag the BE uses (likely a non-null `currentRun` field or similar). If unclear, fall back to the documented downgrade in the spec's Risks section: mark UC-NET-03.c as `GAP-PARTIAL` and skip the test.
+Read `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt` around `fun startRun` (line ~171). Confirm whether two consecutive calls within the same tick can both return `true`. If a second call cannot return `false` synchronously, the UC-NET-03.c test below must instead force the "in-flight" state via whatever flag the BE uses (likely a non-null `currentRun` field or similar). If unclear, fall back to the documented downgrade in the spec's Risks section: mark UC-NET-03.c as `GAP-PARTIAL` and skip the test.
 
 Decision recorded as a comment in the spec test below.
 
 - [ ] **Step 2: Determine `SharedSettings.specSaveDir` interaction**
 
-Read `src/main/kotlin/com/breadmoirai/redstonespecs/config/SharedSettings.kt` to learn how `specSaveDir` is resolved. We need either to write `.spec.kts` / `.nbt` to `saveDir(server)` (which is `world/<specSaveDir>`) or to override `SharedSettings.specSaveDir` to point at the temp root.
+Read `src/main/kotlin/com/breadmoirai/garnet/config/SharedSettings.kt` to learn how `specSaveDir` is resolved. We need either to write `.spec.kts` / `.nbt` to `saveDir(server)` (which is `world/<specSaveDir>`) or to override `SharedSettings.specSaveDir` to point at the temp root.
 
 Use whichever is reachable from a gametest. The gametest server's world path is under `build/`; writing into it is acceptable as long as we clean up after each test. Below, the tests use `saveDir(server)` directly via the `internal` helper exposed in Task 1.
 
 Add an import in the test spec:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.saveDir
+import com.breadmoirai.garnet.network.saveDir
 ```
 
 (If `saveDir` is `internal` to the `network` package and not visible from the test sourceset, change the production declaration in NetworkRegistry.kt from `internal fun saveDir` to `fun saveDir` — Kotlin `internal` is per-sourceset per project memory. Verify by attempting a compile after the test edits.)
@@ -777,7 +777,7 @@ Add to `RecorderRunnerNetworkRegistrySpec.kt`:
                 val level = this.overworld()
                 val pos = BlockPos(1108, 64, 1000)
                 // Place runner but don't configure (blank spec id)
-                level.setBlock(pos, com.breadmoirai.redstonespecs.ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK.defaultBlockState(), 2)
+                level.setBlock(pos, com.breadmoirai.garnet.ModRegistries.GARNET_RUNNER_BLOCK.defaultBlockState(), 2)
                 drainPayloads(player)
 
                 handleRunnerCommand(this, player, RunnerCommandC2S(pos, RunnerCmd.PLACE_STRUCTURE))
@@ -883,7 +883,7 @@ Add to `RecorderRunnerNetworkRegistrySpec.kt`:
                 val player = makeMockServerPlayer(this)
                 val level = this.overworld()
                 val pos = BlockPos(1148, 64, 1000)
-                level.setBlock(pos, com.breadmoirai.redstonespecs.ModRegistries.REDSTONE_SPEC_RUNNER_BLOCK.defaultBlockState(), 2)
+                level.setBlock(pos, com.breadmoirai.garnet.ModRegistries.GARNET_RUNNER_BLOCK.defaultBlockState(), 2)
                 drainPayloads(player)
 
                 handleRunnerCommand(this, player, RunnerCommandC2S(pos, RunnerCmd.RESTORE))
@@ -899,12 +899,12 @@ Add to `RecorderRunnerNetworkRegistrySpec.kt`:
 Imports to add:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.RunnerState
-import com.breadmoirai.redstonespecs.network.RunnerStatusS2C
-import com.breadmoirai.redstonespecs.persistence.StructurePersistence
-import com.breadmoirai.redstonespecs.test.placeRunnerBE
-import com.breadmoirai.redstonespecs.test.managed.clearCellVolume
-import com.breadmoirai.redstonespecs.test.managed.writeStub
+import com.breadmoirai.garnet.network.RunnerState
+import com.breadmoirai.garnet.network.RunnerStatusS2C
+import com.breadmoirai.garnet.persistence.StructurePersistence
+import com.breadmoirai.garnet.test.placeRunnerBE
+import com.breadmoirai.garnet.test.managed.clearCellVolume
+import com.breadmoirai.garnet.test.managed.writeStub
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.Vec3i
 ```
@@ -920,7 +920,7 @@ Expected: all UC-NET-03 cases pass. If UC-NET-03.c fails because the second `sta
 - [ ] **Step 5: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt
 git commit -m "test(network): UC-NET-03 runner status S2C coverage
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -931,7 +931,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 7: UC-NET-04 — overwrite-decision tests (server half)
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`
 
 Three tests: origin guard, overwrite=true clears + loads, overwrite=false leaves world alone. UC-NET-04.d (disconnect) is covered structurally.
 
@@ -1008,8 +1008,8 @@ Three tests: origin guard, overwrite=true clears + loads, overwrite=false leaves
 Add imports:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.handleOverwriteDecision
-import com.breadmoirai.redstonespecs.network.OverwriteDecisionC2SPayload
+import com.breadmoirai.garnet.network.handleOverwriteDecision
+import com.breadmoirai.garnet.network.OverwriteDecisionC2SPayload
 ```
 
 - [ ] **Step 2: Run gametest**
@@ -1023,7 +1023,7 @@ Expected: all three UC-NET-04 cases pass.
 - [ ] **Step 3: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt
 git commit -m "test(network): UC-NET-04 overwrite-decision coverage
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -1034,7 +1034,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 8: UC-NET-05 — block-kind guard tests
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`
 
 Three tests: recorder cmd on runner block, runner cmd on recorder block, two-player no-permission demonstration.
 
@@ -1103,10 +1103,10 @@ Three tests: recorder cmd on runner block, runner cmd on recorder block, two-pla
 Add import for placeRecorderBE:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.test.placeRecorderBE
+import com.breadmoirai.garnet.test.placeRecorderBE
 ```
 
-**Note:** UC-NET-05.a uses `be.isRecording` — verify this property exists on `SpecBlockEntity` by reading `src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`. If the actual flag is named differently (e.g. `isStateRecorderActive`, or a `state` string check), substitute the correct accessor.
+**Note:** UC-NET-05.a uses `be.isRecording` — verify this property exists on `SpecBlockEntity` by reading `src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`. If the actual flag is named differently (e.g. `isStateRecorderActive`, or a `state` string check), substitute the correct accessor.
 
 - [ ] **Step 2: Run gametest**
 
@@ -1119,7 +1119,7 @@ Expected: all three UC-NET-05 cases pass.
 - [ ] **Step 3: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt
 git commit -m "test(network): UC-NET-05 block-kind guard coverage
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -1130,13 +1130,13 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 9: UC-NET-01 — server-initiated recorder open
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt`
 
 UC-NET-01 covers the server-side build of `OpenRecorderScreenS2C`. The block's `useWithoutItem` is what actually emits the payload; we verify the *output* of that path by simulating a right-click via the block's public method (or, if not reachable from the test, by directly building the payload from a configured BE — a weaker structural test).
 
 - [ ] **Step 1: Locate the screen-open path**
 
-Read `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRecorderBlock.kt`. Find `useWithoutItem`. Note whether it can be invoked from a test (it likely takes `BlockState`, `Level`, `BlockPos`, `Player`, `InteractionHand`, `BlockHitResult`) — if reachable, call it directly. If not, an alternative is to extract the `ServerPlayNetworking.send(player, OpenRecorderScreenS2C(...))` call into a dedicated helper function `openRecorderScreenFor(server, player, be)` on `RedstoneSpecRecorderBlock` and call that helper directly.
+Read `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRecorderBlock.kt`. Find `useWithoutItem`. Note whether it can be invoked from a test (it likely takes `BlockState`, `Level`, `BlockPos`, `Player`, `InteractionHand`, `BlockHitResult`) — if reachable, call it directly. If not, an alternative is to extract the `ServerPlayNetworking.send(player, OpenRecorderScreenS2C(...))` call into a dedicated helper function `openRecorderScreenFor(server, player, be)` on `GarnetRecorderBlock` and call that helper directly.
 
 Default: invoke `useWithoutItem` with synthetic arguments. If signatures or hit-result construction is too painful, extract the helper.
 
@@ -1158,10 +1158,10 @@ Default: invoke `useWithoutItem` with synthetic arguments. If signatures or hit-
                 drainPayloads(player)
 
                 // Invoke the recorder open path. Adjust per Step 1 finding:
-                //   Option A: call RedstoneSpecRecorderBlock.useWithoutItem directly
+                //   Option A: call GarnetRecorderBlock.useWithoutItem directly
                 //   Option B: call extracted helper openRecorderScreenFor(this, player, be)
-                val be = level.getBlockEntity(pos) as com.breadmoirai.redstonespecs.block.SpecBlockEntity
-                com.breadmoirai.redstonespecs.block.RedstoneSpecRecorderBlock.openScreenFor(this, player, be)
+                val be = level.getBlockEntity(pos) as com.breadmoirai.garnet.block.SpecBlockEntity
+                com.breadmoirai.garnet.block.GarnetRecorderBlock.openScreenFor(this, player, be)
 
                 val packet = drainPayloads(player).filterIsInstance<OpenRecorderScreenS2C>().single()
                 packet.originPos shouldBe pos
@@ -1172,12 +1172,12 @@ Default: invoke `useWithoutItem` with synthetic arguments. If signatures or hit-
     }
 ```
 
-If extraction (Option B) is needed, add a corresponding production-side change in this same task: a `companion object`-level or top-level function `openScreenFor(server, player, be)` on `RedstoneSpecRecorderBlock` that contains the existing payload-build + send logic. The block's `useWithoutItem` then delegates to it.
+If extraction (Option B) is needed, add a corresponding production-side change in this same task: a `companion object`-level or top-level function `openScreenFor(server, player, be)` on `GarnetRecorderBlock` that contains the existing payload-build + send logic. The block's `useWithoutItem` then delegates to it.
 
 Add import:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.OpenRecorderScreenS2C
+import com.breadmoirai.garnet.network.OpenRecorderScreenS2C
 ```
 
 - [ ] **Step 3: Run gametest**
@@ -1191,8 +1191,8 @@ Expected: UC-NET-01.a passes.
 - [ ] **Step 4: Commit**
 
 ```
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/network/RecorderRunnerNetworkRegistrySpec.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRecorderBlock.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/network/RecorderRunnerNetworkRegistrySpec.kt \
+        src/main/kotlin/com/breadmoirai/garnet/block/GarnetRecorderBlock.kt
 git commit -m "test(network): UC-NET-01 server-initiated recorder open
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -1299,7 +1299,7 @@ Expected: Kotest summary in the log shows ALL specs green (managed + new network
 
 - [ ] **Step 3: Inspect XML report**
 
-Open `build/reports/redstonespecs/gametest/` and confirm `RecorderRunnerNetworkRegistrySpec` lists every `UC-NET-...` test as a passing case.
+Open `build/reports/garnet/gametest/` and confirm `RecorderRunnerNetworkRegistrySpec` lists every `UC-NET-...` test as a passing case.
 
 - [ ] **Step 4: Final summary commit (only if Steps 1-3 pass)**
 

@@ -37,15 +37,17 @@ keybinds, payload round-trips driven from the client — it belongs in
   `SpecPersistenceTest`, `StateConditionTest`, `StateRecordingStorageTest`,
   `StateRecordingViewTest`, `GridLayoutTest`, `SimTimeTest`. All
   pure data / algorithm checks; no level, no runner.
-- **Server gametest (`src/gametest/`):** `RedstonespecsGameTests` —
-  currently a placeholder stub. These need a real level: only the live MC
+- **Server gametest (`src/gametest/`):** the `*Spec` classes registered in
+  `GametestSentinel` (`SmokeSpec`, `project/*Spec`, `persistence/*Spec`,
+  `recorder/*Spec`, `network/*Spec`). These need a real level: only the live MC
   tick loop produces accurate scheduled-tick cadence, neighbor-update
   ordering, and comparator/piston timing. Author new tests using
-  `runRedstoneSpec` with the DSL lambda; see
+  `runGarnetSpec` with the DSL lambda; see
   [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
-- **Client gametest (`src/clientTest/`):** `RedstonespecsClientTests` —
-  also a placeholder stub at the moment. Runs via `runClientTest`;
-  exercises the full recorder screen → runner block flow.
+- **Client gametest (`src/clientTest/`):** the `*Spec` classes registered in
+  `ClientTestSentinel` (`RunGarnetSpecSmokeTest`, `ClientNetworkSpec`,
+  `Dock*Spec`, `Viewport*Spec`, `ProjectExplorerSpec`, …). Runs via
+  `runClientTest`; exercises the full recorder screen → runner block flow.
 
 ## Why DSL/algorithm logic is unit-tested but circuit behaviour is gametested
 
@@ -68,11 +70,12 @@ the real-world circuit behaviour.
 
 - New algorithm or pure data logic? Add to `src/test/`.
 - New runner / verifier / coordinator behavior that depends on ticks
-  or scheduling? Add a gametest scenario in `RedstonespecsGameTests`
-  using `RedstoneTestSpec` + `awaitTicks`/`spawnStructure`.
-- New screen, widget, payload, or marker-tool flow? Add to
-  `RedstonespecsClientTests` in `src/clientTest/` (uses
-  `ClientContextHolder` to access `ClientGameTestContext`).
+  or scheduling? Add a gametest spec under `src/gametest/`
+  using `GarnetTestSpec` + `awaitTicks`/`spawnStructure`, and register it
+  in `GametestSentinel`.
+- New screen, widget, payload, or marker-tool flow? Add a `ClientSpec`
+  under `src/clientTest/` (uses `ClientContextHolder` to access
+  `ClientGameTestContext`), and register it in `ClientTestSentinel`.
 - See `kotest-bridge.md` for the full DSL reference and cookbook.
 
 ## Bootstrap caveat for unit tests

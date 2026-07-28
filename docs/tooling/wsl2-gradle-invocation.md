@@ -6,7 +6,7 @@ summary: Run `cmd.exe /c "gradlew.bat ..."` instead of `./gradlew` because the p
 
 # Invoking Gradle from WSL2 on Windows
 
-This repository lives on a Windows filesystem (`H:\Repo\RedstoneSpecs`) but is
+This repository lives on a Windows filesystem (`H:\Repo\garnet`) but is
 typically edited from a WSL2 shell. **Always invoke Gradle through the Windows
 batch wrapper, not the POSIX wrapper.**
 
@@ -19,7 +19,7 @@ cmd.exe /c "gradlew.bat <tasks...>"
 Or, when the working directory may differ:
 
 ```sh
-cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat <tasks...>"
+cmd.exe /c "cd /d H:\\Repo\\garnet && gradlew.bat <tasks...>"
 ```
 
 ## Why not `./gradlew`?

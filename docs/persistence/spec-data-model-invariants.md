@@ -1,23 +1,23 @@
 ---
 title: Spec DSL invariants
 tags: [data-model, dsl, design]
-summary: What RedstoneSpec / SpecRun guarantee at construction time and what callers can rely on.
+summary: What GarnetSpec / SpecRun guarantee at construction time and what callers can rely on.
 ---
 
 # Spec DSL invariants
 
-## RedstoneSpec
+## GarnetSpec
 
 - `id: String` — stable identifier; used as the filename stem for `.spec.kts` and `.nbt`.
 - `bounds: Vec3i` — every axis ≥ 1 (enforced in `init {}`).
-- `lifespan: Int` — ticks ≥ 1; `runRedstoneSpec` loops `0 until lifespan`.
+- `lifespan: Int` — ticks ≥ 1; `runGarnetSpec` loops `0 until lifespan`.
 - `structure: String?` — optional structure resource id; supplies initial block state at run start if set.
-- `strict: Boolean` — if true, `runRedstoneSpec` scans for unexpected change-ticks at declared output positions.
+- `strict: Boolean` — if true, `runGarnetSpec` scans for unexpected change-ticks at declared output positions.
 - `block: SpecRun.() -> Unit` — the spec lambda. **This is the spec.** There is no flat entry list.
 
 ## SpecRun (execution context)
 
-Constructed once per run by `runRedstoneSpec`; passed as receiver to `spec.block`.
+Constructed once per run by `runGarnetSpec`; passed as receiver to `spec.block`.
 
 - `inputActions: TreeMap<SimTime, List<() -> Unit>>` — callbacks scheduled by `input { at(tick) { … } }`.
 - `assertions: TreeMap<SimTime, List<() -> Unit>>` — callbacks scheduled by `output { at(tick) { … } }`.
@@ -40,4 +40,4 @@ Constructed once per run by `runRedstoneSpec`; passed as receiver to `spec.block
 - `SpecMode`, `BreakpointSpec`, `AutoSpec` — removed.
 - `SpecJsonCodec` — removed; JSON is not used for spec storage or network sync.
 - `KtsSpecEmitter` / `RecordingFinalizer` — replaced by `RecordingDslEmitter`.
-- `RedstoneSpec.withEntryAddedOrUpdated` — no longer needed; the spec is a lambda, not a list.
+- `GarnetSpec.withEntryAddedOrUpdated` — no longer needed; the spec is a lambda, not a list.

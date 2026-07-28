@@ -31,7 +31,7 @@ fight each other.
    the GPU-API mechanics of both blits.
 3. **The Compose overlay** (`ComposeOverlay.renderInto` → `ComposeSurface.renderFrame` →
    `BlitUvPipeline.blit(..., blend = true)`) — runs *after* the composite is presented into the frame
-   sequence, rendering the full-window `RedstoneDock` scene and alpha-blending it over the composite
+   sequence, rendering the full-window `GarnetDock` scene and alpha-blending it over the composite
    with the premultiplied-alpha `PIPELINE_BLEND`. Only the pixels the dock actually paints (edge
    regions with visible panels) become opaque; the transparent CENTER lets the composited world show
    through untouched. See [ui/compose-blended-overlay.md](../ui/compose-blended-overlay.md).
@@ -45,14 +45,14 @@ coordinate system to convert between.
 
 `DockState`'s region sizes and visibility (`leftWidth`, `rightVisible`, etc.) are plain Compose
 snapshot-state fields, mutated eagerly by input handlers (`DockKeybinds`, splitter drag) — **not**
-as a side effect of a `RedstoneDock` recomposition. `ViewportState`/`WindowMixin` read those fields
+as a side effect of a `GarnetDock` recomposition. `ViewportState`/`WindowMixin` read those fields
 directly to compute `DockInsets` and the shrink rect. This ordering is deliberate: the shrink must be
 correct on the very first frame after a panel is shown or resized, even if the Compose scene hasn't
 rendered yet that frame (e.g. `ComposeSurface.disabled`, or the scene is mid-recreate on a resize).
 If the inset computation instead depended on reading back something Compose painted, a panel toggle
 would show a one-frame flash of the old (unshrunk) game viewport underneath the new panel — or worse,
 permanently desync if a compose pass is ever skipped. Because `DockState` is authoritative arithmetic
-that both `RedstoneDock`'s layout and the shrink read independently, a splitter drag moves the panel
+that both `GarnetDock`'s layout and the shrink read independently, a splitter drag moves the panel
 edge and the world content rect in lockstep with no cross-system round-trip.
 
 ## Guard and fallback
@@ -67,11 +67,11 @@ top is missing. Nothing about the dock being unavailable can corrupt the base ga
 
 ## Where the docking insets are consumed
 
-`ViewportState.contentRect` (read by `WindowMixin` every `redstonespecs$updateScaledFramebuffer` call)
+`ViewportState.contentRect` (read by `WindowMixin` every `garnet$updateScaledFramebuffer` call)
 folds `DockInsets(left, right, bottom, top)` — computed from `DockState.leftWidth`/`rightWidth`/
 `bottomHeight` gated on `isVisible` — into the shrink rect the same way it already folded the older,
 independent viewport-shrink-keybind reservation. A dock resize or visibility toggle calls
-`redstonespecs$updateScaledFramebuffer(true)` explicitly (see `DockKeybinds`'s Shift+1 handler) so the
+`garnet$updateScaledFramebuffer(true)` explicitly (see `DockKeybinds`'s Shift+1 handler) so the
 world inset updates immediately rather than waiting for the next incidental window resize.
 
 ## Cursor input maps through the shrink offset

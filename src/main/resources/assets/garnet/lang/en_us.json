@@ -1,0 +1,29 @@
+{
+  "block.garnet.garnet_editor": "Garnet Editor",
+  "block.garnet.garnet_recorder": "Garnet Recorder",
+  "block.garnet.garnet_runner": "Garnet Runner",
+  "item.garnet.garnet_editor": "Garnet Editor",
+  "item.garnet.garnet_recorder": "Garnet Recorder",
+  "item.garnet.garnet_runner": "Garnet Runner",
+  "item.garnet.input_spec_marker": "Input Spec Marker",
+  "item.garnet.output_spec_marker": "Output Spec Marker",
+  "item.garnet.breakpoint_spec_marker": "Breakpoint Spec Marker",
+  "item.garnet.auto_spec_marker": "Auto Spec Marker",
+
+  "screen.garnet.spec_overview": "Spec Overview",
+  "screen.garnet.spec_overview.spec_id": "Spec ID",
+  "screen.garnet.spec_overview.active_case": "Active Case",
+  "screen.garnet.spec_overview.no_spec": "No spec loaded",
+  "screen.garnet.spec_overview.run": "Run",
+  "screen.garnet.spec_overview.run_all": "Run All",
+  "screen.garnet.spec_overview.cases": "Cases",
+  "screen.garnet.spec_overview.bounds": "Bounds",
+  "screen.garnet.spec_overview.reset_load": "Reset & Load",
+  "screen.garnet.spec_overview.save": "Save",
+
+  "screen.garnet.spec_cases": "Test Cases",
+  "screen.garnet.spec_cases.name_hint": "Test case name…",
+
+  "screen.garnet.spec_bounds": "Spec Bounds",
+  "screen.garnet.spec_editor": "Spec Editor"
+}

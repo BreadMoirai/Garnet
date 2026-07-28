@@ -23,7 +23,7 @@ UC-NET-01.b–d and UC-NET-03.e below describe that no-op reality, not a screen.
 ### UC-NET-01 — Client requests recorder screen state from the server (server side is live; client is a no-op)
 
 **Actor:** Player
-**Trigger:** Player right-clicks a placed `RedstoneSpecRecorderBlock`; the block's `useWithoutItem` calls `ServerPlayNetworking.send` with `OpenRecorderScreenS2C`.
+**Trigger:** Player right-clicks a placed `GarnetRecorderBlock`; the block's `useWithoutItem` calls `ServerPlayNetworking.send` with `OpenRecorderScreenS2C`.
 **Preconditions:** The block entity at the clicked position is a `SpecBlockEntity`; the player is in a `ServerLevel`.
 **Outcome:** The server sends `OpenRecorderScreenS2C` exactly as before; the client's registered receiver executes on the main thread and logs that the recorder UI is removed. No screen opens; there is currently no live UI to reach a recorder block's state from the client (see `ui/dock-framework.md` — a future Explorer-adjacent panel is the intended replacement).
 
@@ -49,7 +49,7 @@ UC-NET-01.b–d and UC-NET-03.e below describe that no-op reality, not a screen.
 **System interactions:**
 - UC-NET-02.a — Every C2S handler inside `NetworkRegistry.registerNetworking` wraps its body in `context.server().execute { … }` to run on the server main thread; lookup races with world unload are impossible inside that executor.
 - UC-NET-02.b — The lookup pattern `context.player().level().getBlockEntity(payload.originPos) as? SpecBlockEntity ?: return@execute` is the canonical guard; a broken/replaced block causes the cast to return `null` and the handler exits silently.
-- UC-NET-02.c — Block-kind re-validation is applied for state-changing handlers: `SetRecorderConfigC2S` and `RecorderCommandC2S` check `level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock`; `SetRunnerConfigC2S` and `RunnerCommandC2S` check `!is RedstoneSpecRunnerBlock`. This prevents a misrouted packet from mutating a BE that has been transformed to a different block type.
+- UC-NET-02.c — Block-kind re-validation is applied for state-changing handlers: `SetRecorderConfigC2S` and `RecorderCommandC2S` check `level.getBlockState(payload.originPos).block !is GarnetRecorderBlock`; `SetRunnerConfigC2S` and `RunnerCommandC2S` check `!is GarnetRunnerBlock`. This prevents a misrouted packet from mutating a BE that has been transformed to a different block type.
 - UC-NET-02.d — The stale-reference outcome is a silent no-op on the server. The client receives no acknowledgment that its payload was discarded; the UI may show a stale state until the player re-opens the block.
 
 **Invariants:** [persistence/network-payload-contract.md](../persistence/network-payload-contract.md) — Invariant 2: every payload carries `originPos`; stale references are silent no-ops.
@@ -60,7 +60,7 @@ UC-NET-01.b–d and UC-NET-03.e below describe that no-op reality, not a screen.
 
 **Actor:** Server
 **Trigger:** A `RunnerCommandC2S` payload arrives with `cmd` equal to `PLACE_STRUCTURE`, `RUN`, or `RESTORE`.
-**Preconditions:** The `SpecBlockEntity` at `payload.originPos` passes the block-kind guard (`RedstoneSpecRunnerBlock`); for `RUN`, `SpecPersistence.load` must resolve a `RedstoneSpec` from disk.
+**Preconditions:** The `SpecBlockEntity` at `payload.originPos` passes the block-kind guard (`GarnetRunnerBlock`); for `RUN`, `SpecPersistence.load` must resolve a `GarnetSpec` from disk.
 **Outcome:** The client receives a `RunnerStatusS2C` payload with an updated `RunnerState` (`IDLE`, `RUNNING`, `PASS`, or `FAIL`) and a human-readable `summary` string; `ClientNetworkHandler` logs it at debug level ("runner status (no UI)"). There is currently no client widget that displays it — `RunnerScreen` (which used to read `active.originPos` and call `pushStatus`) was deleted.
 
 **System interactions:**
@@ -94,13 +94,13 @@ UC-NET-01.b–d and UC-NET-03.e below describe that no-op reality, not a screen.
 ### UC-NET-05 — Server rejects unauthorized or misrouted C2S commands
 
 **Actor:** Server
-**Trigger:** A C2S payload arrives for a `RecorderCommandC2S` or `RunnerCommandC2S` whose `originPos` resolves to a block that is not of the expected type (e.g., a `RunnerCommandC2S` for a position holding a `RedstoneSpecRecorderBlock`).
+**Trigger:** A C2S payload arrives for a `RecorderCommandC2S` or `RunnerCommandC2S` whose `originPos` resolves to a block that is not of the expected type (e.g., a `RunnerCommandC2S` for a position holding a `GarnetRecorderBlock`).
 **Preconditions:** A `SpecBlockEntity` exists at `payload.originPos`; the block-kind check fails because the block type does not match the expected handler.
 **Outcome:** The handler returns early without executing any mutation; no S2C feedback is sent; the world state is unchanged.
 
 **System interactions:**
-- UC-NET-05.a — `RecorderCommandC2S` handler checks `if (level.getBlockState(payload.originPos).block !is RedstoneSpecRecorderBlock) return@execute` before dispatching `RecorderCmd.START`, `STOP`, or `DISCARD`.
-- UC-NET-05.b — `RunnerCommandC2S` handler checks `if (serverLevel.getBlockState(payload.originPos).block !is RedstoneSpecRunnerBlock) return@execute` before dispatching `RunnerCmd.PLACE_STRUCTURE`, `RUN`, or `RESTORE`.
+- UC-NET-05.a — `RecorderCommandC2S` handler checks `if (level.getBlockState(payload.originPos).block !is GarnetRecorderBlock) return@execute` before dispatching `RecorderCmd.START`, `STOP`, or `DISCARD`.
+- UC-NET-05.b — `RunnerCommandC2S` handler checks `if (serverLevel.getBlockState(payload.originPos).block !is GarnetRunnerBlock) return@execute` before dispatching `RunnerCmd.PLACE_STRUCTURE`, `RUN`, or `RESTORE`.
 - UC-NET-05.c — Because the `SpecBlockEntity` is shared across recorder and runner block types, omitting the block-kind check would allow a recorder command to fire on a runner BE (and vice versa); the check is the sole enforcement boundary.
 - UC-NET-05.d — No permission or ownership check is performed beyond the block-kind guard and the `originPos` lookup; any connected player can issue a command to any reachable BE. Out-of-range command filtering is not yet implemented.
 

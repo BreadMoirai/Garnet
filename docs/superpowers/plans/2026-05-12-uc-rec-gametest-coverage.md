@@ -6,39 +6,39 @@
 
 **Architecture:** A new spec `MarkerToolSpec` covers `SpecMarkerTool.useOn` behaviour (out-of-bounds PASS, runner-block guard, replace/append semantics) and the server-side `handleSetRecorderConfig` handler. A single test appended to the existing `RecordingLifecycleSpec` covers `StateRecorder.onPhaseForActiveRecorders` advancing `currentTick`/`currentPhase`. Tick advancement is observed via `SimTime` on a recorded change rather than via reflection — `currentTick` is private and behavioural assertion is more robust.
 
-**Tech Stack:** Kotlin, Kotest, Fabric API, Minecraft 26.1, `RedstoneTestSpec` base, `onServer` / `McDispatchers.Server`, existing helpers in `NetworkTestSupport.kt`.
+**Tech Stack:** Kotlin, Kotest, Fabric API, Minecraft 26.1, `GarnetTestSpec` base, `onServer` / `McDispatchers.Server`, existing helpers in `NetworkTestSupport.kt`.
 
 ---
 
 ### Task 1: Add `MarkerToolSpec.kt` skeleton and register it
 
 **Files:**
-- Create: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt`
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`
+- Create: `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`
 
 - [ ] **Step 1: Locate the Gametest spec registration list**
 
-Run: `grep -n "specs = listOf\|class GametestSentinel" src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`
+Run: `grep -n "specs = listOf\|class GametestSentinel" src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`
 
 Note the line range that holds the `specs = listOf(...)` block. You'll append `MarkerToolSpec::class` to it in Step 3.
 
 - [ ] **Step 2: Create the skeleton spec file**
 
-Create `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt`:
+Create `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.recorder
+package com.breadmoirai.garnet.test.recorder
 
-import com.breadmoirai.redstonespecs.ModRegistries
-import com.breadmoirai.redstonespecs.block.SpecBlockEntity
-import com.breadmoirai.redstonespecs.network.SetRecorderConfigC2S
-import com.breadmoirai.redstonespecs.network.handleSetRecorderConfig
-import com.breadmoirai.redstonespecs.runner.EntryMarker
-import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
-import com.breadmoirai.redstonespecs.test.placeRecorderBE
-import com.breadmoirai.redstonespecs.test.placeRunnerBE
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.ModRegistries
+import com.breadmoirai.garnet.block.SpecBlockEntity
+import com.breadmoirai.garnet.network.SetRecorderConfigC2S
+import com.breadmoirai.garnet.network.handleSetRecorderConfig
+import com.breadmoirai.garnet.runner.EntryMarker
+import com.breadmoirai.garnet.test.makeMockServerPlayer
+import com.breadmoirai.garnet.test.placeRecorderBE
+import com.breadmoirai.garnet.test.placeRunnerBE
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -60,17 +60,17 @@ import net.minecraft.world.phys.Vec3
  * because direct construction trips MC's intrusive-holder guard
  * (feedback_item_construction_in_tests).
  */
-class MarkerToolSpec : RedstoneTestSpec({
+class MarkerToolSpec : GarnetTestSpec({
     // tests added in subsequent tasks
 })
 ```
 
 - [ ] **Step 3: Register `MarkerToolSpec` in `GametestSentinel`**
 
-In `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`, find the `specs = listOf(...)` block (located via Step 1) and append `MarkerToolSpec::class` to it. Add the import line:
+In `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`, find the `specs = listOf(...)` block (located via Step 1) and append `MarkerToolSpec::class` to it. Add the import line:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.test.recorder.MarkerToolSpec
+import com.breadmoirai.garnet.test.recorder.MarkerToolSpec
 ```
 
 This is required per `feedback_kotest_specs_must_be_registered` — autoscan is off; specs not in the explicit list silently don't run.
@@ -83,8 +83,8 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt
 git commit -m "test(gametest): add MarkerToolSpec scaffold for UC-REC-02/03 coverage"
 ```
 
@@ -93,7 +93,7 @@ git commit -m "test(gametest): add MarkerToolSpec scaffold for UC-REC-02/03 cove
 ### Task 2: UC-REC-02.a — `useOn` outside any recorder returns `PASS`
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt`
 
 - [ ] **Step 1: Add a helper to build a `UseOnContext`**
 
@@ -116,7 +116,7 @@ private fun buildUseOnContext(
 
 If the constructor signature differs in your MC version, check `UseOnContext` (e.g. via `grep -rn "class UseOnContext\b" ~/.gradle/caches/`). MC 26.1's primary constructor takes `(Player?, InteractionHand, BlockHitResult)` overloads — pick the one that compiles.
 
-- [ ] **Step 2: Add the test inside the `RedstoneTestSpec({ ... })` body**
+- [ ] **Step 2: Add the test inside the `GarnetTestSpec({ ... })` body**
 
 Replace the placeholder comment with:
 
@@ -136,7 +136,7 @@ Replace the placeholder comment with:
 ```
 
 If the registry constant is named differently, look it up:
-`grep -n "INPUT_SPEC_MARKER" src/main/kotlin/com/breadmoirai/redstonespecs/ModRegistries.kt`. Use the actual field name.
+`grep -n "INPUT_SPEC_MARKER" src/main/kotlin/com/breadmoirai/garnet/ModRegistries.kt`. Use the actual field name.
 
 - [ ] **Step 3: Verify it compiles**
 
@@ -147,14 +147,14 @@ Expected: BUILD SUCCESSFUL.
 
 Run: `cmd.exe /c "gradlew.bat :26.1:test"` (per `feedback_kotest_test_filter` — do not use `--tests`; read the XML report).
 
-Inspect: `build/test-results/test/TEST-com.breadmoirai.redstonespecs.test.recorder.MarkerToolSpec.xml` (path may vary; search `build/` for `MarkerToolSpec`).
+Inspect: `build/test-results/test/TEST-com.breadmoirai.garnet.test.recorder.MarkerToolSpec.xml` (path may vary; search `build/` for `MarkerToolSpec`).
 
 Expected: the one new test passes. If the `UseOnContext` constructor doesn't compile or the runtime throws, fix in this task before committing.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt
 git commit -m "test(gametest): UC-REC-02.a — marker tool PASSes outside recorder bounds"
 ```
 
@@ -163,7 +163,7 @@ git commit -m "test(gametest): UC-REC-02.a — marker tool PASSes outside record
 ### Task 3: UC-REC-02.b — `useOn` on a runner block is rejected
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt`
 
 - [ ] **Step 1: Append the test**
 
@@ -189,7 +189,7 @@ Add inside the spec body:
     }
 ```
 
-Rationale: `findFor` returns the runner's `SpecBlockEntity` because the hit position is inside its `specBounds`. The guard at `SpecMarkerTool.useOn:42` (`if (be.blockState.block is RedstoneSpecRunnerBlock)`) rejects the placement.
+Rationale: `findFor` returns the runner's `SpecBlockEntity` because the hit position is inside its `specBounds`. The guard at `SpecMarkerTool.useOn:42` (`if (be.blockState.block is GarnetRunnerBlock)`) rejects the placement.
 
 - [ ] **Step 2: Compile and run**
 
@@ -200,7 +200,7 @@ Expected: this test passes alongside Task 2's.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt
 git commit -m "test(gametest): UC-REC-02.b — runner-block guard rejects marker placement"
 ```
 
@@ -209,7 +209,7 @@ git commit -m "test(gametest): UC-REC-02.b — runner-block guard rejects marker
 ### Task 4: UC-REC-02.d — `addOrUpdateMarker` replace/append semantics
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt`
 
 - [ ] **Step 1: Append the test**
 
@@ -254,7 +254,7 @@ Expected: all three `MarkerToolSpec` tests pass.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt
 git commit -m "test(gametest): UC-REC-02.d — addOrUpdateMarker replace/append semantics"
 ```
 
@@ -263,11 +263,11 @@ git commit -m "test(gametest): UC-REC-02.d — addOrUpdateMarker replace/append 
 ### Task 5: UC-REC-03.b — `handleSetRecorderConfig` applies `specId` and `structureId`
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt`
 
 - [ ] **Step 1: Read the handler to confirm scope**
 
-The current handler at `src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt:66` applies `specId` (when non-blank) and `structureId` (when non-blank). It does NOT apply `outPath`, and does NOT touch `specBounds`. This contradicts the UC-REC-03.b row in `docs/use-cases/recording.md`, which is aspirational. The test asserts actual behaviour; the doc is corrected in Task 7.
+The current handler at `src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt:66` applies `specId` (when non-blank) and `structureId` (when non-blank). It does NOT apply `outPath`, and does NOT touch `specBounds`. This contradicts the UC-REC-03.b row in `docs/use-cases/recording.md`, which is aspirational. The test asserts actual behaviour; the doc is corrected in Task 7.
 
 - [ ] **Step 2: Append the test**
 
@@ -334,7 +334,7 @@ The current handler at `src/main/kotlin/com/breadmoirai/redstonespecs/network/Ne
     }
 ```
 
-If `SpecBlockEntity` exposes `specId`/`specStructure` differently (e.g. as `getSpecId()` rather than a Kotlin property), look up the actual API: `grep -n "fun getSpecId\|val specId\|fun setSpecId" src/main/kotlin/com/breadmoirai/redstonespecs/block/SpecBlockEntity.kt`. Adjust the assertion expressions to match.
+If `SpecBlockEntity` exposes `specId`/`specStructure` differently (e.g. as `getSpecId()` rather than a Kotlin property), look up the actual API: `grep -n "fun getSpecId\|val specId\|fun setSpecId" src/main/kotlin/com/breadmoirai/garnet/block/SpecBlockEntity.kt`. Adjust the assertion expressions to match.
 
 - [ ] **Step 3: Compile and run**
 
@@ -344,7 +344,7 @@ Expected: all three new 03.b tests pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/MarkerToolSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/MarkerToolSpec.kt
 git commit -m "test(gametest): UC-REC-03.b — handleSetRecorderConfig applies/guards fields"
 ```
 
@@ -353,7 +353,7 @@ git commit -m "test(gametest): UC-REC-03.b — handleSetRecorderConfig applies/g
 ### Task 6: UC-REC-04.d — `onPhaseForActiveRecorders` advances tick/phase state
 
 **Files:**
-- Modify: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/RecordingLifecycleSpec.kt`
+- Modify: `src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/RecordingLifecycleSpec.kt`
 
 - [ ] **Step 1: Read the existing spec's end to choose insertion point**
 
@@ -364,8 +364,8 @@ The file ends with the UC-REC-02.e test (UndoStack). Append the new test after i
 Ensure these imports are present at the top of `RecordingLifecycleSpec.kt`:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.dsl.Phase
-import com.breadmoirai.redstonespecs.runner.StateRecorder
+import com.breadmoirai.garnet.dsl.Phase
+import com.breadmoirai.garnet.runner.StateRecorder
 ```
 
 `StateRecorder` is already imported (used in earlier tests). `Phase` likely is not; add it.
@@ -413,7 +413,7 @@ import com.breadmoirai.redstonespecs.runner.StateRecorder
 ```
 
 Notes:
-- `Phase.PRE_RST` is a placeholder for "any phase other than START_OF_TICK". Open `src/main/kotlin/com/breadmoirai/redstonespecs/dsl/Phase.kt` (or grep `enum class Phase`) and pick a real enum value. Common candidates: `START_OF_TICK`, `END_OF_TICK`, `PRE_REDSTONE`, etc.
+- `Phase.PRE_RST` is a placeholder for "any phase other than START_OF_TICK". Open `src/main/kotlin/com/breadmoirai/garnet/dsl/Phase.kt` (or grep `enum class Phase`) and pick a real enum value. Common candidates: `START_OF_TICK`, `END_OF_TICK`, `PRE_REDSTONE`, etc.
 - `Blocks` import is needed: `import net.minecraft.world.level.block.Blocks`.
 - `BlockPos`, `Vec3i`, and `placeRecorderBE` are already imported by the existing file.
 - The `try / finally stopRecordingAndFinalize` is critical — `activeRecorders` is global state and leaks across tests if not cleaned up.
@@ -435,7 +435,7 @@ Common failure modes:
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/gametest/kotlin/com/breadmoirai/redstonespecs/test/recorder/RecordingLifecycleSpec.kt
+git add src/gametest/kotlin/com/breadmoirai/garnet/test/recorder/RecordingLifecycleSpec.kt
 git commit -m "test(gametest): UC-REC-04.d — onPhaseForActiveRecorders advances tick/phase"
 ```
 

@@ -23,7 +23,7 @@ We record block changes via `Level.setBlock(BlockPos, BlockState, int)`. The met
 is declared on `Level`, not `ServerLevel` — so the recorder mixin targets
 `Level.class` and guards with `instanceof ServerLevel`:
 
-`src/main/java/com/breadmoirai/redstonespecs/mixin/ServerLevelSetBlockMixin.java`:
+`src/main/java/com/breadmoirai/garnet/mixin/ServerLevelSetBlockMixin.java`:
 
 ```java
 @Mixin(Level.class)
@@ -32,7 +32,7 @@ abstract class ServerLevelSetBlockMixin {
         method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;I)Z",
         at = @At("HEAD")
     )
-    private void redstonespecs$captureBeforeState(...) {
+    private void garnet$captureBeforeState(...) {
         if (!(((Object) this) instanceof ServerLevel)) {
             BEFORE_STATE_STACK.get().push(SKIP_SENTINEL);
             return;

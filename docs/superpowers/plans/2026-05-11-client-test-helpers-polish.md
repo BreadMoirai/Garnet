@@ -4,7 +4,7 @@
 
 **Goal:** Split `ClientNetworkTestSupport.kt` into `ClientTestSupport.kt` (general client-test helpers) plus a slimmed `ClientNetworkTestSupport.kt` (network-only helpers), and fix five misleading/stale KDoc blocks. No behavior change.
 
-**Architecture:** Both files stay in `package com.breadmoirai.redstonespecs.test`, so call sites need zero import edits — Kotlin same-package resolution covers it. The split is mechanical (move declarations and their required imports); the doc fixes are localized text edits.
+**Architecture:** Both files stay in `package com.breadmoirai.garnet.test`, so call sites need zero import edits — Kotlin same-package resolution covers it. The split is mechanical (move declarations and their required imports); the doc fixes are localized text edits.
 
 **Tech Stack:** Kotlin, Fabric API, Stonecutter, Kotest.
 
@@ -23,8 +23,8 @@ cmd.exe /c "gradlew.bat :26.1:runClientTest"
 ## Task 1: Create `ClientTestSupport.kt` and remove its declarations from `ClientNetworkTestSupport.kt`
 
 **Files:**
-- Create: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSupport.kt`
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt`
+- Create: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSupport.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt`
 
 Move the 8 non-network helpers (`clientContext`, `currentWorld`, `onClient`, `runOnClient`, `waitForClientScreen`, `closeClientScreen`, `takeClientScreenshot`, `waitClientTicks`) out of `ClientNetworkTestSupport.kt` and into a new `ClientTestSupport.kt`. Apply the documentation fixes from the spec at the same time (doc fixes #2, #3, #5 land in the new file; doc fixes #1 and #4 land in other files in later tasks).
 
@@ -38,14 +38,14 @@ Expected: BUILD SUCCESSFUL.
 
 - [ ] **Step 2: Create `ClientTestSupport.kt`**
 
-Create `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSupport.kt` with the following content:
+Create `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSupport.kt` with the following content:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder
-import com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump
-import com.breadmoirai.redstonespecs.testing.core.WorldHolder
+import com.breadmoirai.garnet.testing.core.ClientContextHolder
+import com.breadmoirai.garnet.testing.core.FabricTestThreadPump
+import com.breadmoirai.garnet.testing.core.WorldHolder
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
 
@@ -146,7 +146,7 @@ The KDoc for `onClient`, `runOnClient`, `waitForClientScreen`, and `waitClientTi
 
 - [ ] **Step 3: Remove the moved declarations from `ClientNetworkTestSupport.kt`**
 
-Edit `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt`. Delete:
+Edit `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt`. Delete:
 
 - The two functions `clientContext()` and `currentWorld()` and their KDocs (currently lines 16–22).
 - Both function declarations and their KDocs for `onClient` and `runOnClient` (currently lines 149–175). Also delete the orphaned KDoc block that sits above `runOnClient` (lines 149–156).
@@ -157,12 +157,12 @@ Edit `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTest
 
 Also remove these imports — they're no longer needed in this file:
 
-- `import com.breadmoirai.redstonespecs.testing.core.ClientContextHolder`
-- `import com.breadmoirai.redstonespecs.testing.core.WorldHolder`
+- `import com.breadmoirai.garnet.testing.core.ClientContextHolder`
+- `import com.breadmoirai.garnet.testing.core.WorldHolder`
 - `import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext`
 - `import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext`
 
-Keep `import com.breadmoirai.redstonespecs.testing.core.FabricTestThreadPump` — it's still used by `drainClientPayloads`.
+Keep `import com.breadmoirai.garnet.testing.core.FabricTestThreadPump` — it's still used by `drainClientPayloads`.
 
 After the edit, the file's top-level declarations are:
 - `private fun sendToLocalPlayer(...)`
@@ -180,7 +180,7 @@ After the edit, the file's top-level declarations are:
 cmd.exe /c "gradlew.bat :26.1:clientTestClasses"
 ```
 
-Expected: BUILD SUCCESSFUL. If the build fails with "unresolved reference" on `onClient` (or any other moved function), check that both files are in `package com.breadmoirai.redstonespecs.test` so same-package resolution works.
+Expected: BUILD SUCCESSFUL. If the build fails with "unresolved reference" on `onClient` (or any other moved function), check that both files are in `package com.breadmoirai.garnet.test` so same-package resolution works.
 
 - [ ] **Step 5: Run client gametest**
 
@@ -193,8 +193,8 @@ Expected: `Kotest: All 6 tests passed`. No behavior change from the split, just 
 - [ ] **Step 6: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSupport.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSupport.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt
 git commit -m "refactor(test): split client-test helpers into ClientTestSupport
 
 Move the 8 non-network helpers (clientContext, currentWorld, onClient,
@@ -216,9 +216,9 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 2: Fix `sendToLocalPlayer` KDoc
 
 **Files:**
-- Modify: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt`
+- Modify: `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt`
 
-The KDoc on `sendToLocalPlayer` references `RedstoneTestSpec` and claims callers "are usually already on the server thread". Neither is true now — consumers extend `ClientSpec`, which dispatches onto `Dispatchers.Default`. The same-thread fast path stays as a safety net.
+The KDoc on `sendToLocalPlayer` references `GarnetTestSpec` and claims callers "are usually already on the server thread". Neither is true now — consumers extend `ClientSpec`, which dispatches onto `Dispatchers.Default`. The same-thread fast path stays as a safety net.
 
 - [ ] **Step 1: Replace the KDoc**
 
@@ -229,7 +229,7 @@ In `ClientNetworkTestSupport.kt`, find the existing block:
  * Synchronously sends an S2C payload to the integrated server's first overworld
  * player.
  *
- * `RedstoneTestSpec` dispatches test bodies onto the server thread via
+ * `GarnetTestSpec` dispatches test bodies onto the server thread via
  * `withContext(McDispatchers.Server)`, so by the time this helper runs we are
  * usually already on the server thread; in that case we call [action] inline.
  * If we somehow end up off-thread (e.g., a future spec that detaches), fall
@@ -248,7 +248,7 @@ Replace with:
  * Hops to the server thread via `MinecraftServer.execute` and waits on a
  * `CountDownLatch`. The `isSameThread` fast path is a safety net for callers
  * that already happen to be on the server thread (e.g. a future
- * `RedstoneTestSpec`-based caller); `ClientSpec` runs test bodies on
+ * `GarnetTestSpec`-based caller); `ClientSpec` runs test bodies on
  * `Dispatchers.Default`, so in normal use we always take the post-and-wait path.
  */
 private fun sendToLocalPlayer(action: (net.minecraft.server.MinecraftServer) -> Unit) {
@@ -265,12 +265,12 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientNetworkTestSupport.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientNetworkTestSupport.kt
 git commit -m "docs(test): fix stale sendToLocalPlayer KDoc
 
 Consumers now extend ClientSpec (Dispatchers.Default), not
-RedstoneTestSpec (server thread), so the same-thread fast path is
-effectively a safety net for hypothetical future RedstoneTestSpec
+GarnetTestSpec (server thread), so the same-thread fast path is
+effectively a safety net for hypothetical future GarnetTestSpec
 callers rather than the normal path. Update the doc to say so.
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
@@ -281,30 +281,30 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ## Task 3: Fix `ClientSpec` KDoc
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/testing/ClientSpec.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/testing/ClientSpec.kt`
 
 The KDoc says "Test bodies run on the Kotest worker thread by default". The factory actually installs `Dispatchers.Default`. The Kotest worker thread is what launches the coroutine, but the body runs on a Default dispatcher thread.
 
 - [ ] **Step 1: Replace the KDoc**
 
-In `src/main/kotlin/com/breadmoirai/redstonespecs/testing/ClientSpec.kt`, find the current class KDoc:
+In `src/main/kotlin/com/breadmoirai/garnet/testing/ClientSpec.kt`, find the current class KDoc:
 
 ```kotlin
 /**
  * Base class for Kotest specs in the `clientTest` source set.
  *
  * Test bodies run on the Kotest worker thread by default, not the server thread.
- * This is the key difference from [RedstoneTestSpec], which is server-thread-first
+ * This is the key difference from [GarnetTestSpec], which is server-thread-first
  * (correct for gametest, wrong for client tests):
  *
  * - The worker thread can sleep freely without blocking server ticks or client
  *   ticks, so polling helpers like `waitForClientScreen` work without deadlock.
  * - Server-side mutations hop explicitly via `onServer { … }`.
- * - Calls that already wrap themselves (e.g. `runRedstoneSpec`) switch threads
+ * - Calls that already wrap themselves (e.g. `runGarnetSpec`) switch threads
  *   internally — call them directly.
  *
- * A `RecordingHolder` is installed in the coroutine context so `runRedstoneSpec`
- * can attach the recording on completion (same as `RedstoneTestSpec`).
+ * A `RecordingHolder` is installed in the coroutine context so `runGarnetSpec`
+ * can attach the recording on completion (same as `GarnetTestSpec`).
  *
  * `ClientGameTestContext.waitForScreen` / `waitFor` / `waitTick` still assert the
  * Fabric test thread and will throw if called from a Kotest spec running on the
@@ -320,18 +320,18 @@ Replace with:
  * Base class for Kotest specs in the `clientTest` source set.
  *
  * Test bodies run on `Dispatchers.Default` (a kotlinx-coroutines pool), not on
- * the server thread. This is the key difference from [RedstoneTestSpec], which
+ * the server thread. This is the key difference from [GarnetTestSpec], which
  * is server-thread-first (correct for gametest, wrong for client tests):
  *
  * - A worker-pool thread can sleep freely without blocking server ticks or
  *   client ticks, so polling helpers like `waitForClientScreen` work without
  *   deadlock.
  * - Server-side mutations hop explicitly via `onServer { … }`.
- * - Calls that already wrap themselves (e.g. `runRedstoneSpec`) switch threads
+ * - Calls that already wrap themselves (e.g. `runGarnetSpec`) switch threads
  *   internally — call them directly.
  *
- * A `RecordingHolder` is installed in the coroutine context so `runRedstoneSpec`
- * can attach the recording on completion (same as `RedstoneTestSpec`).
+ * A `RecordingHolder` is installed in the coroutine context so `runGarnetSpec`
+ * can attach the recording on completion (same as `GarnetTestSpec`).
  *
  * `ClientGameTestContext.waitForScreen` / `waitFor` / `waitTick` still assert
  * the Fabric test thread and will throw if called from a `ClientSpec` test body.
@@ -355,7 +355,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```
-git add src/main/kotlin/com/breadmoirai/redstonespecs/testing/ClientSpec.kt
+git add src/main/kotlin/com/breadmoirai/garnet/testing/ClientSpec.kt
 git commit -m "docs(test): correct ClientSpec dispatcher KDoc
 
 Body runs on Dispatchers.Default, not on the Kotest worker thread.
@@ -407,5 +407,5 @@ If any step failed, diagnose and fix with a new commit (do not amend).
 ## Self-review notes
 
 - **No behavior change** — both gametests must pass with the same counts as before (42 server, 6 client). If either fails, the split or doc rewrite broke something.
-- **No cross-package import edits expected** — both files in `package com.breadmoirai.redstonespecs.test`, so `ClientNetworkSpec` and `RunRedstoneSpecSmokeTest` need no changes. If the compile fails with "unresolved reference", check package declarations first.
+- **No cross-package import edits expected** — both files in `package com.breadmoirai.garnet.test`, so `ClientNetworkSpec` and `RunGarnetSpecSmokeTest` need no changes. If the compile fails with "unresolved reference", check package declarations first.
 - **Out of scope per the spec**: `FabricTestThreadPump` timeout, `WorldHolder`/`ClientContextHolder` unification, `@Suppress("UnstableApiUsage")` placement. Don't include those in this pass.

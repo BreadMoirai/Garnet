@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Capture a `StateRecording` for every test that runs through `runRedstoneSpec`, attach it to the test's `TestResult`, surface it through `LauncherResult` to `EngineDrivenRun`, and include it in the `TestResultS2CPayload` sent to clients. This is the always-on R2′ diagnostic recording from the spec.
+**Goal:** Capture a `StateRecording` for every test that runs through `runGarnetSpec`, attach it to the test's `TestResult`, surface it through `LauncherResult` to `EngineDrivenRun`, and include it in the `TestResultS2CPayload` sent to clients. This is the always-on R2′ diagnostic recording from the spec.
 
-**Architecture:** `runRedstoneSpec` already produces a `StateRecording` and returns it. A new Kotest `TestListener` (`DiagnosticRecorderListener`) collects per-test recordings into a side-channel keyed by test name. `LauncherResult` grows a `recordings: Map<String, StateRecording>` field. `EngineDrivenRun.toTestResult` and the network payload pass the recording through. The on-server `RedstoneSpecRunnerBlock` UI side surfaces it via Plan F.
+**Architecture:** `runGarnetSpec` already produces a `StateRecording` and returns it. A new Kotest `TestListener` (`DiagnosticRecorderListener`) collects per-test recordings into a side-channel keyed by test name. `LauncherResult` grows a `recordings: Map<String, StateRecording>` field. `EngineDrivenRun.toTestResult` and the network payload pass the recording through. The on-server `GarnetRunnerBlock` UI side surfaces it via Plan F.
 
 **Tech Stack:** Kotest TestListener API, `StateRecordingStorage` (NBT codec), Fabric `StreamCodec`.
 
@@ -17,29 +17,29 @@
 ## File structure (after this plan)
 
 **New:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/DiagnosticRecorderListener.kt` — collects per-test recordings.
-- `src/test/kotlin/com/breadmoirai/redstonespecs/testing/launcher/DiagnosticRecorderListenerTest.kt`.
+- `src/main/kotlin/com/breadmoirai/garnet/testing/launcher/DiagnosticRecorderListener.kt` — collects per-test recordings.
+- `src/test/kotlin/com/breadmoirai/garnet/testing/launcher/DiagnosticRecorderListenerTest.kt`.
 
 **Modified:**
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RunRedstoneSpec.kt` — pushes the captured recording onto the listener-side ThreadLocal.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/ResultCollector.kt` — adds `recordings` field to `LauncherResult`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/KotestLauncher.kt` — registers `DiagnosticRecorderListener`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/runner/EngineDrivenRun.kt` — propagates the recording from `LauncherResult` into `TestResult.recording` (new optional field).
-- `src/main/kotlin/com/breadmoirai/redstonespecs/data/TestResult.kt` — gains optional `recording: StateRecording?` field.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt` — `TestResultS2CPayload` STREAM_CODEC composes the new field.
+- `src/main/kotlin/com/breadmoirai/garnet/testing/runner/RunGarnetSpec.kt` — pushes the captured recording onto the listener-side ThreadLocal.
+- `src/main/kotlin/com/breadmoirai/garnet/testing/launcher/ResultCollector.kt` — adds `recordings` field to `LauncherResult`.
+- `src/main/kotlin/com/breadmoirai/garnet/testing/launcher/KotestLauncher.kt` — registers `DiagnosticRecorderListener`.
+- `src/main/kotlin/com/breadmoirai/garnet/runner/EngineDrivenRun.kt` — propagates the recording from `LauncherResult` into `TestResult.recording` (new optional field).
+- `src/main/kotlin/com/breadmoirai/garnet/data/TestResult.kt` — gains optional `recording: StateRecording?` field.
+- `src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt` — `TestResultS2CPayload` STREAM_CODEC composes the new field.
 
 ---
 
 ## Task 1: Add `recording` field to `TestResult` (TDD)
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/data/TestResult.kt`
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/data/TestResultTest.kt` *(if not present)*
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/data/TestResult.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/data/TestResultTest.kt` *(if not present)*
 
 - [ ] **Step 1: Read the existing TestResult**
 
 ```bash
-cat src/main/kotlin/com/breadmoirai/redstonespecs/data/TestResult.kt
+cat src/main/kotlin/com/breadmoirai/garnet/data/TestResult.kt
 ```
 
 This file is auto-emitted via `@AutoEmit` (per Plan A's discovery: AutoEmit annotation is in use). Adding a field will require regenerating its codec.
@@ -57,19 +57,19 @@ data class TestResult(
 )
 ```
 
-If `StateRecording` is not in the same module classpath as `TestResult` for codec purposes, add a small wrapper type or inline the necessary encoder (see Step 4 below). Check `data/SpecJsonCodec.kt` to see how `RedstoneSpec`-side codecs handle list/optional fields.
+If `StateRecording` is not in the same module classpath as `TestResult` for codec purposes, add a small wrapper type or inline the necessary encoder (see Step 4 below). Check `data/SpecJsonCodec.kt` to see how `GarnetSpec`-side codecs handle list/optional fields.
 
 - [ ] **Step 3: Run KSP / build to regenerate AutoEmit codec**
 
 Run: `cmd.exe /c "./gradlew.bat :26.1:kspKotlin"`
 Expected: BUILD SUCCESSFUL; new generated codec includes the optional recording field.
 
-If AutoEmit cannot codec-encode `StateRecording` directly, add a manual `StreamCodec<ByteBuf, StateRecording>` based on the existing `StateRecordingStorage` NBT serialization, and exclude the field from AutoEmit by marking it with the appropriate annotation (see existing AutoEmit usage in `RedstoneSpec` for the pattern).
+If AutoEmit cannot codec-encode `StateRecording` directly, add a manual `StreamCodec<ByteBuf, StateRecording>` based on the existing `StateRecordingStorage` NBT serialization, and exclude the field from AutoEmit by marking it with the appropriate annotation (see existing AutoEmit usage in `GarnetSpec` for the pattern).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/data/TestResult.kt
+git add src/main/kotlin/com/breadmoirai/garnet/data/TestResult.kt
 git commit -m "feat(data): TestResult carries optional StateRecording for diagnostics"
 ```
 
@@ -78,15 +78,15 @@ git commit -m "feat(data): TestResult carries optional StateRecording for diagno
 ## Task 2: `DiagnosticRecorderListener`
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/DiagnosticRecorderListener.kt`
-- Create: `src/test/kotlin/com/breadmoirai/redstonespecs/testing/launcher/DiagnosticRecorderListenerTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/testing/launcher/DiagnosticRecorderListener.kt`
+- Create: `src/test/kotlin/com/breadmoirai/garnet/testing/launcher/DiagnosticRecorderListenerTest.kt`
 
 - [ ] **Step 1: Write the listener**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.launcher
+package com.breadmoirai.garnet.testing.launcher
 
-import com.breadmoirai.redstonespecs.runner.StateRecording
+import com.breadmoirai.garnet.runner.StateRecording
 import io.kotest.core.listeners.TestListener
 import io.kotest.core.test.TestCase
 import io.kotest.core.test.TestResult
@@ -94,7 +94,7 @@ import io.kotest.core.test.TestType
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Collects the [StateRecording] produced by `runRedstoneSpec` (set via [recordingThreadLocal])
+ * Collects the [StateRecording] produced by `runGarnetSpec` (set via [recordingThreadLocal])
  * for each leaf test, keyed by the test's full name. Read by [ResultCollector] when assembling
  * the [LauncherResult].
  */
@@ -111,7 +111,7 @@ class DiagnosticRecorderListener : TestListener {
     fun snapshot(): Map<String, StateRecording> = byTestName.toMap()
 
     companion object {
-        /** Set by `runRedstoneSpec` after producing a recording; cleared by `afterTest`. */
+        /** Set by `runGarnetSpec` after producing a recording; cleared by `afterTest`. */
         val recordingThreadLocal: ThreadLocal<StateRecording?> = ThreadLocal()
     }
 }
@@ -152,7 +152,7 @@ data class LauncherResult(
     val passed: Int,
     val failed: Int,
     val errors: List<TestFailureRecord>,
-    val recordings: Map<String, com.breadmoirai.redstonespecs.runner.StateRecording> = emptyMap(),
+    val recordings: Map<String, com.breadmoirai.garnet.runner.StateRecording> = emptyMap(),
 ) {
     val total: Int get() = passed + failed
     fun summary(): String = if (failed == 0) {
@@ -164,9 +164,9 @@ data class LauncherResult(
 }
 ```
 
-- [ ] **Step 4: Update `runRedstoneSpec` to publish to the ThreadLocal**
+- [ ] **Step 4: Update `runGarnetSpec` to publish to the ThreadLocal**
 
-In `RunRedstoneSpec.kt`, after `assertOutputsMatch(spec, recording)` succeeds OR before the throw on failure:
+In `RunGarnetSpec.kt`, after `assertOutputsMatch(spec, recording)` succeeds OR before the throw on failure:
 
 ```kotlin
     } finally {
@@ -184,9 +184,9 @@ In `RunRedstoneSpec.kt`, after `assertOutputsMatch(spec, recording)` succeeds OR
 - [ ] **Step 5: Write a test for the listener**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.testing.launcher
+package com.breadmoirai.garnet.testing.launcher
 
-import com.breadmoirai.redstonespecs.runner.StateRecording
+import com.breadmoirai.garnet.runner.StateRecording
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 
@@ -211,11 +211,11 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/DiagnosticRecorderListener.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/KotestLauncher.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/ResultCollector.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/testing/runner/RunRedstoneSpec.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/testing/launcher/DiagnosticRecorderListenerTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/testing/launcher/DiagnosticRecorderListener.kt \
+        src/main/kotlin/com/breadmoirai/garnet/testing/launcher/KotestLauncher.kt \
+        src/main/kotlin/com/breadmoirai/garnet/testing/launcher/ResultCollector.kt \
+        src/main/kotlin/com/breadmoirai/garnet/testing/runner/RunGarnetSpec.kt \
+        src/test/kotlin/com/breadmoirai/garnet/testing/launcher/DiagnosticRecorderListenerTest.kt
 git commit -m "feat(testing): DiagnosticRecorderListener captures per-test StateRecording"
 ```
 
@@ -224,7 +224,7 @@ git commit -m "feat(testing): DiagnosticRecorderListener captures per-test State
 ## Task 3: `EngineDrivenRun` propagates the recording into `TestResult`
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/runner/EngineDrivenRun.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/runner/EngineDrivenRun.kt`
 
 - [ ] **Step 1: Plumb the recording**
 
@@ -252,7 +252,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/runner/EngineDrivenRun.kt
+git add src/main/kotlin/com/breadmoirai/garnet/runner/EngineDrivenRun.kt
 git commit -m "feat(runner): EngineDrivenRun puts diagnostic recording on TestResult"
 ```
 
@@ -261,7 +261,7 @@ git commit -m "feat(runner): EngineDrivenRun puts diagnostic recording on TestRe
 ## Task 4: `TestResultS2CPayload` stream-codec includes recording
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt`
 
 - [ ] **Step 1: Update the codec**
 
@@ -272,7 +272,7 @@ If AutoEmit cannot codec the `StateRecording`, exclude `recording` from AutoEmit
 ```kotlin
 companion object {
     val TYPE = CustomPacketPayload.Type<TestResultS2CPayload>(
-        Identifier.fromNamespaceAndPath("redstonespecs", "test_result")
+        Identifier.fromNamespaceAndPath("garnet", "test_result")
     )
     val STREAM_CODEC: StreamCodec<ByteBuf, TestResultS2CPayload> = StreamCodec.composite(
         BlockPos.STREAM_CODEC, TestResultS2CPayload::originPos,
@@ -292,7 +292,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt
 git commit -m "feat(network): TestResultS2CPayload includes optional diagnostic recording"
 ```
 
@@ -301,23 +301,23 @@ git commit -m "feat(network): TestResultS2CPayload includes optional diagnostic 
 ## Task 5: End-to-end clientTest — confirm recording reaches client
 
 **Files:**
-- Create: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/DiagnosticRecordingE2ETest.kt`
+- Create: `src/clientTest/kotlin/com/breadmoirai/garnet/test/DiagnosticRecordingE2ETest.kt`
 
 - [ ] **Step 1: Write the test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.data.dsl.redstoneSpec
-import com.breadmoirai.redstonespecs.runner.EngineDrivenRun
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import com.breadmoirai.garnet.data.dsl.garnetSpec
+import com.breadmoirai.garnet.runner.EngineDrivenRun
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.core.McDispatchers
 import io.kotest.matchers.nulls.shouldNotBeNull
 import net.minecraft.core.BlockPos
 
-class DiagnosticRecordingE2ETest : RedstoneTestSpec({
+class DiagnosticRecordingE2ETest : GarnetTestSpec({
     test("EngineDrivenRun result carries a non-null StateRecording") {
-        val spec = redstoneSpec("e2e-diag") { bounds(1, 1, 1); lifespan = 2 }
+        val spec = garnetSpec("e2e-diag") { bounds(1, 1, 1); lifespan = 2 }
         val server = McDispatchers.currentServer
         val result = EngineDrivenRun.run(spec, BlockPos(0, 64, 0), server.overworld())
         result.recording.shouldNotBeNull()
@@ -333,7 +333,7 @@ Expected: `DiagnosticRecordingE2ETest` PASSes.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/DiagnosticRecordingE2ETest.kt
+git add src/clientTest/kotlin/com/breadmoirai/garnet/test/DiagnosticRecordingE2ETest.kt
 git commit -m "test(clientTest): EngineDrivenRun attaches diagnostic recording to TestResult"
 ```
 
@@ -344,7 +344,7 @@ git commit -m "test(clientTest): EngineDrivenRun attaches diagnostic recording t
 - [ ] `TestResult.recording` exists and is `null` by default.
 - [ ] `DiagnosticRecorderListener` collects per-test recordings into a `Map<String, StateRecording>`.
 - [ ] `LauncherResult.recordings` exposes them.
-- [ ] `EngineDrivenRun.run(...)` returns `TestResult.recording != null` when a `runRedstoneSpec` body executed.
+- [ ] `EngineDrivenRun.run(...)` returns `TestResult.recording != null` when a `runGarnetSpec` body executed.
 - [ ] `TestResultS2CPayload` round-trips a recording over the wire.
 - [ ] All five source sets compile.
 - [ ] `:26.1:runClientTest` passes.

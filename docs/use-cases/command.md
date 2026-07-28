@@ -1,20 +1,20 @@
 ---
 title: Command-surface use-cases
 tags: [command, dispatch, use-cases]
-summary: `/redstonespecs project` subcommand dispatcher and its observable effects.
+summary: `/garnet project` subcommand dispatcher and its observable effects.
 last_audited_commit: 04907e06339cd4a545cef18246e30f515326c44d
 ---
 
 # Command-surface use-cases
 
-The mod exposes server-side subcommands under `/redstonespecs project`. Each parent UC below is one subcommand path with its observable outcome.
+The mod exposes server-side subcommands under `/garnet project`. Each parent UC below is one subcommand path with its observable outcome.
 
 ---
 
-### UC-CMD-01 — `/redstonespecs project` opens the project-folder UI when a root is available
+### UC-CMD-01 — `/garnet project` opens the project-folder UI when a root is available
 
 **Actor:** Player (server-side command source)
-**Trigger:** A player executes `/redstonespecs project` on a server where a project root is available.
+**Trigger:** A player executes `/garnet project` on a server where a project root is available.
 **Preconditions:** Either `ProjectServerContext.get(server)` returns a non-null context pin, or `SharedSettings.projectRootPath` is a non-blank string that resolves to an absolute path; the command is registered via `ProjectCommand.register(dispatcher)`.
 **Outcome:** The server scans the root via `scanFolder(root.path)`, builds a `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` payload carrying the full recursive folder tree, and sends it to the requesting player. The client receiver feeds the snapshot into `ProjectTreeState` (the Compose Project Explorer's observable state); it no longer auto-opens `ProjectScreen`. The command returns `Command.SINGLE_SUCCESS`.
 
@@ -28,10 +28,10 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 
 ---
 
-### UC-CMD-02 — `/redstonespecs project` rejects execution when no root is configured
+### UC-CMD-02 — `/garnet project` rejects execution when no root is configured
 
 **Actor:** Player (server-side command source)
-**Trigger:** A player executes `/redstonespecs project` on a server where neither a `ProjectServerContext` pin nor a non-blank `SharedSettings.projectRootPath` is present.
+**Trigger:** A player executes `/garnet project` on a server where neither a `ProjectServerContext` pin nor a non-blank `SharedSettings.projectRootPath` is present.
 **Preconditions:** `ProjectServerContext.get(server)` returns `null`; `SharedSettings.projectRootPath` is blank or empty; the command is registered via `ProjectCommand.register(dispatcher)`.
 **Outcome:** The server sends a red system-chat message to the player explaining how to configure the project root. No `ProjectTreeSnapshotS2C` is sent; `ProjectScreen` does not open. The command returns `0`.
 
@@ -45,7 +45,7 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 ### UC-CMD-03 — Root resolution follows a priority chain: context pin → config string
 
 **Actor:** Server (internal, triggered by any execution of `ProjectCommand.open`)
-**Trigger:** `/redstonespecs project` is dispatched; `ProjectCommand.open` selects the authoritative `ProjectRoot` for the current server.
+**Trigger:** `/garnet project` is dispatched; `ProjectCommand.open` selects the authoritative `ProjectRoot` for the current server.
 **Preconditions:** The server is live; the command source holds a valid `CommandSourceStack` with `playerOrException` available.
 **Outcome:** Exactly one `ProjectRoot` is chosen from the highest-priority source available; the chosen root is used for all subsequent scan and snapshot operations in that invocation. No persistent state is written.
 
@@ -60,7 +60,7 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 ### UC-CMD-04 — Active session subpath is embedded in every tree snapshot
 
 **Actor:** Server
-**Trigger:** Any snapshot build during `/redstonespecs project` dispatch (UC-CMD-01) where the executing player has an existing `ProjectSession`.
+**Trigger:** Any snapshot build during `/garnet project` dispatch (UC-CMD-01) where the executing player has an existing `ProjectSession`.
 **Preconditions:** `ProjectSession.get(player.uuid)` returns a non-null session with a non-null `activeSubpath`; the root resolves and the scan succeeds.
 **Outcome:** `ProjectTreeSnapshotS2C.currentSubpath` carries the player's active subpath string. The Compose Explorer uses this to mark the active leaf (a `●` marker). If no session exists the field is `null` and no leaf is marked.
 
@@ -75,19 +75,19 @@ The mod exposes server-side subcommands under `/redstonespecs project`. Each par
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
-| UC-CMD-01 | `/redstonespecs project` opens project-folder UI when root is available | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
-| UC-CMD-01.a | `ProjectCommand.open` tries context pin first | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
+| UC-CMD-01 | `/garnet project` opens project-folder UI when root is available | `ProjectCommandSpec."/garnet managed with context sends a ProjectTreeSnapshotS2C"` | covered |
+| UC-CMD-01.a | `ProjectCommand.open` tries context pin first | `ProjectCommandSpec."/garnet managed with context sends a ProjectTreeSnapshotS2C"` | covered |
 | UC-CMD-01.b | Falls back to `SharedSettings.projectRootPath` if context pin is null | — | **GAP** |
-| UC-CMD-01.c | `scanFolder` produces the recursive folder tree | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
+| UC-CMD-01.c | `scanFolder` produces the recursive folder tree | `ProjectCommandSpec."/garnet managed with context sends a ProjectTreeSnapshotS2C"` | covered |
 | UC-CMD-01.d | Player's `activeSubpath` embedded in snapshot; null if no prior session | — | **GAP** |
-| UC-CMD-01.e | `ServerPlayNetworking.send` delivers `ProjectTreeSnapshotS2C` to player | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
-| UC-CMD-01.f | Command returns `Command.SINGLE_SUCCESS` (integer > 0) | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
-| UC-CMD-02 | `/redstonespecs project` rejects execution when no root configured | `ProjectCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
-| UC-CMD-02.a | Both resolution paths attempted; both null / blank | `ProjectCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
-| UC-CMD-02.b | Red error message sent to player's chat | `ProjectCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
-| UC-CMD-02.c | Returns `0` immediately; no scan or send logic executed | `ProjectCommandSpec."/redstonespecs managed without root configured sends an error message"` | covered |
-| UC-CMD-03 | Root resolution follows priority chain: context pin → config string | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"`, `ProjectCommandSpec."/redstonespecs managed without root configured sends an error message"` | **GAP-PARTIAL** |
-| UC-CMD-03.a | Priority 1: `ProjectServerContext.get(server)?.root` wins when set | `ProjectCommandSpec."/redstonespecs managed with context sends a ProjectTreeSnapshotS2C"` | covered |
+| UC-CMD-01.e | `ServerPlayNetworking.send` delivers `ProjectTreeSnapshotS2C` to player | `ProjectCommandSpec."/garnet managed with context sends a ProjectTreeSnapshotS2C"` | covered |
+| UC-CMD-01.f | Command returns `Command.SINGLE_SUCCESS` (integer > 0) | `ProjectCommandSpec."/garnet managed with context sends a ProjectTreeSnapshotS2C"` | covered |
+| UC-CMD-02 | `/garnet project` rejects execution when no root configured | `ProjectCommandSpec."/garnet managed without root configured sends an error message"` | covered |
+| UC-CMD-02.a | Both resolution paths attempted; both null / blank | `ProjectCommandSpec."/garnet managed without root configured sends an error message"` | covered |
+| UC-CMD-02.b | Red error message sent to player's chat | `ProjectCommandSpec."/garnet managed without root configured sends an error message"` | covered |
+| UC-CMD-02.c | Returns `0` immediately; no scan or send logic executed | `ProjectCommandSpec."/garnet managed without root configured sends an error message"` | covered |
+| UC-CMD-03 | Root resolution follows priority chain: context pin → config string | `ProjectCommandSpec."/garnet managed with context sends a ProjectTreeSnapshotS2C"`, `ProjectCommandSpec."/garnet managed without root configured sends an error message"` | **GAP-PARTIAL** |
+| UC-CMD-03.a | Priority 1: `ProjectServerContext.get(server)?.root` wins when set | `ProjectCommandSpec."/garnet managed with context sends a ProjectTreeSnapshotS2C"` | covered |
 | UC-CMD-03.b | Priority 2: `SharedSettings.projectRootPath` non-blank → constructs `ProjectRoot` | — | **GAP** |
 | UC-CMD-03.c | Priority 1 win means `SharedSettings.projectRootPath` never read | — | **GAP** |
 | UC-CMD-03.d | `ProjectRoot` enforces absolute path at construction; relative path throws | — | **GAP** |

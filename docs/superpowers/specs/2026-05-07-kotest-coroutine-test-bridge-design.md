@@ -34,7 +34,7 @@ This was chosen over:
 A new `testBridge` source set in the root project (not a separate Gradle subproject — the project has no real subprojects; introducing one would entangle with Stonecutter and loom configuration). The `gametest` and `clientTest` source sets pull `testBridge` into their compile/runtime classpaths via existing source-set plumbing.
 
 ```
-src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/
+src/testBridge/kotlin/com/breadmoirai/garnet/testing/
 ├── core/
 │   ├── Ticks.kt          — serverTickStart, serverTickEnd: SharedFlow<MinecraftServer>
 │   ├── Dispatchers.kt    — ServerThreadDispatcher, McDispatchers.Server
@@ -97,7 +97,7 @@ Three discovery points — one per source set, no other test discovery.
 **`src/gametest/GametestSentinel.kt`** — single `@GameTest` method:
 
 ```kotlin
-@GameTest(template = "redstonespecs:empty_platform", timeoutTicks = 12000)
+@GameTest(template = "garnet:empty_platform", timeoutTicks = 12000)
 fun runAll(helper: GameTestHelper) {
     // We're on the server thread. Spawn a worker; do NOT join here.
     Thread.ofPlatform().name("kotest-gametest").uncaughtExceptionHandler { _, t ->
@@ -157,7 +157,7 @@ Kotest configured with `concurrentSpecs = 1`, `concurrentTests = 1` by default f
 ### Reporting
 
 ```
-build/reports/redstonespecs/
+build/reports/garnet/
 ├── test/        — Kotest HTML
 ├── gametest/    — Kotest HTML, JUnit XML
 └── clientTest/  — Kotest HTML, JUnit XML
@@ -228,7 +228,7 @@ SERVER_STOPPING → dispatcher cleared
 
 ### Bridge smoke gametest
 
-One `@GameTest` that spawns `redstonespecs:empty_platform`, runs a 3-leaf Kotest spec exercising `awaitTicks(2)`, `onServer { read tickCount }`, `spawnStructure + teardown`. Catches "did the bridge actually wire to MC's lifecycle" bugs independently of real test content.
+One `@GameTest` that spawns `garnet:empty_platform`, runs a 3-leaf Kotest spec exercising `awaitTicks(2)`, `onServer { read tickCount }`, `spawnStructure + teardown`. Catches "did the bridge actually wire to MC's lifecycle" bugs independently of real test content.
 
 ### Migration
 

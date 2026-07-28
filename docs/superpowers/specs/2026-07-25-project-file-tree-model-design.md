@@ -30,7 +30,7 @@ the filesystem, that can back a real expand/collapse explorer and per-file actio
 
 ## Model
 
-New file: `src/main/kotlin/com/breadmoirai/redstonespecs/project/FileTree.kt` — pure Kotlin data
+New file: `src/main/kotlin/com/breadmoirai/garnet/project/FileTree.kt` — pure Kotlin data
 plus a scanner. No Minecraft dependencies, so it is unit-testable off-thread in `src/test`.
 
 ```kotlin
@@ -105,7 +105,7 @@ fun FolderNode.walk(): Sequence<Pair<String, FileTreeNode>>
 
 ## Testing
 
-New file: `src/test/kotlin/com/breadmoirai/redstonespecs/project/FileTreeTest.kt`, mirroring the
+New file: `src/test/kotlin/com/breadmoirai/garnet/project/FileTreeTest.kt`, mirroring the
 existing `ProjectFolderTreeTest` style (JUnit + temp dir). Cases:
 
 - **Structure:** a temp tree (nested folders, files, an empty folder) scans to the expected

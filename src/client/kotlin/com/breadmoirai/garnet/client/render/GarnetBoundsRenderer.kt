@@ -1,0 +1,195 @@
+package com.breadmoirai.garnet.client.render
+
+import com.breadmoirai.garnet.ModRegistries
+import com.breadmoirai.garnet.block.SpecBlockEntity
+import com.breadmoirai.garnet.client.HoveredFace
+import com.breadmoirai.garnet.client.currentHoveredFace
+import com.breadmoirai.garnet.runner.EntryMarker
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer
+import net.minecraft.client.renderer.rendertype.RenderTypes
+import net.minecraft.client.renderer.state.level.CameraRenderState
+import net.minecraft.core.Vec3i
+import net.minecraft.world.phys.Vec3
+import org.joml.Matrix4f
+
+fun registerBoundsRenderer() {
+    BlockEntityRenderers.register(
+        ModRegistries.SPEC_BLOCK_ENTITY_TYPE,
+        ::SpecBlockEntityRenderer,
+    )
+}
+
+class GarnetRenderState : BlockEntityRenderState() {
+    var bounds: Vec3i? = null
+    var activeEntries: List<EntryMarker> = emptyList()
+    var hoveredFace: HoveredFace? = null
+}
+
+class SpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
+    BlockEntityRenderer<SpecBlockEntity, GarnetRenderState> {
+
+    override fun createRenderState(): GarnetRenderState = GarnetRenderState()
+
+    override fun extractRenderState(
+        entity: SpecBlockEntity,
+        state: GarnetRenderState,
+        partialTick: Float,
+        cameraPos: Vec3,
+        crumbling: ModelFeatureRenderer.CrumblingOverlay?,
+    ) {
+        super.extractRenderState(entity, state, partialTick, cameraPos, crumbling)
+        state.bounds = entity.specBounds
+        state.hoveredFace = if (entity.blockPos == currentHoveredFace?.originPos) currentHoveredFace else null
+        state.activeEntries = entity.specMarkers
+    }
+
+    override fun submit(
+        state: GarnetRenderState,
+        poseStack: PoseStack,
+        collector: net.minecraft.client.renderer.SubmitNodeCollector,
+        cameraState: CameraRenderState,
+    ) {
+        // MC 26.2 removed RenderBuffers.bufferSource(): block-entity renderers no longer draw into an
+        // immediate MultiBufferSource. Instead we hand the geometry to the SubmitNodeCollector via
+        // submitCustomGeometry, which supplies the pose + a VertexConsumer for the given RenderType.
+        collector.submitCustomGeometry(poseStack, RenderTypes.LINES) { pose, buffer ->
+            val matrix: Matrix4f = pose.pose()
+            state.bounds?.let { drawBoundingBox(buffer, matrix, it, 1f, 1f, 0f, 0.8f) }
+
+            for (entry in state.activeEntries) {
+                val (r, g, b) = unpackColor(entryColor(entry))
+                val pos = entry.pos
+                val x1 = pos.x.toFloat()
+                val y1 = pos.y.toFloat()
+                val z1 = pos.z.toFloat()
+                val x2 = x1 + 1f
+                val y2 = y1 + 1f
+                val z2 = z1 + 1f
+                drawBox(buffer, matrix, x1, y1, z1, x2, y2, z2, r, g, b, 0.9f)
+            }
+        }
+
+        state.hoveredFace?.let { face ->
+            val b = state.bounds ?: return@let
+            collector.submitCustomGeometry(poseStack, RenderTypes.debugQuads()) { pose, bufferFace ->
+                drawFaceHighlight(bufferFace, pose.pose(), b, face)
+            }
+        }
+    }
+
+    override fun shouldRenderOffScreen(): Boolean = true
+
+    override fun getViewDistance(): Int = 256
+
+    private fun entryColor(entry: EntryMarker): Int = entry.color
+
+    private fun unpackColor(color: Int): Triple<Float, Float, Float> = Triple(
+        ((color shr 16) and 0xFF) / 255f,
+        ((color shr 8) and 0xFF) / 255f,
+        (color and 0xFF) / 255f,
+    )
+
+    private fun drawBoundingBox(
+        buffer: VertexConsumer,
+        matrix: Matrix4f,
+        bounds: Vec3i,
+        r: Float, g: Float, b: Float, a: Float,
+    ) {
+        drawBox(buffer, matrix, 0f, 0f, 0f,
+            bounds.x.toFloat(), bounds.y.toFloat(), bounds.z.toFloat(),
+            r, g, b, a)
+    }
+
+    private fun drawFaceHighlight(
+        buffer: VertexConsumer,
+        matrix: Matrix4f,
+        bounds: Vec3i,
+        face: HoveredFace,
+    ) {
+        val x1 = 0f
+        val y1 = 0f
+        val z1 = 0f
+        val x2 = bounds.x.toFloat()
+        val y2 = bounds.y.toFloat()
+        val z2 = bounds.z.toFloat()
+
+        val r: Float; val g: Float; val b: Float; val a = 0.3f
+        when (face.axis) {
+            0 -> { r = 1f; g = 0.27f; b = 0.27f }  // red — X axis
+            1 -> { r = 0.27f; g = 1f; b = 0.27f }   // green — Y axis
+            else -> { r = 0.27f; g = 0.27f; b = 1f } // blue — Z axis
+        }
+
+        when {
+            face.axis == 0 && face.isMax -> {  // +X face
+                buffer.addVertex(matrix, x2, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z1).setColor(r, g, b, a)
+            }
+            face.axis == 0 && !face.isMax -> {  // -X face
+                buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z2).setColor(r, g, b, a)
+            }
+            face.axis == 1 && face.isMax -> {  // +Y face
+                buffer.addVertex(matrix, x1, y2, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z1).setColor(r, g, b, a)
+            }
+            face.axis == 1 && !face.isMax -> {  // -Y face
+                buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a)
+            }
+            face.axis == 2 && face.isMax -> {  // +Z face
+                buffer.addVertex(matrix, x2, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y1, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z2).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a)
+            }
+            else -> {  // -Z face
+                buffer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y1, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x2, y2, z1).setColor(r, g, b, a)
+                buffer.addVertex(matrix, x1, y2, z1).setColor(r, g, b, a)
+            }
+        }
+    }
+
+    private fun drawBox(
+        buffer: VertexConsumer,
+        matrix: Matrix4f,
+        x1: Float, y1: Float, z1: Float,
+        x2: Float, y2: Float, z2: Float,
+        r: Float, g: Float, b: Float, a: Float,
+        lineWidth: Float = 2f,
+    ) {
+        val nx = 0f; val ny = 1f; val nz = 0f
+
+        fun line(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float) {
+            buffer.addVertex(matrix, ax, ay, az).setColor(r, g, b, a).setNormal(nx, ny, nz).setLineWidth(lineWidth)
+            buffer.addVertex(matrix, bx, by, bz).setColor(r, g, b, a).setNormal(nx, ny, nz).setLineWidth(lineWidth)
+        }
+
+        // Bottom
+        line(x1, y1, z1, x2, y1, z1); line(x2, y1, z1, x2, y1, z2)
+        line(x2, y1, z2, x1, y1, z2); line(x1, y1, z2, x1, y1, z1)
+        // Top
+        line(x1, y2, z1, x2, y2, z1); line(x2, y2, z1, x2, y2, z2)
+        line(x2, y2, z2, x1, y2, z2); line(x1, y2, z2, x1, y2, z1)
+        // Verticals
+        line(x1, y1, z1, x1, y2, z1); line(x2, y1, z1, x2, y2, z1)
+        line(x2, y1, z2, x2, y2, z2); line(x1, y1, z2, x1, y2, z2)
+    }
+}

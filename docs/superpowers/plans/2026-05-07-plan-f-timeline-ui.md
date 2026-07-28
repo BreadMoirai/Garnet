@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** When a player views the result of an engine run on a `RedstoneSpecRunnerBlock`, expose the `StateRecording` attached to the `TestResult` (Plan E) through a tick-by-tick timeline scrubber UI showing each output position's state at every tick.
+**Goal:** When a player views the result of an engine run on a `GarnetRunnerBlock`, expose the `StateRecording` attached to the `TestResult` (Plan E) through a tick-by-tick timeline scrubber UI showing each output position's state at every tick.
 
 **Architecture:** The client receives `TestResultS2CPayload` carrying an optional `StateRecording` (Plan E). `ClientNetworkHandler` stores it next to `TestResult`. A new screen `RunnerTimelineScreen` reads from a per-runner `ClientRunnerState` and renders a horizontal tick axis with a draggable cursor; below the cursor, the state of each declared output position at the cursor's tick.
 
@@ -17,33 +17,33 @@
 ## File structure (after this plan)
 
 **New:**
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/state/ClientRunnerState.kt` — caches latest `TestResult` and recording per runner-block position.
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerTimelineScreen.kt` — the scrubber screen.
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/widget/TimelineSliderWidget.kt` — horizontal scrubber widget, slot for keyboard arrows.
+- `src/client/kotlin/com/breadmoirai/garnet/client/state/ClientRunnerState.kt` — caches latest `TestResult` and recording per runner-block position.
+- `src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerTimelineScreen.kt` — the scrubber screen.
+- `src/client/kotlin/com/breadmoirai/garnet/client/widget/TimelineSliderWidget.kt` — horizontal scrubber widget, slot for keyboard arrows.
 
 **Modified:**
-- `src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt` — write the recording to `ClientRunnerState` when receiving `TestResultS2CPayload`.
-- `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRunnerBlock.kt` — adds an interaction (e.g. shift-right-click) that opens the timeline screen.
+- `src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt` — write the recording to `ClientRunnerState` when receiving `TestResultS2CPayload`.
+- `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRunnerBlock.kt` — adds an interaction (e.g. shift-right-click) that opens the timeline screen.
 
 ---
 
 ## Task 1: `ClientRunnerState`
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/state/ClientRunnerState.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/state/ClientRunnerState.kt`
 
 - [ ] **Step 1: Implement**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.state
+package com.breadmoirai.garnet.client.state
 
-import com.breadmoirai.redstonespecs.data.TestResult
+import com.breadmoirai.garnet.data.TestResult
 import net.minecraft.core.BlockPos
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Client-side cache of the latest [TestResult] and its diagnostic recording per runner block.
- * Populated by [com.breadmoirai.redstonespecs.client.network.ClientNetworkHandler] on
+ * Populated by [com.breadmoirai.garnet.client.network.ClientNetworkHandler] on
  * TestResultS2CPayload receipt; read by RunnerTimelineScreen.
  */
 object ClientRunnerState {
@@ -62,7 +62,7 @@ object ClientRunnerState {
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/state/ClientRunnerState.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/state/ClientRunnerState.kt
 git commit -m "feat(client): ClientRunnerState caches TestResult per runner block"
 ```
 
@@ -71,12 +71,12 @@ git commit -m "feat(client): ClientRunnerState caches TestResult per runner bloc
 ## Task 2: Wire `ClientNetworkHandler` to write into the cache
 
 **Files:**
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt`
 
 - [ ] **Step 1: Read the file**
 
 ```bash
-cat src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt
+cat src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt
 ```
 
 Find the `TestResultS2CPayload` handler.
@@ -85,7 +85,7 @@ Find the `TestResultS2CPayload` handler.
 
 ```kotlin
 // Cache for the timeline screen.
-com.breadmoirai.redstonespecs.client.state.ClientRunnerState.put(payload.originPos, payload.result)
+com.breadmoirai.garnet.client.state.ClientRunnerState.put(payload.originPos, payload.result)
 ```
 
 - [ ] **Step 3: Build**
@@ -96,7 +96,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt
 git commit -m "feat(client): cache TestResult in ClientRunnerState on payload receipt"
 ```
 
@@ -105,12 +105,12 @@ git commit -m "feat(client): cache TestResult in ClientRunnerState on payload re
 ## Task 3: `TimelineSliderWidget`
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/widget/TimelineSliderWidget.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/widget/TimelineSliderWidget.kt`
 
 - [ ] **Step 1: Implement**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.widget
+package com.breadmoirai.garnet.client.widget
 
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.AbstractSliderButton
@@ -148,7 +148,7 @@ class TimelineSliderWidget(
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/widget/TimelineSliderWidget.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/widget/TimelineSliderWidget.kt
 git commit -m "feat(client): TimelineSliderWidget for tick scrubbing"
 ```
 
@@ -157,20 +157,20 @@ git commit -m "feat(client): TimelineSliderWidget for tick scrubbing"
 ## Task 4: `RunnerTimelineScreen`
 
 **Files:**
-- Create: `src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerTimelineScreen.kt`
+- Create: `src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerTimelineScreen.kt`
 
 - [ ] **Step 1: Implement the screen**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.screen
+package com.breadmoirai.garnet.client.screen
 
-import com.breadmoirai.redstonespecs.client.state.ClientRunnerState
-import com.breadmoirai.redstonespecs.client.widget.TimelineSliderWidget
-import com.breadmoirai.redstonespecs.data.Phase
-import com.breadmoirai.redstonespecs.data.SimTime
-import com.breadmoirai.redstonespecs.data.TestResult
-import com.breadmoirai.redstonespecs.runner.StateRecording
-import com.breadmoirai.redstonespecs.runner.StateRecordingView
+import com.breadmoirai.garnet.client.state.ClientRunnerState
+import com.breadmoirai.garnet.client.widget.TimelineSliderWidget
+import com.breadmoirai.garnet.data.Phase
+import com.breadmoirai.garnet.data.SimTime
+import com.breadmoirai.garnet.data.TestResult
+import com.breadmoirai.garnet.runner.StateRecording
+import com.breadmoirai.garnet.runner.StateRecordingView
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.core.BlockPos
@@ -252,7 +252,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerTimelineScreen.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerTimelineScreen.kt
 git commit -m "feat(client): RunnerTimelineScreen renders tick scrubber over recording"
 ```
 
@@ -261,9 +261,9 @@ git commit -m "feat(client): RunnerTimelineScreen renders tick scrubber over rec
 ## Task 5: Trigger the screen from the Runner block
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRunnerBlock.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt` (new S2C `OpenTimelineS2CPayload`)
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/block/GarnetRunnerBlock.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt` (new S2C `OpenTimelineS2CPayload`)
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt`
 
 - [ ] **Step 1: Add S2C payload**
 
@@ -273,7 +273,7 @@ In `Packets.kt`:
 data class OpenTimelineS2CPayload(val runnerPos: BlockPos) : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<OpenTimelineS2CPayload>(
-            Identifier.fromNamespaceAndPath("redstonespecs", "open_timeline")
+            Identifier.fromNamespaceAndPath("garnet", "open_timeline")
         )
         val STREAM_CODEC: StreamCodec<ByteBuf, OpenTimelineS2CPayload> = StreamCodec.composite(
             BlockPos.STREAM_CODEC, OpenTimelineS2CPayload::runnerPos,
@@ -288,7 +288,7 @@ Register it in `NetworkRegistry.kt` (`registerS2C`).
 
 - [ ] **Step 2: Server sends it on shift-right-click of the runner block**
 
-In `RedstoneSpecRunnerBlock.kt`'s `useWithoutItem` (or the relevant interaction handler), add a branch:
+In `GarnetRunnerBlock.kt`'s `useWithoutItem` (or the relevant interaction handler), add a branch:
 
 ```kotlin
 if (player.isShiftKeyDown && player is ServerPlayer) {
@@ -317,10 +317,10 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/block/RedstoneSpecRunnerBlock.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/Packets.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/NetworkRegistry.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/network/ClientNetworkHandler.kt
+git add src/main/kotlin/com/breadmoirai/garnet/block/GarnetRunnerBlock.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/Packets.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/NetworkRegistry.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/network/ClientNetworkHandler.kt
 git commit -m "feat(client): shift-right-click runner block opens RunnerTimelineScreen"
 ```
 
@@ -334,8 +334,8 @@ Run: `cmd.exe /c "./gradlew.bat :26.1:runClient"` (or whatever the dev client ta
 
 - [ ] **Step 2: In-game**
 
-1. Place a `RedstoneSpecRecorderBlock`, record any spec.
-2. Place a `RedstoneSpecRunnerBlock` on the same id.
+1. Place a `GarnetRecorderBlock`, record any spec.
+2. Place a `GarnetRunnerBlock` on the same id.
 3. Click Run. Wait for the result toast/UI.
 4. Shift-right-click the runner block.
 5. Verify the timeline screen opens, the slider exists, and dragging it updates the displayed states.
@@ -367,7 +367,7 @@ git add -A && git commit -m "fix(client): minor timeline UI polish from manual t
 ## Notes on what is intentionally NOT in this plan
 
 - Visualization of **input** events (button presses) on the timeline — out of scope; only output state shown.
-- Inline diff highlighting between expected (from `RedstoneSpec.outputs`) and actual states at each tick — would be a high-value follow-up but is beyond "scrubber MVP."
+- Inline diff highlighting between expected (from `GarnetSpec.outputs`) and actual states at each tick — would be a high-value follow-up but is beyond "scrubber MVP."
 - Persisting the open screen across world reloads.
 - Hover-on-slider showing per-tick TickCheck pass/fail — follow-up.
 
@@ -376,5 +376,5 @@ git add -A && git commit -m "fix(client): minor timeline UI polish from manual t
 ## Open questions to resolve during execution
 
 - Where does the runner block's `useWithoutItem` (or interact handler) live exactly? Confirm the method signature against MC 26.1's current `Block` API before editing.
-- Does `RedstoneSpecRunnerBlock` already have a non-shift interaction that opens a different screen? If so, ensure shift-right-click doesn't conflict.
+- Does `GarnetRunnerBlock` already have a non-shift interaction that opens a different screen? If so, ensure shift-right-click doesn't conflict.
 - Is `StateRecording.initialSnapshot` part of the public API? If not, expose it (small refactor).

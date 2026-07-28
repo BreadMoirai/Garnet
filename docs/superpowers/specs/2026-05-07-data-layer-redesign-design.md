@@ -1,7 +1,7 @@
 ---
-title: Data Layer Redesign — flatten RedstoneSpec, .kts authoring, JSON network-only
+title: Data Layer Redesign — flatten GarnetSpec, .kts authoring, JSON network-only
 tags: [data-model, dsl, scripting, persistence, refactor]
-summary: Simplify RedstoneSpec (drop SpecMode/breakpoints/autoSpecs), flatten SpecEntry, switch on-disk format to .kts evaluated by a custom kotlin-scripting host, keep JSON only for network payloads.
+summary: Simplify GarnetSpec (drop SpecMode/breakpoints/autoSpecs), flatten SpecEntry, switch on-disk format to .kts evaluated by a custom kotlin-scripting host, keep JSON only for network payloads.
 ---
 
 # Data Layer Redesign
@@ -25,7 +25,7 @@ summary: Simplify RedstoneSpec (drop SpecMode/breakpoints/autoSpecs), flatten Sp
 ### Final shape
 
 ```kotlin
-data class RedstoneSpec(
+data class GarnetSpec(
     val id: String,
     val bounds: Vec3i,            // size only; origin always (0,0,0)
     val lifespan: Int,
@@ -45,12 +45,12 @@ data class SpecEntry(
 )
 ```
 
-`RedstoneSpec.init {}` validates that every `entry.pos` lies within `bounds`.
+`GarnetSpec.init {}` validates that every `entry.pos` lies within `bounds`.
 
 ### Removed
 
 - `SpecMode` (entire enum + file).
-- `RedstoneSpec.mode`, `RedstoneSpec.breakpoints`, `RedstoneSpec.autoSpecs`.
+- `GarnetSpec.mode`, `GarnetSpec.breakpoints`, `GarnetSpec.autoSpecs`.
 - `BreakpointSpec`, `AutoSpec` sealed-class siblings.
 - `InputSpec`, `OutputSpec` separate classes — collapsed into `SpecEntry` with `kind` discriminator.
 - `InputSpec`'s `entries: List<Pair<SimTime, StateCondition>>` shape — every (time, condition) is now its own `SpecEntry`. Multiple entries at the same `(pos, kind)` represent multi-step sequences.
@@ -60,9 +60,9 @@ data class SpecEntry(
 ### Helper extensions
 
 ```kotlin
-val RedstoneSpec.inputs: List<SpecEntry>  get() = entries.filter { it.kind == EntryKind.INPUT }
-val RedstoneSpec.outputs: List<SpecEntry> get() = entries.filter { it.kind == EntryKind.OUTPUT }
-fun RedstoneSpec.entriesAt(pos: BlockPos): List<SpecEntry> = entries.filter { it.pos == pos }
+val GarnetSpec.inputs: List<SpecEntry>  get() = entries.filter { it.kind == EntryKind.INPUT }
+val GarnetSpec.outputs: List<SpecEntry> get() = entries.filter { it.kind == EntryKind.OUTPUT }
+fun GarnetSpec.entriesAt(pos: BlockPos): List<SpecEntry> = entries.filter { it.pos == pos }
 ```
 
 ---
@@ -72,10 +72,10 @@ fun RedstoneSpec.entriesAt(pos: BlockPos): List<SpecEntry> = entries.filter { it
 ### Example
 
 ```kotlin
-redstoneSpec("door_latch") {
+garnetSpec("door_latch") {
     bounds(5, 4, 5)
     lifespan = 40
-    structure = "redstonespecs:door_latch"
+    structure = "garnet:door_latch"
 
     input(2, 0, 2, label = "lever", color = 0xFFFF4444.toInt()) {
         atStart { powered() }
@@ -92,7 +92,7 @@ redstoneSpec("door_latch") {
 
 | Element | Form | Notes |
 |---|---|---|
-| Top-level | `redstoneSpec(id) { ... }` | Last expression of the script. Returns `RedstoneSpec`. |
+| Top-level | `garnetSpec(id) { ... }` | Last expression of the script. Returns `GarnetSpec`. |
 | Bounds | `bounds(x, y, z)` | Size vector. `x,y,z >= 1`. |
 | Lifespan | `lifespan = N` | Integer ticks. |
 | Structure | `structure = "ns:path"` | Optional. |
@@ -103,14 +103,14 @@ redstoneSpec("door_latch") {
 
 ### File location
 
-`<world>/redstonespecs/<id>.spec.kts`
+`<world>/garnet/<id>.spec.kts`
 
 ---
 
 ## Translation layer
 
 ```
-   .spec.kts file  ──load──►  RedstoneSpec  ──emit──►  .spec.kts text
+   .spec.kts file  ──load──►  GarnetSpec  ──emit──►  .spec.kts text
                                   ▲   │
                            (network only)
                                   │   ▼
@@ -121,18 +121,18 @@ redstoneSpec("door_latch") {
 
 ```
 data/
-  RedstoneSpec.kt        // simplified data class (no codec — moved out)
+  GarnetSpec.kt        // simplified data class (no codec — moved out)
   SpecEntry.kt           // single class + EntryKind
   StateCondition.kt      // unchanged
   SimTime.kt             // unchanged
   dsl/
-    SpecDsl.kt           // redstoneSpec { } entry + RedstoneSpecBuilder
+    SpecDsl.kt           // garnetSpec { } entry + GarnetBuilder
     EntryDsl.kt          // input/output blocks
     ConditionDsl.kt      // powered(), lit(), all { }, etc.
   serial/
-    KtsSpecLoader.kt     // .kts → RedstoneSpec via custom scripting host
-    KtsSpecEmitter.kt    // RedstoneSpec → .kts text via KotlinPoet
-    SpecJsonCodec.kt     // RedstoneSpec ↔ JSON; used ONLY by network
+    KtsSpecLoader.kt     // .kts → GarnetSpec via custom scripting host
+    KtsSpecEmitter.kt    // GarnetSpec → .kts text via KotlinPoet
+    SpecJsonCodec.kt     // GarnetSpec ↔ JSON; used ONLY by network
 ```
 
 ### `KtsSpecLoader` (custom kotlin-scripting host)
@@ -145,25 +145,25 @@ data/
 abstract class SpecScript
 
 object SpecScriptConfig : ScriptCompilationConfiguration({
-    defaultImports("com.breadmoirai.redstonespecs.data.dsl.*")
+    defaultImports("com.breadmoirai.garnet.data.dsl.*")
     jvm { dependenciesFromCurrentContext(wholeClasspath = true) }
 })
 
 object KtsSpecLoader {
     private val host = BasicJvmScriptingHost()
-    fun loadFile(path: Path): RedstoneSpec { /* compile, eval, return result.value */ }
-    fun loadString(source: String): RedstoneSpec { /* same */ }
+    fun loadFile(path: Path): GarnetSpec { /* compile, eval, return result.value */ }
+    fun loadString(source: String): GarnetSpec { /* same */ }
     // Compiled scripts are cached by source hash to avoid re-compile.
 }
 ```
 
-The script's last expression is the `redstoneSpec(...)` call, whose value is the returned `RedstoneSpec`. The loader unwraps `EvaluationResult.returnValue` to read it.
+The script's last expression is the `garnetSpec(...)` call, whose value is the returned `GarnetSpec`. The loader unwraps `EvaluationResult.returnValue` to read it.
 
 ### `KtsSpecEmitter` (KotlinPoet)
 
 ```kotlin
 object KtsSpecEmitter {
-    fun emit(spec: RedstoneSpec): String  // produces a .kts text
+    fun emit(spec: GarnetSpec): String  // produces a .kts text
 }
 ```
 
@@ -173,7 +173,7 @@ object KtsSpecEmitter {
 
 ### `SpecJsonCodec`
 
-The existing `RedstoneSpec.CODEC` is moved here, regenerated for the new shape. Used **only** by C2S/S2C payloads. No on-disk JSON read/write path remains.
+The existing `GarnetSpec.CODEC` is moved here, regenerated for the new shape. Used **only** by C2S/S2C payloads. No on-disk JSON read/write path remains.
 
 ### Dependencies (build)
 
@@ -194,7 +194,7 @@ Expected JAR size impact: ~30–50 MB (kotlin compiler embeddable). KotlinPoet i
 | Screens (`SpecEditorScreen`, `RecorderSetupScreen`, `SpecOverviewScreen`, `RunnerSpecPickerScreen`, `SpecFileBrowserScreen`) | Drop SpecMode picker. Drop breakpoint/autoSpec UI. Replace `BoundingBox` controls with size controls. On save: emit `.kts` via `KtsSpecEmitter` and write to disk. On load: read via `KtsSpecLoader`. |
 | Network payloads | Re-derive `SpecJsonCodec` for new shape. Payload classes unchanged in structure; just point at the new codec. |
 | Runner | Delete branches on `is BreakpointSpec` / `is AutoSpec` / `SpecMode`. Replace iteration over `spec.inputs[i].entries` with iteration over `spec.inputs` directly (entries are flat). Initial-state handling reads from the structure file rather than from `SimTime.START` entries. |
-| Tests (`RedstoneSpecTest`, `SpecEntryTest`, `SpecPersistenceTest`, runner tests) | Rewrite for new shape. Many tests simplify substantially. |
+| Tests (`GarnetTest`, `SpecEntryTest`, `SpecPersistenceTest`, runner tests) | Rewrite for new shape. Many tests simplify substantially. |
 | Mixin code | Unaffected — mixins target MC classes, not our data model. |
 
 ### Deleted files
@@ -226,7 +226,7 @@ Expected JAR size impact: ~30–50 MB (kotlin compiler embeddable). KotlinPoet i
 ## Verification plan
 
 - Unit tests:
-  - `RedstoneSpec.init {}` rejects entries outside bounds.
+  - `GarnetSpec.init {}` rejects entries outside bounds.
   - `KtsSpecEmitter.emit` then `KtsSpecLoader.loadString` round-trips identity for a corpus of fixture specs.
   - `SpecJsonCodec` round-trip identity.
 - Game tests: existing runner game tests, ported to construct specs via the DSL, must pass.

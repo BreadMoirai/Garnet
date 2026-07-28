@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
-  "id": "redstonespecs",
+  "id": "garnet",
   "version": "${version}",
-  "name": "RedstoneSpecs",
-  "description": "Redstone Specs",
+  "name": "Garnet",
+  "description": "Garnet — a Minecraft redstone spec IDE",
   "authors": [],
   "contact": {},
   "license": "All-Rights-Reserved",
-  "icon": "assets/redstonespecs/icon.png",
+  "icon": "assets/garnet/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.breadmoirai.redstonespecs.Redstonespecs"
+      "com.breadmoirai.garnet.Garnet"
     ],
     "client": [
-      "com.breadmoirai.redstonespecs.client.RedstonespecsClient"
+      "com.breadmoirai.garnet.client.GarnetClient"
     ],
     "modmenu": [
-      "com.breadmoirai.redstonespecs.client.config.ModMenuIntegration"
+      "com.breadmoirai.garnet.client.config.ModMenuIntegration"
     ]
   },
   "mixins": [
-    "redstonespecs.mixins.json",
+    "garnet.mixins.json",
     {
-      "config": "redstonespecs.client.mixins.json",
+      "config": "garnet.client.mixins.json",
       "environment": "client"
     }
   ],
@@ -33,5 +33,5 @@
     "fabric-api": "*",
     "minecraft": "${minecraft_version}"
   },
-  "classTweaker": "redstonespecs.classtweaker"
+  "classTweaker": "garnet.classtweaker"
 }

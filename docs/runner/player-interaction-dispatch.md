@@ -16,7 +16,7 @@ a target `BlockState` to a position in two possible ways:
 
 The specific path exists because some blocks have side effects beyond state mutation that the generic path skips. The motivating case is `ButtonBlock`.
 
-`InputScope` callbacks (inside `redstoneSpec { input(…) { … } }`) call
+`InputScope` callbacks (inside `garnetSpec { input(…) { … } }`) call
 `tryApplyAsPlayerInteraction` when applying a state change at a tick boundary.
 
 ## ButtonBlock — why setBlock isn't enough
@@ -69,8 +69,8 @@ Avoid driving `useWithoutItem` with a fake player unless necessary. Lever-style 
 
 ## Known residual drift
 
-Even with `ButtonBlock.press`, replay timing for the very first input can drift ~1 tick from the original recording depending on how the recording was produced. The `runRedstoneSpec` tick loop applies `START_OF_TICK` inputs at the beginning of each tick iteration, which may not align exactly with when `gametest thenExecute` fired during recording. Aligning them exactly requires carefully matching the `SimTime` anchor in the emitted DSL; this is a known limitation of the current emitter.
+Even with `ButtonBlock.press`, replay timing for the very first input can drift ~1 tick from the original recording depending on how the recording was produced. The `runGarnetSpec` tick loop applies `START_OF_TICK` inputs at the beginning of each tick iteration, which may not align exactly with when `gametest thenExecute` fired during recording. Aligning them exactly requires carefully matching the `SimTime` anchor in the emitted DSL; this is a known limitation of the current emitter.
 
 ## Related
 
-- [runRedstoneSpec — inline verification](engine-driven-verification.md) — how the tick loop fires the InputScope callbacks that call this function.
+- [runGarnetSpec — inline verification](engine-driven-verification.md) — how the tick loop fires the InputScope callbacks that call this function.

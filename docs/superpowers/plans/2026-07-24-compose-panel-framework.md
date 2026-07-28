@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- **Build (all 5 source sets):** `cmd.exe /c "cd /d H:\Repo\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
+- **Build (all 5 source sets):** `cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
 - **Unit tests:** `cmd.exe /c "gradlew.bat :26.1:test"` — Kotest `--tests` filter is unreliable; read `versions/26.1/build/test-results/**/*.xml`.
 - **Client runtime tests:** `cmd.exe /c "gradlew.bat :26.1:runClientTest"` — runs the whole `ClientTestSentinel` suite; screenshots via `ViewportState.compositeCaptureRequest` → `versions/26.1/run/screenshots/` (controller verifies visually).
 - **Gradle task prefix is `:26.1:`** (Stonecutter single node). Always invoke `gradlew.bat` via `cmd.exe /c`, never `./gradlew`.
@@ -32,7 +32,7 @@
 - `client/ui/compose/dock/Panel.kt` — `Panel` (id, title, `@Composable` body).
 - `client/ui/compose/dock/DockState.kt` — snapshot-state source of truth.
 - `client/ui/compose/dock/DockInsets.kt` — pure `DockState → insets` + region-rect math.
-- `client/ui/compose/dock/RedstoneDock.kt` — `@Composable` dock root (regions, tab strips, splitters).
+- `client/ui/compose/dock/GarnetDock.kt` — `@Composable` dock root (regions, tab strips, splitters).
 - `client/ui/compose/input/DockInputRouter.kt` — capture/focus state + event forwarding.
 - `client/ui/compose/ComposeSceneHost.kt` — generic `ImageComposeScene` wrapper (generalizes `ComposeScenePanel`).
 - `client/ide/ProjectTreeState.kt` — `mutableStateOf` Explorer client state.
@@ -45,14 +45,14 @@
 **Modified:**
 - `build.gradle.kts` — Task 0 runtime scoping.
 - `client/viewport/BlitUvPipeline.kt` — blended blit variant.
-- `client/ui/compose/ComposeSurface.kt` — full-window, transparent clear, hosts `RedstoneDock`.
+- `client/ui/compose/ComposeSurface.kt` — full-window, transparent clear, hosts `GarnetDock`.
 - `client/ui/compose/ComposeOverlay.kt` — full-window blended blit.
 - `client/viewport/ViewportState.kt` — insets from `DockState`.
 - `client/project/ProjectClientNetworking.kt` — feed `ProjectTreeState`.
 - `client/project/ProjectIntegratedBoot.kt` — add `bootWorkspace()`.
 - `mixin/client/TitleScreenMixin.java` — retarget button to `bootWorkspace()`.
 - `client/network/ClientNetworkHandler.kt` — recorder/runner receivers → no-ops.
-- `resources/redstonespecs.client.mixins.json` — register the two new mixins.
+- `resources/garnet.client.mixins.json` — register the two new mixins.
 - `clientTest/.../ClientTestSentinel.kt` — register new specs, de-register deleted ones.
 
 **Deleted:**
@@ -89,7 +89,7 @@ to:
 
 - [ ] **Step 2: Build all 5 source sets and observe**
 
-Run: `cmd.exe /c "cd /d H:\Repo\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
+Run: `cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
 
 Expected: **FAIL** on `compileKotlin` / `compileTestKotlin` / `compileGametestKotlin` with a Compose `VersionChecker` error ("Compose Runtime … not found on the classpath" or similar), because the compiler plugin runs on those compilations but the runtime is now client-only.
 
@@ -288,7 +288,7 @@ No code change is strictly required if the spec already only asserts `clickCount
 
 - [ ] **Step 7: Build**
 
-Run: `cmd.exe /c "cd /d H:\Repo\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
+Run: `cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
 Expected: **BUILD SUCCESSFUL**.
 
 - [ ] **Step 8: Run the client test + screenshot checkpoint**
@@ -321,15 +321,15 @@ git commit -m "feat(ui): full-window transparent Compose overlay via premultipli
 
 - [ ] **Step 1: Write the failing inset-math test**
 
-Create `clientTest/kotlin/com/breadmoirai/redstonespecs/test/DockInsetsSpec.kt`:
+Create `clientTest/kotlin/com/breadmoirai/garnet/test/DockInsetsSpec.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.insets
-import com.breadmoirai.redstonespecs.client.viewport.ViewportState
+import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
+import com.breadmoirai.garnet.client.ui.compose.dock.DockState
+import com.breadmoirai.garnet.client.ui.compose.dock.insets
+import com.breadmoirai.garnet.client.viewport.ViewportState
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 
@@ -342,14 +342,14 @@ class DockInsetsSpec : StringSpec({
 
     "hidden regions reserve no space" {
         DockState.reset()
-        DockState.insets() shouldBe com.breadmoirai.redstonespecs.client.ui.compose.dock.DockInsets(0, 0, 0, 0)
+        DockState.insets() shouldBe com.breadmoirai.garnet.client.ui.compose.dock.DockInsets(0, 0, 0, 0)
     }
 
     "a visible left region reserves its width" {
         DockState.reset()
         DockState.setVisible(DockRegion.LEFT, true)
         DockState.setSize(DockRegion.LEFT, 260)
-        DockState.insets() shouldBe com.breadmoirai.redstonespecs.client.ui.compose.dock.DockInsets(260, 0, 0, 0)
+        DockState.insets() shouldBe com.breadmoirai.garnet.client.ui.compose.dock.DockInsets(260, 0, 0, 0)
     }
 
     "insets drive the content rect, clamped to the minimum" {
@@ -385,7 +385,7 @@ Expected: **FAIL** — `DockRegion`, `DockState`, `DockInsets`, `insets` unresol
 `client/ui/compose/dock/DockRegion.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ui.compose.dock
+package com.breadmoirai.garnet.client.ui.compose.dock
 
 /** The four dock positions. LEFT/RIGHT/BOTTOM reserve edge space; CENTER holds the live world (or an occluding panel). */
 enum class DockRegion { LEFT, RIGHT, BOTTOM, CENTER }
@@ -396,7 +396,7 @@ enum class DockRegion { LEFT, RIGHT, BOTTOM, CENTER }
 `client/ui/compose/dock/Panel.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ui.compose.dock
+package com.breadmoirai.garnet.client.ui.compose.dock
 
 import androidx.compose.runtime.Composable
 
@@ -416,7 +416,7 @@ class Panel(
 `client/ui/compose/dock/DockState.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ui.compose.dock
+package com.breadmoirai.garnet.client.ui.compose.dock
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -429,7 +429,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
  * Single source of truth for the dock layout: which edge regions are visible, how big they are
  * (splitter positions), which tab is active, and which region has input focus.
  *
- * Fields are Compose **snapshot state** so [RedstoneDock] recomposes when they change, yet plain
+ * Fields are Compose **snapshot state** so [GarnetDock] recomposes when they change, yet plain
  * reads (`.value` via the getters below) are cheap and thread-safe for [ViewportState]/`WindowMixin`
  * to consult when computing the framebuffer shrink. The geometry is authoritative *plain arithmetic*
  * updated eagerly by input handlers — never a side effect of rendering — so the shrink never waits
@@ -525,7 +525,7 @@ object DockState {
 `client/ui/compose/dock/DockInsets.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ui.compose.dock
+package com.breadmoirai.garnet.client.ui.compose.dock
 
 /** Reserved edge strips (real framebuffer px) the shrunk world must avoid. */
 data class DockInsets(val left: Int, val right: Int, val bottom: Int, val top: Int)
@@ -554,7 +554,7 @@ In `client/viewport/ViewportState.kt`, remove the `RESERVED_LEFT`/`RESERVED_BOTT
     // ... realWidth / realHeight / compositeCaptureRequest unchanged ...
 
     fun contentRect(realW: Int, realH: Int): ContentRect {
-        val insets = com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState.insets()
+        val insets = com.breadmoirai.garnet.client.ui.compose.dock.DockState.insets()
         val frameX = insets.left
         val frameY = insets.top
         val frameWidth = (realW - insets.left - insets.right).coerceAtLeast(MIN_CONTENT_SIZE)
@@ -567,7 +567,7 @@ Keep `active`, `shouldModify()`, `realWidth`, `realHeight`, `compositeCaptureReq
 
 - [ ] **Step 8: Build + run the spec**
 
-Run: `cmd.exe /c "cd /d H:\Repo\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
+Run: `cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"`
 Expected: **BUILD SUCCESSFUL**.
 
 Run: `cmd.exe /c "gradlew.bat :26.1:runClientTest"` and read `versions/26.1/build/test-results` — `DockInsetsSpec` passes (4 tests).
@@ -583,34 +583,34 @@ git commit -m "feat(ui): DockState/DockInsets drive ViewportState shrink (replac
 
 ---
 
-## Task 3: RedstoneDock composable + full-window hosting
+## Task 3: GarnetDock composable + full-window hosting
 
 **Files:**
 - Create: `client/ui/compose/ComposeSceneHost.kt`
-- Create: `client/ui/compose/dock/RedstoneDock.kt`
-- Modify: `client/ui/compose/ComposeSurface.kt` (host `RedstoneDock` full-window; use `ComposeSceneHost`)
+- Create: `client/ui/compose/dock/GarnetDock.kt`
+- Modify: `client/ui/compose/ComposeSurface.kt` (host `GarnetDock` full-window; use `ComposeSceneHost`)
 - Test: `clientTest/.../DockRenderSpec.kt` + register in `ClientTestSentinel`
 
 **Interfaces:**
 - Produces: `class ComposeSceneHost(width, height, content: @Composable () -> Unit) : AutoCloseable` with `render(nanos): Image`, `pointerMove/Press/Release(Offset)`, `sendKey(...)`, `sendChar(...)`.
-- Produces: `@Composable fun RedstoneDock(realW: Int, realH: Int)` — lays out the four regions from `DockState` at real pixel sizes (Density(1f) ⇒ dp==px), transparent center.
+- Produces: `@Composable fun GarnetDock(realW: Int, realH: Int)` — lays out the four regions from `DockState` at real pixel sizes (Density(1f) ⇒ dp==px), transparent center.
 - Consumes: `DockState`, `DockInsets` (Task 2), premultiplied blit (Task 1).
 
 - [ ] **Step 1: Write the failing render test**
 
-Create `clientTest/kotlin/com/breadmoirai/redstonespecs/test/DockRenderSpec.kt`:
+Create `clientTest/kotlin/com/breadmoirai/garnet/test/DockRenderSpec.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ui.compose.ComposeOverlay
-import com.breadmoirai.redstonespecs.client.ui.compose.ComposeSurface
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
-import com.breadmoirai.redstonespecs.client.viewport.ViewportState
-import com.breadmoirai.redstonespecs.client.viewport.WindowViewportExt
-import com.breadmoirai.redstonespecs.testing.ClientSpec
+import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
+import com.breadmoirai.garnet.client.ui.compose.ComposeSurface
+import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
+import com.breadmoirai.garnet.client.ui.compose.dock.DockState
+import com.breadmoirai.garnet.client.ui.compose.dock.Panel
+import com.breadmoirai.garnet.client.viewport.ViewportState
+import com.breadmoirai.garnet.client.viewport.WindowViewportExt
+import com.breadmoirai.garnet.testing.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import androidx.compose.foundation.background
@@ -653,7 +653,7 @@ class DockRenderSpec : ClientSpec({
             DockState.setVisible(DockRegion.BOTTOM, true)
             ViewportState.active = true
             ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(12)
 
@@ -665,7 +665,7 @@ class DockRenderSpec : ClientSpec({
             ComposeOverlay.enabled = false
             ViewportState.active = false
             DockState.reset()
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(6)
         ViewportState.active.shouldBeFalse()
@@ -676,14 +676,14 @@ class DockRenderSpec : ClientSpec({
 - [ ] **Step 2: Register + run to confirm failure**
 
 Add `DockRenderSpec::class` to `ClientTestSentinel`. Run: `cmd.exe /c "gradlew.bat :26.1:clientTestClasses"`.
-Expected: **FAIL** — `RedstoneDock`/`ComposeSceneHost` not yet wired; also `ComposeSurface` still hosts the old panel.
+Expected: **FAIL** — `GarnetDock`/`ComposeSceneHost` not yet wired; also `ComposeSurface` still hosts the old panel.
 
 - [ ] **Step 3: Create the generic `ComposeSceneHost`**
 
 `client/ui/compose/ComposeSceneHost.kt` (generalizes `ComposeScenePanel` — content is now a parameter, and it exposes key/char forwarding for Task 4):
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ui.compose
+package com.breadmoirai.garnet.client.ui.compose
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -723,12 +723,12 @@ class ComposeSceneHost(
 
 Verify `sendPointerEvent`'s `scrollDelta` parameter name and `sendKeyEvent`'s presence against Compose 1.12 `ImageComposeScene`/`ComposeScene` (adjust if the API differs).
 
-- [ ] **Step 4: Create `RedstoneDock`**
+- [ ] **Step 4: Create `GarnetDock`**
 
-`client/ui/compose/dock/RedstoneDock.kt`. Uses absolute pixel offsets/sizes (Density(1f)); regions laid out around a transparent center. Splitters are thin draggable bars that write `DockState` sizes:
+`client/ui/compose/dock/GarnetDock.kt`. Uses absolute pixel offsets/sizes (Density(1f)); regions laid out around a transparent center. Splitters are thin draggable bars that write `DockState` sizes:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ui.compose.dock
+package com.breadmoirai.garnet.client.ui.compose.dock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -766,7 +766,7 @@ private val SPLITTER_COLOR = Color(0xFF10161F)
  * through. Sizes come from [DockState] in real pixels (the scene runs at Density(1f)).
  */
 @Composable
-fun RedstoneDock(realW: Int, realH: Int) {
+fun GarnetDock(realW: Int, realH: Int) {
     Box(Modifier.fillMaxSize()) {
         val left = if (DockState.isVisible(DockRegion.LEFT)) DockState.leftWidth else 0
         val right = if (DockState.isVisible(DockRegion.RIGHT)) DockState.rightWidth else 0
@@ -861,9 +861,9 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectTa
 
 Note: the two `Splitter` overloads may collide by JVM signature; if the compiler complains, rename the horizontal-only one to `SplitterX`. Verify `detectDragGestures`/`detectTapGestures` import paths against foundation 1.12.
 
-- [ ] **Step 5: Host `RedstoneDock` in `ComposeSurface`**
+- [ ] **Step 5: Host `GarnetDock` in `ComposeSurface`**
 
-In `client/ui/compose/ComposeSurface.kt`, replace the `panel: ComposeScenePanel?` field and `ensurePanel` with a `ComposeSceneHost` that renders `RedstoneDock`. Replace the field:
+In `client/ui/compose/ComposeSurface.kt`, replace the `panel: ComposeScenePanel?` field and `ensurePanel` with a `ComposeSceneHost` that renders `GarnetDock`. Replace the field:
 
 ```kotlin
     /** The full-window dock scene, recreated when the window size changes. */
@@ -877,10 +877,10 @@ Replace `ensurePanel` and its `renderFrame` usage:
         host?.let { if (it.width == width && it.height == height) return it }
         host?.close()
         val h = ComposeSceneHost(width, height) {
-            com.breadmoirai.redstonespecs.client.ui.compose.dock.RedstoneDock(width, height)
+            com.breadmoirai.garnet.client.ui.compose.dock.GarnetDock(width, height)
         }
         host = h
-        logger.info("[compose] RedstoneDock scene ({}x{}) created", width, height)
+        logger.info("[compose] GarnetDock scene ({}x{}) created", width, height)
         return h
     }
 ```
@@ -900,7 +900,7 @@ In `renderFrame`, change `val p = ensurePanel(width, height)` → `val h = ensur
     }
 ```
 
-Delete `ComposeScenePanel.kt` now that `ComposeSceneHost` + `RedstoneDock` replace it, and remove the `panel`-based references. (`ComposeOverlaySpec` referenced `ComposeSurface.buttonCenter`/`clickCount`; that spec is retired in Task 7 — for now, temporarily keep a no-op `buttonCenter: Offset? get() = null` and `clickCount: Int get() = 0` on `ComposeSurface` so the old spec still compiles, and delete them in Task 7.)
+Delete `ComposeScenePanel.kt` now that `ComposeSceneHost` + `GarnetDock` replace it, and remove the `panel`-based references. (`ComposeOverlaySpec` referenced `ComposeSurface.buttonCenter`/`clickCount`; that spec is retired in Task 7 — for now, temporarily keep a no-op `buttonCenter: Offset? get() = null` and `clickCount: Int get() = 0` on `ComposeSurface` so the old spec still compiles, and delete them in Task 7.)
 
 - [ ] **Step 6: Build**
 
@@ -915,7 +915,7 @@ Expected: `DockRenderSpec` passes; `versions/26.1/run/screenshots/dock_left_bott
 
 ```bash
 git add -A
-git commit -m "feat(ui): RedstoneDock — L/R/B/Center regions, tab strips, drag splitters, full-window scene"
+git commit -m "feat(ui): GarnetDock — L/R/B/Center regions, tab strips, drag splitters, full-window scene"
 ```
 
 ---
@@ -926,7 +926,7 @@ git commit -m "feat(ui): RedstoneDock — L/R/B/Center regions, tab strips, drag
 - Create: `client/ui/compose/input/DockInputRouter.kt`
 - Create: `mixin/client/MouseHandlerMixin.java`, `mixin/client/KeyboardHandlerMixin.java`
 - Create: `client/viewport/DockKeybinds.kt`
-- Modify: `resources/redstonespecs.client.mixins.json` (register mixins)
+- Modify: `resources/garnet.client.mixins.json` (register mixins)
 - Modify: the client entrypoint that calls `registerViewportToggle()` (register `DockKeybinds`)
 - Test: `clientTest/.../DockInputSpec.kt` + register in `ClientTestSentinel`
 
@@ -939,17 +939,17 @@ git commit -m "feat(ui): RedstoneDock — L/R/B/Center regions, tab strips, drag
 Create `clientTest/.../DockInputSpec.kt`. It shows a Left panel with a Compose button whose click increments a test-visible counter, focuses via `DockInputRouter.focus(LEFT)`, drives a GLFW-style press/release through the router at the button's window coords, and asserts the counter incremented:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ui.compose.ComposeOverlay
-import com.breadmoirai.redstonespecs.client.ui.compose.ComposeSurface
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
-import com.breadmoirai.redstonespecs.client.ui.compose.input.DockInputRouter
-import com.breadmoirai.redstonespecs.client.viewport.ViewportState
-import com.breadmoirai.redstonespecs.client.viewport.WindowViewportExt
-import com.breadmoirai.redstonespecs.testing.ClientSpec
+import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
+import com.breadmoirai.garnet.client.ui.compose.ComposeSurface
+import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
+import com.breadmoirai.garnet.client.ui.compose.dock.DockState
+import com.breadmoirai.garnet.client.ui.compose.dock.Panel
+import com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter
+import com.breadmoirai.garnet.client.viewport.ViewportState
+import com.breadmoirai.garnet.client.viewport.WindowViewportExt
+import com.breadmoirai.garnet.testing.ClientSpec
 import io.kotest.matchers.booleans.shouldBeTrue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -978,7 +978,7 @@ class DockInputSpec : ClientSpec({
             DockState.setSize(DockRegion.LEFT, 300)
             ViewportState.active = true
             ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(12)
 
@@ -999,7 +999,7 @@ class DockInputSpec : ClientSpec({
         runOnClient { mc ->
             ComposeOverlay.enabled = false; ViewportState.active = false
             DockInputRouter.clearFocus(); DockState.reset()
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(6)
     }
@@ -1015,12 +1015,12 @@ Add `DockInputSpec::class` to `ClientTestSentinel`. Run `cmd.exe /c "gradlew.bat
 `client/ui/compose/input/DockInputRouter.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ui.compose.input
+package com.breadmoirai.garnet.client.ui.compose.input
 
 import androidx.compose.ui.geometry.Offset
-import com.breadmoirai.redstonespecs.client.ui.compose.ComposeSurface
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
+import com.breadmoirai.garnet.client.ui.compose.ComposeSurface
+import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
+import com.breadmoirai.garnet.client.ui.compose.dock.DockState
 import net.minecraft.client.Minecraft
 
 /**
@@ -1082,9 +1082,9 @@ The spec drives `DockInputRouter` directly, so it passes without the mixins. Run
 `mixin/client/MouseHandlerMixin.java`. **Verify method names against the decompiled `net.minecraft.client.MouseHandler` for 26.2** (`onMove(long,double,double)`, `onPress(long,int,int,int)`, `onScroll(long,double,double)` are the historical names; confirm via `javap`/sources — memory `reference_mc_sources`). Inject at HEAD, cancellable, and forward+cancel when captured:
 
 ```java
-package com.breadmoirai.redstonespecs.mixin.client;
+package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.redstonespecs.client.ui.compose.input.DockInputRouter;
+import com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter;
 import net.minecraft.client.MouseHandler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -1100,13 +1100,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MouseHandlerMixin {
 
     @Inject(method = "onMove(JDD)V", at = @At("HEAD"), cancellable = true)
-    private void redstonespecs$onMove(long window, double x, double y, CallbackInfo ci) {
+    private void garnet$onMove(long window, double x, double y, CallbackInfo ci) {
         DockInputRouter.INSTANCE.onGlfwMove(x, y);
         if (DockInputRouter.INSTANCE.getCaptured()) ci.cancel();
     }
 
     @Inject(method = "onPress(JIII)V", at = @At("HEAD"), cancellable = true)
-    private void redstonespecs$onPress(long window, int button, int action, int mods, CallbackInfo ci) {
+    private void garnet$onPress(long window, int button, int action, int mods, CallbackInfo ci) {
         if (!DockInputRouter.INSTANCE.getCaptured()) return;
         if (action == org.lwjgl.glfw.GLFW.GLFW_PRESS) DockInputRouter.INSTANCE.onGlfwPress(button);
         else if (action == org.lwjgl.glfw.GLFW.GLFW_RELEASE) DockInputRouter.INSTANCE.onGlfwRelease(button);
@@ -1114,7 +1114,7 @@ public abstract class MouseHandlerMixin {
     }
 
     @Inject(method = "onScroll(JDD)V", at = @At("HEAD"), cancellable = true)
-    private void redstonespecs$onScroll(long window, double dx, double dy, CallbackInfo ci) {
+    private void garnet$onScroll(long window, double dx, double dy, CallbackInfo ci) {
         if (!DockInputRouter.INSTANCE.getCaptured()) return;
         DockInputRouter.INSTANCE.onGlfwScroll(dx, dy);
         ci.cancel();
@@ -1129,9 +1129,9 @@ public abstract class MouseHandlerMixin {
 `mixin/client/KeyboardHandlerMixin.java`. Inject into `net.minecraft.client.KeyboardHandler#keyPress(long,int,int,int,int)` and `charTyped`/`onCharEvent` (verify names). Forward to Compose and cancel when captured, **except** never swallow ESC (so the user can always drop focus):
 
 ```java
-package com.breadmoirai.redstonespecs.mixin.client;
+package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.redstonespecs.client.ui.compose.input.DockInputRouter;
+import com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter;
 import net.minecraft.client.KeyboardHandler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -1147,7 +1147,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class KeyboardHandlerMixin {
 
     @Inject(method = "keyPress(JIIII)V", at = @At("HEAD"), cancellable = true)
-    private void redstonespecs$keyPress(long window, int key, int scancode, int action, int mods, CallbackInfo ci) {
+    private void garnet$keyPress(long window, int key, int scancode, int action, int mods, CallbackInfo ci) {
         if (!DockInputRouter.INSTANCE.getCaptured()) return;
         if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) return; // let focus be dropped
         ci.cancel();
@@ -1159,7 +1159,7 @@ public abstract class KeyboardHandlerMixin {
 
 - [ ] **Step 7: Register the mixins**
 
-In `src/client/resources/redstonespecs.client.mixins.json` (confirm exact filename), add to the `"client"` mixin list:
+In `src/client/resources/garnet.client.mixins.json` (confirm exact filename), add to the `"client"` mixin list:
 
 ```json
     "MouseHandlerMixin",
@@ -1171,11 +1171,11 @@ In `src/client/resources/redstonespecs.client.mixins.json` (confirm exact filena
 `client/viewport/DockKeybinds.kt` — Alt+1 focuses the Explorer (index 0 of LEFT), Shift+1 toggles LEFT visibility. Modifier state is read from GLFW; keybind is the `1` key:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.viewport
+package com.breadmoirai.garnet.client.viewport
 
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
-import com.breadmoirai.redstonespecs.client.ui.compose.input.DockInputRouter
+import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
+import com.breadmoirai.garnet.client.ui.compose.dock.DockState
+import com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.minecraft.client.KeyMapping
@@ -1184,7 +1184,7 @@ import org.lwjgl.glfw.GLFW
 private const val GLFW_KEY_1 = 49
 
 private val keyExplorerFocus = KeyMappingHelper.registerKeyMapping(
-    KeyMapping("key.redstonespecs.dock_explorer_focus", GLFW_KEY_1, KeyMapping.Category.MISC)
+    KeyMapping("key.garnet.dock_explorer_focus", GLFW_KEY_1, KeyMapping.Category.MISC)
 )
 
 /**
@@ -1206,7 +1206,7 @@ fun registerDockKeybinds() {
                     if (!DockState.isVisible(DockRegion.LEFT) && DockState.focusedRegion == DockRegion.LEFT) {
                         DockInputRouter.clearFocus()
                     }
-                    (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+                    (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
                 }
                 alt -> {
                     if (DockState.focusedRegion == DockRegion.LEFT) DockInputRouter.clearFocus()
@@ -1252,18 +1252,18 @@ git commit -m "feat(ui): route GLFW pointer/key into the dock while focused; Alt
 Create `clientTest/.../ProjectExplorerSpec.kt`: pushes a synthetic `ProjectTreeSnapshotS2C` into `ProjectTreeState`, shows the Explorer panel in LEFT, renders, and asserts the snapshot is retained + a screenshot is produced (tree rows visible):
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ide.ProjectTreeState
-import com.breadmoirai.redstonespecs.client.ide.explorerPanel
-import com.breadmoirai.redstonespecs.client.ui.compose.ComposeOverlay
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockRegion
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState
-import com.breadmoirai.redstonespecs.client.viewport.ViewportState
-import com.breadmoirai.redstonespecs.client.viewport.WindowViewportExt
-import com.breadmoirai.redstonespecs.network.project.ProjectLeafEntry
-import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.redstonespecs.testing.ClientSpec
+import com.breadmoirai.garnet.client.ide.ProjectTreeState
+import com.breadmoirai.garnet.client.ide.explorerPanel
+import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
+import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
+import com.breadmoirai.garnet.client.ui.compose.dock.DockState
+import com.breadmoirai.garnet.client.viewport.ViewportState
+import com.breadmoirai.garnet.client.viewport.WindowViewportExt
+import com.breadmoirai.garnet.network.project.ProjectLeafEntry
+import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.garnet.testing.ClientSpec
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldNotBe
 import java.nio.file.Files
@@ -1292,7 +1292,7 @@ class ProjectExplorerSpec : ClientSpec({
             DockState.setVisible(DockRegion.LEFT, true)
             DockState.setSize(DockRegion.LEFT, 300)
             ViewportState.active = true; ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(12)
         ProjectTreeState.snapshot shouldNotBe null
@@ -1300,7 +1300,7 @@ class ProjectExplorerSpec : ClientSpec({
 
         runOnClient { mc ->
             ComposeOverlay.enabled = false; ViewportState.active = false; DockState.reset()
-            (mc.window as Any as WindowViewportExt).`redstonespecs$updateScaledFramebuffer`(true)
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(6)
     }
@@ -1316,15 +1316,15 @@ Add `ProjectExplorerSpec::class` to `ClientTestSentinel`. Run `cmd.exe /c "gradl
 `client/ide/ProjectTreeState.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ide
+package com.breadmoirai.garnet.client.ide
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.redstonespecs.network.project.ProjectErrorS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectFolderLoadedS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectSaveReportS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.garnet.network.project.ProjectErrorS2C
+import com.breadmoirai.garnet.network.project.ProjectFolderLoadedS2C
+import com.breadmoirai.garnet.network.project.ProjectSaveReportS2C
+import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 
 /**
  * Client-side, Compose-observable state for the Project Explorer. The networking layer mutates it
@@ -1361,7 +1361,7 @@ object ProjectTreeState {
 `client/ide/ProjectExplorerPanel.kt` — a composable tree over the snapshot; clicking a leaf sends `LoadProjectFolderC2S`; a refresh row sends `ListProjectTreeC2S`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.ide
+package com.breadmoirai.garnet.client.ide
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1378,16 +1378,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import com.breadmoirai.redstonespecs.client.ui.compose.dock.Panel
-import com.breadmoirai.redstonespecs.network.project.ListProjectTreeC2S
-import com.breadmoirai.redstonespecs.network.project.LoadProjectFolderC2S
+import com.breadmoirai.garnet.client.ui.compose.dock.Panel
+import com.breadmoirai.garnet.network.project.ListProjectTreeC2S
+import com.breadmoirai.garnet.network.project.LoadProjectFolderC2S
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 
 private val TEXT = Color(0xFFDDE3EC)
 private val TEXT_DIM = Color(0xFF8FA0B5)
 
 /** The Explorer tab for DockState.leftPanels. */
-fun explorerPanel(): Panel = Panel("redstonespecs.explorer", "Explorer") { ProjectExplorer() }
+fun explorerPanel(): Panel = Panel("garnet.explorer", "Explorer") { ProjectExplorer() }
 
 @Composable
 private fun ProjectExplorer() {
@@ -1426,13 +1426,13 @@ Verify `verticalScroll`/`rememberScrollState` import paths against foundation 1.
 Rewrite `client/project/ProjectClientNetworking.kt` to update `ProjectTreeState` instead of `ProjectScreen`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.client.project
+package com.breadmoirai.garnet.client.project
 
-import com.breadmoirai.redstonespecs.client.ide.ProjectTreeState
-import com.breadmoirai.redstonespecs.network.project.ProjectErrorS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectFolderLoadedS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectSaveReportS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.garnet.client.ide.ProjectTreeState
+import com.breadmoirai.garnet.network.project.ProjectErrorS2C
+import com.breadmoirai.garnet.network.project.ProjectFolderLoadedS2C
+import com.breadmoirai.garnet.network.project.ProjectSaveReportS2C
+import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 
 object ProjectClientNetworking {
@@ -1458,8 +1458,8 @@ object ProjectClientNetworking {
 Find the client entrypoint (grep for `ProjectClientNetworking.register()` / `registerViewportToggle()`), and after it, seed the Explorer into the dock once:
 
 ```kotlin
-        com.breadmoirai.redstonespecs.client.ui.compose.dock.DockState.leftPanels
-            .add(com.breadmoirai.redstonespecs.client.ide.explorerPanel())
+        com.breadmoirai.garnet.client.ui.compose.dock.DockState.leftPanels
+            .add(com.breadmoirai.garnet.client.ide.explorerPanel())
 ```
 
 Leave LEFT hidden by default (Shift+1 reveals it) so nothing renders until toggled.
@@ -1493,7 +1493,7 @@ In `client/project/ProjectIntegratedBoot.kt`, add a root-agnostic entry that reu
 
 ```kotlin
     /** Fixed workspace save the main-menu button boots into; project folders are loaded/unloaded in-world. */
-    private const val WORKSPACE_SAVE = "redstonespecs-workspace"
+    private const val WORKSPACE_SAVE = "garnet-workspace"
 
     /** Boots (opens or creates) the shared flat-void workspace world, without pinning a project root. */
     fun bootWorkspace() {
@@ -1509,9 +1509,9 @@ In `client/project/ProjectIntegratedBoot.kt`, add a root-agnostic entry that reu
 In `mixin/client/TitleScreenMixin.java`, change the button's click handler from opening `ProjectRootListScreen` to `bootWorkspace()`, and drop the `ProjectRootListScreen` import:
 
 ```java
-        RedstoneIconButton button = new RedstoneIconButton(
+        GarnetIconButton button = new GarnetIconButton(
                 this.width / 2 + 104, topPos, 20, label,
-                b -> com.breadmoirai.redstonespecs.client.project.ProjectIntegratedBoot.INSTANCE.bootWorkspace()
+                b -> com.breadmoirai.garnet.client.project.ProjectIntegratedBoot.INSTANCE.bootWorkspace()
         );
 ```
 
@@ -1574,19 +1574,19 @@ In `client/ui/compose/ComposeSurface.kt`, delete the temporary `buttonCenter`/`c
 - [ ] **Step 3: Delete the dead files**
 
 ```bash
-git rm src/client/kotlin/com/breadmoirai/redstonespecs/client/project/ProjectScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/project/ProjectRootListScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RecorderScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/RunnerScreen.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/screen/IntEditBox.kt \
-       src/client/kotlin/com/breadmoirai/redstonespecs/client/widget/TimelineSliderWidget.kt \
-       src/test/kotlin/com/breadmoirai/redstonespecs/data/IntEditBoxLogicTest.kt \
-       src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ProjectEntryFlowSpec.kt \
-       src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/RecorderScreenSpec.kt \
-       src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ComposeOverlaySpec.kt
+git rm src/client/kotlin/com/breadmoirai/garnet/client/project/ProjectScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/project/ProjectRootListScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/RecorderScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/RunnerScreen.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/screen/IntEditBox.kt \
+       src/client/kotlin/com/breadmoirai/garnet/client/widget/TimelineSliderWidget.kt \
+       src/test/kotlin/com/breadmoirai/garnet/data/IntEditBoxLogicTest.kt \
+       src/clientTest/kotlin/com/breadmoirai/garnet/test/ProjectEntryFlowSpec.kt \
+       src/clientTest/kotlin/com/breadmoirai/garnet/test/RecorderScreenSpec.kt \
+       src/clientTest/kotlin/com/breadmoirai/garnet/test/ComposeOverlaySpec.kt
 ```
 
-(If `RedstoneIconButton` is now used only by `TitleScreenMixin`, keep it — it is not dead.)
+(If `GarnetIconButton` is now used only by `TitleScreenMixin`, keep it — it is not dead.)
 
 - [ ] **Step 4: De-register deleted specs; keep new ones**
 
@@ -1598,7 +1598,7 @@ Run:
 ```bash
 grep -rn "RunnerScreen\|RecorderScreen\|ProjectScreen\|ProjectRootListScreen\|TimelineSliderWidget\|IntEditBox" src/client src/clientTest src/main
 ```
-Expected: **zero** hits except `RedstoneIconButton` (kept) and any comment mentions. If `ClientNetworkSpec.kt` references `RunnerScreen`/`RunnerScreen.active`, rewrite that portion to assert on the no-op path (e.g. that receiving `OpenRunnerScreenS2C` does not open a screen) or delete the obsolete assertions.
+Expected: **zero** hits except `GarnetIconButton` (kept) and any comment mentions. If `ClientNetworkSpec.kt` references `RunnerScreen`/`RunnerScreen.active`, rewrite that portion to assert on the no-op path (e.g. that receiving `OpenRunnerScreenS2C` does not open a screen) or delete the obsolete assertions.
 
 - [ ] **Step 6: Build all 5 source sets**
 
@@ -1648,7 +1648,7 @@ Update `docs/ui/INDEX.md`: replace the "two live screens (Recorder/Runner)" prea
 
 - [ ] **Step 5: Drop recording/running use-cases**
 
-In `docs/use-cases/`, delete `recording.md` and `running.md` if they exist; remove their `INDEX.md` entries; grep `docs/` for links to them and fix (`grep -rn "recording.md\|running.md" docs/`). Update `command.md` (the `/redstonespecs project` entry now boots the workspace world + in-world Explorer) and any `cross-cutting.md` references to the dropped journeys.
+In `docs/use-cases/`, delete `recording.md` and `running.md` if they exist; remove their `INDEX.md` entries; grep `docs/` for links to them and fix (`grep -rn "recording.md\|running.md" docs/`). Update `command.md` (the `/garnet project` entry now boots the workspace world + in-world Explorer) and any `cross-cutting.md` references to the dropped journeys.
 
 - [ ] **Step 6: Verify doc cross-references resolve**
 

@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move the `testing` package from `src/testBridge/` to `src/main/`, promote Kotest engine + assertions to the shipped `main` configuration, and rename `ServerTestSpec` to `RedstoneTestSpec` so the same base class is available to shipped specs and to all dev test source sets.
+**Goal:** Move the `testing` package from `src/testBridge/` to `src/main/`, promote Kotest engine + assertions to the shipped `main` configuration, and rename `ServerTestSpec` to `GarnetTestSpec` so the same base class is available to shipped specs and to all dev test source sets.
 
 **Architecture:** No behavior change. The `testBridge` source set goes away; its contents live in `main`. Configurations that previously inherited `testBridgeImplementation` now inherit nothing extra (Kotest is on `main`'s classpath). All existing test specs continue to work with one base-class rename.
 
 **Tech Stack:** Kotlin, Gradle (Loom + Stonecutter), Kotest 5.9.1, Fabric Language Kotlin, kotlin-scripting-jvm-host (already on `main`).
 
-**Spec reference:** `docs/superpowers/specs/2026-05-07-redstonespec-kotest-bridge-design.md` §"Module shape", §"Convergence with dev-side tests".
+**Spec reference:** `docs/superpowers/specs/2026-05-07-garnet-kotest-bridge-design.md` §"Module shape", §"Convergence with dev-side tests".
 
 **Prerequisite verification:** `KtsSpecLoader.kt:22-24` and `SpecScript.kt:21` already pin the Fabric "knot" classloader for scripting evaluation. Spec Plan #1 (scripting-host spike) is therefore already discharged; Task 1 below verifies it under the runtime conditions Plan D will need.
 
@@ -16,9 +16,9 @@
 
 ## File structure (after this plan)
 
-**Moved from `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/` to `src/main/kotlin/com/breadmoirai/redstonespecs/testing/`:**
+**Moved from `src/testBridge/kotlin/com/breadmoirai/garnet/testing/` to `src/main/kotlin/com/breadmoirai/garnet/testing/`:**
 
-- `RedstoneTestSpec.kt` (renamed from `ServerTestSpec.kt`) — Kotest `FunSpec` subclass with server-thread dispatcher.
+- `GarnetTestSpec.kt` (renamed from `ServerTestSpec.kt`) — Kotest `FunSpec` subclass with server-thread dispatcher.
 - `core/Dispatchers.kt` — `McDispatchers.Server`.
 - `core/Lifecycle.kt` — server lifecycle hooks.
 - `core/Ticks.kt` — `awaitTicks`, `awaitTickEnd`, `awaitTickWhere`.
@@ -30,11 +30,11 @@
 
 **Modified:**
 - `build.gradle.kts` — remove `testBridge` source set + configurations; promote Kotest deps to `implementation`; remove gametest/clientTest extension of testBridge.
-- `src/test/kotlin/com/breadmoirai/redstonespecs/testing/server/SuspendingTest.kt` — package-only update.
-- `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt` — references move from `testBridge` package to `main` package.
-- `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/ClientTestSentinel.kt` — same.
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt` — same.
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/SmokeSpec.kt` — extends `RedstoneTestSpec` (was `ServerTestSpec`).
+- `src/test/kotlin/com/breadmoirai/garnet/testing/server/SuspendingTest.kt` — package-only update.
+- `src/clientTest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt` — references move from `testBridge` package to `main` package.
+- `src/clientTest/kotlin/com/breadmoirai/garnet/test/ClientTestSentinel.kt` — same.
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt` — same.
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/SmokeSpec.kt` — extends `GarnetTestSpec` (was `ServerTestSpec`).
 
 **Deleted:**
 - `src/testBridge/` source set entirely (after migration).
@@ -45,28 +45,28 @@
 ## Task 1: Verify scripting host works in current main classpath
 
 **Files:**
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecLoaderRoundtripTest.kt` *(new)*
+- Test: `src/test/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecLoaderRoundtripTest.kt` *(new)*
 
 - [ ] **Step 1: Write the failing test**
 
 ```kotlin
-package com.breadmoirai.redstonespecs.data.serial
+package com.breadmoirai.garnet.data.serial
 
-import com.breadmoirai.redstonespecs.data.RedstoneSpec
-import com.breadmoirai.redstonespecs.data.dsl.redstoneSpec
+import com.breadmoirai.garnet.data.GarnetSpec
+import com.breadmoirai.garnet.data.dsl.garnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 
 class KtsSpecLoaderRoundtripTest : FunSpec({
-    test("emit then load yields equivalent RedstoneSpec") {
-        val original = redstoneSpec("roundtrip-1") {
+    test("emit then load yields equivalent GarnetSpec") {
+        val original = garnetSpec("roundtrip-1") {
             bounds(4, 3, 2)
             lifespan = 8
         }
         val source = KtsSpecEmitter.emit(original)
         val loaded = KtsSpecLoader.loadString(source, name = "roundtrip-1.spec.kts")
-        loaded.shouldBeInstanceOf<RedstoneSpec>()
+        loaded.shouldBeInstanceOf<GarnetSpec>()
         loaded.id shouldBe "roundtrip-1"
         loaded.lifespan shouldBe 8
         loaded.bounds shouldBe original.bounds
@@ -76,13 +76,13 @@ class KtsSpecLoaderRoundtripTest : FunSpec({
 
 - [ ] **Step 2: Run test**
 
-Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.redstonespecs.data.serial.KtsSpecLoaderRoundtripTest"`
+Run: `cmd.exe /c "./gradlew.bat :26.1:test --tests com.breadmoirai.garnet.data.serial.KtsSpecLoaderRoundtripTest"`
 Expected: PASS. (If it fails, investigate before proceeding — every later plan assumes script eval works.)
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/test/kotlin/com/breadmoirai/redstonespecs/data/serial/KtsSpecLoaderRoundtripTest.kt
+git add src/test/kotlin/com/breadmoirai/garnet/data/serial/KtsSpecLoaderRoundtripTest.kt
 git commit -m "test(serial): add KtsSpecLoader emit↔load roundtrip"
 ```
 
@@ -91,27 +91,27 @@ git commit -m "test(serial): add KtsSpecLoader emit↔load roundtrip"
 ## Task 2: Move `testing/core` from testBridge to main
 
 **Files:**
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Dispatchers.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Dispatchers.kt`
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Lifecycle.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Lifecycle.kt`
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt`
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/ClientContextHolder.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/ClientContextHolder.kt`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Dispatchers.kt` → `src/main/kotlin/com/breadmoirai/garnet/testing/core/Dispatchers.kt`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Lifecycle.kt` → `src/main/kotlin/com/breadmoirai/garnet/testing/core/Lifecycle.kt`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt` → `src/main/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/ClientContextHolder.kt` → `src/main/kotlin/com/breadmoirai/garnet/testing/core/ClientContextHolder.kt`
 
 - [ ] **Step 1: Move the four files via git mv**
 
 ```bash
-mkdir -p src/main/kotlin/com/breadmoirai/redstonespecs/testing/core
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Dispatchers.kt        src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Lifecycle.kt          src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/Ticks.kt              src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/core/ClientContextHolder.kt src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/
+mkdir -p src/main/kotlin/com/breadmoirai/garnet/testing/core
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Dispatchers.kt        src/main/kotlin/com/breadmoirai/garnet/testing/core/
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Lifecycle.kt          src/main/kotlin/com/breadmoirai/garnet/testing/core/
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/Ticks.kt              src/main/kotlin/com/breadmoirai/garnet/testing/core/
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/core/ClientContextHolder.kt src/main/kotlin/com/breadmoirai/garnet/testing/core/
 ```
 
 - [ ] **Step 2: Verify package declarations are unchanged**
 
-The files already declare `package com.breadmoirai.redstonespecs.testing.core` — no edit needed.
+The files already declare `package com.breadmoirai.garnet.testing.core` — no edit needed.
 
-Run: `grep -n "^package" src/main/kotlin/com/breadmoirai/redstonespecs/testing/core/*.kt`
-Expected: each prints `package com.breadmoirai.redstonespecs.testing.core`.
+Run: `grep -n "^package" src/main/kotlin/com/breadmoirai/garnet/testing/core/*.kt`
+Expected: each prints `package com.breadmoirai.garnet.testing.core`.
 
 - [ ] **Step 3: Don't compile yet** — testBridge still references these via classpath; we'll fix after the rest of the move. Defer commit to Task 6.
 
@@ -120,15 +120,15 @@ Expected: each prints `package com.breadmoirai.redstonespecs.testing.core`.
 ## Task 3: Move `testing/server` from testBridge to main
 
 **Files:**
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Suspending.kt` → `src/main/...`
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Structures.kt` → `src/main/...`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Suspending.kt` → `src/main/...`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Structures.kt` → `src/main/...`
 
 - [ ] **Step 1: Move the files**
 
 ```bash
-mkdir -p src/main/kotlin/com/breadmoirai/redstonespecs/testing/server
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Suspending.kt  src/main/kotlin/com/breadmoirai/redstonespecs/testing/server/
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Structures.kt  src/main/kotlin/com/breadmoirai/redstonespecs/testing/server/
+mkdir -p src/main/kotlin/com/breadmoirai/garnet/testing/server
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Suspending.kt  src/main/kotlin/com/breadmoirai/garnet/testing/server/
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/server/Structures.kt  src/main/kotlin/com/breadmoirai/garnet/testing/server/
 ```
 
 - [ ] **Step 2: Defer commit to Task 6.**
@@ -138,42 +138,42 @@ git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/server/Struct
 ## Task 4: Move `testing/launcher` from testBridge to main
 
 **Files:**
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/KotestLauncher.kt` → `src/main/...`
-- Move: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/ResultCollector.kt` → `src/main/...`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/KotestLauncher.kt` → `src/main/...`
+- Move: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/ResultCollector.kt` → `src/main/...`
 
 - [ ] **Step 1: Move the files**
 
 ```bash
-mkdir -p src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/KotestLauncher.kt  src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/launcher/ResultCollector.kt src/main/kotlin/com/breadmoirai/redstonespecs/testing/launcher/
+mkdir -p src/main/kotlin/com/breadmoirai/garnet/testing/launcher
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/KotestLauncher.kt  src/main/kotlin/com/breadmoirai/garnet/testing/launcher/
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/launcher/ResultCollector.kt src/main/kotlin/com/breadmoirai/garnet/testing/launcher/
 ```
 
 - [ ] **Step 2: Defer commit to Task 6.**
 
 ---
 
-## Task 5: Rename `ServerTestSpec` to `RedstoneTestSpec` and move to main
+## Task 5: Rename `ServerTestSpec` to `GarnetTestSpec` and move to main
 
 **Files:**
-- Move + rename: `src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/ServerTestSpec.kt` → `src/main/kotlin/com/breadmoirai/redstonespecs/testing/RedstoneTestSpec.kt`
+- Move + rename: `src/testBridge/kotlin/com/breadmoirai/garnet/testing/ServerTestSpec.kt` → `src/main/kotlin/com/breadmoirai/garnet/testing/GarnetTestSpec.kt`
 
 - [ ] **Step 1: Move and rename**
 
 ```bash
-git mv src/testBridge/kotlin/com/breadmoirai/redstonespecs/testing/ServerTestSpec.kt  src/main/kotlin/com/breadmoirai/redstonespecs/testing/RedstoneTestSpec.kt
+git mv src/testBridge/kotlin/com/breadmoirai/garnet/testing/ServerTestSpec.kt  src/main/kotlin/com/breadmoirai/garnet/testing/GarnetTestSpec.kt
 ```
 
 - [ ] **Step 2: Edit the file — rename the class**
 
-Edit `src/main/kotlin/com/breadmoirai/redstonespecs/testing/RedstoneTestSpec.kt`. Replace every occurrence of `ServerTestSpec` with `RedstoneTestSpec`. Final file content:
+Edit `src/main/kotlin/com/breadmoirai/garnet/testing/GarnetTestSpec.kt`. Replace every occurrence of `ServerTestSpec` with `GarnetTestSpec`. Final file content:
 
 ```kotlin
 @file:OptIn(io.kotest.common.ExperimentalKotest::class)
 
-package com.breadmoirai.redstonespecs.testing
+package com.breadmoirai.garnet.testing
 
-import com.breadmoirai.redstonespecs.testing.core.McDispatchers
+import com.breadmoirai.garnet.testing.core.McDispatchers
 import io.kotest.core.concurrency.CoroutineDispatcherFactory
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.core.test.TestCase
@@ -184,7 +184,7 @@ import kotlinx.coroutines.withContext
  * Used by both shipped `.spec.kts` files (loaded at runtime) and dev tests in `src/gametest/`,
  * `src/clientTest/`, and `src/test/`.
  */
-abstract class RedstoneTestSpec(body: RedstoneTestSpec.() -> Unit = {}) : FunSpec() {
+abstract class GarnetTestSpec(body: GarnetTestSpec.() -> Unit = {}) : FunSpec() {
     init {
         coroutineDispatcherFactory = object : CoroutineDispatcherFactory {
             override suspend fun <T> withDispatcher(testCase: TestCase, block: suspend () -> T): T =
@@ -282,13 +282,13 @@ Expected: BUILD SUCCESSFUL across all five source sets. If anything in `clientTe
 - [ ] **Step 4: Commit**
 
 ```bash
-git add build.gradle.kts src/main/kotlin/com/breadmoirai/redstonespecs/testing src/testBridge
+git add build.gradle.kts src/main/kotlin/com/breadmoirai/garnet/testing src/testBridge
 git commit -m "refactor(testing): promote testing package and Kotest to main"
 ```
 
 ---
 
-## Task 7: Update consumers — rename ServerTestSpec → RedstoneTestSpec
+## Task 7: Update consumers — rename ServerTestSpec → GarnetTestSpec
 
 **Files:**
 - Modify: every file referencing `ServerTestSpec` (find them with grep below).
@@ -298,24 +298,24 @@ git commit -m "refactor(testing): promote testing package and Kotest to main"
 Run: `grep -rn "ServerTestSpec" src/ --include="*.kt"`
 
 The expected hits at the time of writing:
-- `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/SmokeSpec.kt`
-- `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/SpecTestContext.kt` (may import; verify)
+- `src/gametest/kotlin/com/breadmoirai/garnet/test/SmokeSpec.kt`
+- `src/clientTest/kotlin/com/breadmoirai/garnet/test/SpecTestContext.kt` (may import; verify)
 - `docs/gametest/kotest-bridge.md` (docs — handled in Task 8)
 
 - [ ] **Step 2: For each `.kt` consumer, rewrite extends/imports**
 
-For each file printed by the grep above, replace `ServerTestSpec` with `RedstoneTestSpec` (both in `import` lines and `class X : ServerTestSpec(...)` declarations).
+For each file printed by the grep above, replace `ServerTestSpec` with `GarnetTestSpec` (both in `import` lines and `class X : ServerTestSpec(...)` declarations).
 
 Example for `SmokeSpec.kt`:
 
 ```kotlin
 // Before:
-import com.breadmoirai.redstonespecs.testing.ServerTestSpec
+import com.breadmoirai.garnet.testing.ServerTestSpec
 class SmokeSpec : ServerTestSpec({ ... })
 
 // After:
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-class SmokeSpec : RedstoneTestSpec({ ... })
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+class SmokeSpec : GarnetTestSpec({ ... })
 ```
 
 - [ ] **Step 3: Build all source sets**
@@ -332,7 +332,7 @@ Expected: PASS. The `KtsSpecLoaderRoundtripTest` from Task 1 now runs against th
 
 ```bash
 git add src/
-git commit -m "refactor(testing): rename ServerTestSpec to RedstoneTestSpec at all call sites"
+git commit -m "refactor(testing): rename ServerTestSpec to GarnetTestSpec at all call sites"
 ```
 
 ---
@@ -346,7 +346,7 @@ git commit -m "refactor(testing): rename ServerTestSpec to RedstoneTestSpec at a
 
 - [ ] **Step 1: In `docs/gametest/kotest-bridge.md`**
 
-Replace `ServerTestSpec` with `RedstoneTestSpec` throughout. Update the "Base class" section's class name and prose. Add a sentence at the top of the article: "The same base class is used by shipped `.spec.kts` files at runtime — see `docs/superpowers/specs/2026-05-07-redstonespec-kotest-bridge-design.md`."
+Replace `ServerTestSpec` with `GarnetTestSpec` throughout. Update the "Base class" section's class name and prose. Add a sentence at the top of the article: "The same base class is used by shipped `.spec.kts` files at runtime — see `docs/superpowers/specs/2026-05-07-garnet-kotest-bridge-design.md`."
 
 - [ ] **Step 2: Decide on `gametest-sourceset-split-wiring.md`**
 
@@ -368,7 +368,7 @@ The `testBridge` source set was merged into `main` on 2026-05-07; see `docs/supe
 
 ```bash
 git add docs/
-git commit -m "docs: update kotest-bridge for ServerTestSpec→RedstoneTestSpec; retire split-wiring article"
+git commit -m "docs: update kotest-bridge for ServerTestSpec→GarnetTestSpec; retire split-wiring article"
 ```
 
 ---
@@ -376,7 +376,7 @@ git commit -m "docs: update kotest-bridge for ServerTestSpec→RedstoneTestSpec;
 ## Task 9: Update memory references
 
 **Files:**
-- Modify: `/home/local/.claude/projects/-mnt-h-Repo-RedstoneSpecs/memory/MEMORY.md`
+- Modify: `/home/local/.claude/projects/-mnt-h-Repo-garnet/memory/MEMORY.md`
 - Modify: the linked memory file `reference_gametest_split_wiring.md` if it exists.
 
 - [ ] **Step 1: Update the memory pointer**
@@ -400,8 +400,8 @@ git commit -m "chore: refresh memory pointer for retired split-wiring doc" --all
 - [ ] `grep -rn "ServerTestSpec" src/ docs/` returns nothing.
 - [ ] `cmd.exe /c "./gradlew.bat :26.1:clientClasses classes gametestClasses clientTestClasses testClasses"` succeeds.
 - [ ] `cmd.exe /c "./gradlew.bat :26.1:test"` succeeds, including the new `KtsSpecLoaderRoundtripTest`.
-- [ ] `RedstoneTestSpec` is in `src/main/kotlin/com/breadmoirai/redstonespecs/testing/RedstoneTestSpec.kt`.
-- [ ] `KotestLauncher`, `ResultCollector`, `Structures`, `Suspending`, `McDispatchers`, `awaitTicks` all live under `src/main/kotlin/com/breadmoirai/redstonespecs/testing/`.
+- [ ] `GarnetTestSpec` is in `src/main/kotlin/com/breadmoirai/garnet/testing/GarnetTestSpec.kt`.
+- [ ] `KotestLauncher`, `ResultCollector`, `Structures`, `Suspending`, `McDispatchers`, `awaitTicks` all live under `src/main/kotlin/com/breadmoirai/garnet/testing/`.
 
 ---
 
@@ -409,5 +409,5 @@ git commit -m "chore: refresh memory pointer for retired split-wiring doc" --all
 
 - No new behavior. Nothing at runtime calls `KotestLauncher` from production code yet — that's Plan D.
 - `OutputVerifier` is untouched. Plan B retires it.
-- `KtsSpecEmitter` still emits the declarative `redstoneSpec(...)` form. Plan C wraps that in a `RedstoneTestSpec` subclass.
+- `KtsSpecEmitter` still emits the declarative `garnetSpec(...)` form. Plan C wraps that in a `GarnetTestSpec` subclass.
 - The shipped jar gets larger (Kotest engine + assertions move from `testBridgeImplementation` to `implementation`). This is intentional and discussed in the spec; no mitigation in this plan.

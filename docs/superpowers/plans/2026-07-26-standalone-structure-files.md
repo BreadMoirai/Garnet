@@ -6,7 +6,7 @@
 
 **Architecture:** A pure Kotlin math unit (`StructureRegionMath`) computes the tight auto-fit box and the placement anchor. `StructurePersistence` gains level-driven `saveAutoFitToFile`/`placeStructureCentered`. `ProjectDimRegistry` hands out a disjoint per-structure region lane and tracks the last-placed box for cheap re-clears. Three C2S packets + one S2C packet drive three server handlers in `ProjectNetworkRegistry`. The client wires `.nbt` clicks and two header actions into those packets.
 
-**Tech Stack:** Kotlin 2.x, Fabric, Minecraft **26.1.2** (Mojang mappings; `LevelHeightAccessor.getMinY()/getMaxY()`), `StructureTemplate`/`NbtIo`, Kotest (`FunSpec` autoscanned in `src/test`; `RedstoneTestSpec`/`ClientSpec` registered in `GametestSentinel` for game/client tests).
+**Tech Stack:** Kotlin 2.x, Fabric, Minecraft **26.1.2** (Mojang mappings; `LevelHeightAccessor.getMinY()/getMaxY()`), `StructureTemplate`/`NbtIo`, Kotest (`FunSpec` autoscanned in `src/test`; `GarnetTestSpec`/`ClientSpec` registered in `GametestSentinel` for game/client tests).
 
 ## Global Constraints
 
@@ -25,8 +25,8 @@
 ### Task 1: Pure region math (`StructureRegionMath.kt`)
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/project/StructureRegionMath.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/project/StructureRegionMathTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/project/StructureRegionMath.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/project/StructureRegionMathTest.kt`
 
 **Interfaces:**
 - Consumes: nothing (leaf, no Minecraft deps).
@@ -39,10 +39,10 @@
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `src/test/kotlin/com/breadmoirai/redstonespecs/project/StructureRegionMathTest.kt`:
+Create `src/test/kotlin/com/breadmoirai/garnet/project/StructureRegionMathTest.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.project
+package com.breadmoirai.garnet.project
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldBeNull
@@ -90,10 +90,10 @@ Expected: FAIL — unresolved `autoFit` / `FitBox` / `centeredStart` / `anchorY`
 
 - [ ] **Step 3: Write the minimal implementation**
 
-Create `src/main/kotlin/com/breadmoirai/redstonespecs/project/StructureRegionMath.kt`:
+Create `src/main/kotlin/com/breadmoirai/garnet/project/StructureRegionMath.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.project
+package com.breadmoirai.garnet.project
 
 /** A tight axis-aligned box in region-local coordinates. */
 data class FitBox(
@@ -144,8 +144,8 @@ Expected: PASS (all `StructureRegionMathTest` cases).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/project/StructureRegionMath.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/project/StructureRegionMathTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/project/StructureRegionMath.kt \
+        src/test/kotlin/com/breadmoirai/garnet/project/StructureRegionMathTest.kt
 git commit -m "feat(project): pure auto-fit box + placement-anchor math for structures"
 ```
 
@@ -154,8 +154,8 @@ git commit -m "feat(project): pure auto-fit box + placement-anchor math for stru
 ### Task 2: Create empty structure file (`ProjectNewStructure`)
 
 **Files:**
-- Create: `src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectNewStructure.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/project/ProjectNewStructureTest.kt`
+- Create: `src/main/kotlin/com/breadmoirai/garnet/project/ProjectNewStructure.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/project/ProjectNewStructureTest.kt`
 
 **Interfaces:**
 - Consumes: nothing.
@@ -165,10 +165,10 @@ Mirrors `ProjectNewSpec.create` (same name validation regex), but writes an empt
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/test/kotlin/com/breadmoirai/redstonespecs/project/ProjectNewStructureTest.kt`:
+Create `src/test/kotlin/com/breadmoirai/garnet/project/ProjectNewStructureTest.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.project
+package com.breadmoirai.garnet.project
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
@@ -209,10 +209,10 @@ Expected: FAIL — unresolved `ProjectNewStructure`.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-Create `src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectNewStructure.kt`:
+Create `src/main/kotlin/com/breadmoirai/garnet/project/ProjectNewStructure.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.project
+package com.breadmoirai.garnet.project
 
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtIo
@@ -221,7 +221,7 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.exists
 
-private val LOGGER = LoggerFactory.getLogger("Redstone Specs")
+private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 object ProjectNewStructure {
     /**
@@ -256,8 +256,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectNewStructure.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/project/ProjectNewStructureTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/project/ProjectNewStructure.kt \
+        src/test/kotlin/com/breadmoirai/garnet/project/ProjectNewStructureTest.kt
 git commit -m "feat(project): ProjectNewStructure creates an empty .nbt file"
 ```
 
@@ -266,9 +266,9 @@ git commit -m "feat(project): ProjectNewStructure creates an empty .nbt file"
 ### Task 3: Config + structure region assignment + placed-box tracking
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/config/SharedSettings.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectDimRegistry.kt`
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/project/ProjectDimRegistryTest.kt` (extend)
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/config/SharedSettings.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/project/ProjectDimRegistry.kt`
+- Test: `src/test/kotlin/com/breadmoirai/garnet/project/ProjectDimRegistryTest.kt` (extend)
 
 **Interfaces:**
 - Consumes: `SharedSettings.projectGridYBase`, `ProjectDimRegistry.REGION_PAD`.
@@ -385,9 +385,9 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/config/SharedSettings.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/project/ProjectDimRegistry.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/project/ProjectDimRegistryTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/config/SharedSettings.kt \
+        src/main/kotlin/com/breadmoirai/garnet/project/ProjectDimRegistry.kt \
+        src/test/kotlin/com/breadmoirai/garnet/project/ProjectDimRegistryTest.kt
 git commit -m "feat(project): structure region lane + placed-box tracking + region-size config"
 ```
 
@@ -396,9 +396,9 @@ git commit -m "feat(project): structure region lane + placed-box tracking + regi
 ### Task 4: Level-driven capture + placement (`StructurePersistence` extend)
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructurePersistence.kt`
-- Create (gametest): `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/persistence/StructureRegionPersistenceSpec.kt`
-- Modify (register): `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/persistence/StructurePersistence.kt`
+- Create (gametest): `src/gametest/kotlin/com/breadmoirai/garnet/test/persistence/StructureRegionPersistenceSpec.kt`
+- Modify (register): `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`
 
 **Interfaces:**
 - Consumes (Task 1): `autoFit`, `FitBox`, `centeredStart`, `anchorY`; (Task 3) `PlacedBox`.
@@ -408,15 +408,15 @@ git commit -m "feat(project): structure region lane + placed-box tracking + regi
 
 - [ ] **Step 1: Write the failing gametest**
 
-Create `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/persistence/StructureRegionPersistenceSpec.kt`:
+Create `src/gametest/kotlin/com/breadmoirai/garnet/test/persistence/StructureRegionPersistenceSpec.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.persistence
+package com.breadmoirai.garnet.test.persistence
 
-import com.breadmoirai.redstonespecs.persistence.StructurePersistence
-import com.breadmoirai.redstonespecs.project.ProjectDimRegistry
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.persistence.StructurePersistence
+import com.breadmoirai.garnet.project.ProjectDimRegistry
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
@@ -424,7 +424,7 @@ import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Blocks
 import java.nio.file.Files
 
-class StructureRegionPersistenceSpec : RedstoneTestSpec({
+class StructureRegionPersistenceSpec : GarnetTestSpec({
 
     test("auto-fit save captures the tight non-air box; place re-centers it") {
         onServer {
@@ -477,7 +477,7 @@ class StructureRegionPersistenceSpec : RedstoneTestSpec({
 ```
 
 Register it in `GametestSentinel.kt`: add the import
-`import com.breadmoirai.redstonespecs.test.persistence.StructureRegionPersistenceSpec`
+`import com.breadmoirai.garnet.test.persistence.StructureRegionPersistenceSpec`
 and add `StructureRegionPersistenceSpec::class,` to the `specs = listOf(...)`.
 
 - [ ] **Step 2: Run to verify it fails**
@@ -494,10 +494,10 @@ Expected: FAIL — unresolved `saveAutoFitToFile` / `placeStructureCentered`.
 Add imports at the top of `StructurePersistence.kt`:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.project.PlacedBox
-import com.breadmoirai.redstonespecs.project.anchorY
-import com.breadmoirai.redstonespecs.project.autoFit
-import com.breadmoirai.redstonespecs.project.centeredStart
+import com.breadmoirai.garnet.project.PlacedBox
+import com.breadmoirai.garnet.project.anchorY
+import com.breadmoirai.garnet.project.autoFit
+import com.breadmoirai.garnet.project.centeredStart
 ```
 
 Add these two methods inside `object StructurePersistence`:
@@ -576,9 +576,9 @@ Expected: PASS — both `StructureRegionPersistenceSpec` cases.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/persistence/StructurePersistence.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/persistence/StructureRegionPersistenceSpec.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt
+git add src/main/kotlin/com/breadmoirai/garnet/persistence/StructurePersistence.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/persistence/StructureRegionPersistenceSpec.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt
 git commit -m "feat(persistence): auto-fit capture + centered placement for structures"
 ```
 
@@ -587,9 +587,9 @@ git commit -m "feat(persistence): auto-fit capture + centered placement for stru
 ### Task 5: Packets (`network/project`)
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt`
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt` (register types only)
-- Test: `src/test/kotlin/com/breadmoirai/redstonespecs/network/StructurePacketsTest.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt` (register types only)
+- Test: `src/test/kotlin/com/breadmoirai/garnet/network/StructurePacketsTest.kt`
 
 **Interfaces:**
 - Produces:
@@ -600,15 +600,15 @@ git commit -m "feat(persistence): auto-fit capture + centered placement for stru
 
 - [ ] **Step 1: Write the failing codec round-trip test**
 
-Create `src/test/kotlin/com/breadmoirai/redstonespecs/network/StructurePacketsTest.kt`:
+Create `src/test/kotlin/com/breadmoirai/garnet/network/StructurePacketsTest.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.network
+package com.breadmoirai.garnet.network
 
-import com.breadmoirai.redstonespecs.network.project.NewStructureC2S
-import com.breadmoirai.redstonespecs.network.project.PlaceStructureC2S
-import com.breadmoirai.redstonespecs.network.project.SaveStructureC2S
-import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
+import com.breadmoirai.garnet.network.project.NewStructureC2S
+import com.breadmoirai.garnet.network.project.PlaceStructureC2S
+import com.breadmoirai.garnet.network.project.SaveStructureC2S
+import com.breadmoirai.garnet.network.project.StructureResultS2C
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.netty.buffer.Unpooled
@@ -725,9 +725,9 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectPackets.kt \
-        src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt \
-        src/test/kotlin/com/breadmoirai/redstonespecs/network/StructurePacketsTest.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectPackets.kt \
+        src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt \
+        src/test/kotlin/com/breadmoirai/garnet/network/StructurePacketsTest.kt
 git commit -m "feat(net): structure place/save/new C2S + result S2C packets"
 ```
 
@@ -736,9 +736,9 @@ git commit -m "feat(net): structure place/save/new C2S + result S2C packets"
 ### Task 6: Server handlers (`ProjectNetworkRegistry`)
 
 **Files:**
-- Modify: `src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt`
-- Test: `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectStructureNetworkSpec.kt` (new)
-- Modify (register): `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt`
+- Modify: `src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt`
+- Test: `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectStructureNetworkSpec.kt` (new)
+- Modify (register): `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt`
 
 **Interfaces:**
 - Consumes: Task 3 (`getOrAssignStructureRegion`, `placedBoxOf`, `setPlacedBox`, `PlacedBox`), Task 4 (`saveAutoFitToFile`, `placeStructureCentered`, `StructurePersistence.clearBounds`), Task 2 (`ProjectNewStructure.create`), Task 5 packets.
@@ -746,34 +746,34 @@ git commit -m "feat(net): structure place/save/new C2S + result S2C packets"
 
 - [ ] **Step 1: Write the failing gametest**
 
-Create `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectStructureNetworkSpec.kt`:
+Create `src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectStructureNetworkSpec.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test.project
+package com.breadmoirai.garnet.test.project
 
-import com.breadmoirai.redstonespecs.config.SharedSettings
-import com.breadmoirai.redstonespecs.network.project.NewStructureC2S
-import com.breadmoirai.redstonespecs.network.project.PlaceStructureC2S
-import com.breadmoirai.redstonespecs.network.project.SaveStructureC2S
-import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectErrorS2C
-import com.breadmoirai.redstonespecs.network.project.ProjectNetworkRegistry
-import com.breadmoirai.redstonespecs.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.redstonespecs.project.ProjectNewStructure
-import com.breadmoirai.redstonespecs.project.ProjectRoot
-import com.breadmoirai.redstonespecs.project.ProjectServerContext
-import com.breadmoirai.redstonespecs.project.ProjectSession
-import com.breadmoirai.redstonespecs.test.drainPayloads
-import com.breadmoirai.redstonespecs.test.makeMockServerPlayer
-import com.breadmoirai.redstonespecs.test.withTempRoot
-import com.breadmoirai.redstonespecs.testing.RedstoneTestSpec
-import com.breadmoirai.redstonespecs.testing.server.onServer
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.network.project.NewStructureC2S
+import com.breadmoirai.garnet.network.project.PlaceStructureC2S
+import com.breadmoirai.garnet.network.project.SaveStructureC2S
+import com.breadmoirai.garnet.network.project.StructureResultS2C
+import com.breadmoirai.garnet.network.project.ProjectErrorS2C
+import com.breadmoirai.garnet.network.project.ProjectNetworkRegistry
+import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
+import com.breadmoirai.garnet.project.ProjectNewStructure
+import com.breadmoirai.garnet.project.ProjectRoot
+import com.breadmoirai.garnet.project.ProjectServerContext
+import com.breadmoirai.garnet.project.ProjectSession
+import com.breadmoirai.garnet.test.drainPayloads
+import com.breadmoirai.garnet.test.makeMockServerPlayer
+import com.breadmoirai.garnet.test.withTempRoot
+import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import net.minecraft.world.level.block.Blocks
 import kotlin.io.path.exists
 
-class ProjectStructureNetworkSpec : RedstoneTestSpec({
+class ProjectStructureNetworkSpec : GarnetTestSpec({
 
     test("place then save round-trips a standalone structure via handlers") {
         withTempRoot("struct-net") { tmp ->
@@ -792,7 +792,7 @@ class ProjectStructureNetworkSpec : RedstoneTestSpec({
                 placed.subpath shouldBe "gadget.nbt"
 
                 // Build a block in the assigned region, then save: captures a 1x1x1 box.
-                val region = com.breadmoirai.redstonespecs.project.ProjectDimRegistry.of(this).structureRegionOriginOf("gadget.nbt")!!
+                val region = com.breadmoirai.garnet.project.ProjectDimRegistry.of(this).structureRegionOriginOf("gadget.nbt")!!
                 overworld().setBlock(region.offset(5, 0, 5), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                 ProjectNetworkRegistry.handleSaveStructure(this, player, SaveStructureC2S("gadget.nbt"))
                 val saved = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
@@ -851,7 +851,7 @@ Expected: FAIL — unresolved `handlePlaceStructure` / `handleSaveStructure` / `
 Add imports to `ProjectNetworkRegistry.kt`:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.persistence.StructurePersistence
+import com.breadmoirai.garnet.persistence.StructurePersistence
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.entity.Relative
@@ -963,9 +963,9 @@ Expected: PASS — all `ProjectStructureNetworkSpec` cases.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/redstonespecs/network/project/ProjectNetworkRegistry.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/project/ProjectStructureNetworkSpec.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt
+git add src/main/kotlin/com/breadmoirai/garnet/network/project/ProjectNetworkRegistry.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/project/ProjectStructureNetworkSpec.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt
 git commit -m "feat(net): place/save/new structure server handlers"
 ```
 
@@ -974,11 +974,11 @@ git commit -m "feat(net): place/save/new structure server handlers"
 ### Task 7: Client wiring (Explorer actions + result status)
 
 **Files:**
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/project/ProjectClientNetworking.kt`
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt`
-- Modify: `src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt`
-- Test: `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/StructureExplorerSpec.kt` (new)
-- Modify (register): `src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt` (clientTest specs are registered the same way — add to the appropriate list; if clientTest uses a separate sentinel, register there)
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/project/ProjectClientNetworking.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt`
+- Modify: `src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt`
+- Test: `src/clientTest/kotlin/com/breadmoirai/garnet/test/StructureExplorerSpec.kt` (new)
+- Modify (register): `src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt` (clientTest specs are registered the same way — add to the appropriate list; if clientTest uses a separate sentinel, register there)
 
 **Interfaces:**
 - Consumes: Task 5 packets, `ProjectTreeState`.
@@ -986,14 +986,14 @@ git commit -m "feat(net): place/save/new structure server handlers"
 
 - [ ] **Step 1: Write the failing clientTest**
 
-Create `src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/StructureExplorerSpec.kt`:
+Create `src/clientTest/kotlin/com/breadmoirai/garnet/test/StructureExplorerSpec.kt`:
 
 ```kotlin
-package com.breadmoirai.redstonespecs.test
+package com.breadmoirai.garnet.test
 
-import com.breadmoirai.redstonespecs.client.ide.ProjectTreeState
-import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
-import com.breadmoirai.redstonespecs.testing.ClientSpec
+import com.breadmoirai.garnet.client.ide.ProjectTreeState
+import com.breadmoirai.garnet.network.project.StructureResultS2C
+import com.breadmoirai.garnet.testing.ClientSpec
 import io.kotest.matchers.shouldBe
 
 class StructureExplorerSpec : ClientSpec({
@@ -1019,7 +1019,7 @@ Expected: FAIL — unresolved `onStructureResult`.
 In `ProjectTreeState.kt`, add the import and handler:
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
+import com.breadmoirai.garnet.network.project.StructureResultS2C
 ```
 ```kotlin
     fun onStructureResult(r: StructureResultS2C) { status = r.message }
@@ -1028,7 +1028,7 @@ import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
 In `ProjectClientNetworking.kt`, add the import and receiver (inside `register()`):
 
 ```kotlin
-import com.breadmoirai.redstonespecs.network.project.StructureResultS2C
+import com.breadmoirai.garnet.network.project.StructureResultS2C
 ```
 ```kotlin
         ClientPlayNetworking.registerGlobalReceiver(StructureResultS2C.TYPE) { payload, ctx ->
@@ -1046,9 +1046,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.breadmoirai.redstonespecs.network.project.NewStructureC2S
-import com.breadmoirai.redstonespecs.network.project.PlaceStructureC2S
-import com.breadmoirai.redstonespecs.network.project.SaveStructureC2S
+import com.breadmoirai.garnet.network.project.NewStructureC2S
+import com.breadmoirai.garnet.network.project.PlaceStructureC2S
+import com.breadmoirai.garnet.network.project.SaveStructureC2S
 ```
 
 Make `.nbt` file rows place-on-click (and keep selection). Replace the `is FileNode ->` branch body in `TreeNode` with:
@@ -1108,11 +1108,11 @@ Expected: PASS. Also run the compile sanity across all sourcesets:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/client/kotlin/com/breadmoirai/redstonespecs/client/project/ProjectClientNetworking.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectTreeState.kt \
-        src/client/kotlin/com/breadmoirai/redstonespecs/client/ide/ProjectExplorerPanel.kt \
-        src/clientTest/kotlin/com/breadmoirai/redstonespecs/test/StructureExplorerSpec.kt \
-        src/gametest/kotlin/com/breadmoirai/redstonespecs/test/GametestSentinel.kt
+git add src/client/kotlin/com/breadmoirai/garnet/client/project/ProjectClientNetworking.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectTreeState.kt \
+        src/client/kotlin/com/breadmoirai/garnet/client/ide/ProjectExplorerPanel.kt \
+        src/clientTest/kotlin/com/breadmoirai/garnet/test/StructureExplorerSpec.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/GametestSentinel.kt
 git commit -m "feat(ui): Explorer place/save/new actions for structure files"
 ```
 

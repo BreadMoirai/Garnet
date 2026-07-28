@@ -40,7 +40,7 @@ Unsaved edits are captured to a **dirty sidecar file adjacent to the structure f
 
 Fabric fires `BEFORE_SAVE` on **every** world save — periodic autosave, `/save-all`, and the
 shutdown save. Signature: `onBeforeSave(server, flush, force)`. Registered in
-`Redstonespecs.kt` alongside the existing `SERVER_STARTING` / `SERVER_STARTED` /
+`garnet.kt` alongside the existing `SERVER_STARTING` / `SERVER_STARTED` /
 `SERVER_STOPPED` hooks. No mixin on the save path is needed.
 
 On each fire, for **every structure currently placed this session**
