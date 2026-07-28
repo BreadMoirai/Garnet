@@ -46,3 +46,12 @@ versions/**/logs/
 /versions/**/options.txt
 /.claude/settings.local.json
 /.claude/scheduled_tasks.lock
+
+# qmd docs search — local index artifacts. The collection config .qmd/index.yml IS committed;
+# everything else here is a machine-local build artifact, rebuildable with `qmd update && qmd embed`.
+/.qmd/*.sqlite
+/.qmd/*.sqlite-*
+/.qmd/*.db
+/.qmd/*.db-*
+/.qmd/*.lock
+/.qmd/reindex.log

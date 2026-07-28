@@ -1,8 +1,12 @@
-# Build
+# Tooling
 
-Multi-version build setup. Stonecutter task paths, gradle wrappers, fabric/loom configuration, and dependency choices.
+Build and developer tooling. Multi-version build setup, Stonecutter task paths, gradle wrappers,
+fabric/loom configuration, dependency choices, and the local docs-search index.
 
-**Tags:** gradle, stonecutter, fabric, loom, deps, wsl
+**Tags:** gradle, stonecutter, fabric, loom, deps, wsl, tooling, docs
+
+> Named `tooling/`, not `build/`: qmd (the docs search index) hardcodes an exclude for any
+> directory named `build`, so articles here would be permanently unsearchable under that name.
 
 ## Articles
 

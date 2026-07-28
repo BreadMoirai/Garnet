@@ -1,0 +1,10 @@
+collections:
+  redstonespecs-docs:
+    path: /mnt/h/Repo/RedstoneSpecs/docs
+    pattern: "!(superpowers)/**/*.md"
+    context:
+      "": "Minecraft Fabric mod (Kotlin, Stonecutter multi-version). Internals documentation: architecture and data model, client editor/runner UI, spec execution engine, persistence and network payloads, gametest harness, MC API quirks and mixins, Gradle build, and user-journey coverage audits."
+models:
+  embed: hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf
+  generate: hf:tobil/qmd-query-expansion-1.7B-gguf/qmd-query-expansion-1.7B-q4_k_m.gguf
+  rerank: hf:ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/qwen3-reranker-0.6b-q8_0.gguf

@@ -61,5 +61,5 @@ Don't save: code patterns the code itself shows, transient task state, recent-ch
 | [persistence/](docs/persistence/INDEX.md) | storage, networking, payloads, serialization | How specs are saved/loaded, C2S/S2C payloads, on-disk formats |
 | [gametest/](docs/gametest/INDEX.md) | testing, fixtures, helpers, harness | Game-test infrastructure, test contexts, conventions for new tests |
 | [minecraft/](docs/minecraft/INDEX.md) | mc-api, mixins, versions, quirks | MC source patterns, mixin gotchas, render-state API, version-specific behavior |
-| [build/](docs/build/INDEX.md) | gradle, stonecutter, fabric, deps | Multi-version build setup, Stonecutter task paths, dependency choices |
+| [tooling/](docs/tooling/INDEX.md) | gradle, stonecutter, fabric, deps, tooling | Multi-version build setup, Stonecutter task paths, dependency choices, docs-search index |
 | [use-cases/](docs/use-cases/INDEX.md) | use-cases, scenarios, coverage, audit, test-matrix | User journeys decomposed into system interactions, with a per-journey test-coverage audit |
