@@ -41,7 +41,7 @@ var cursorFocusActive: Boolean = false
 fun registerCursorFocusToggle() {
     ClientTickEvents.END_CLIENT_TICK.register { mc ->
         while (keyToggleCursorFocus.consumeClick()) {
-            if (mc.screen != null) {
+            if (mc.gui.screen() != null) {
                 // A real GUI screen is open; let vanilla's own grab/release handling own the
                 // cursor state instead of fighting it.
                 continue

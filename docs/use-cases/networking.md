@@ -30,7 +30,7 @@ UC-NET-01.b–d and UC-NET-03.e below describe that no-op reality, not a screen.
 **System interactions:**
 - UC-NET-01.a — On the server side the block resolves the `SpecBlockEntity` at `blockPos` and builds an `OpenRecorderScreenS2C` payload carrying `originPos`, `specId`, `outPath`, `structureId`, and the current recorder state string. Unchanged by the hard-cut.
 - UC-NET-01.b — `ClientNetworkHandler.registerClientNetworking` still registers the `OpenRecorderScreenS2C.TYPE` receiver; on arrival the handler executes on the client main thread via `mc.execute` and only logs — it does not instantiate any screen.
-- UC-NET-01.c — No screen is instantiated. `mc.setScreen` is never called for this payload; the payload's fields (`specId`, `outPath`, `structureId`, `state`) are read from the log line only, not surfaced in any widget.
+- UC-NET-01.c — No screen is instantiated. `mc.gui.setScreen` is never called for this payload; the payload's fields (`specId`, `outPath`, `structureId`, `state`) are read from the log line only, not surfaced in any widget.
 - UC-NET-01.d — No C2S packet is sent to open the screen; the server is still the sole initiator of the `OpenRecorderScreenS2C` send, even though the client now discards it.
 
 **Invariants:** [persistence/network-payload-contract.md](../persistence/network-payload-contract.md) — server is the only writer; client carries no cached spec state.
@@ -82,7 +82,7 @@ UC-NET-01.b–d and UC-NET-03.e below describe that no-op reality, not a screen.
 **Outcome:** The player sees a `ConfirmScreen` ("Overwrite existing blocks with structure?"). Their yes/no choice is returned to the server as `OverwriteDecisionC2SPayload`; on "yes" the server clears the bounds region with `StructurePersistence.clearBounds` then calls `StructurePersistence.load` to place the structure; on "no" the load is skipped and the world is unchanged.
 
 **System interactions:**
-- UC-NET-04.a — `ClientNetworkHandler` registers the `OverwritePromptS2CPayload.TYPE` receiver; on arrival it calls `mc.setScreen` with a `ConfirmScreen` whose `BooleanConsumer` closes the screen and sends `OverwriteDecisionC2SPayload(payload.originPos, overwrite)`.
+- UC-NET-04.a — `ClientNetworkHandler` registers the `OverwritePromptS2CPayload.TYPE` receiver; on arrival it calls `mc.gui.setScreen` with a `ConfirmScreen` whose `BooleanConsumer` closes the screen and sends `OverwriteDecisionC2SPayload(payload.originPos, overwrite)`.
 - UC-NET-04.b — The `OverwriteDecisionC2SPayload` handler on the server performs the `SpecBlockEntity` lookup via the standard `originPos` guard (UC-NET-02); if the BE is gone when the decision arrives, the decision is silently dropped.
 - UC-NET-04.c — On `overwrite = true` the server calls `StructurePersistence.clearBounds(level, be.blockPos, be.specBounds)` followed by `StructurePersistence.load`; both calls happen on the server main thread in the same `execute` block.
 - UC-NET-04.d — If the player disconnects after `OverwritePromptS2CPayload` is sent but before `OverwriteDecisionC2SPayload` arrives, the server never receives the decision; the structure is neither cleared nor placed, leaving the world in its pre-prompt state.

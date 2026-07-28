@@ -22,8 +22,10 @@ artifact roots (one pair per stonecutter version slice):
   block classes like `ComparatorBlock` or `RedStoneWireBlock` — those are in
   `minecraft-common`.
 
-For 26.1.2 the common jar is at:
-`/mnt/h/Repo/RedstoneSpecs/.gradle/loom-cache/minecraftMaven/net/minecraft/minecraft-common-b534c02ea6/26.1.2/minecraft-common-b534c02ea6-26.1.2-sources.jar`
+For 26.2 the common sources jar is at:
+`/mnt/h/Repo/RedstoneSpecs/.gradle/loom-cache/minecraftMaven/net/minecraft/minecraft-common-a89b853bf9/26.2/minecraft-common-a89b853bf9-26.2-sources.jar`
+(the `<hash>` differs between the compiled and `-sources` jars, and changes when the MC version
+or mappings change — glob `*26.2*sources.jar` under `loom-cache` rather than hard-coding it).
 
 ## Extracting from WSL
 

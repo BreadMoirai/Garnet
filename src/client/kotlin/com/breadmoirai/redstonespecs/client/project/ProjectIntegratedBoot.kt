@@ -69,7 +69,7 @@ object ProjectIntegratedBoot {
     private fun openOrCreateWorld(saveName: String) {
         val mc = Minecraft.getInstance()
         val flows = mc.createWorldOpenFlows()
-        val onCancel = Runnable { mc.setScreen(null) }
+        val onCancel = Runnable { mc.gui.setScreen(null) }
 
         val exists = try {
             mc.levelSource.levelExists(saveName)
@@ -97,7 +97,11 @@ object ProjectIntegratedBoot {
         val dimensionsProvider = java.util.function.Function<net.minecraft.core.HolderLookup.Provider, WorldDimensions> { provider ->
             // Start from the FLAT preset (gives us nether/end stems), then override the
             // overworld stem with a FlatLevelSource built from THE_VOID's preset settings.
-            val baseDimensions = WorldPresets.createFlatWorldDimensions(provider)
+            // MC 26.2 removed WorldPresets.createFlatWorldDimensions; build the FLAT preset's
+            // dimensions straight from the registry (same shape createNormalWorldDimensions uses),
+            // giving us the nether/end stems before we override the overworld with the void source.
+            val baseDimensions = provider.lookupOrThrow(Registries.WORLD_PRESET)
+                .getOrThrow(WorldPresets.FLAT).value().createWorldDimensions()
             val voidPreset = provider.lookupOrThrow(Registries.FLAT_LEVEL_GENERATOR_PRESET)
                 .getOrThrow(FlatLevelGeneratorPresets.THE_VOID)
                 .value()
@@ -106,7 +110,7 @@ object ProjectIntegratedBoot {
 
         // `createFreshLevel`'s parentScreen is shown if datapack loading throws; pass current
         // screen if any, else a fresh empty TitleScreen-equivalent (null is not allowed).
-        val parentScreen = mc.screen ?: net.minecraft.client.gui.screens.TitleScreen()
+        val parentScreen = mc.gui.screen() ?: net.minecraft.client.gui.screens.TitleScreen()
         flows.createFreshLevel(saveName, levelSettings, worldOptions, dimensionsProvider, parentScreen)
     }
 }

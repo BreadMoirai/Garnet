@@ -44,7 +44,7 @@ fun runOnClient(action: (net.minecraft.client.Minecraft) -> Unit) {
 /**
  * Polls the client's current screen until it is an instance of [screenClass], or
  * until [timeoutMs] elapses. Throws on timeout. To inspect the screen afterward,
- * fetch it explicitly via `onClient { mc -> mc.screen }` — direct access from the
+ * fetch it explicitly via `onClient { mc -> mc.gui.screen() }` — direct access from the
  * calling thread is unsafe.
  */
 fun waitForClientScreen(
@@ -53,11 +53,11 @@ fun waitForClientScreen(
 ) {
     val deadline = System.currentTimeMillis() + timeoutMs
     while (System.currentTimeMillis() < deadline) {
-        val matched = onClient { mc -> screenClass.isInstance(mc.screen) }
+        val matched = onClient { mc -> screenClass.isInstance(mc.gui.screen()) }
         if (matched) return
         Thread.sleep(50)
     }
-    val current = onClient { mc -> mc.screen?.javaClass?.simpleName }
+    val current = onClient { mc -> mc.gui.screen()?.javaClass?.simpleName }
     error("Timed out after ${timeoutMs}ms waiting for screen ${screenClass.simpleName}; current is ${current ?: "null"}")
 }
 
@@ -66,13 +66,13 @@ fun waitForClientScreen(
  * `mc.setScreen(null)`. Polls until the change is observed.
  */
 fun closeClientScreen(timeoutMs: Long = 5000) {
-    onClient { mc -> mc.setScreen(null) }
+    onClient { mc -> mc.gui.setScreen(null) }
     val deadline = System.currentTimeMillis() + timeoutMs
     while (System.currentTimeMillis() < deadline) {
-        if (onClient { mc -> mc.screen } == null) return
+        if (onClient { mc -> mc.gui.screen() } == null) return
         Thread.sleep(50)
     }
-    val current = onClient { mc -> mc.screen?.javaClass?.simpleName }
+    val current = onClient { mc -> mc.gui.screen()?.javaClass?.simpleName }
     error("Timed out after ${timeoutMs}ms waiting for client screen to clear; current is $current")
 }
 

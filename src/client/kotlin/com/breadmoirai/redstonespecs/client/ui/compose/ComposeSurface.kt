@@ -1,5 +1,6 @@
 package com.breadmoirai.redstonespecs.client.ui.compose
 
+import com.mojang.blaze3d.GpuFormat
 import com.mojang.blaze3d.opengl.GlDevice
 import com.mojang.blaze3d.opengl.GlTexture
 import com.mojang.blaze3d.pipeline.TextureTarget
@@ -128,16 +129,19 @@ object ComposeSurface {
         // Skia renders into a Blaze3D-owned TextureTarget: gives us a raw GL FBO (for Skia) and a
         // GpuTextureView (for BlitUvPipeline) backed by the same GL texture. No depth: Skia here needs
         // no depth/stencil, and a bare color attachment keeps the FBO valid for Skia (stencilBits=0).
-        val tt = TextureTarget("RedstoneSpecs compose-skia", width, height, /* useDepth = */ false)
+        val tt = TextureTarget("RedstoneSpecs compose-skia", width, height, /* useDepth = */ false, GpuFormat.RGBA8_UNORM)
         target = tt
 
-        // GlDevice/GlTexture/DirectStateAccess are package-private; an access-widener opens them
-        // (redstonespecs.accesswidener). getFbo lazily creates + caches a GL FBO bound to this
-        // texture's color attachment — exactly the framebuffer id Skia's BackendRenderTarget wraps.
+        // GlDevice/GlTexture/DirectStateAccess are package-private; the class-tweaker opens them
+        // (redstonespecs.classtweaker). MC 26.2 removed GlTexture.getFbo — FBO acquisition now lives
+        // on GlDevice.frameBufferCache(): getFbo(dsa, colorAttachments, depthAttachment) lazily creates
+        // + caches a GL FBO bound to those attachments. GlTexture implements FrameBufferAttachment, so
+        // the color texture is itself the sole (color) attachment here — exactly the framebuffer id
+        // Skia's BackendRenderTarget wraps. No depth attachment (Skia needs none).
         val backend = RenderSystem.getDevice().backend as GlDevice
         val dsa = backend.directStateAccess()
         val glTex = tt.colorTexture as GlTexture
-        val fbo = glTex.getFbo(dsa, null)
+        val fbo = backend.frameBufferCache().getFbo(dsa, listOf(glTex), null)
 
         val brt = BackendRenderTarget.makeGL(width, height, 0, 0, fbo, GR_GL_RGBA8)
         backendRt = brt

@@ -11,9 +11,9 @@ fun registerClientNetworking() {
         val mc = context.client()
         mc.execute {
             LOGGER.debug("[ClientNetworkHandler#overwritePrompt] specId={}", payload.specId)
-            mc.setScreen(net.minecraft.client.gui.screens.ConfirmScreen(
+            mc.setScreenAndShow(net.minecraft.client.gui.screens.ConfirmScreen(
                 it.unimi.dsi.fastutil.booleans.BooleanConsumer { overwrite ->
-                    mc.setScreen(null)
+                    mc.gui.setScreen(null)
                     ClientPlayNetworking.send(OverwriteDecisionC2SPayload(payload.originPos, overwrite))
                 },
                 net.minecraft.network.chat.Component.literal("Blocks found inside bounds"),

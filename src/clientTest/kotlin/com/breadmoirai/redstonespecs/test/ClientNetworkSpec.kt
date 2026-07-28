@@ -53,7 +53,7 @@ class ClientNetworkSpec : ClientSpec({
         }
 
         waitClientTicks(5)
-        onClient { mc -> mc.screen } shouldBe null
+        onClient { mc -> mc.gui.screen() } shouldBe null
     }
 
     // UC-NET-03.e (post-Task-7): the runner UI has been hard-cut — RunnerScreen.active no longer
@@ -64,11 +64,11 @@ class ClientNetworkSpec : ClientSpec({
 
         sendOpenRunnerScreen(OpenRunnerScreenS2C(activePos, "", emptyList(), null))
         waitClientTicks(5)
-        onClient { mc -> mc.screen } shouldBe null
+        onClient { mc -> mc.gui.screen() } shouldBe null
 
         sendRunnerStatus(RunnerStatusS2C(activePos, RunnerState.PASS, "All good"))
         waitClientTicks(5)
-        onClient { mc -> mc.screen } shouldBe null
+        onClient { mc -> mc.gui.screen() } shouldBe null
     }
 
     // UC-NET-04.a: receiver-opens-ConfirmScreen half. Click->send half of the handshake
@@ -80,7 +80,7 @@ class ClientNetworkSpec : ClientSpec({
         waitForClientScreen(ConfirmScreen::class.java)
 
         // ConfirmScreen.message is private; assert on the inherited title field.
-        val titleText = onClient { mc -> (mc.screen as ConfirmScreen).title.string }
+        val titleText = onClient { mc -> (mc.gui.screen() as ConfirmScreen).title.string }
         titleText shouldContain "Blocks found"
 
         takeClientScreenshot("uc-net-04a-confirm-screen")
@@ -98,7 +98,7 @@ class ClientNetworkSpec : ClientSpec({
         }
 
         val deadline = System.currentTimeMillis() + 5000
-        while (onClient { mc -> mc.screen } != null && System.currentTimeMillis() < deadline) Thread.sleep(50)
+        while (onClient { mc -> mc.gui.screen() } != null && System.currentTimeMillis() < deadline) Thread.sleep(50)
 
         val decisions = drainClientPayloads().filterIsInstance<OverwriteDecisionC2SPayload>()
         decisions shouldHaveSize 1
@@ -117,7 +117,7 @@ class ClientNetworkSpec : ClientSpec({
         }
 
         val deadline = System.currentTimeMillis() + 5000
-        while (onClient { mc -> mc.screen } != null && System.currentTimeMillis() < deadline) Thread.sleep(50)
+        while (onClient { mc -> mc.gui.screen() } != null && System.currentTimeMillis() < deadline) Thread.sleep(50)
 
         val decisions = drainClientPayloads().filterIsInstance<OverwriteDecisionC2SPayload>()
         decisions shouldHaveSize 1

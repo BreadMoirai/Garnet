@@ -12,5 +12,11 @@ accessible method com/mojang/blaze3d/opengl/GlDevice directStateAccess ()Lcom/mo
 accessible class com/mojang/blaze3d/systems/GpuDeviceBackend
 accessible field com/mojang/blaze3d/systems/GpuDevice backend Lcom/mojang/blaze3d/systems/GpuDeviceBackend;
 accessible class com/mojang/blaze3d/opengl/GlTexture
-accessible method com/mojang/blaze3d/opengl/GlTexture getFbo (Lcom/mojang/blaze3d/opengl/DirectStateAccess;Lcom/mojang/blaze3d/textures/GpuTexture;)I
+# MC 26.2 removed GlTexture.getFbo(DirectStateAccess, GpuTexture). FBO acquisition moved to
+# GlDevice.frameBufferCache().getFbo(dsa, colorAttachments, depthAttachment). GlTexture implements
+# FrameBufferAttachment, so it is passed directly as the color attachment (see ComposeSurface).
+accessible method com/mojang/blaze3d/opengl/GlDevice frameBufferCache ()Lcom/mojang/blaze3d/opengl/FrameBufferCache;
+accessible class com/mojang/blaze3d/opengl/FrameBufferCache
+accessible method com/mojang/blaze3d/opengl/FrameBufferCache getFbo (Lcom/mojang/blaze3d/opengl/DirectStateAccess;Ljava/util/List;Lcom/mojang/blaze3d/opengl/FrameBufferAttachment;)I
+accessible class com/mojang/blaze3d/opengl/FrameBufferAttachment
 accessible class com/mojang/blaze3d/opengl/DirectStateAccess

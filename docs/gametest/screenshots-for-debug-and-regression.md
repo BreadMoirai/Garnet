@@ -10,7 +10,7 @@ Fabric's client-gametest API supports two screenshot use cases. We currently use
 
 ## Two use cases
 
-1. **Diagnostic capture.** Save the live client state to a PNG to inspect after the run. Useful for "I expected screen X but the test saw Y" debugging, or as evidence a UI element rendered as intended. We use this today in UC-NET-04.a (proof the `ConfirmScreen` opens with the right labels — see `versions/26.1/run/screenshots/0000_uc-net-04a-confirm-screen.png`).
+1. **Diagnostic capture.** Save the live client state to a PNG to inspect after the run. Useful for "I expected screen X but the test saw Y" debugging, or as evidence a UI element rendered as intended. We use this today in UC-NET-04.a (proof the `ConfirmScreen` opens with the right labels — see `versions/26.2/run/screenshots/0000_uc-net-04a-confirm-screen.png`).
 2. **Visual regression.** Compare a fresh capture to a committed baseline. Mismatch (beyond a fuzzy threshold) fails the test. Useful for catching unintended UI changes when refactoring screens or upgrading MC versions. Not yet wired into any test, but the API is ready when we want it.
 
 ## Capturing for diagnostics (today)
@@ -21,7 +21,7 @@ Fabric's client-gametest API supports two screenshot use cases. We currently use
 fun takeClientScreenshot(name: String): java.nio.file.Path
 ```
 
-Call it from any `ClientSpec` test body. Internally hops to the Fabric test thread via `FabricTestThreadPump`, where `ctx.takeScreenshot(name)` is legal. Returns the file path under `versions/26.1/run/screenshots/`. Files are numbered `NNNN_<name>.png` in capture order.
+Call it from any `ClientSpec` test body. Internally hops to the Fabric test thread via `FabricTestThreadPump`, where `ctx.takeScreenshot(name)` is legal. Returns the file path under `versions/26.2/run/screenshots/`. Files are numbered `NNNN_<name>.png` in capture order.
 
 Use during UI work:
 
@@ -30,7 +30,7 @@ takeClientScreenshot("editor-after-add-marker")
 takeClientScreenshot("editor-after-discard")
 ```
 
-Use during debugging — drop a screenshot before each assertion that operates on `mc.screen` to see exactly what state the client was in when the test ran. Especially valuable when a `waitForClientScreen` times out: take a screenshot just before to see what screen is actually up.
+Use during debugging — drop a screenshot before each assertion that operates on `mc.gui.screen()` to see exactly what state the client was in when the test ran. Especially valuable when a `waitForClientScreen` times out: take a screenshot just before to see what screen is actually up.
 
 The screenshots directory is gitignored — these are run-time artifacts, not committed assets.
 
@@ -75,7 +75,7 @@ Three algorithms via `TestScreenshotComparisonAlgorithm`:
 
 ### On failure
 
-The test fails and a diff image is saved alongside the original capture in `versions/26.1/run/screenshots/`. Open both to see what changed.
+The test fails and a diff image is saved alongside the original capture in `versions/26.2/run/screenshots/`. Open both to see what changed.
 
 ### Save-and-compare in one call
 

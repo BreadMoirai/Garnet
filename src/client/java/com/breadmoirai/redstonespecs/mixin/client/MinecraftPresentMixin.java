@@ -7,6 +7,8 @@ import com.breadmoirai.redstonespecs.client.viewport.ViewportState;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.systems.CommandEncoder;
+import com.mojang.blaze3d.systems.GpuSurface;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,12 +19,12 @@ import org.spongepowered.asm.mixin.injection.At;
  * Composite half of the viewport-shrink spike (the mate of {@link WindowMixin}).
  *
  * <p>{@code WindowMixin} makes the game render into a smaller {@code mainRenderTarget}; but MC's
- * default present ({@code Minecraft#renderFrame} → {@code RenderTarget#blitToScreen} →
- * {@code CommandEncoder#presentTexture}) <em>stretches</em> whatever texture it is handed to fill
- * the whole window surface. Left alone that yields a lower-res <em>full-screen</em> world, not a
- * centered sub-rect.</p>
+ * default present ({@code Minecraft#renderFrame} → {@code GpuSurface#blitFromTexture(CommandEncoder,
+ * GpuTextureView)}) <em>stretches</em> whatever texture it is handed to fill the whole window
+ * surface. Left alone that yields a lower-res <em>full-screen</em> world, not a centered sub-rect.</p>
  *
- * <p>This mixin wraps the {@code blitToScreen()} present call. When {@link ViewportState#shouldModify()}
+ * <p>This mixin wraps the {@code GpuSurface#blitFromTexture} present call (MC 26.2 replaced the old
+ * {@code RenderTarget#blitToScreen()} path). When {@link ViewportState#shouldModify()}
  * is on it builds a full-real-size off-screen composite, fills it with an opaque edge color, blits
  * the shrunk game texture into the centered content sub-rect ({@link ViewportState#contentRect}),
  * and presents the composite instead. When off it forwards the original call untouched, so vanilla
@@ -47,23 +49,23 @@ public abstract class MinecraftPresentMixin {
         method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"
+            target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"
         )
     )
-    private void redstonespecs$compositePresent(RenderTarget mainTarget, Operation<Void> original) {
+    private void redstonespecs$compositePresent(GpuSurface surface, CommandEncoder encoder, GpuTextureView gameTexture, Operation<Void> original) {
         if (!ViewportState.INSTANCE.shouldModify()) {
-            original.call(mainTarget);
+            original.call(surface, encoder, gameTexture);
             return;
         }
 
         int realWidth = ViewportState.INSTANCE.getRealWidth();
         int realHeight = ViewportState.INSTANCE.getRealHeight();
-        GpuTextureView gameTexture = mainTarget.getColorTextureView();
 
-        // Guard against a not-yet-initialized real size or a target without a color view; fall
-        // back to vanilla present rather than risk a null/zero-size composite mid-frame.
+        // MC 26.2 hands the present call the main target's color texture view directly (the arg),
+        // so we no longer fetch it off a RenderTarget. Guard against a not-yet-initialized real size
+        // or a missing texture; fall back to vanilla present rather than a null/zero-size composite.
         if (realWidth <= 0 || realHeight <= 0 || gameTexture == null) {
-            original.call(mainTarget);
+            original.call(surface, encoder, gameTexture);
             return;
         }
 
@@ -109,8 +111,14 @@ public abstract class MinecraftPresentMixin {
             CompositeTarget.INSTANCE.captureToPng(composite, capturePath);
         }
 
-        // Present the composite (full real size) instead of the shrunk main target; presentTexture
-        // now maps it 1:1 to the window surface, so the content lands in its centered sub-rect.
-        original.call(composite);
+        // Present the composite (full real size) instead of the shrunk game texture. MC 26.2 presents
+        // by blitting a GpuTextureView onto the window GpuSurface, so we substitute the composite's
+        // color texture view — it maps 1:1 to the window surface, landing the content in its sub-rect.
+        GpuTextureView compositeView = composite.getColorTextureView();
+        if (compositeView == null) {
+            original.call(surface, encoder, gameTexture);
+            return;
+        }
+        original.call(surface, encoder, compositeView);
     }
 }

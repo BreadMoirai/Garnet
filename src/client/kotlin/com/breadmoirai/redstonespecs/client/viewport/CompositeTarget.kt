@@ -1,9 +1,11 @@
 package com.breadmoirai.redstonespecs.client.viewport
 
+import com.mojang.blaze3d.GpuFormat
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Screenshot
+import org.joml.Vector4f
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -33,7 +35,17 @@ object CompositeTarget {
             return existing
         }
         existing?.destroyBuffers()
-        return TextureTarget(LABEL, width, height, /* useDepth = */ true)
+        // MC 26.2's TextureTarget ctor gained a required GpuFormat for the color attachment.
+        return TextureTarget(LABEL, width, height, /* useDepth = */ true, GpuFormat.RGBA8_UNORM)
+    }
+
+    /** Unpack an 0xAARRGGBB int into the normalized RGBA [Vector4f] MC 26.2's clear API now takes. */
+    private fun argbToVec4(argb: Int): Vector4f {
+        val a = (argb ushr 24 and 0xFF) / 255f
+        val r = (argb ushr 16 and 0xFF) / 255f
+        val g = (argb ushr 8 and 0xFF) / 255f
+        val b = (argb and 0xFF) / 255f
+        return Vector4f(r, g, b, a)
     }
 
     /**
@@ -44,11 +56,12 @@ object CompositeTarget {
     fun clearColor(target: RenderTarget, argb: Int) {
         val encoder = RenderSystem.getDevice().createCommandEncoder()
         val colorTexture = requireNotNull(target.colorTexture) { "Composite target has no color texture" }
+        val clear = argbToVec4(argb)
         if (target.useDepth) {
             val depthTexture = requireNotNull(target.depthTexture) { "Composite target has no depth texture" }
-            encoder.clearColorAndDepthTextures(colorTexture, argb, depthTexture, 1.0)
+            encoder.clearColorAndDepthTextures(colorTexture, clear, depthTexture, 1.0)
         } else {
-            encoder.clearColorTexture(colorTexture, argb)
+            encoder.clearColorTexture(colorTexture, clear)
         }
     }
 

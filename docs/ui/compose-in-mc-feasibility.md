@@ -18,7 +18,7 @@ routed through Compose's own interaction plumbing). This retires the whole risk 
 
 A `clientTest` (`ComposeOverlaySpec`) toggles the viewport shrink on, enables the overlay, renders
 several frames, drives pointer events into the scene, and captures composites (under
-`versions/26.1/run/screenshots/`, git-ignored run artifacts):
+`versions/26.2/run/screenshots/`, git-ignored run artifacts):
 
 - `compose_in_mc_scene.png` — the real Compose panel (a small opaque panel with white `Text`
   "Compose in MC" and a blue button "Click me • clicks=0") blitted full-window with premultiplied-alpha
@@ -47,8 +47,9 @@ several frames, drives pointer events into the scene, and captures composites (u
   interaction on the render thread and let `render()` apply pending snapshot changes synchronously. No
   race workaround was needed.
 - **Upload into a Blaze3D `TextureTarget`.** Its color `GlTexture` yields both a raw GL FBO id (via
-  `GlTexture.getFbo(DirectStateAccess, null)`) for a Skia `Surface`, and a `GpuTextureView` for our
-  `BlitUvPipeline`. One texture, two views — the Compose panel blits into the viewport composite with
+  `GlDevice.frameBufferCache().getFbo(dsa, listOf(glTexture), null)` — MC 26.2 removed
+  `GlTexture.getFbo`; `GlTexture` implements `FrameBufferAttachment`, so it is passed directly as the
+  sole color attachment) for a Skia `Surface`, and a `GpuTextureView` for our `BlitUvPipeline`. One texture, two views — the Compose panel blits into the viewport composite with
   the same pipeline the world uses. Each frame: `ImageComposeScene.render()` → draw that `Image` onto
   the FBO-backed Skia canvas → `flush` → blit.
 - **`SurfaceOrigin.BOTTOM_LEFT`** matches MC render-target textures (bottom-up), so `BlitUvPipeline`'s

@@ -6,14 +6,14 @@ summary: `compileKotlin` only covers `main`; verify with `clientClasses classes 
 
 # Local Compile Verification Across All Source Sets
 
-`:26.1:compileKotlin` is **not** sufficient to verify the project compiles. It
+`:26.2:compileKotlin` is **not** sufficient to verify the project compiles. It
 only covers the `main` source set. This project has five source sets, and each
 has independent compile tasks that can fail independently.
 
 ## The full command
 
 ```sh
-cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses :26.1:testClasses"
+cmd.exe /c "cd /d H:\\Repo\\RedstoneSpecs && gradlew.bat :26.2:clientClasses :26.2:classes :26.2:gametestClasses :26.2:clientTestClasses :26.2:testClasses"
 ```
 
 Use `*Classes` aggregate tasks rather than `compile*Kotlin` so that Java
@@ -87,9 +87,9 @@ decision rule.
 Compile tasks check that code builds; they do not run tests. To execute:
 
 ```sh
-cmd.exe /c "gradlew.bat :26.1:test"            # JUnit, no MC runtime
-cmd.exe /c "gradlew.bat :26.1:runGameTest"     # server-side @GameTest harness
-cmd.exe /c "gradlew.bat :26.1:runClientTest"   # FabricClientGameTest harness
+cmd.exe /c "gradlew.bat :26.2:test"            # JUnit, no MC runtime
+cmd.exe /c "gradlew.bat :26.2:runGameTest"     # server-side @GameTest harness
+cmd.exe /c "gradlew.bat :26.2:runClientTest"   # FabricClientGameTest harness
 ```
 
 Both `runGameTest` and `runClientTest` are Loom-managed JavaExec tasks with

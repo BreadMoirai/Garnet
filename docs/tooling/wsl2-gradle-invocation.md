@@ -44,12 +44,12 @@ paths end-to-end, matching how the IDE runs it.
 
 ## Common pitfall
 
-Subagent prompts and runbooks sometimes paste `./gradlew :26.1:compileKotlin`
+Subagent prompts and runbooks sometimes paste `./gradlew :26.2:compileKotlin`
 copied from generic Stonecutter docs. Translate every such command to the
 `cmd.exe /c "gradlew.bat ..."` form before running.
 
 ## See also
 
-- [Stonecutter task paths](stonecutter-task-paths.md) — the `:26.1:` prefix to use
+- [Stonecutter task paths](stonecutter-task-paths.md) — the `:26.2:` prefix to use
 - [Local verification command set](local-verification-commands.md) — which tasks
   to actually run

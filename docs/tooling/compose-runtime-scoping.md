@@ -20,8 +20,8 @@ to satisfy the checker on source sets that never use Compose.
 
 1. **Move `runtime-desktop` to `clientImplementation`, change nothing else.**
    Fails as predicted: `compileKotlin` (main) throws the `VersionChecker` error above.
-   `:26.1:clientClasses :26.1:classes :26.1:gametestClasses :26.1:clientTestClasses
-   :26.1:testClasses` fails at `:26.1:compileKotlin`.
+   `:26.2:clientClasses :26.2:classes :26.2:gametestClasses :26.2:clientTestClasses
+   :26.2:testClasses` fails at `:26.2:compileKotlin`.
 
 2. **Strip the Compose compiler subplugin from the non-client `KotlinCompile` tasks'
    `pluginClasspath`.** In `build.gradle.kts`, after the `dependencies { }` block:
@@ -36,7 +36,7 @@ to satisfy the checker on source sets that never use Compose.
    }
    ```
 
-   **This worked**, including after `:26.1:clean` (ruled out incremental-build/
+   **This worked**, including after `:26.2:clean` (ruled out incremental-build/
    up-to-date artifacts as a false positive). With this block in place and
    `runtime-desktop` on `clientImplementation`, all five source sets
    (`main`/`client`/`gametest`/`clientTest`/`test`) compile clean.

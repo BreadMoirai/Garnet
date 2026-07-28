@@ -14,9 +14,9 @@ All three test source sets (`src/test/`, `src/gametest/`, `src/clientTest/`) run
 
 | Source set | Sentinel | Runs via |
 |---|---|---|
-| `src/test/` | None — Kotest's JUnit Platform engine discovers specs automatically | `./gradlew :26.1:test` |
-| `src/gametest/` | `GametestSentinel` — single `@GameTest` method that spawns a worker | `./gradlew :26.1:runGameTest` |
-| `src/clientTest/` | `ClientTestSentinel` — `FabricClientGameTest.runTest` (already on a worker thread) | `./gradlew :26.1:runClientTest` |
+| `src/test/` | None — Kotest's JUnit Platform engine discovers specs automatically | `./gradlew :26.2:test` |
+| `src/gametest/` | `GametestSentinel` — single `@GameTest` method that spawns a worker | `./gradlew :26.2:runGameTest` |
+| `src/clientTest/` | `ClientTestSentinel` — `FabricClientGameTest.runTest` (already on a worker thread) | `./gradlew :26.2:runClientTest` |
 
 All three produce Kotest's built-in HTML report under `build/reports/redstonespecs/<sourceSet>/` and JUnit XML under `build/test-results/<sourceSet>/`.
 

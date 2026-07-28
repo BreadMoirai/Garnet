@@ -34,7 +34,7 @@ fun registerHudOverlay() {
         Identifier.fromNamespaceAndPath("redstonespecs", "spec_info"),
         HudElement { extractor, _ ->
             val mc = Minecraft.getInstance()
-            if (mc.screen != null) return@HudElement
+            if (mc.gui.screen() != null) return@HudElement
             val level = mc.level ?: return@HudElement
             val hitResult = mc.hitResult as? BlockHitResult ?: return@HudElement
             val hitPos = hitResult.blockPos
@@ -78,7 +78,7 @@ fun registerHudOverlay() {
     )
 
     ClientTickEvents.END_CLIENT_TICK.register { mc ->
-        if (mc.screen != null) {
+        if (mc.gui.screen() != null) {
             currentHoveredFace = null
             return@register
         }

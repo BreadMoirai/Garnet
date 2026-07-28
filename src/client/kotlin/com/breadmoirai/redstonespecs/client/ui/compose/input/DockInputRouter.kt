@@ -25,14 +25,14 @@ object DockInputRouter {
         if (DockState.focusedRegion == region) return
         DockState.focusedRegion = region
         val mc = Minecraft.getInstance()
-        if (mc.screen == null) mc.mouseHandler.releaseMouse()
+        if (mc.gui.screen() == null) mc.mouseHandler.releaseMouse()
     }
 
     fun clearFocus() {
         if (DockState.focusedRegion == null) return
         DockState.focusedRegion = null
         val mc = Minecraft.getInstance()
-        if (mc.screen == null) {
+        if (mc.gui.screen() == null) {
             mc.mouseHandler.setIgnoreFirstMove()
             mc.mouseHandler.grabMouse()
         }

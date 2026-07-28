@@ -16,7 +16,7 @@ This article records what the code alone doesn't make obvious.
 
 Vanilla's own render-target blit (`RenderTarget.blitAndBlendToTexture`) uses the
 `core/screenquad` vertex shader with `DefaultVertexFormat.EMPTY` and
-`VertexFormat.Mode.TRIANGLES`, then calls `renderPass.draw(0, 3)` — a full-screen triangle
+`PrimitiveTopology.TRIANGLES`, then calls `renderPass.draw(...)` — a full-screen triangle
 generated from `gl_VertexID` with **no vertex buffer at all**. That is the simplest path but
 it always covers the whole target.
 
@@ -25,11 +25,26 @@ We need an arbitrary destination sub-rect and source UV region, so we use a real
 
 - Build a per-call vertex buffer: 4 vertices × (3 floats position + 2 floats UV) = 20-byte
   stride, in a `ByteBuffer.allocateDirect(...).order(ByteOrder.nativeOrder())`, uploaded via
-  `RenderSystem.getDevice().createBuffer(label, GpuBuffer.USAGE_VERTEX, byteBuffer)`.
+  `RenderSystem.getDevice().createBuffer(label, GpuBuffer.USAGE_VERTEX, byteBuffer)`. Bind it
+  with `pass.setVertexBuffer(0, vertexBuffer.slice())` — 26.2's `setVertexBuffer` takes a
+  `GpuBufferSlice`, not the raw `GpuBuffer`, so call `.slice()` (whole-buffer slice).
 - Reuse the shared quad index buffer instead of building one:
-  `RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS)` → `.getBuffer(6)` + `.type()`
+  `RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS)` → `.getBuffer(6)` + `.type()`
   (maps 4 verts → 6 indices, `0,1,2,2,3,0`). Then `pass.setIndexBuffer(buf, type)` and
-  `pass.drawIndexed(baseVertex=0, firstIndex=0, indexCount=6, instanceCount=1)`.
+  `pass.drawIndexed(indexCount=6, instanceCount=1, firstIndex=0, vertexOffset=0, firstInstance=0)`.
+  **The 26.2 `drawIndexed` arg order is `(indexCount, instanceCount, firstIndex, vertexOffset,
+  firstInstance)`** — different from the older `(baseVertex, firstIndex, indexCount, instanceCount)`.
+
+## Pipeline builder: bind groups, vertex bindings, primitive topology
+
+26.2's `RenderPipeline.Builder` reworked how samplers and vertex formats are declared:
+
+- **Samplers** are no longer added with `withSampler("Name")`. Declare them through a bind-group
+  layout: `.withBindGroupLayout(BindGroupLayout.builder().withSampler("InSampler").build())`.
+  The `pass.bindTexture("InSampler", view, sampler)` call at draw time is unchanged.
+- **Vertex format** is split from the primitive mode. `withVertexFormat(fmt, VertexFormat.Mode.QUADS)`
+  becomes `.withVertexBinding(0, DefaultVertexFormat.POSITION_TEX).withPrimitiveTopology(
+  PrimitiveTopology.QUADS)`. `VertexFormat.Mode` no longer exists; use `com.mojang.blaze3d.PrimitiveTopology`.
 
 ## Vertex-attribute names must match the format
 
@@ -55,11 +70,13 @@ failure surfaces at that first use, not at `RenderPipeline.build()`.
 
 ## RenderPass creation: clear vs. load
 
-`commandEncoder.createRenderPass(label, colorView, OptionalInt.empty())` **loads** the
-existing target contents (draws on top) — pass `OptionalInt.of(argb)` to clear first. For a
-sub-rect blit that must leave the edges untouched, use `OptionalInt.empty()`. `CompositeTarget`
-clears via `CommandEncoder.clearColorAndDepthTextures(color, argb, depth, 1.0)` (or
-`clearColorTexture` when the target has no depth).
+`commandEncoder.createRenderPass(label, colorView, Optional.empty())` **loads** the existing
+target contents (draws on top) — pass `Optional.of(clearColor)` to clear first. On 26.2 the clear
+color is an `Optional<org.joml.Vector4fc>` (normalized RGBA), **not** the older `OptionalInt`
+packed-ARGB. For a sub-rect blit that must leave the edges untouched, use `Optional.empty()`.
+`CompositeTarget` clears via `CommandEncoder.clearColorAndDepthTextures(color, Vector4f(r,g,b,a),
+depth, 1.0)` (or `clearColorTexture` when the target has no depth) — it unpacks its `0xAARRGGBB`
+int into a `Vector4f` first, since 26.2's clear API also switched from packed-int to `Vector4fc`.
 
 ## Gotcha: blitting into the main target mid-frame is not screenshot-visible
 
@@ -71,35 +88,34 @@ it by drawing into the main target from an ad-hoc hook.
 
 ## Intercepting the present blit: `MinecraftPresentMixin`
 
-On 26.2 the present is **`Minecraft.renderFrame` → `this.mainRenderTarget.blitToScreen()`**,
-and `RenderTarget.blitToScreen()` internally calls
-`RenderSystem.getDevice().createCommandEncoder().presentTexture(colorTextureView)`. (The old
-Flashback-era `GpuSurface.blitFromTexture(CommandEncoder, GpuTextureView)` signature does **not**
-exist here — verify against the current sources before wrapping.) `presentTexture` *stretches*
-whatever texture it is handed to fill the whole window surface.
+On 26.2 the present is **`Minecraft.renderFrame` → `this.windowSurface.blitFromTexture(encoder,
+mainColorTextureView)`**, where `windowSurface` is a `com.mojang.blaze3d.systems.GpuSurface` and
+the presented texture is `gameRenderer.mainRenderTarget().getColorTextureView()`. (The older
+`RenderTarget.blitToScreen()` → `presentTexture(...)` path was **removed** in 26.2;
+`GpuSurface.blitFromTexture(CommandEncoder, GpuTextureView)` is now the real present call — the
+reverse of what earlier snapshots had.) `blitFromTexture` *stretches* whatever texture it is
+handed to fill the whole window surface.
 
 `MinecraftPresentMixin` (`src/client/java/.../mixin/client/MinecraftPresentMixin.java`) puts a
-MixinExtras `@WrapOperation` on the `blitToScreen()` call:
+MixinExtras `@WrapOperation` on the `blitFromTexture` call:
 
 ```java
-@WrapOperation(method = "renderFrame",
-    at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"))
+@WrapOperation(method = "renderFrame", at = @At(value = "INVOKE",
+    target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"))
+private void redstonespecs$compositePresent(GpuSurface surface, CommandEncoder encoder, GpuTextureView gameTexture, Operation<Void> original)
 ```
 
-When the viewport effect is off it just forwards `original.call(mainTarget)` — byte-for-byte
-vanilla. When on it: sizes a full-*real*-size `CompositeTarget`, clears it to an opaque edge
-color, blits the (shrunk) game texture into the content sub-rect (at the inset-derived origin
-`(frameX, frameY)` — left/top-aligned, not centered), then presents the
-**composite** via `original.call(composite)`. Because the composite is the real window size,
-`presentTexture` maps it 1:1 and the content lands in its sub-rect with the reserved strips
-showing the fill color. Filling the whole composite with an opaque clear first (rather than
-transparent) means the reserved edges are solid for free — no separate edge-rect draw needed.
-
-`RenderTarget.blitToScreen()` is a concrete method on the base class and `mainRenderTarget` is
-typed `RenderTarget`, so the `@WrapOperation` receiver is `RenderTarget instance`;
-`original.call(anyRenderTarget)` presents *that* target's color view. `TextureTarget`'s color
-texture is created with usage mask `15` (includes `USAGE_RENDER_ATTACHMENT`, bit 8), which
-`presentTexture` requires — so presenting our composite passes its usage assertion.
+The wrapped call is an instance method, so the callback receives the receiver (`GpuSurface`) plus
+both args (`CommandEncoder`, `GpuTextureView`). When the viewport effect is off it just forwards
+`original.call(surface, encoder, gameTexture)` — byte-for-byte vanilla. When on it: sizes a
+full-*real*-size `CompositeTarget`, clears it to an opaque edge color, blits the (shrunk) game
+texture — the `gameTexture` arg is already the main target's color view — into the content sub-rect
+(at the inset-derived origin `(frameX, frameY)` — left/top-aligned, not centered), then presents
+the **composite** via `original.call(surface, encoder, composite.getColorTextureView())`. Because
+the composite is the real window size, `blitFromTexture` maps it 1:1 and the content lands in its
+sub-rect with the reserved strips showing the fill color. Filling the whole composite with an
+opaque clear first (rather than transparent) means the reserved edges are solid for free — no
+separate edge-rect draw needed.
 
 ### MixinExtras is bundled, but not on the compile classpath by default
 

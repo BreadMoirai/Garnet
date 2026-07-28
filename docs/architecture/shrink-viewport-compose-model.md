@@ -20,7 +20,7 @@ fight each other.
    those getters — including `GameRenderer#extractWindow`, which resizes the main render target —
    therefore renders the *game world* at the smaller effective size. `WindowMixin` does not decide
    *where* the smaller image ends up on screen; it only shrinks what gets rendered.
-2. **`MinecraftPresentMixin`** (`@WrapOperation` on `RenderTarget.blitToScreen()` inside
+2. **`MinecraftPresentMixin`** (`@WrapOperation` on `GpuSurface.blitFromTexture()` inside
    `Minecraft.renderFrame`) — composites that shrunk game texture into the content sub-rect of a
    full-real-size `CompositeTarget` at origin `(frameX, frameY)` = `(insets.left, insets.top)` (top
    is `0` today, so the content is left-aligned/top-aligned and the reserved strips fall on the right

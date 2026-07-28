@@ -35,11 +35,11 @@ Split across two same-package files (no imports needed between them):
 **`src/clientTest/.../ClientTestSupport.kt`** — general helpers:
 
 - `onServer { server -> … }` — hop to server thread, run work, return the result. Use for `level.setBlock`, `ServerPlayNetworking.send`, etc. (Defined in the testing-core module's `Suspending.kt`; not in this file, but available in scope.)
-- `onClient { mc -> … }` — hop to the render thread (via the Fabric test thread + `ctx.runOnClient`), run work with a safe `Minecraft` reference, return the result. Use for ANY `Minecraft.getInstance()` access, including `mc.screen`, `mc.setScreen(…)`, and reads off screen fields. Nullable returns are routed through an `Any?` holder because Fabric's `computeOnClient` is typed `<T : Any>`.
+- `onClient { mc -> … }` — hop to the render thread (via the Fabric test thread + `ctx.runOnClient`), run work with a safe `Minecraft` reference, return the result. Use for ANY `Minecraft.getInstance()` access, including `mc.gui.screen()`, `mc.gui.setScreen(…)`, and reads off screen fields. Nullable returns are routed through an `Any?` holder because Fabric's `computeOnClient` is typed `<T : Any>`.
 - `runOnClient { mc -> … }` — same as `onClient` but for `Unit`-returning actions.
-- `waitForClientScreen(class, timeoutMs)` — polls `mc.screen` via `onClient` until it matches, with a wall-clock deadline.
-- `closeClientScreen(timeoutMs)` — `mc.setScreen(null)` via `onClient`, then poll until cleared. End every screen-opening test with this — single-player pauses the integrated server when a screen is open, which tangles shutdown.
-- `takeClientScreenshot(name)` — `ctx.takeScreenshot(name)` via the pump. Returns the file path (under `versions/26.1/run/screenshots/`). Useful for proving UI state in tests and for debugging. See [screenshots-for-debug-and-regression.md](screenshots-for-debug-and-regression.md).
+- `waitForClientScreen(class, timeoutMs)` — polls `mc.gui.screen()` via `onClient` until it matches, with a wall-clock deadline.
+- `closeClientScreen(timeoutMs)` — `mc.gui.setScreen(null)` via `onClient`, then poll until cleared. End every screen-opening test with this — single-player pauses the integrated server when a screen is open, which tangles shutdown.
+- `takeClientScreenshot(name)` — `ctx.takeScreenshot(name)` via the pump. Returns the file path (under `versions/26.2/run/screenshots/`). Useful for proving UI state in tests and for debugging. See [screenshots-for-debug-and-regression.md](screenshots-for-debug-and-regression.md).
 - `waitClientTicks(ticks)` — sleeps the calling thread for ~`ticks * 50ms`; useful when waiting for render-thread tasks to drain.
 - `clientContext()` / `currentWorld()` — accessors for the active `ClientGameTestContext` / `TestSingleplayerContext` (both installed by `ClientTestSentinel`).
 
@@ -60,9 +60,9 @@ The drain happens after each tick, which means any worker call to `onClient` add
 ## Common pitfalls
 
 - **`Minecraft.getInstance()` from any thread other than render throws.** Fabric injects a check. The error message tells you to use `ctx.runOnClient`/`computeOnClient`; `onClient` wraps that. Never call `Minecraft.getInstance()` from a `ClientSpec` test body directly — always through `onClient`.
-- **Single-player pauses the integrated server when a screen is open.** Any non-null `mc.screen` triggers `Saving and pausing game…`. The server stops ticking; `context.waitTick()` on the Fabric test thread blocks. Always close screens at the end of each test with `closeClientScreen()`.
+- **Single-player pauses the integrated server when a screen is open.** Any non-null `mc.gui.screen()` triggers `Saving and pausing game…`. The server stops ticking; `context.waitTick()` on the Fabric test thread blocks. Always close screens at the end of each test with `closeClientScreen()`.
 - **`runOnServer` / `waitForScreen` / `waitTick` are Fabric-test-thread only.** Calling from the worker or server thread throws. Use the `onClient`/`onServer`/`waitForClientScreen` helpers instead.
-- **`computeOnClient` is `<T : Any>` in Java.** Kotlin's `onClient` boxes through a `Any?` holder to allow nullable returns (e.g., reading `mc.screen` which can be null).
+- **`computeOnClient` is `<T : Any>` in Java.** Kotlin's `onClient` boxes through a `Any?` holder to allow nullable returns (e.g., reading `mc.gui.screen()` which can be null).
 
 ## See also
 

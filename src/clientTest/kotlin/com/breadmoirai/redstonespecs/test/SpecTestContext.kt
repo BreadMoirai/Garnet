@@ -33,7 +33,7 @@ class SpecTestContext(
 
     fun closeScreen() {
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE)
-        context.waitFor { mc -> mc.screen == null }
+        context.waitFor { mc -> mc.gui.screen() == null }
     }
 
     fun rightClickBlock(pos: BlockPos, direction: Direction = Direction.SOUTH) {
@@ -66,7 +66,7 @@ class SpecTestContext(
      */
     fun waitForButton(labelText: String, timeoutTicks: Int = 100) {
         context.waitFor({ mc ->
-            val screen = mc.screen ?: return@waitFor false
+            val screen = mc.gui.screen() ?: return@waitFor false
             screen.children()
                 .filterIsInstance<net.minecraft.client.gui.components.AbstractButton>()
                 .any { it.message.string == labelText }
@@ -79,7 +79,7 @@ class SpecTestContext(
      */
     fun clickNthButton(labelText: String, index: Int) {
         onClient { mc ->
-            val screen = mc.screen
+            val screen = mc.gui.screen()
                 ?: throw AssertionError("clickNthButton($labelText, $index): no screen open")
             val matching = screen.children()
                 .filterIsInstance<net.minecraft.client.gui.components.AbstractButton>()
@@ -104,7 +104,7 @@ class SpecTestContext(
      */
     fun clickNthCycleButtonByValue(valueText: String, index: Int) {
         onClient { mc ->
-            val screen = mc.screen
+            val screen = mc.gui.screen()
                 ?: throw AssertionError("clickNthCycleButtonByValue($valueText, $index): no screen open")
             val matching = screen.children()
                 .filterIsInstance<net.minecraft.client.gui.components.CycleButton<*>>()
@@ -129,7 +129,7 @@ class SpecTestContext(
     /** Finds an EditBox in the current screen by its pixel width and sets its value directly. */
     fun fillEditBoxByWidth(widthPx: Int, value: String) {
         onClient { mc ->
-            val screen = mc.screen
+            val screen = mc.gui.screen()
                 ?: throw AssertionError("fillEditBoxByWidth($widthPx): no screen open")
             val box = screen.children()
                 .filterIsInstance<EditBox>()
@@ -158,8 +158,8 @@ class SpecTestContext(
      */
     fun clickYaclButton(labelText: String) {
         onClient { mc ->
-            val screen = mc.screen as? YACLScreen
-                ?: throw AssertionError("clickYaclButton($labelText): current screen is not a YACLScreen (got ${mc.screen?.javaClass?.simpleName})")
+            val screen = mc.gui.screen() as? YACLScreen
+                ?: throw AssertionError("clickYaclButton($labelText): current screen is not a YACLScreen (got ${mc.gui.screen()?.javaClass?.simpleName})")
             for (category in screen.config.categories()) {
                 for (group in category.groups()) {
                     for (option in group.options()) {
@@ -188,7 +188,7 @@ class SpecTestContext(
      */
     fun <T : Any> setYaclOption(optionName: String, value: T, groupName: String? = null) {
         onClient { mc ->
-            val screen = mc.screen as? YACLScreen
+            val screen = mc.gui.screen() as? YACLScreen
                 ?: throw AssertionError("setYaclOption($optionName): not a YACLScreen")
             for (category in screen.config.categories()) {
                 for (group in category.groups()) {

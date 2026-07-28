@@ -1,6 +1,8 @@
 package com.breadmoirai.redstonespecs.client.viewport
 
+import com.mojang.blaze3d.PrimitiveTopology
 import com.mojang.blaze3d.buffers.GpuBuffer
+import com.mojang.blaze3d.pipeline.BindGroupLayout
 import com.mojang.blaze3d.pipeline.BlendFunction
 import com.mojang.blaze3d.pipeline.ColorTargetState
 import com.mojang.blaze3d.pipeline.RenderPipeline
@@ -9,11 +11,11 @@ import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode
 import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.resources.Identifier
+import org.joml.Vector4fc
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.OptionalInt
+import java.util.Optional
 
 /**
  * Clean-room blit pipeline for MC 26.2's Blaze3D GPU API.
@@ -44,8 +46,9 @@ object BlitUvPipeline {
         .withLocation(Identifier.fromNamespaceAndPath(NAMESPACE, "pipeline/blit_uv"))
         .withVertexShader(Identifier.fromNamespaceAndPath(NAMESPACE, "core/blit_uv"))
         .withFragmentShader(Identifier.fromNamespaceAndPath(NAMESPACE, "core/blit_uv"))
-        .withSampler("InSampler")
-        .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+        .withBindGroupLayout(BindGroupLayout.builder().withSampler("InSampler").build())
+        .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+        .withPrimitiveTopology(PrimitiveTopology.QUADS)
         // A screen-aligned blit quad should never be back-face culled regardless of
         // winding, so disable culling for robustness.
         .withCull(false)
@@ -65,8 +68,9 @@ object BlitUvPipeline {
         .withLocation(Identifier.fromNamespaceAndPath(NAMESPACE, "pipeline/blit_uv_blend"))
         .withVertexShader(Identifier.fromNamespaceAndPath(NAMESPACE, "core/blit_uv"))
         .withFragmentShader(Identifier.fromNamespaceAndPath(NAMESPACE, "core/blit_uv"))
-        .withSampler("InSampler")
-        .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+        .withBindGroupLayout(BindGroupLayout.builder().withSampler("InSampler").build())
+        .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+        .withPrimitiveTopology(PrimitiveTopology.QUADS)
         .withCull(false)
         .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA))
         .build()
@@ -112,19 +116,21 @@ object BlitUvPipeline {
         val target = requireNotNull(to.colorTextureView) { "Blit target has no color texture view" }
         val device = RenderSystem.getDevice()
         val sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
-        val indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS)
+        val indices = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS)
         val indexBuffer = indices.getBuffer(INDEX_COUNT)
         val indexType = indices.type()
 
         device.createBuffer({ "RedstoneSpecs blit_uv vertices" }, GpuBuffer.USAGE_VERTEX, vertexData).use { vertexBuffer ->
             device.createCommandEncoder()
-                .createRenderPass({ "RedstoneSpecs blit_uv" }, target, OptionalInt.empty())
+                .createRenderPass({ "RedstoneSpecs blit_uv" }, target, Optional.empty<Vector4fc>())
                 .use { pass ->
                     pass.setPipeline(if (blend) PIPELINE_BLEND else PIPELINE)
                     pass.bindTexture("InSampler", from, sampler)
-                    pass.setVertexBuffer(0, vertexBuffer)
+                    // MC 26.2: setVertexBuffer takes a GpuBufferSlice; drawIndexed's args are
+                    // (indexCount, instanceCount, firstIndex, vertexOffset, firstInstance).
+                    pass.setVertexBuffer(0, vertexBuffer.slice())
                     pass.setIndexBuffer(indexBuffer, indexType)
-                    pass.drawIndexed(0, 0, INDEX_COUNT, 1)
+                    pass.drawIndexed(INDEX_COUNT, 1, 0, 0, 0)
                 }
         }
     }

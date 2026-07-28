@@ -66,8 +66,8 @@ links.
 
 ### UC-X2X-04 — Kotest spec registered, harness drives runRedstoneSpec, diagnostic recording on failure
 
-**Actor:** Test author (CI / local `:26.1:test` run)
-**Trigger:** A new Kotest spec is added to `GametestSentinel` and `:26.1:test` is executed.
+**Actor:** Test author (CI / local `:26.2:test` run)
+**Trigger:** A new Kotest spec is added to `GametestSentinel` and `:26.2:test` is executed.
 **Preconditions:** The spec class is registered in the sentinel's explicit list; `runRedstoneSpec` references a valid `.spec.kts` fixture; the fixture encodes at least one verifiable output condition.
 **Outcome:** When the spec passes, the test run reports green. When an output value diverges, the harness captures a diagnostic recording that identifies the failing tick and output position; the Kotest report surfaces the recording path.
 

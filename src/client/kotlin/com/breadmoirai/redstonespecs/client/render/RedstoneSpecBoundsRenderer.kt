@@ -56,29 +56,31 @@ class SpecBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) :
         collector: net.minecraft.client.renderer.SubmitNodeCollector,
         cameraState: CameraRenderState,
     ) {
-        val mc = Minecraft.getInstance()
-        val bufferSource = mc.renderBuffers().bufferSource()
-        val buffer = bufferSource.getBuffer(RenderTypes.LINES)
-        val matrix: Matrix4f = poseStack.last().pose()
+        // MC 26.2 removed RenderBuffers.bufferSource(): block-entity renderers no longer draw into an
+        // immediate MultiBufferSource. Instead we hand the geometry to the SubmitNodeCollector via
+        // submitCustomGeometry, which supplies the pose + a VertexConsumer for the given RenderType.
+        collector.submitCustomGeometry(poseStack, RenderTypes.LINES) { pose, buffer ->
+            val matrix: Matrix4f = pose.pose()
+            state.bounds?.let { drawBoundingBox(buffer, matrix, it, 1f, 1f, 0f, 0.8f) }
 
-        state.bounds?.let { drawBoundingBox(buffer, matrix, it, 1f, 1f, 0f, 0.8f) }
-
-        for (entry in state.activeEntries) {
-            val (r, g, b) = unpackColor(entryColor(entry))
-            val pos = entry.pos
-            val x1 = pos.x.toFloat()
-            val y1 = pos.y.toFloat()
-            val z1 = pos.z.toFloat()
-            val x2 = x1 + 1f
-            val y2 = y1 + 1f
-            val z2 = z1 + 1f
-            drawBox(buffer, matrix, x1, y1, z1, x2, y2, z2, r, g, b, 0.9f)
+            for (entry in state.activeEntries) {
+                val (r, g, b) = unpackColor(entryColor(entry))
+                val pos = entry.pos
+                val x1 = pos.x.toFloat()
+                val y1 = pos.y.toFloat()
+                val z1 = pos.z.toFloat()
+                val x2 = x1 + 1f
+                val y2 = y1 + 1f
+                val z2 = z1 + 1f
+                drawBox(buffer, matrix, x1, y1, z1, x2, y2, z2, r, g, b, 0.9f)
+            }
         }
 
         state.hoveredFace?.let { face ->
             val b = state.bounds ?: return@let
-            val bufferFace = bufferSource.getBuffer(RenderTypes.debugQuads())
-            drawFaceHighlight(bufferFace, matrix, b, face)
+            collector.submitCustomGeometry(poseStack, RenderTypes.debugQuads()) { pose, bufferFace ->
+                drawFaceHighlight(bufferFace, pose.pose(), b, face)
+            }
         }
     }
 
