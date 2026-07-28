@@ -4,11 +4,14 @@ Project documentation lives in `docs/`. This file is the entry point: it indexes
 
 ## How to search for information
 
-1. Skim the **Category index** below and pick the folder whose tags match your task.
-2. Open that folder's `INDEX.md` to see article-level entries with one-line summaries.
-3. If the topic spans multiple categories, check each candidate `INDEX.md` — articles are hyperspecialized and a topic may have entries in 2+ folders.
-4. If nothing matches, `grep -ri "<keyword>" docs/` across all article bodies before assuming the doc doesn't exist.
-5. Source code is the source of truth. Docs explain *why* / non-obvious *how*. Verify file:line citations against current code before relying on them — articles can drift.
+`docs/` is indexed for semantic search by [qmd](https://github.com/tobi/qmd) as the collection `redstonespecs-docs`. **Query it first** — don't hand-walk the folder table.
+
+1. `qmd query "<your question>" -c redstonespecs-docs -n 8 --no-rerank --format md`. The **docs-search** skill covers mode selection (`qmd search` for exact identifiers, `qmd query` for concepts) and why `--no-rerank` is the default.
+2. `Read` the articles it names. Excerpts are for ranking; the file is what you cite.
+3. **If qmd returns nothing** — or isn't installed, it's an optional local tool — fall back: pick the folder from the **Category index** below, open its `INDEX.md`, then `grep -ri "<keyword>" docs/`. Articles are hyperspecialized and a topic may have entries in 2+ folders.
+4. Source code is the source of truth. Docs explain *why* / non-obvious *how*. Verify file:line citations against current code before relying on them — articles can drift.
+
+`docs/superpowers/` is deliberately **not** indexed — those specs and plans are commit-time snapshots, not live docs. Read them by path when you want history.
 
 ## How to write docs
 
@@ -36,6 +39,8 @@ Project documentation lives in `docs/`. This file is the entry point: it indexes
 4. **Changed something a doc cites by file:line?** Either update the citation to the new location or convert it to a description that survives refactors.
 5. **Cross-references stay valid:** `INDEX.md` titles, "See also" sections, and inline `[link](path.md)` references must all resolve to a real article with matching summary text.
 6. **Superpowers `specs/` and `plans/` are historical artifacts.** Leave them as-is; treat them as commit-time snapshots, not living docs.
+
+Newly written articles are indexed automatically on save — there is no manual reindex step, and running `qmd embed` by hand only contends for the reindex lock.
 
 Skip steps 1–5 only when the source change is purely internal (an unobservable refactor) AND no doc currently references the changed code. If unsure, default to checking.
 
