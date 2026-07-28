@@ -56,11 +56,9 @@ keybinds, see `dock-input-routing.md`) does that, so the dock is off-by-default 
 
 The dock never steals input on its own. `DockInputRouter.captured` (`= DockState.focusedRegion !=
 null`) gates every GLFW mouse/keyboard mixin — see [dock-input-routing.md](dock-input-routing.md) for
-the mixin targets, the Alt+1 (focus)/Shift+1 (visibility) keybinds, and the current limitation that
-**key→Compose delivery is deferred**: `KeyboardHandlerMixin` currently only cancels game keys while a
-region is focused (so movement/hotbar input doesn't leak into the world), it does not yet construct
-and forward a Compose `KeyEvent`, so no panel can consume typed text or arrow-key navigation yet.
-Pointer input (move/press/release/scroll) is fully wired end-to-end. Every entry point on
+the mixin targets, the Alt+1 (focus)/Shift+1 (visibility) keybinds, and ESC-drops-focus. Both pointer
+input (move/press/release/scroll) and key/character input (arrow-key navigation, typed text) are
+wired end-to-end into the Compose scene while a region is focused. Every entry point on
 `ComposeSurface` is guarded — a native-load or Skia failure sets `ComposeSurface.disabled` and the
 whole dock (rendering and input) silently no-ops back to vanilla, never crashing the client.
 

@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
 tags: [compose, dock, input, mixin, glfw, keybind]
-summary: How raw GLFW pointer/key callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds, and ESC-drops-focus.
+summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds, and ESC-drops-focus.
 ---
 
 # Dock input routing
@@ -41,7 +41,12 @@ The historical GLFW-callback signatures changed in 26.1.2; the injections target
 - `KeyboardHandlerMixin` → `net.minecraft.client.KeyboardHandler`:
   - `keyPress(JILnet/minecraft/client/input/KeyEvent;)V` — the key callback. **This replaces the
     older `keyPress(JIIII)V`**: 26.1.2 folds key/scancode/mods into a `KeyEvent` record. The GLFW key
-    code is read via `KeyEvent#key()`. The middle `int` is the action.
+    code is read via `KeyEvent#key()`, modifiers via `KeyEvent#modifiers()`. The middle `int` is the
+    action.
+  - `charTyped(JLnet/minecraft/client/input/CharacterEvent;)V` — the printable-character callback.
+    `CharacterEvent` is a record wrapping a single `int codepoint` (accessor `codepoint()`, all
+    lowercase — not `codePoint()`). Added in Task 3 so a focused text field can receive typed text;
+    the key callback above only ever carries key codes, never characters.
 
 A wrong `@Inject` target here fails silently (mixin doesn't apply) or crashes at class-load, so these
 descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel vanilla **only when
@@ -52,18 +57,27 @@ descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel van
 - Pointer move/press/release/scroll are forwarded into `ComposeSurface.sendPointer*/sendScroll`
   (guarded — a `disabled` Compose surface no-ops). This is the load-bearing dispatch the Explorer
   relies on (pointer-driven interactions).
-- **Key→Compose translation is deferred.** `KeyboardHandlerMixin` currently only *cancels* game keys
-  while focused (so movement/hotbar don't leak); it does not yet build a Compose `KeyEvent`.
-  `DockInputRouter` has no `onGlfwChar` yet.
-- **ESC drops dock focus.** `DockInputRouter.onGlfwKey(key, action)` is the ESC policy, called from
-  `KeyboardHandlerMixin` for every key while captured. While captured, a plain key-**press** of ESC
-  calls `clearFocus()` and returns `true` ("consumed"); the mixin then cancels the callback, so
-  vanilla ESC (pause menu) never runs on top of a dropped dock focus. ESC release/repeat and all
-  other keys return `false` but are still cancelled by the mixin (same as before) since the game must
-  not see keystrokes while a panel is focused. When not captured, `onGlfwKey` always returns `false`
-  and the mixin returns before touching `ci`, so ESC is byte-for-byte vanilla (opens the pause menu
-  as normal). This closes the previous total-input-lockout bug where ESC opened the pause menu while
-  `captured` stayed true, and the mouse mixin then swallowed clicks on that menu too.
+- **Key→Compose translation and typed characters are wired (Task 3).** `DockInputRouter.onGlfwKey(key,
+  action, mods)` forwards every non-ESC key while captured into `ComposeSurface.sendKey`, building a
+  Compose `KeyEvent` via the synthetic desktop factory
+  `androidx.compose.ui.input.key.KeyEvent(key, type, codePoint, isCtrlPressed, isMetaPressed,
+  isAltPressed, isShiftPressed, nativeEvent)` (opt-in: `@OptIn(InternalComposeUiApi::class)` — despite
+  looking like a candidate for `@ExperimentalComposeUiApi`, the factory's actual marker annotation in
+  the 1.11.0 jar is `InternalComposeUiApi`). Keys with no `glfwKeyToComposeKey` mapping
+  (`GlfwKeyMap.kt`) are dropped rather than guessed at. `DockInputRouter.onGlfwChar(codePoint)`, fed by
+  the new `garnet$charTyped` injection, delivers printable text the same way with `key = Key.Unknown`.
+  Both paths are additive: they still return/report nothing that changes cancellation, so a focused
+  text field or list can now consume arrow keys and typed text.
+- **ESC drops dock focus.** `DockInputRouter.onGlfwKey(key, action, mods = 0)` keeps its original ESC
+  policy first and unchanged, called from `KeyboardHandlerMixin` for every key while captured. While
+  captured, a plain key-**press** of ESC calls `clearFocus()` and returns `true` ("consumed"); the
+  mixin then cancels the callback, so vanilla ESC (pause menu) never runs on top of a dropped dock
+  focus. ESC release/repeat and all other keys (including ones now forwarded to Compose) return
+  `false` but are still cancelled by the mixin (same as before) since the game must not see keystrokes
+  while a panel is focused. When not captured, `onGlfwKey` always returns `false` and the mixin
+  returns before touching `ci`, so ESC is byte-for-byte vanilla (opens the pause menu as normal). This
+  closes the previous total-input-lockout bug where ESC opened the pause menu while `captured` stayed
+  true, and the mouse mixin then swallowed clicks on that menu too.
 
 ## Keybinds (`DockKeybinds.kt`)
 
@@ -115,4 +129,10 @@ intact; and asserts ESC returns `false` when not captured. A third case exercise
 `syncDockViewport()` directly (no GLFW): starting from `DockState.reset()` with both flags `false`,
 it asserts the flags stay `false` when nothing is visible, flip to `true` once `LEFT` becomes
 visible, revert to `false` once hidden again, and also flip to `true` when only `focusedRegion` is
-set (no visible region). `DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
+set (no visible region). Two more cases (Task 3) close the key-delivery gap: one mounts a
+`focusable().onKeyEvent { }` Box, focuses it via `FocusRequester`, drives a real
+`DockInputRouter.onGlfwKey(GLFW_KEY_DOWN, GLFW_PRESS, 0)` through the router→`ComposeSurface`→scene
+path, and asserts the widget observed `Key.DirectionDown`; the other re-asserts the ESC-only-consumed
+contract now that `onGlfwKey` takes a third `mods` param, confirming a non-ESC key while captured is
+delivered but still reported `false` (not consumed) and ESC is still the only key returning `true`.
+`DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
