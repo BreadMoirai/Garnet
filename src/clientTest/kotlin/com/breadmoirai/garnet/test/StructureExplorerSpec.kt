@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.test
 
+import com.breadmoirai.garnet.client.ide.ExplorerTreeState
 import com.breadmoirai.garnet.client.ide.ProjectTreeState
 import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.garnet.network.project.StructureResultS2C
@@ -12,6 +13,7 @@ class StructureExplorerSpec : ClientSpec({
     test("onStructureResult surfaces the message as Explorer status") {
         runOnClient {
             ProjectTreeState.reset()
+            ExplorerTreeState.reset()
             ProjectTreeState.onStructureResult(
                 StructureResultS2C("a/box.nbt", 2, 1, 3, hasUnsaved = false, message = "placed a/box.nbt"),
             )
@@ -22,15 +24,16 @@ class StructureExplorerSpec : ClientSpec({
     test("selectedHasUnsaved reflects the dirty flag on the selected .nbt node") {
         runOnClient {
             ProjectTreeState.reset()
+            ExplorerTreeState.reset()
             val root = FolderNode("root", listOf(
                 FileNode("dirty.nbt", "nbt", hasUnsaved = true),
                 FileNode("clean.nbt", "nbt", hasUnsaved = false),
             ))
             ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root, currentSubpath = null))
-            ProjectTreeState.select("dirty.nbt")
+            ExplorerTreeState.select("dirty.nbt")
         }
-        ProjectTreeState.selectedHasUnsaved() shouldBe true
-        runOnClient { ProjectTreeState.select("clean.nbt") }
-        ProjectTreeState.selectedHasUnsaved() shouldBe false
+        ExplorerTreeState.selectedHasUnsaved() shouldBe true
+        runOnClient { ExplorerTreeState.select("clean.nbt") }
+        ExplorerTreeState.selectedHasUnsaved() shouldBe false
     }
 })

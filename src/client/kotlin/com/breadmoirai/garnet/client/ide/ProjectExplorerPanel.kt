@@ -97,12 +97,12 @@ private fun StructureActions() {
         }.padding(horizontal = 6.dp)) { BasicText("+ Structure", style = TextStyle(color = TEXT_DIM)) }
         Spacer(Modifier.weight(1f))
         Box(Modifier.clickable {
-            val sel = ProjectTreeState.selectedPath
+            val sel = ExplorerTreeState.selectedPath
             if (sel != null && sel.endsWith(".nbt")) ClientPlayNetworking.send(SaveStructureC2S(sel))
         }.padding(horizontal = 6.dp)) { BasicText("Save Structure", style = TextStyle(color = TEXT_DIM)) }
-        val selDirty = ProjectTreeState.selectedHasUnsaved()
+        val selDirty = ExplorerTreeState.selectedHasUnsaved()
         Box(Modifier.clickable {
-            val sel = ProjectTreeState.selectedPath
+            val sel = ExplorerTreeState.selectedPath
             if (sel != null && sel.endsWith(".nbt")) ClientPlayNetworking.send(DiscardStructureC2S(sel))
         }.padding(horizontal = 6.dp)) {
             BasicText("Discard", style = TextStyle(color = if (selDirty) TEXT_DIM else TEXT_DISABLED))
@@ -131,19 +131,19 @@ private fun TreeNode(node: FileTreeNode, path: String, depth: Int, currentSubpat
     val indent = (depth * 12).dp
     when (node) {
         is FolderNode -> {
-            val isExpanded = path in ProjectTreeState.expanded
+            val isExpanded = path in ExplorerTreeState.expandedPaths
             val hasChildren = node.children.isNotEmpty()
             val isSpecFolder = node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }
             val triangle = if (!hasChildren) "  " else if (isExpanded) "▾" else "▸"
             val marker = if (path == currentSubpath) "● " else ""
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 Spacer(Modifier.width(indent))
-                Box(Modifier.clickable(enabled = hasChildren) { ProjectTreeState.toggleExpanded(path) }) {
+                Box(Modifier.clickable(enabled = hasChildren) { ExplorerTreeState.toggleExpanded(path) }) {
                     BasicText("$triangle ", style = TextStyle(color = TEXT_DIM))
                 }
                 Box(Modifier.fillMaxWidth().clickable {
                     if (isSpecFolder) ClientPlayNetworking.send(LoadProjectFolderC2S(path))
-                    else ProjectTreeState.toggleExpanded(path)
+                    else ExplorerTreeState.toggleExpanded(path)
                 }) {
                     BasicText("$marker${node.name}", style = TextStyle(color = TEXT))
                 }
@@ -155,10 +155,10 @@ private fun TreeNode(node: FileTreeNode, path: String, depth: Int, currentSubpat
             }
         }
         is FileNode -> {
-            val isSelected = path == ProjectTreeState.selectedPath
+            val isSelected = path == ExplorerTreeState.selectedPath
             val isStructure = node.extension == "nbt"
             val onClick: () -> Unit = {
-                ProjectTreeState.select(path)
+                ExplorerTreeState.select(path)
                 if (isStructure) ClientPlayNetworking.send(PlaceStructureC2S(path))
             }
             val base = Modifier.fillMaxWidth().clickable(onClick = onClick)

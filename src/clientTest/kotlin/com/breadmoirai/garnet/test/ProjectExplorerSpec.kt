@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.test
 
+import com.breadmoirai.garnet.client.ide.ExplorerTreeState
 import com.breadmoirai.garnet.client.ide.ProjectTreeState
 import com.breadmoirai.garnet.client.ide.explorerPanel
 import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
@@ -44,10 +45,11 @@ class ProjectExplorerSpec : ClientSpec({
         runOnClient { mc ->
             DockState.reset()
             ProjectTreeState.reset()
+            ExplorerTreeState.reset()
             ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root = tree, currentSubpath = "adders/full-adder"))
             // Expand so the nested folders and files are visible in the screenshot.
-            ProjectTreeState.toggleExpanded("adders")
-            ProjectTreeState.toggleExpanded("adders/full-adder")
+            ExplorerTreeState.toggleExpanded("adders")
+            ExplorerTreeState.toggleExpanded("adders/full-adder")
             DockState.leftPanels.add(explorerPanel())
             DockState.setVisible(DockRegion.LEFT, true)
             DockState.setSize(DockRegion.LEFT, 300)
@@ -77,7 +79,7 @@ class ProjectExplorerSpec : ClientSpec({
             FolderNode("set", listOf(FileNode("a.spec.kts", "kts"))),
         ))
         runOnClient { mc ->
-            DockState.reset(); ProjectTreeState.reset()
+            DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
             com.breadmoirai.garnet.client.ide.RootPickerController.resetForTest()
             ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root = tree, currentSubpath = null))
             com.breadmoirai.garnet.client.ide.RootPickerController.toggleMenu()

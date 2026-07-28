@@ -8,24 +8,19 @@ import com.breadmoirai.garnet.network.project.ProjectFolderLoadedS2C
 import com.breadmoirai.garnet.network.project.ProjectSaveReportS2C
 import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.garnet.network.project.StructureResultS2C
-import com.breadmoirai.garnet.project.FileNode
-import com.breadmoirai.garnet.project.resolve
 
 /**
- * Client-side, Compose-observable state for the Project Explorer. The networking layer mutates it
- * from the client thread; [ProjectExplorerPanel] reads it during composition and recomposes on
- * change. Replaces the old ProjectScreen-as-state-holder model (hard-cut).
+ * Client-side, Compose-observable state for the Project Explorer: the server's tree snapshot and the
+ * status line. The networking layer mutates it from the client thread; [ProjectExplorerPanel] reads
+ * it during composition and recomposes on change.
+ *
+ * Tree *interaction* state (expansion, selection) deliberately lives in [ExplorerTreeState], owned by
+ * Jewel's TreeState, so there is exactly one copy of it.
  */
 object ProjectTreeState {
     var snapshot by mutableStateOf<ProjectTreeSnapshotS2C?>(null)
         private set
     var status by mutableStateOf("")
-        private set
-    /** Subpaths the user has expanded in the tree. */
-    val expanded = androidx.compose.runtime.mutableStateListOf<String>()
-
-    /** The file the user has clicked (highlighted). Null when nothing is selected. */
-    var selectedPath by mutableStateOf<String?>(null)
         private set
 
     fun onSnapshot(s: ProjectTreeSnapshotS2C) { snapshot = s }
@@ -40,24 +35,9 @@ object ProjectTreeState {
     fun onError(e: ProjectErrorS2C) { status = "error: ${e.reason}" }
     fun onStructureResult(r: StructureResultS2C) { status = r.message }
 
-    fun toggleExpanded(subpath: String) {
-        if (!expanded.remove(subpath)) expanded.add(subpath)
-    }
-
-    fun select(path: String) { selectedPath = path }
-
-    /** True when [selectedPath] resolves to a `.nbt` file flagged dirty in the current snapshot. */
-    fun selectedHasUnsaved(): Boolean {
-        val path = selectedPath ?: return false
-        val node = snapshot?.root?.resolve(path)
-        return node is FileNode && node.hasUnsaved
-    }
-
-    /** Test/reset hook: clears the snapshot, status, and expanded set back to initial values. */
+    /** Test/reset hook: clears the snapshot and status back to initial values. */
     fun reset() {
         snapshot = null
         status = ""
-        expanded.clear()
-        selectedPath = null
     }
 }

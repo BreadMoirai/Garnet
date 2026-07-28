@@ -78,6 +78,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         DockRenderSpec::class,
                         DockInputSpec::class,
                         GlfwKeyMapSpec::class,
+                        ExplorerTreeStateSpec::class,
                         ProjectExplorerSpec::class,
                         RootPickerSpec::class,
                         StructureExplorerSpec::class,
