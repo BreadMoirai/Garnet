@@ -27,11 +27,11 @@ import com.breadmoirai.garnet.project.FolderNode
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.component.Dropdown
-import org.jetbrains.jewel.ui.component.DefaultButton
+import org.jetbrains.jewel.ui.component.DefaultSlimButton
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
 import org.jetbrains.jewel.ui.component.LazyTree
-import org.jetbrains.jewel.ui.component.OutlinedButton
+import org.jetbrains.jewel.ui.component.OutlinedSlimButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.separator
@@ -131,12 +131,22 @@ private fun StructureActions() {
     val newName = rememberTextFieldState()
     val selected = ExplorerTreeState.selectedPath
     val isStructure = selected != null && selected.endsWith(".nbt")
+    // All four controls must stay reachable at the dock's typical 300px LEFT-panel width without
+    // shrinking the tree area or scrolling this row — slim button variants (Jewel's
+    // DefaultSlimButton/OutlinedSlimButton, a narrower min-height/padding than the default
+    // buttons used elsewhere in this panel), a narrower name field, a shorter "+ New" label, and a
+    // fixed (not flex) inter-button gap buy back enough width for Save AND Discard to render fully
+    // on-canvas, label included. A flex Spacer(weight = 1f) here would still overflow the row when
+    // the fixed-width children alone exceed 300px, since it can only shrink to zero, never negative
+    // — packing everything left-aligned with a small fixed gap is what actually guarantees no
+    // clipping. Verified visually via the client-test screenshots (see task-5-report.md), not just
+    // by compiling.
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         TextField(
             state = newName,
-            modifier = Modifier.width(110.dp),
+            modifier = Modifier.width(48.dp),
         )
-        DefaultButton(
+        DefaultSlimButton(
             onClick = {
                 val name = newName.text.toString()
                 if (name.isNotBlank()) {
@@ -144,18 +154,18 @@ private fun StructureActions() {
                     newName.clearText()
                 }
             },
-            modifier = Modifier.padding(horizontal = 4.dp),
-        ) { Text("+ Structure") }
-        Spacer(Modifier.weight(1f))
-        OutlinedButton(
+            modifier = Modifier.padding(horizontal = 2.dp),
+        ) { Text("+ New") }
+        Spacer(Modifier.width(4.dp))
+        OutlinedSlimButton(
             onClick = { if (isStructure) ClientPlayNetworking.send(SaveStructureC2S(selected!!)) },
             enabled = isStructure,
-            modifier = Modifier.padding(horizontal = 2.dp),
+            modifier = Modifier.padding(horizontal = 1.dp),
         ) { Text("Save") }
-        OutlinedButton(
+        OutlinedSlimButton(
             onClick = { if (isStructure) ClientPlayNetworking.send(DiscardStructureC2S(selected!!)) },
             enabled = isStructure && ExplorerTreeState.selectedHasUnsaved(),
-            modifier = Modifier.padding(horizontal = 2.dp),
+            modifier = Modifier.padding(horizontal = 1.dp),
         ) { Text("Discard") }
     }
 }
