@@ -25,17 +25,11 @@ object RootPickerController {
     var sender: (CustomPacketPayload) -> Unit = { ClientPlayNetworking.send(it) }
     var persist: (String) -> Unit = { path -> ModConfig.projectRootPath = path; ModConfig.save() }
 
-    var menuOpen by mutableStateOf(false)
-        private set
     var picking by mutableStateOf(false)
         private set
 
-    fun toggleMenu() { menuOpen = !menuOpen }
-    fun closeMenu() { menuOpen = false }
-
     /** Open the native folder picker; on a non-null result, persist it and send [SetProjectRootC2S]. */
     fun openFolder() {
-        closeMenu()
         if (picking) return
         picking = true
         try {
@@ -68,7 +62,6 @@ object RootPickerController {
         executor = { Minecraft.getInstance().execute(it) }
         sender = { ClientPlayNetworking.send(it) }
         persist = { path -> ModConfig.projectRootPath = path; ModConfig.save() }
-        menuOpen = false
         picking = false
     }
 }

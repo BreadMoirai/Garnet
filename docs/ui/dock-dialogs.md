@@ -1,24 +1,29 @@
 ---
-title: Dialogs in the dock — no Compose Popup, native pickers on a worker thread
-tags: [compose, dock, dialogs, popup, tinyfd, threading, gotcha]
-summary: The embedded ImageComposeScene can't host Compose Popup/DropdownMenu (they spawn a separate desktop window); hand-roll overlays. Native OS dialogs (tinyfd) block, so run them off the render thread and marshal back via Minecraft.execute.
+title: Dialogs in the dock — Compose Popup renders in-scene, native pickers on a worker thread
+tags: [compose, dock, dialogs, popup, jewel, tinyfd, threading, gotcha]
+summary: Compose Popup/DropdownMenu DO render inside the embedded ImageComposeScene (it's a CanvasLayersComposeScene, so popup layers draw in-canvas, not a separate OS window) — Jewel's Dropdown is used directly. Native OS dialogs (tinyfd) still block, so run them off the render thread and marshal back via Minecraft.execute.
 ---
 
 # Dialogs in the dock
 
 Two rules govern any menu or dialog inside the Compose dock.
 
-## No Compose `Popup` / `DropdownMenu`
+## Compose `Popup` renders in-scene — retired "hand-roll it" advice
 
-The dock hosts Compose in an embedded `ImageComposeScene` (CPU raster, no platform
-windowing — see [dock-framework.md](dock-framework.md)). Material `DropdownMenu` and the
-underlying `Popup` open a **separate desktop window**, which that scene cannot host — the
-content renders nowhere. Hand-roll dropdowns/menus instead: a z-layered sibling `Box`
-(optionally with a full-size transparent scrim `Box` behind it to close on outside-click),
-rendered only when an observable "open" flag is set. `ProjectExplorerPanel.RootMenu` is the
-reference. Keep the trigger control *outside* any `verticalScroll` so the overlay isn't
-scroll-clipped. (This is the Compose-era analog of the legacy "scissor baked at record time"
-dropdown warning.)
+**Retired 2026-07-28 (jewel-widget-layer spike):** this doc previously said the dock's
+`ImageComposeScene` couldn't host a Compose `Popup`/`DropdownMenu` because they open a
+separate desktop window, and told panels to hand-roll overlays instead
+(`ProjectExplorerPanel.RootMenu` was the reference for that pattern). That premise was wrong
+for Compose 1.11's `ImageComposeScene`: it is internally a `CanvasLayersComposeScene`, so
+popup layers draw into the *same* canvas as the rest of the scene rather than spawning an OS
+window. The spike confirmed a bare Compose `Popup` renders in-scene; the Explorer panel now
+uses Jewel's `Dropdown` (built on `PopupContainer` → `androidx.compose.ui.window.Popup`)
+directly for its root-folder picker, and `RootMenu` was deleted along with
+`RootPickerController.menuOpen`/`toggleMenu`/`closeMenu`. New dock UI should reach for
+Jewel's `Dropdown`/menu components rather than hand-rolling a scrim+card overlay. Keep the
+trigger control *outside* any scrollable container so the popup isn't scroll-clipped — that
+constraint survives from the old advice (this is the Compose-era analog of the legacy
+"scissor baked at record time" dropdown warning).
 
 ## Native OS dialogs block — run them off the render thread
 

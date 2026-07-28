@@ -9,6 +9,7 @@ import com.breadmoirai.garnet.project.FileTreeNode
 import com.breadmoirai.garnet.project.FolderNode
 import com.breadmoirai.garnet.project.resolve
 import org.jetbrains.jewel.foundation.lazy.SelectableLazyListState
+import org.jetbrains.jewel.foundation.lazy.SelectionMode
 import org.jetbrains.jewel.foundation.lazy.tree.Tree
 import org.jetbrains.jewel.foundation.lazy.tree.TreeGeneratorScope
 import org.jetbrains.jewel.foundation.lazy.tree.TreeState
@@ -30,7 +31,9 @@ object ExplorerTreeState {
     var treeState: TreeState by mutableStateOf(newTreeState())
         private set
 
-    private fun newTreeState() = TreeState(SelectableLazyListState(LazyListState()))
+    // LazyTree has no selectionMode parameter of its own in this Jewel version — selection mode is
+    // a property of SelectableLazyListState, constructed here rather than passed at the call site.
+    private fun newTreeState() = TreeState(SelectableLazyListState(LazyListState(), SelectionMode.Single))
 
     /** The selected node's path, or null. Single-selection: the tree is configured Single-mode. */
     val selectedPath: String?

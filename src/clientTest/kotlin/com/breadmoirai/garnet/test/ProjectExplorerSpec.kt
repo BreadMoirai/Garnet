@@ -2,6 +2,7 @@ package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.client.ide.ExplorerTreeState
 import com.breadmoirai.garnet.client.ide.ProjectTreeState
+import com.breadmoirai.garnet.client.ide.RootPickerController
 import com.breadmoirai.garnet.client.ide.explorerPanel
 import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
@@ -73,26 +74,25 @@ class ProjectExplorerSpec : ClientSpec({
         waitClientTicks(6)
     }
 
-    test("Explorer header renders the root option button and opens the dropdown") {
+    test("Explorer header renders the root name") {
         closeClientScreen(); waitClientTicks(2)
         val tree = FolderNode("myroot", listOf(
             FolderNode("set", listOf(FileNode("a.spec.kts", "kts"))),
         ))
         runOnClient { mc ->
             DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
-            com.breadmoirai.garnet.client.ide.RootPickerController.resetForTest()
+            RootPickerController.resetForTest()
             ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root = tree, currentSubpath = null))
-            com.breadmoirai.garnet.client.ide.RootPickerController.toggleMenu()
             DockState.leftPanels.add(explorerPanel())
             DockState.setVisible(DockRegion.LEFT, true); DockState.setSize(DockRegion.LEFT, 300)
             ViewportState.active = true; ComposeOverlay.enabled = true
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(12)
-        com.breadmoirai.garnet.client.ide.RootPickerController.menuOpen shouldBe true
-        capture("explorer_root_menu.png")
+        ProjectTreeState.snapshot!!.root.name shouldBe "myroot"
+        capture("explorer_root_header.png")
         runOnClient { mc ->
-            com.breadmoirai.garnet.client.ide.RootPickerController.resetForTest()
+            RootPickerController.resetForTest()
             ComposeOverlay.enabled = false; ViewportState.active = false; DockState.reset()
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }

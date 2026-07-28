@@ -83,7 +83,7 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
 
 - **UC-MAN-05.a** `/garnet project` immediately sends `ListProjectTreeC2S`. `ProjectNetworkRegistry.handleListTree` (via private `sendTree`) calls `scanFolder(root.path)` on the server and replies with `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` carrying the full recursive folder tree (every file/folder, not just spec leaves) and the player's current `activeSubpath`.
-- **UC-MAN-05.b** `ProjectClientNetworking` receives `ProjectTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot` and recursively renders `snapshot.root.children`, recomposing on change. This is the **only** client-side reaction to the snapshot — the legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the recursive render pattern and expand/select state.
+- **UC-MAN-05.b** `ProjectClientNetworking` receives `ProjectTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot`, converts it via `ExplorerTreeState.buildTreeFrom(snapshot.root)`, and renders it with Jewel's `LazyTree`, recomposing on change. This is the **only** client-side reaction to the snapshot — the legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the `ExplorerTreeState`/`ProjectTreeState` split (expand/select state vs. server data).
 - **UC-MAN-05.c** Clicking a "spec-folder" row (a folder directly containing a `*.spec.kts` file) sends `LoadProjectFolderC2S(path)`. `ProjectNetworkRegistry.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `ProjectTeleport.toFolder`, and sends `ProjectFolderLoadedS2C` with the spec-id list and any errors. Clicking a non-spec folder or its expand triangle just toggles expand client-side (no packet); clicking a file row selects/highlights it client-side (no packet).
 - **UC-MAN-05.d** `ProjectTeleport.toFolder` looks up `ProjectDimRegistry.regionOriginOf(subpath)`, teleports the player to `(region.x+0.5, yBase+2, region.z+0.5)` in `projectLevel()`, and calls `ProjectSession.setActive(player.uuid, subpath)` so subsequent server actions (save, new-spec) scope to the right folder.
 - **UC-MAN-05.e** If the subpath's region has not been assigned (folder not yet placed), `toFolder` returns `false` and the server replies with `ProjectErrorS2C`. `ProjectTreeState.onError(payload)` sets `status = "error: ${payload.reason}"`, which the Explorer panel renders as its status line — the same mechanism that used to update `ProjectScreen`'s status label.
@@ -133,10 +133,12 @@ A player opens the Explorer header's option button, chooses **Open Folder**, and
 in the OS dialog; the workspace root switches to it. **Attach Folder** is present but disabled
 (multi-root is Plan B).
 
-- **UC-MAN-09.a** Clicking the option button toggles `RootPickerController.menuOpen`, rendering
-  the hand-rolled `RootMenu` overlay. **Open Folder** calls `RootPickerController.openFolder`,
-  which runs the injectable `FolderPicker` (default `TinyfdFolderPicker` →
-  `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
+- **UC-MAN-09.a** The option button is a Jewel `Dropdown` (replacing the earlier hand-rolled
+  `RootMenu` overlay + `RootPickerController.menuOpen`/`toggleMenu`, deleted once the dock's
+  `ImageComposeScene` was confirmed to render Compose `Popup`s in-scene — see
+  [ui/dock-dialogs.md](../ui/dock-dialogs.md)); clicking it opens the menu itself. **Open Folder**
+  calls `RootPickerController.openFolder`, which runs the injectable `FolderPicker` (default
+  `TinyfdFolderPicker` → `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
 - **UC-MAN-09.b** On a non-null pick, the controller normalizes the path to absolute (matching
   the server's canonical form) and persists it client-side (`ModConfig.projectRootPath` →
   `garnet.json`, also mirrored to `SharedSettings.projectRootPath`) and sends

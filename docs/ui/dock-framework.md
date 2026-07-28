@@ -73,59 +73,73 @@ whole dock (rendering and input) silently no-ops back to vanilla, never crashing
   level (`Function2` vs `Function1`), but to avoid call-site overload ambiguity the horizontal one is
   named `SplitterX`. LEFT/RIGHT use `SplitterX`; BOTTOM uses the two-arg `Splitter` and reads `dy`.
 
-## First real panel: the Project Explorer (live-data pattern)
+## First real panel: the Project Explorer (live-data pattern, now on Jewel)
 
-`client/ide/ProjectExplorerPanel.kt` + `client/ide/ProjectTreeState.kt` are the first non-demo panel
-and the template future panels (debugger, timeline) should copy. The pattern:
+`client/ide/ProjectExplorerPanel.kt` + `client/ide/ProjectTreeState.kt` +
+`client/ide/ExplorerTreeState.kt` are the first non-demo panel and the template future panels
+(debugger, timeline) should copy. As of the jewel-widget-layer migration, the panel is built
+entirely from JetBrains Jewel components (`LazyTree`, `Dropdown`, `TextField`, `DefaultButton`/
+`OutlinedButton`, `IconButton`) under one `IntUiTheme(isDark = true)`, not hand-rolled
+`BasicText`/`Box.clickable` rows. The pattern:
 
-- **State is a `mutableStateOf`-backed singleton**, not the panel. `ProjectTreeState` holds
-  `snapshot: ProjectTreeSnapshotS2C?`, `status: String`, `expanded: SnapshotStateList<String>`, and
-  `selectedPath: String?` as snapshot state with private setters, mutated only by
-  `onSnapshot/onFolderLoaded/onSaveReport/onError/toggleExpanded/select`. The networking layer
-  (`ProjectClientNetworking`, on the client thread via `ctx.client().execute {}`) calls the S2C
-  handlers; the panel `@Composable` reads `ProjectTreeState` during composition and recomposes on
-  change. Keep the state object separate from the `Panel` so packet handlers never touch Compose
-  internals.
+- **State is split across two `mutableStateOf`-backed singletons**, neither of which is the
+  panel. `ProjectTreeState` holds only the server-driven data: `snapshot:
+  ProjectTreeSnapshotS2C?` and `status: String`, mutated by its S2C packet handlers
+  (`onSnapshot/onFolderLoaded/onSaveReport/onError`). `ExplorerTreeState` owns all UI-only tree
+  state — selection and expansion — by wrapping a single Jewel `TreeState` (hoisted, not
+  `rememberTreeState()`'d inside composition, so packet handlers and tests can drive it from
+  outside a composable): `selectedPath`/`select(path)` and `expandedPaths`/`toggleExpanded(path)`
+  read/write `treeState.selectedKeys`/`openNodes` directly rather than mirroring them in a second
+  field, and `buildTreeFrom(root: FolderNode): Tree<FileTreeNode>` converts a snapshot into a
+  Jewel `Tree` (node `id`s are the same `/`-joined paths used everywhere else). Keep both state
+  objects separate from the `Panel` so packet handlers never touch Compose internals.
 - **`explorerPanel(): Panel`** returns the tab (`Panel("garnet.explorer", "Explorer") { … }`);
   it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT stays
   hidden by default (Shift+1 reveals it).
-- **The tree renders recursively.** `snapshot.root` is a `FolderNode` (package
-  `com.breadmoirai.garnet.project`); a private `TreeNode(node, path, depth, currentSubpath)`
-  composable recurses over `FolderNode`/`FileNode` (sealed `FileTreeNode`). Paths are `/`-joined
-  relative to root (`child.name` at depth 0, `"$path/${child.name}"` deeper) to match the server's
-  `FolderNode.walk()` keys and `currentSubpath`. A folder only recurses into its children when
-  `path in ProjectTreeState.expanded`.
-- **Clicks dispatch by node kind**: a folder is a "spec-folder" (directly contains a `FileNode`
-  named `*.spec.kts`) iff `node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }`;
-  clicking a spec-folder's label sends `LoadProjectFolderC2S(path)`, clicking any other folder's
-  label (or its expand triangle) calls `ProjectTreeState.toggleExpanded(path)`. Clicking a file row
-  calls `ProjectTreeState.select(path)` — highlight only, no packet sent — **except** a `.nbt`
-  `FileNode` (`node.extension == "nbt"`, rendered with a `▶` prefix), which selects **and** sends
+- **The tree renders via Jewel's `LazyTree`**, not a hand-written recursive composable.
+  `ExplorerTreeState.buildTreeFrom(snap.root)` builds the `Tree<FileTreeNode>` each recomposition;
+  `LazyTree(tree, treeState = ExplorerTreeState.treeState, onElementClick = { ... }) { element ->
+  TreeRow(...) }` handles expand/collapse and row layout — `LazyTree` has no `selectionMode`
+  parameter of its own in Jewel 0.39.1-262.9437.29 despite some Jewel docs implying otherwise;
+  selection mode is a constructor argument of the `SelectableLazyListState` that backs
+  `TreeState` (`ExplorerTreeState` constructs it with `SelectionMode.Single` explicitly — the
+  single-arg `SelectableLazyListState(LazyListState())` convenience constructor defaults to
+  `SelectionMode.Multiple`, which is *not* what a single-selection file tree wants).
+  `Tree.Element.Node.children` is lazy (only materializes once `open()`/expand is called) while
+  node `id`s are eager — this doesn't affect `LazyTree` itself, only direct `Tree` traversal.
+- **Clicks dispatch by node kind** (`onElementClick` in `ProjectExplorerPanel.kt`): a folder is a
+  "spec-folder" (directly contains a `FileNode` named `*.spec.kts`) iff `node.children.any { it is
+  FileNode && it.name.endsWith(".spec.kts") }`; clicking a spec-folder sends
+  `LoadProjectFolderC2S(path)`, other folders just expand/collapse (`LazyTree`'s own click-to-toggle
+  behavior). Clicking a file row calls `ExplorerTreeState.select(path)` — highlight only, no packet
+  sent — **except** a `.nbt` `FileNode` (`node.extension == "nbt"`), which selects **and** sends
   `PlaceStructureC2S(path)` to place the standalone structure centered in its auto-assigned region.
-  The Refresh row sends `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh unit
-  payload — see `ProjectPackets`). The folder whose path equals `currentSubpath` is marked with a
-  `●`.
-- **`StructureActions()`**, rendered under `Header()`, provides "+ Structure" (a name input that
-  sends `NewStructureC2S(name)` to write an empty `.nbt` into the active folder) and "Save
-  Structure" (sends `SaveStructureC2S(selectedPath)` when the current `selectedPath` ends with
-  `.nbt`, auto-fitting and rewriting that file). `StructureResultS2C` for all three structure
-  packets (place/save/new) surfaces through `ProjectTreeState.onStructureResult` into the same
-  status line as folder load/save results. See
+  The Refresh `IconButton` sends `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh
+  unit payload — see `ProjectPackets`). `TreeRow` prefixes a row's label with `●` when the row's
+  path equals `snapshot.currentSubpath` or (for a `.nbt` file) `node.hasUnsaved` is true, and shows
+  a Jewel `AllIconsKeys` icon per node kind (`Nodes.Folder`, `FileTypes.Archive` for `.nbt`,
+  `FileTypes.Text` otherwise).
+- **`StructureActions()`**, rendered under `Header()`, provides "+ Structure" (a Jewel `TextField`
+  backed by `rememberTextFieldState()` — the `TextField(value: String, onValueChange, ...)`
+  overload does not exist in this Jewel version, only `TextFieldState`- and `TextFieldValue`-keyed
+  overloads do — plus a `DefaultButton` that sends `NewStructureC2S(name)` to write an empty `.nbt`
+  into the active folder and clears the field via the `TextFieldState.clearText()` extension) and
+  "Save"/"Discard" `OutlinedButton`s (send `SaveStructureC2S`/`DiscardStructureC2S(selectedPath)`
+  when `ExplorerTreeState.selectedPath` ends with `.nbt`; Discard is additionally gated on
+  `ExplorerTreeState.selectedHasUnsaved()` and dims via Jewel's own disabled-button styling).
+  `StructureResultS2C` for all four structure packets (place/save/new/discard) surfaces through
+  `ProjectTreeState.onStructureResult` into the same status line as folder load/save results. See
   [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
   for the region-placement model these actions drive.
-- **Scrolling a panel body** uses `Column(Modifier.verticalScroll(rememberScrollState()))` from
-  `androidx.compose.foundation`, **not** `LazyColumn` — this deferred render pipeline bakes
-  scissor/clipping at record time, and `LazyColumn`'s scroll-area clipping interacts badly with
-  that. `Column`+`verticalScroll` is sufficient for the tree sizes involved and matches the rest of
-  the dock's foundation usage.
-- **The panel has a header bar** (`Header` in `ProjectExplorerPanel.kt`, rendered *outside* the
-  tree's `verticalScroll`): an option button labeled with the current root's folder name +
-  `▾`, and a `↻` refresh button. Clicking the option button toggles
-  `RootPickerController.menuOpen`, which renders `RootMenu` — a hand-rolled dropdown overlay
-  (scrim + card) as a z-layered sibling `Box`. **Open Folder** runs a native folder picker and
-  swaps the single server root (`SetProjectRootC2S` → `handleSetRoot`); **Attach Folder** is
-  disabled pending multi-root (Plan B). See [dock-dialogs.md](dock-dialogs.md) for why the menu
-  is hand-rolled and how the native picker is threaded.
+- **The panel has a header bar** (`Header` in `ProjectExplorerPanel.kt`): a Jewel `Dropdown`
+  labeled with the current root's folder name, and an `IconButton` (`AllIconsKeys.Actions.Refresh`)
+  for the refresh action. The dropdown's `menuContent` offers "Open Folder" (runs
+  `RootPickerController.openFolder()`, a native folder picker that swaps the single server root via
+  `SetProjectRootC2S` → `handleSetRoot`) and a disabled "Attach Folder (soon)" placeholder pending
+  multi-root (Plan B). This replaced a hand-rolled `RootMenu` overlay (`RootPickerController.
+  menuOpen`/`toggleMenu`/`closeMenu`, since deleted) that existed only because Compose `Popup`s were
+  believed unable to render inside the embedded scene — see [dock-dialogs.md](dock-dialogs.md) for
+  why that premise turned out to be wrong and how the native picker is threaded.
 
 ## `ImageComposeScene` input API (verified against 1.12.0-beta02)
 

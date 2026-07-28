@@ -26,14 +26,12 @@ class RootPickerSpec : ClientSpec({
         RootPickerController.executor = Runnable::run
         RootPickerController.sender = { sent.add(it) }
         RootPickerController.persist = { persisted.add(it) }
-        RootPickerController.toggleMenu() // open, then openFolder should close it
 
         RootPickerController.openFolder()
 
         sent.filterIsInstance<SetProjectRootC2S>().single().path shouldBe expected
         persisted.single() shouldBe expected
         RootPickerController.picking shouldBe false
-        RootPickerController.menuOpen shouldBe false
     }
 
     test("openFolder sends nothing when the picker is cancelled") {
