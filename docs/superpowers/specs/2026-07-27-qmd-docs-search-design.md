@@ -20,8 +20,9 @@ Two halves have to land together:
 - **Discoverability:** CLAUDE.md and a project skill that make querying it the *default* first move,
   so no reminder is needed.
 
-Non-goals: an MCP server; indexing Kotlin source; reindexing on every turn; replacing the
-`INDEX.md` files (they stay as the human-browsable table of contents and the qmd fallback).
+Non-goals: an MCP server; indexing Kotlin source; reindexing on every turn regardless of whether
+docs changed; replacing the `INDEX.md` files (they stay as the human-browsable table of contents
+and the qmd fallback).
 
 ## Prerequisite: a WSL-side JS runtime
 
@@ -90,8 +91,8 @@ Body content:
    - `--no-rerank` as the escape hatch when latency hurts.
 3. **Fallback.** If qmd returns nothing above the score floor, fall back to the existing ladder:
    category `INDEX.md`, then `grep -ri`. A miss must degrade, not dead-end.
-4. **Freshness note.** The index is refreshed at session start; docs written *during* this session
-   are not yet indexed, so search results are not a substitute for knowing what you just wrote.
+4. **Freshness note.** The index refreshes automatically on every write to `docs/`, so articles are
+   searchable within seconds of being written. No manual reindex step, and none should be added.
 
 **Latency is measured, not assumed.** During implementation, benchmark all three modes (and
 `--no-rerank`) against this corpus on this machine, and write the observed timings into the skill.
@@ -99,25 +100,36 @@ Guidance about which mode to reach for is only useful if the numbers behind it a
 inference under WSL2 is the risk: if `qmd query` proves unusably slow, the skill's documented
 default changes to `vsearch`/`--no-rerank`, and the design still stands.
 
-## Freshness: a backgrounded SessionStart hook
+## Freshness: reindex on doc write
 
-Registered in `.claude/settings.json`:
+The index refreshes **when a doc is written**, so an article is searchable in the same session it
+is created. Both triggers run one shared script, `.claude/hooks/qmd-reindex.sh`, registered in
+`.claude/settings.json`:
 
-```
-command -v qmd >/dev/null 2>&1 || exit 0
-( qmd update && qmd embed ) >> .qmd/reindex.log 2>&1 &
-```
+**`PostToolUse` on `Write|Edit`** — the primary trigger. The hook receives the tool call as JSON on
+stdin; the script reads `tool_input.file_path` and **exits immediately unless the path is a `.md`
+file under `docs/`**. This filter is the whole point: a hook that reindexed after every source edit
+would fire constantly for nothing.
 
-- **Guarded** — a machine without qmd installed exits cleanly, so the repo stays usable by anyone
-  (or any agent) who skipped the manual install. Degradation is to plain grep, never to an error
-  on every session start.
-- **Detached** — reindexing must never block the first prompt. Output goes to a log for debugging.
-- **Once per session** — CLAUDE.md already mandates a docs audit at the end of any task touching
-  source, so edits reliably land before a session ends and get picked up by the next one. Index is
-  at most one session stale.
+**`SessionStart`** — the catch-up trigger, invoked with no path. Covers edits qmd never saw a tool
+call for: `git pull`, branch switches, rebases, edits made in an IDE. The write hook structurally
+cannot see those.
+
+The script's three guards:
+
+1. **Availability** — `command -v qmd >/dev/null 2>&1 || exit 0`. A machine without qmd installed
+   exits cleanly, so the repo stays usable by anyone (or any agent) who skipped the manual install.
+   Degradation is to plain grep, never an error on every write.
+2. **Serialization** — `flock -n` on a lock file. Writing several docs in quick succession would
+   otherwise start overlapping reindexes racing on the same SQLite database. Non-blocking, so a run
+   that arrives while another holds the lock **skips** rather than queues; the run already in
+   progress rescans the tree by mtime and picks up the newer file anyway.
+3. **Detachment** — the reindex runs backgrounded with output to `.qmd/reindex.log`. It must never
+   block the agent's next action, and a hook that stalls a turn is worse than a stale index.
 
 Rejected alternative: a `Stop` hook reindexing after every turn. Docs change far less often than
-turns end, so nearly every run would be a no-op scan.
+turns end, so nearly every run would be a no-op scan — and it would still leave the index stale for
+the remainder of the turn that wrote the doc.
 
 ## Discoverability: the CLAUDE.md rewrite
 
@@ -131,9 +143,9 @@ The skill alone is not enough — CLAUDE.md is what every session reads uncondit
    `docs/`.
 
 The **"Keep docs in sync with code"** section is left untouched. It is what keeps the corpus worth
-indexing in the first place — a stale corpus searched well is still stale. One addition: the docs
-audit gains a note that new articles become searchable at the next session start, so a same-session
-follow-up should not expect to find them by query.
+indexing in the first place — a stale corpus searched well is still stale. It needs no reindex
+instruction: the write hook handles that invisibly, and telling the agent to reindex by hand would
+invite redundant runs that fight the lock.
 
 The **"Category index"** table stays. It is the fallback path and the human-facing map.
 
@@ -142,8 +154,9 @@ The **"Category index"** table stays. It is the fallback path and the human-faci
 | Path | Disposition |
 |---|---|
 | `.qmd/index.yml` | **Committed** — collection definition, rebuildable config |
-| `.qmd/*.db`, `.qmd/reindex.log` | **Ignored** — machine-local build artifacts, regenerated in seconds |
+| `.qmd/*.db`, `.qmd/reindex.log`, `.qmd/*.lock` | **Ignored** — machine-local build artifacts, regenerated in seconds |
 | `.claude/skills/docs-search/SKILL.md` | **Committed** |
+| `.claude/hooks/qmd-reindex.sh` | **Committed** — executable bit included |
 | `.claude/settings.json` (hook) | **Committed** — shared project setting, distinct from the existing gitignored `settings.local.json` |
 
 ## Verification
@@ -154,5 +167,8 @@ The work is done when, from a **fresh** session with no prompting about docs:
 2. The query returns a relevant article, and the answer cites `file:line` from the real file.
 3. A question whose answer is *not* in `docs/` degrades to the `INDEX.md`/grep fallback instead of
    stalling or fabricating.
-4. `git status` is clean of `.qmd` database and log artifacts.
-5. Temporarily renaming `qmd` off `PATH` leaves session start silent and the repo fully usable.
+4. Writing a brand-new article to `docs/` makes it findable by `qmd query` **in the same session**,
+   with no manual reindex.
+5. Editing a source file under `src/` triggers **no** reindex — the path filter holds.
+6. `git status` is clean of `.qmd` database, lock, and log artifacts.
+7. Temporarily renaming `qmd` off `PATH` leaves both hooks silent and the repo fully usable.
