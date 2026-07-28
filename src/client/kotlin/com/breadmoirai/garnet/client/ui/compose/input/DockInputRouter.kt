@@ -1,6 +1,10 @@
 package com.breadmoirai.garnet.client.ui.compose.input
 
+import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
 import com.breadmoirai.garnet.client.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
 import com.breadmoirai.garnet.client.ui.compose.dock.DockState
@@ -56,14 +60,53 @@ object DockInputRouter {
     }
 
     /**
-     * ESC policy for the dock's key mixin. While [captured], a plain key-press of ESC drops focus
-     * and reports "consumed" so the mixin cancels vanilla handling (no pause-menu open). Any other
-     * key, action, or the uncaptured state falls through untouched.
+     * Key policy for the dock's key mixin, called for every key while [captured].
+     *
+     * ESC keeps its original contract: a plain key-**press** of ESC drops focus and returns `true`
+     * ("consumed") so the mixin cancels vanilla handling and the pause menu never opens on top of a
+     * dropped dock focus. Every other key returns `false` — the mixin cancels it anyway so keystrokes
+     * cannot leak into the game, but "not consumed" keeps that behavior exactly as it was.
+     *
+     * Additively, non-ESC keys are now *delivered* into the Compose scene, which is what makes tree
+     * navigation and text fields work at all. Unmapped keys ([glfwKeyToComposeKey] returns null) are
+     * dropped rather than guessed at.
      */
-    fun onGlfwKey(key: Int, action: Int): Boolean {
+    @OptIn(InternalComposeUiApi::class)
+    fun onGlfwKey(key: Int, action: Int, mods: Int = 0): Boolean {
         if (!captured) return false
-        if (key != GLFW.GLFW_KEY_ESCAPE || action != GLFW.GLFW_PRESS) return false
-        clearFocus()
-        return true
+        if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_PRESS) {
+            clearFocus()
+            return true
+        }
+        val composeKey = glfwKeyToComposeKey(key) ?: return false
+        val type = when (action) {
+            GLFW.GLFW_PRESS, GLFW.GLFW_REPEAT -> KeyEventType.KeyDown
+            GLFW.GLFW_RELEASE -> KeyEventType.KeyUp
+            else -> return false
+        }
+        ComposeSurface.sendKey(
+            KeyEvent(
+                key = composeKey,
+                type = type,
+                codePoint = 0,
+                isCtrlPressed = GlfwMods.ctrl(mods),
+                isMetaPressed = GlfwMods.meta(mods),
+                isAltPressed = GlfwMods.alt(mods),
+                isShiftPressed = GlfwMods.shift(mods),
+            ),
+        )
+        return false
+    }
+
+    /**
+     * Printable text from the GLFW character callback. Control keys arrive via [onGlfwKey]; actual
+     * typed characters only exist here, so a Compose text field needs both paths wired to be usable.
+     */
+    @OptIn(InternalComposeUiApi::class)
+    fun onGlfwChar(codePoint: Int) {
+        if (!captured) return
+        ComposeSurface.sendKey(
+            KeyEvent(key = Key.Unknown, type = KeyEventType.KeyDown, codePoint = codePoint),
+        )
     }
 }

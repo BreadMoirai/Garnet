@@ -16,14 +16,26 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import io.kotest.matchers.shouldBe
 import org.lwjgl.glfw.GLFW
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class DockInputSpec : ClientSpec({
     test("focused Left panel receives routed pointer clicks") {
@@ -144,5 +156,61 @@ class DockInputSpec : ClientSpec({
             ComposeOverlay.enabled = false
         }
         waitClientTicks(2)
+    }
+
+    test("a non-ESC key press reaches a focused Compose widget in the scene") {
+        closeClientScreen(); waitClientTicks(2)
+        val seen = AtomicReference<String?>(null)
+        val focusRequester = FocusRequester()
+
+        runOnClient { mc ->
+            DockState.reset()
+            DockState.leftPanels.add(Panel("test.keys", "Keys") {
+                Box(
+                    Modifier.fillMaxSize()
+                        .focusRequester(focusRequester)
+                        .focusable()
+                        .onKeyEvent { e ->
+                            if (e.type == KeyEventType.KeyDown) seen.set(e.key.toString())
+                            true
+                        },
+                )
+                LaunchedEffect(Unit) { focusRequester.requestFocus() }
+            })
+            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.setSize(DockRegion.LEFT, 300)
+            ViewportState.active = true
+            ComposeOverlay.enabled = true
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(8)
+
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(2)
+        runOnClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_DOWN, GLFW.GLFW_PRESS, 0) }
+        waitClientTicks(4)
+
+        seen.get() shouldBe Key.DirectionDown.toString()
+
+        runOnClient { mc ->
+            ComposeOverlay.enabled = false; ViewportState.active = false
+            DockInputRouter.clearFocus(); DockState.reset()
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(6)
+    }
+
+    test("onGlfwKey still reports only ESC-press as consumed, and drops nothing when uncaptured") {
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        // Forwarding is additive: a non-ESC key is delivered to the scene but NOT reported consumed,
+        // so the mixin's existing cancel-everything-while-captured behavior is unchanged.
+        // Note: runOnClient's action is `(Minecraft) -> Unit`, so it cannot round-trip a Boolean;
+        // onClient<T> is the value-returning variant (see ClientTestSupport.kt).
+        onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_DOWN, GLFW.GLFW_PRESS, 0) } shouldBe false
+        onClient { DockState.focusedRegion } shouldBe DockRegion.LEFT
+        onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS, 0) } shouldBe true
+        onClient { DockState.focusedRegion } shouldBe null
+        // Uncaptured: never consumed, so vanilla ESC still opens the pause menu.
+        onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS, 0) } shouldBe false
     }
 })
