@@ -56,7 +56,15 @@ descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel van
 
 - Pointer move/press/release/scroll are forwarded into `ComposeSurface.sendPointer*/sendScroll`
   (guarded — a `disabled` Compose surface no-ops). This is the load-bearing dispatch the Explorer
-  relies on (pointer-driven interactions).
+  relies on (pointer-driven interactions). **The GLFW button index is threaded all the way
+  through as of the context-menu work**: `onGlfwPress(button: Int)`/`onGlfwRelease(button: Int)`
+  map the raw index via `glfwMouseButtonToPointerButton` (file-scope function in
+  `DockInputRouter.kt`; `LEFT→Primary`, `RIGHT→Secondary`, `MIDDLE→Tertiary`, anything else →
+  `null`, dropped rather than mislabelled) and pass the resulting `PointerButton?` down through
+  `ComposeSurface.sendPointerPress/Release(pos, button)` → `ComposeSceneHost.pointerPress/Release(pos,
+  button)` → `ImageComposeScene.sendPointerEvent(.., button = button)`. Previously the button index
+  was discarded and every dock click reached Compose as `PointerButton.Primary`, which made
+  right-click context menus impossible to distinguish from a left click.
 - **Key→Compose translation and typed characters are wired (Task 3).** `DockInputRouter.onGlfwKey(key,
   action, mods)` forwards every non-ESC key while captured into `ComposeSurface.sendKey`, building a
   Compose `KeyEvent` via the synthetic desktop factory
@@ -169,3 +177,13 @@ path, and asserts the widget observed `Key.DirectionDown`; the other re-asserts 
 contract now that `onGlfwKey` takes a third `mods` param, confirming a non-ESC key while captured is
 delivered but still reported `false` (not consumed) and ESC is still the only key returning `true`.
 `DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
+
+Two more cases cover the button-threading fix above: a pure-function test asserts
+`glfwMouseButtonToPointerButton` maps `LEFT`/`RIGHT`/`MIDDLE` to `Primary`/`Secondary`/`Tertiary`
+and an unmapped index (`7`) to `null`; a router-level test mounts a panel with a raw
+`pointerInput { awaitPointerEventScope { ... } }` probe, drives `onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`
+through the real router→`ComposeSurface`→scene path, and asserts the probe observed exactly
+`PointerButton.Secondary`. That test must call `DockState.reset()` before mounting its panel —
+`DockState.leftPanels` already holds the production Explorer panel at tab index 0, so a panel
+appended without a reset lands on a non-active tab and its `content()` is never composed
+(`RegionColumn` only invokes `panels[active].content(panels[active])`).
