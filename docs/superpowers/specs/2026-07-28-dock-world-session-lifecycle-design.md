@@ -35,7 +35,9 @@ A new method on `DockState`, sibling to `reset()`:
 ```kotlin
 /** Ends the dock's world session: hides every edge region, clears CENTER, drops focus. */
 fun closeAll() {
-    DockRegion.entries.forEach { setVisible(it, false) }
+    setVisible(DockRegion.LEFT, false)
+    setVisible(DockRegion.RIGHT, false)
+    setVisible(DockRegion.BOTTOM, false)
     if (centerPanels.isNotEmpty()) { centerPanels.clear(); bumpMountEpoch(DockRegion.CENTER) }
     centerActiveTab = 0
     focusedRegion = null
@@ -111,7 +113,8 @@ already closed is a no-op (`setVisible(false)` on a hidden region skips the epoc
 
 ## Testing
 
-New clientTest spec `DockLifecycleSpec` (`ClientSpec` base). Autoscan is off, so it must be added to
+New clientTest spec `DockLifecycleSpec`. It touches no render context, so it is a plain Kotest
+`StringSpec` like `DockInsetsSpec`, not a `ClientSpec`. Autoscan is off, so it must be added to
 the explicit list in `src/clientTest/.../ClientTestSentinel.kt` alongside `DockInputSpec` or it
 silently does not run. It asserts on `DockState` directly:
 
