@@ -118,16 +118,18 @@ class JewelExplorerSpec : ClientSpec({
         runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
         waitClientTicks(2)
         // Rows start right below the toolbar (task 3 dropped the header/actions rows; the tab strip
-        // was already gone). Click the first tree
-        // row ("adders", measured at y≈44 in jewel_explorer_tree.png). If this coordinate drifts
-        // onto a neighbouring row ("clocks", "box.nbt", ...) the click still fires
+        // was already gone). Task 4 made the root itself the first row ("myproject", y≈44), pushing
+        // every child down a row and indenting it a level deeper — click the first CHILD row
+        // ("adders", measured at y≈68, x≈70 in jewel_explorer_tree.png, chosen to land inside a
+        // solid glyph stroke rather than an inter-letter gap). If this coordinate drifts onto a
+        // neighbouring row ("myproject", "clocks", "box.nbt", ...) the click still fires
         // ExplorerTreeState.select(path) for THAT row, so selectedPath is still non-null — a null
         // check alone would go green on a mis-click. Assert the exact expected path instead.
         runOnClient {
-            // Was y=75 (measured with the actions row still present, before task 3 dropped it);
-            // removing that row shifted the panel body up again, so the first tree row ("adders")
-            // now sits at y=44.
-            DockInputRouter.onGlfwMove(80.0, 44.0)
+            // Was (80, 44) — that measured "adders" as the first row (task 3, actions row dropped).
+            // Task 4 added the root as row 0, so "adders" is now row 1 at y=68; x moved to 70 because
+            // the added indent level shifted the label right and 80 now falls in a letter gap.
+            DockInputRouter.onGlfwMove(70.0, 68.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(3)
@@ -148,10 +150,10 @@ class JewelExplorerSpec : ClientSpec({
         // Seed a selection by clicking (see the mis-click note in the previous test — same
         // coordinate, same neighbouring-row risk), so the tree has focus and a starting row.
         runOnClient {
-            // Was y=75 (measured with the actions row still present, before task 3 dropped it);
-            // removing that row shifted the panel body up again, so the first tree row ("adders")
-            // now sits at y=44.
-            DockInputRouter.onGlfwMove(80.0, 44.0)
+            // Was (80, 44) — that measured "adders" as the first row (task 3, actions row dropped).
+            // Task 4 added the root as row 0, so "adders" is now row 1 at y=68; x moved to 70 because
+            // the added indent level shifted the label right and 80 now falls in a letter gap.
+            DockInputRouter.onGlfwMove(70.0, 68.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(2)

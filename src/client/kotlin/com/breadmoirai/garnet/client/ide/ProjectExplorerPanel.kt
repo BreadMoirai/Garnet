@@ -44,7 +44,23 @@ private fun ProjectExplorer() {
                 // reads ProjectTreeState.status, which changes on every S2C packet, so an
                 // un-remembered call rebuilds the entire tree on each packet. Keyed on the root so a
                 // genuinely new snapshot still rebuilds.
-                val tree = remember(snap.root) { ExplorerTreeState.buildTreeFrom(snap.root) }
+                // The root node carries the project name and is the "create at root" target, so it
+                // is useless collapsed. Opening it here — synchronously inside this remember block —
+                // rather than via LaunchedEffect is load-bearing: Jewel's LazyTree computes its own
+                // remembered flatten list on first composition and, as part of that, intersects
+                // TreeState.openNodes down to only the ids reachable from an already-OPEN root. A
+                // LaunchedEffect's coroutine body runs strictly after that first composition commits,
+                // so opening the root there is one frame too late — any pre-existing expand state
+                // (e.g. a caller that expanded "adders" before this panel ever mounted) gets pruned
+                // away in that same first pass because the root itself wasn't open yet when Jewel
+                // computed reachability. Doing it here, before `buildTreeFrom` even runs, guarantees
+                // the root is open by the time LazyTree's internal prune executes. Keyed on the root so
+                // a genuinely new project re-opens it, while a user who collapses it during a session
+                // keeps it collapsed (LazyTree's prune only runs once per (tree, treeState) identity).
+                val tree = remember(snap.root) {
+                    ExplorerTreeState.treeState.openNodes += ExplorerTreeState.ROOT_PATH
+                    ExplorerTreeState.buildTreeFrom(snap.root)
+                }
                 LazyTree(
                     tree = tree,
                     modifier = Modifier.fillMaxWidth().weight(1f),

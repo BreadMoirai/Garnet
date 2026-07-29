@@ -114,6 +114,25 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
   `FolderNode.walk()`/`resolve()` produce. That single key space is what lets selection/expansion
   state, server "current folder" state, and click dispatch all refer to the same node without a
   translation layer.
+- `ExplorerTreeState.buildTreeFrom` emits the project root itself as the tree's single top-level
+  element, under id `ExplorerTreeState.ROOT_PATH` (`""`) — the root's children nest beneath it,
+  rather than becoming top-level rows themselves. This needs no translation on the resolve side:
+  `FolderNode.resolve("")` and `ProjectRoot.resolveSubpath("")` already both mean "the root". Making
+  the root a real node (rather than omitting it) restores a place to show the project name and gives
+  a right-click target that means "create at the project root".
+- **Opening a node before first composition must happen synchronously, not via `LaunchedEffect`.**
+  `BasicLazyTree`'s internal `remember(tree, treeState) { ... }` block runs once per (tree, treeState)
+  identity and, as part of computing its flattened row list, does
+  `treeState.openNodes = treeState.openNodes.intersect(idsReachableFromOpenRoots)` — i.e. it prunes
+  away any `openNodes` entry that isn't reachable by recursively descending through nodes already
+  flagged open, starting from the roots. A `LaunchedEffect(key) { treeState.openNodes += id }` used to
+  auto-expand the root runs its coroutine body strictly *after* that first composition commits, so
+  the root is still closed at prune time — with the observed effect that this prune throws away
+  *every other* pre-existing `openNodes` entry too (e.g. a caller/test that expanded a child folder
+  before the panel ever mounted), because none of them were reachable from a closed root either.
+  `ProjectExplorerPanel`'s `ProjectExplorer()` opens `ROOT_PATH` synchronously inside the same
+  `remember(snap.root) { ... }` block that builds the `Tree`, before `LazyTree` is even called, so the
+  root is already open by the time `BasicLazyTree`'s prune runs.
 - `openNodes` and `selectedKeys` on the underlying `SelectableLazyListState` *are* the
   expanded/selected path sets — `ExplorerTreeState.expandedPaths`/`selectedPath` read and write
   them directly rather than mirroring them into a second field.

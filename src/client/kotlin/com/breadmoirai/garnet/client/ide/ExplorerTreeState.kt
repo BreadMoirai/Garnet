@@ -60,12 +60,19 @@ object ExplorerTreeState {
         return node is FileNode && node.hasUnsaved
     }
 
+    /** The tree id of the project root itself. `FolderNode.resolve("")` and
+     *  `ProjectRoot.resolveSubpath("")` both already mean "the root", so this needs no translation. */
+    const val ROOT_PATH: String = ""
+
     /**
-     * Convert a snapshot root into a Jewel [Tree]. The root folder itself is not emitted — its
-     * children become the top-level rows, matching the previous hand-rolled tree.
+     * Convert a snapshot root into a Jewel [Tree]. The root folder is emitted as the single
+     * top-level node under id [ROOT_PATH] (`""`), with its children nested beneath — so the root's
+     * name is visible and the root is itself a right-click target for "create at project root".
      */
     fun buildTreeFrom(root: FolderNode): Tree<FileTreeNode> = buildTree {
-        root.children.forEach { child -> addFileTreeNode(child, child.name) }
+        addNode(root, ROOT_PATH) {
+            root.children.forEach { child -> addFileTreeNode(child, child.name) }
+        }
     }
 
     /** The `/`-joined path a tree element was built with. */

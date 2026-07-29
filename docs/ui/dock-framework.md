@@ -176,7 +176,15 @@ rows. The pattern:
   `val tree = remember(snap.root) { ExplorerTreeState.buildTreeFrom(snap.root) }` builds the
   `Tree<FileTreeNode>` — **`remember` it**: the enclosing scope also reads `ProjectTreeState.status`,
   which changes on every S2C packet, so an un-remembered call rebuilds the whole project tree
-  recursively (and makes `LazyTree` re-flatten it) on each packet;
+  recursively (and makes `LazyTree` re-flatten it) on each packet. `buildTreeFrom` emits the project
+  root itself as the tree's single top-level element (id `ExplorerTreeState.ROOT_PATH`, `""`), with
+  its children nested beneath — the root's name is what makes the panel show the project name at
+  all, and it is the right-click target that will mean "create at the project root". That same
+  `remember` block also opens the root synchronously
+  (`ExplorerTreeState.treeState.openNodes += ExplorerTreeState.ROOT_PATH`, *before* calling
+  `buildTreeFrom`) rather than in a `LaunchedEffect` — see
+  [jewel-widget-layer.md](jewel-widget-layer.md#tree-state-is-jewels-not-a-custom-model) for why a
+  `LaunchedEffect` here is one frame too late and silently discards any other node's expand state too;
   `LazyTree(tree, treeState = ExplorerTreeState.treeState, onElementClick = { ... }) { element ->
   TreeRow(...) }` handles expand/collapse and row layout — `LazyTree` has no `selectionMode`
   parameter of its own in Jewel 0.39.1-262.9437.29 despite some Jewel docs implying otherwise;

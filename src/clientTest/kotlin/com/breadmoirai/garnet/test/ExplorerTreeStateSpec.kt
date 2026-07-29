@@ -50,15 +50,39 @@ class ExplorerTreeStateSpec : ClientSpec({
         ExplorerTreeState.selectedHasUnsaved() shouldBe false
     }
 
+    test("buildTreeFrom emits the project root as the single top-level node") {
+        val root = FolderNode("myproject", listOf(
+            FolderNode("adders", listOf(FileNode("full.spec.kts", "kts"))),
+            FileNode("clock.nbt", "nbt"),
+        ))
+
+        val built = ExplorerTreeState.buildTreeFrom(root)
+
+        built.roots.size shouldBe 1
+        val rootElement = built.roots.single()
+        ExplorerTreeState.pathOf(rootElement) shouldBe ExplorerTreeState.ROOT_PATH
+        rootElement.data shouldBe root
+
+        // Tree.Element.Node.children is lazy — open() materializes it.
+        val node = rootElement as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        node.open()
+        node.children!!.map { ExplorerTreeState.pathOf(it) } shouldBe listOf("adders", "clock.nbt")
+    }
+
     test("buildTreeFrom mirrors the snapshot with path ids, folders keeping their children") {
         val built = ExplorerTreeState.buildTreeFrom(tree)
-        val ids = built.roots.map { it.id }
+        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        rootElement.open(false)
+        val ids = (rootElement.children ?: emptyList()).map { it.id }
         ids shouldContainExactly listOf("adders", "dirty.nbt", "clean.nbt")
     }
 
     test("buildTreeFrom nests folder children with /-joined ids, matching select/toggleExpanded's format") {
         val built = ExplorerTreeState.buildTreeFrom(tree)
-        val adders = built.roots.first { it.id == "adders" } as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        rootElement.open(false)
+        val rootChildren = rootElement.children ?: emptyList()
+        val adders = rootChildren.first { it.id == "adders" } as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
         adders.open(false) // children are lazily evaluated on open, per Jewel's Tree.Element.Node
         val addersChildren = adders.children ?: emptyList()
         addersChildren.map { it.id } shouldContainExactly listOf("adders/full-adder")
