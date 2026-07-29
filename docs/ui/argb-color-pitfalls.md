@@ -20,9 +20,8 @@ convention as MC's — and the top byte is alpha. `GarnetDock.kt`'s palette cons
 pattern:
 
 ```kotlin
-private val PANEL_BG = Color(0xF01B2433)   // ~94% opaque slate; center stays transparent by omission
-private val TAB_BG = Color(0xFF2D6DA3)      // fully opaque
-private val TEXT = Color(0xFFFFFFFF)        // opaque white
+private val PANEL_BG = Color(0xF01B2433)     // ~94% opaque slate; center stays transparent by omission
+private val SPLITTER_COLOR = Color(0xFF10161F) // fully opaque
 ```
 
 Omitting the leading `FF` (or `F0`, or any non-zero byte) — writing `Color(0x1B2433)` — produces alpha

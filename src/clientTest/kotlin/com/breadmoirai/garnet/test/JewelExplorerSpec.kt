@@ -54,7 +54,9 @@ class JewelExplorerSpec : ClientSpec({
 
     fun openRootMenu() {
         runOnClient {
-            DockInputRouter.onGlfwMove(40.0, 34.0)
+            // Click the header dropdown anchor. Was y=34 (below the now-removed 18px tab strip);
+            // with the strip gone the whole panel body shifted up by TAB_H, so the anchor is at y=16.
+            DockInputRouter.onGlfwMove(40.0, 16.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(2)
@@ -113,14 +115,15 @@ class JewelExplorerSpec : ClientSpec({
         mountExplorer()
         runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
         waitClientTicks(2)
-        // Rows start below the tab strip, header and actions row. Click the first tree row
-        // ("adders", measured at y≈93 in jewel_explorer_tree.png — the brief's y=78 guess landed
-        // in the gap between the actions row and the first tree row and missed). If this coordinate
-        // drifts onto a neighbouring row ("clocks", "box.nbt", ...) the click still fires
+        // Rows start below the header and actions row (no tab strip anymore). Click the first tree
+        // row ("adders", measured at y≈75 in jewel_explorer_tree.png). If this coordinate drifts
+        // onto a neighbouring row ("clocks", "box.nbt", ...) the click still fires
         // ExplorerTreeState.select(path) for THAT row, so selectedPath is still non-null — a null
         // check alone would go green on a mis-click. Assert the exact expected path instead.
         runOnClient {
-            DockInputRouter.onGlfwMove(80.0, 93.0)
+            // Was y=93 (measured with the 18px tab strip present); the strip's removal shifted the
+            // panel body up by TAB_H, so the first tree row ("adders") now sits at y=75.
+            DockInputRouter.onGlfwMove(80.0, 75.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(3)
@@ -141,7 +144,9 @@ class JewelExplorerSpec : ClientSpec({
         // Seed a selection by clicking (see the mis-click note in the previous test — same
         // coordinate, same neighbouring-row risk), so the tree has focus and a starting row.
         runOnClient {
-            DockInputRouter.onGlfwMove(80.0, 93.0)
+            // Was y=93 (measured with the 18px tab strip present); the strip's removal shifted the
+            // panel body up by TAB_H, so the first tree row ("adders") now sits at y=75.
+            DockInputRouter.onGlfwMove(80.0, 75.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(2)

@@ -2,38 +2,27 @@ package com.breadmoirai.garnet.client.ui.compose.dock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 
 private const val SPLITTER = 4
-private const val TAB_H = 18
 private val PANEL_BG = Color(0xF01B2433)   // ~94% opaque slate; center stays transparent
-private val TAB_BG = Color(0xFF2D6DA3)
-private val TAB_BG_INACTIVE = Color(0xFF243044)
-private val TEXT = Color(0xFFFFFFFF)
 private val SPLITTER_COLOR = Color(0xFF10161F)
 
 /**
- * Full-window dock. Draws the visible LEFT/RIGHT/BOTTOM regions (with tab strips and draggable
- * splitters) and any CENTER panel; everything else is transparent so the composited world shows
- * through. Sizes come from [DockState] in real pixels (the scene runs at Density(1f)).
+ * Full-window dock. Draws the visible LEFT/RIGHT/BOTTOM regions (with draggable splitters) and
+ * any CENTER panel; everything else is transparent so the composited world shows through. Sizes
+ * come from [DockState] in real pixels (the scene runs at Density(1f)).
  */
 @Composable
 fun GarnetDock(realW: Int, realH: Int) {
@@ -67,28 +56,13 @@ fun GarnetDock(realW: Int, realH: Int) {
     }
 }
 
-/** A region = a tab strip over its panels + the active panel's body. */
+/** A region = the active panel's body, filling the region. */
 @Composable
 private fun RegionColumn(region: DockRegion, modifier: Modifier) {
     val panels = DockState.panelsFor(region)
     if (panels.isEmpty()) return
     val active = activeTabFor(region).coerceIn(0, panels.lastIndex)
     Column(modifier.background(PANEL_BG)) {
-        Row(Modifier.fillMaxWidth().height(TAB_H.dp)) {
-            panels.forEachIndexed { i, p ->
-                Box(
-                    Modifier
-                        .height(TAB_H.dp)
-                        .background(if (i == active) TAB_BG else TAB_BG_INACTIVE)
-                        .pointerInput(region, i) {
-                            detectTapOrDown { setActiveTab(region, i) }
-                        }
-                        .padding(horizontal = 6.dp),
-                ) {
-                    BasicText(p.title, style = TextStyle(color = TEXT, fontSize = TextUnit.Unspecified))
-                }
-            }
-        }
         // key(): a panel body must not be able to outlive its mount. Panel content is invoked at a
         // fixed slot, and a re-mounted panel from the same factory has the same composable source
         // key, so without this Compose reuses the group and every `remember` inside survives — most
@@ -122,16 +96,3 @@ private fun activeTabFor(region: DockRegion) = when (region) {
     DockRegion.CENTER -> DockState.centerActiveTab
 }
 
-private fun setActiveTab(region: DockRegion, i: Int) {
-    when (region) {
-        DockRegion.LEFT -> DockState.leftActiveTab = i
-        DockRegion.RIGHT -> DockState.rightActiveTab = i
-        DockRegion.BOTTOM -> DockState.bottomActiveTab = i
-        DockRegion.CENTER -> DockState.centerActiveTab = i
-    }
-}
-
-// Minimal tap detector (foundation `clickable` also works; kept explicit for Density(1f) hit-testing).
-private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectTapOrDown(onTap: () -> Unit) {
-    detectTapGestures(onTap = { onTap() })
-}

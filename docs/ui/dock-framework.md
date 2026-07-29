@@ -43,9 +43,13 @@ these transparent pixels.)
 
 Each of the four `DockRegion`s (LEFT/RIGHT/BOTTOM/CENTER) holds an independent
 `SnapshotStateList<Panel>` (`DockState.leftPanels`/`rightPanels`/`bottomPanels`/`centerPanels`) plus an
-`activeTab: Int` index. `Panel(id, title, content)` is a plain data holder — the "tab" concept has no
-separate type; a region with 2+ panels renders a tab strip (`RegionColumn` in `GarnetDock.kt`) above
-the active panel's `content`, and clicking a tab writes the region's `activeTab` index. LEFT/RIGHT/
+`activeTab: Int` index. `Panel(id, title, content)` is a plain data holder. `RegionColumn` in
+`GarnetDock.kt` renders only the active panel's `content`, filling the whole region — there is no tab
+strip; the hand-rolled `Box`+`BasicText` strip (with its own tap-gesture handling and hardcoded colours)
+was removed once it became clear only one panel is ever registered per region. `activeTab` still exists
+on `DockState` and `RegionColumn` still reads it via `activeTabFor`, so a future multi-panel region only
+needs a new way to *write* that index (the old `setActiveTab` was deleted with the strip since nothing
+else called it) — switching UI is a separate concern from which panel is "active". LEFT/RIGHT/
 BOTTOM are hidden by default (`DockState.leftVisible` etc. all start `false`); CENTER's visibility is
 derived (`centerPanels.isNotEmpty()`) rather than an independent flag, since an empty CENTER must stay
 transparent. Seeding a panel into a region (e.g. `explorerPanel()` into `leftPanels` at client init)
@@ -138,12 +142,8 @@ wired end-to-end into the Compose scene while a region is focused. Every entry p
 `ComposeSurface` is guarded — a native-load or Skia failure sets `ComposeSurface.disabled` and the
 whole dock (rendering and input) silently no-ops back to vanilla, never crashing the client.
 
-## Two Compose API gotchas
+## A Compose API gotcha
 
-- **`detectTapGestures` must be imported, not fully-qualified.** A fully-qualified call
-  `androidx.compose.foundation.gestures.detectTapGestures(...)` fails to resolve ("Unresolved
-  reference") in foundation 1.12; `detectDragGestures` at the same package resolves only because it is
-  imported. Import both and call unqualified.
 - **Splitter has two overloads that differ only by lambda arity.** The full `Splitter(Modifier,
   (dx, dy) -> Unit)` and the horizontal convenience `(Modifier, (dx) -> Unit)` don't clash at the JVM
   level (`Function2` vs `Function1`), but to avoid call-site overload ambiguity the horizontal one is
