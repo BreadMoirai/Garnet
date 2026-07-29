@@ -11,9 +11,12 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Relative
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
 
@@ -74,6 +77,9 @@ object ProjectNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(NewStructureC2S.TYPE) { payload, ctx ->
             ctx.server().execute { handleNewStructure(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(CreateFolderC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { handleCreateFolder(ctx.server(), ctx.player(), payload) }
         }
         ServerPlayNetworking.registerGlobalReceiver(DiscardStructureC2S.TYPE) { payload, ctx ->
             ctx.server().execute { handleDiscardStructure(ctx.server(), ctx.player(), payload) }
@@ -265,26 +271,64 @@ object ProjectNetworkRegistry {
     }
 
     fun handleNewStructure(server: MinecraftServer, player: ServerPlayer, payload: NewStructureC2S) {
-        val activeSubpath = ProjectSession.get(player.uuid)?.activeSubpath ?: run {
-            ServerPlayNetworking.send(player, ProjectErrorS2C("no folder selected")); return
+        val folder = resolveParentFolder(server, player, payload.parentSubpath) ?: return
+        val finalName = ProjectNames.resolveFinalName(payload.name, NewNodeKind.STRUCTURE)
+        ProjectNames.validate(finalName, siblingNames(folder))?.let {
+            ServerPlayNetworking.send(player, ProjectErrorS2C(it)); return
         }
-        val root = rootFor(server) ?: run {
-            ServerPlayNetworking.send(player, ProjectErrorS2C("project-root not configured")); return
-        }
-        val world = ProjectWorld.get(server)
-        val folderAbsolute = world?.folderAbsoluteByPath?.get(activeSubpath)
-            ?: root.resolveSubpath(activeSubpath)
-            ?: run {
-                ServerPlayNetworking.send(player, ProjectErrorS2C("active folder not resolvable: $activeSubpath")); return
-            }
         try {
-            ProjectNewStructure.create(folderAbsolute, payload.name)
+            // ProjectNewStructure.create appends ".nbt" itself, so hand it the bare stem.
+            ProjectNewStructure.create(folder, finalName.removeSuffix(".nbt"))
         } catch (e: Exception) {
-            LOGGER.error("[project/new-structure] create {}/{}: {}", activeSubpath, payload.name, e.message, e)
+            LOGGER.error("[project/new-structure] create {}/{}: {}", payload.parentSubpath, finalName, e.message, e)
             ServerPlayNetworking.send(player, ProjectErrorS2C("new-structure failed: ${e.message}")); return
         }
         sendTree(server, player)
     }
+
+    fun handleCreateFolder(server: MinecraftServer, player: ServerPlayer, payload: CreateFolderC2S) {
+        val parent = resolveParentFolder(server, player, payload.parentSubpath) ?: return
+        val name = payload.name.trim()
+        ProjectNames.validate(name, siblingNames(parent))?.let {
+            ServerPlayNetworking.send(player, ProjectErrorS2C(it)); return
+        }
+        try {
+            parent.resolve(name).createDirectory()
+        } catch (e: Exception) {
+            LOGGER.error("[project/create-folder] {}/{}: {}", payload.parentSubpath, name, e.message, e)
+            ServerPlayNetworking.send(player, ProjectErrorS2C("create-folder failed: ${e.message}")); return
+        }
+        sendTree(server, player)
+    }
+
+    /**
+     * The absolute path of [parentSubpath] under the configured root, or null after sending the
+     * player an error. `""` means the root itself, which `resolveSubpath` already handles; anything
+     * absolute or escaping the root comes back null from that call and is refused here.
+     */
+    private fun resolveParentFolder(
+        server: MinecraftServer,
+        player: ServerPlayer,
+        parentSubpath: String,
+    ): Path? {
+        val root = rootFor(server) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("project-root not configured")); return null
+        }
+        val folder = root.resolveSubpath(parentSubpath) ?: run {
+            ServerPlayNetworking.send(
+                player,
+                ProjectErrorS2C("folder not found or escapes root: $parentSubpath"),
+            ); return null
+        }
+        if (!folder.isDirectory()) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("not a folder: $parentSubpath")); return null
+        }
+        return folder
+    }
+
+    /** Names already present in [folder], for the duplicate check. */
+    private fun siblingNames(folder: Path): List<String> =
+        folder.listDirectoryEntries().map { it.name }
 
     private fun sendTree(server: MinecraftServer, player: ServerPlayer) {
         val root = rootFor(server) ?: run {

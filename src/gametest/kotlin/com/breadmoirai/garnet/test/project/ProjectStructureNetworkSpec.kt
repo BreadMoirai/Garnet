@@ -130,7 +130,8 @@ class ProjectStructureNetworkSpec : GarnetTestSpec({
             onServer {
                 ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp)))
                 val player = makeMockServerPlayer(this)
-                ProjectSession.setActive(player.uuid, "")  // active folder = root
+                // The session's active folder is deliberately NOT set: handleNewStructure resolves
+                // strictly from payload.parentSubpath now, so "" here must still land at the root.
                 drainPayloads(player)
                 ProjectNetworkRegistry.handleNewStructure(this, player, NewStructureC2S("", "fresh"))
                 tmp.resolve("fresh.nbt").exists() shouldBe true

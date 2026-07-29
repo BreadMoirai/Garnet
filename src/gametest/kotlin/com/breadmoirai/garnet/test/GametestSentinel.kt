@@ -3,6 +3,7 @@ package com.breadmoirai.garnet.test
 import com.breadmoirai.garnet.test.project.ProjectCellSaverSpec
 import com.breadmoirai.garnet.test.project.ProjectCommandSpec
 import com.breadmoirai.garnet.test.project.ProjectDimSpec
+import com.breadmoirai.garnet.test.project.ProjectFileOpsNetworkSpec
 import com.breadmoirai.garnet.test.project.ProjectNetworkRegistrySpec
 import com.breadmoirai.garnet.test.project.ProjectStructureNetworkSpec
 import com.breadmoirai.garnet.test.project.ProjectTeleportSpec
@@ -53,6 +54,7 @@ class GametestSentinel {
                             ProjectTeleportSpec::class,
                             ProjectNetworkRegistrySpec::class,
                             ProjectStructureNetworkSpec::class,
+                            ProjectFileOpsNetworkSpec::class,
                             ProjectCommandSpec::class,
                             RecorderRunnerNetworkRegistrySpec::class,
                             RecordingLifecycleSpec::class,

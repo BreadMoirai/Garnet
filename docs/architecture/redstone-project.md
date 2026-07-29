@@ -113,14 +113,17 @@ Client:
   `SaveStructureC2S` / `DiscardStructureC2S` are still fully wired server-side and covered by
   `ProjectStructureNetworkSpec`; a later step in the explorer-toolbar-context-menu work reintroduces
   them as a tree-row context menu). `NewStructureC2S` was reshaped to
-  `NewStructureC2S(parentSubpath, name)` so the eventual context-menu "New Structure" action can
-  target the folder that was right-clicked instead of the session's active folder; the payload
-  carries `parentSubpath` but `handleNewStructure` still resolves the target from
-  `ProjectSession`'s active folder — the field isn't consumed until the handler is rewired.
+  `NewStructureC2S(parentSubpath, name)` so the context-menu "New Structure" action targets the
+  folder that was right-clicked instead of the session's active folder; `handleNewStructure` now
+  resolves `folder` strictly via `ProjectRoot.resolveSubpath(payload.parentSubpath)` and no longer
+  reads `ProjectSession.activeSubpath` or `ProjectWorld.folderAbsoluteByPath` at all.
   `CreateFolderC2S(parentSubpath, name)` and `RenamePathC2S(subpath, newName)` are new payloads
-  registered alongside it (`PayloadTypeRegistry.serverboundPlay()`); neither has a server receiver
-  yet — that lands with the "New Folder" and "Rename" context-menu actions. This is the **only**
-  live client UI for browsing the project
+  registered alongside it (`PayloadTypeRegistry.serverboundPlay()`); `CreateFolderC2S` now has a
+  server receiver (`handleCreateFolder`, same folder-resolution path); `RenamePathC2S` still has
+  none — that lands with the "Rename" context-menu action. Both `handleNewStructure` and
+  `handleCreateFolder` re-validate the final name server-side through `ProjectNames.validate`
+  against the destination folder's real directory listing, since the client's tree snapshot can be
+  stale. This is the **only** live client UI for browsing the project
   tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy folder-browser GUI and
   world-list-screen root picker) were deleted in the Compose-dock hard-cut. See
   [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the
@@ -147,7 +150,8 @@ places it (`StructurePersistence.placeStructureCentered`) centered in an auto-as
 `z = STRUCTURE_LANE_Z = 4096`), floored at `projectGridYBase` (64) — or vertically centered when
 the structure's height ≥ `TALL_THRESHOLD` (256). "Save Structure" auto-fits the tight non-air box
 in the region (`StructurePersistence.saveAutoFitToFile` → `project.autoFit`) and rewrites the file.
-"New Structure" (`ProjectNewStructure.create`) writes an empty `<name>.nbt` into the active folder.
+"New Structure" (`ProjectNewStructure.create`) writes an empty `<name>.nbt` into the folder named
+by `NewStructureC2S.parentSubpath` (`""` = the project root).
 
 - **Region size:** `SharedSettings.structureRegionChunks` (default 9 → 144×144 blocks), full
   world height.
