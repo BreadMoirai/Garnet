@@ -84,6 +84,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         RootPickerSpec::class,
                         StructureExplorerSpec::class,
                         JewelExplorerSpec::class,
+                        ExplorerContextMenuSpec::class,
                     ),
                 )
             } catch (t: Throwable) {

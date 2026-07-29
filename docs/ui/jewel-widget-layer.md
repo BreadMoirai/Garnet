@@ -171,6 +171,49 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
   takes `edit: ExplorerEdit? = null` and only synthesizes the placeholder when `edit` is a pending
   `Creating` targeting that folder.
 
+## Right-click context menu drives the inline field
+
+`ExplorerContextMenu` (in `ExplorerContextMenu.kt`) is a Jewel `PopupMenu` with a `New ▸
+(Folder | Structure)` submenu and a `Rename` item, opened by a right-click on a `TreeRow`. It sets
+`edit` on `ProjectExplorerPanel`'s hoisted `ExplorerEdit?` state — the same state the previous
+section describes — so the menu and the inline field are two faces of one mechanism: the menu
+picks *what* to edit, the field does the actual typing.
+
+- **`ExplorerMenuState` (`target`, `anchor`) is `remember`-ed inside `ProjectExplorer()`, never a
+  top-level `object`.** Same reasoning as the mount-lifecycle guards above: a popup layer belongs
+  to the composition that opened it, and a global menu-state object would survive a panel
+  re-mount and repaint over the next one.
+- **Row-local pointer coordinates must be converted to window coordinates before anchoring the
+  popup.** `PopupMenu`'s `popupPositionProvider` receives coordinates in the scene's (window)
+  space, but the pointer event `TreeRow` observes only carries a position local to that row. Each
+  `TreeRow` records its own origin via `Modifier.onGloballyPositioned { rowOrigin =
+  it.positionInWindow() }` and adds it to the event's local position before calling
+  `onSecondaryClick`. The scene renders full-window at `Density(1f)`, so window coordinates equal
+  scene coordinates with no scale factor to apply. Skipping this step anchors every menu near the
+  panel's left edge regardless of where the row actually sits.
+- **Detecting the right-click needs `PointerButton`, not just click position** — see
+  [dock-input-routing.md](dock-input-routing.md) for how `DockInputRouter.onGlfwPress` now carries
+  real GLFW mouse-button values into the scene as `PointerButton.Secondary` and friends.
+  `TreeRow`'s `Modifier.pointerInput(path) { awaitPointerEventScope { ... } }` filters for
+  `PointerEventType.Press` with `event.button == PointerButton.Secondary`.  Reading
+  `PointerEvent.button` is `@ExperimentalComposeUiApi` in this Compose version, hence the
+  file-level `@file:OptIn(ExperimentalComposeUiApi::class)` on `ProjectExplorerPanel.kt`.
+- **`ExplorerActions` is the validate-then-send seam** for `commitCreate`/`commitRename`, called
+  from the inline field's `onCommit`. It re-runs `ProjectNames.validate` against the client's own
+  tree snapshot before sending a C2S packet — a pre-check, not a replacement for the server's own
+  validation, since the client's snapshot can be stale. `ExplorerActions.sender` is swappable
+  (mirrors `RootPickerController`'s pattern) so clientTests can assert on payloads without a live
+  connection; `resetForTest()` restores the real `ClientPlayNetworking.send`.
+- **`New` targets the clicked folder itself, or a clicked file's parent** — the IDE convention.
+  `ExplorerContextMenu` resolves this by reading the live snapshot (`root.resolve(target)`) rather
+  than guessing from the path string, since a folder name may legitimately contain a dot. `Rename`
+  targets the clicked node directly and is disabled on `ExplorerTreeState.ROOT_PATH`, which has no
+  parent to rename within.
+- Opening the target folder for a `New` action (`ExplorerTreeState.treeState.openNodes += parent`)
+  happens synchronously in the menu-item's `onClick`, for the same reason root-opening happens
+  synchronously elsewhere in this file: the placeholder row only renders if the folder is already
+  open by the time `LazyTree`'s prune runs.
+
 ## Keyboard delivery into Jewel widgets
 
 Jewel's `LazyTree`/`TextField` consume real Compose key events (arrow-key navigation, typed text),

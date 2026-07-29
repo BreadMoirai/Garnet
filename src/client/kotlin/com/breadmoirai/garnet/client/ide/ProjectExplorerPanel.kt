@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalComposeUiApi::class)
+
 package com.breadmoirai.garnet.client.ide
 
 import androidx.compose.foundation.background
@@ -16,16 +18,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.breadmoirai.garnet.client.ui.compose.dock.Panel
 import com.breadmoirai.garnet.network.project.LoadProjectFolderC2S
@@ -35,6 +45,7 @@ import com.breadmoirai.garnet.project.FolderNode
 import com.breadmoirai.garnet.project.NewNodeKind
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
+import org.jetbrains.jewel.ui.Outline
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.LazyTree
 import org.jetbrains.jewel.ui.component.Text
@@ -53,6 +64,8 @@ private fun ProjectExplorer() {
         Column(Modifier.fillMaxSize().background(PANEL_BG).padding(4.dp)) {
             ExplorerToolbar()
             var edit by remember { mutableStateOf<ExplorerEdit?>(null) }
+            var editError by remember { mutableStateOf<String?>(null) }
+            val menu = remember { ExplorerMenuState() }
             val snap = ProjectTreeState.snapshot
             if (snap == null) {
                 Text("(no project loaded — Refresh)", Modifier.padding(vertical = 2.dp))
@@ -91,13 +104,44 @@ private fun ProjectExplorer() {
                         ExplorerTreeState.pathOf(element),
                         snap.currentSubpath,
                         edit,
-                        onCommit = { edit = null },
-                        onCancel = { edit = null },
+                        editError,
+                        onCommit = { typed ->
+                            val current = edit
+                            val failure = when (current) {
+                                is ExplorerEdit.Creating ->
+                                    ExplorerActions.commitCreate(current.parentPath, current.kind, typed)
+                                is ExplorerEdit.Renaming ->
+                                    ExplorerActions.commitRename(current.path, typed)
+                                null -> null
+                            }
+                            editError = failure
+                            // Keep the field open on failure so the user can fix the name in place.
+                            if (failure == null) edit = null
+                        },
+                        onCancel = { edit = null; editError = null },
+                        onSecondaryClick = { path, local ->
+                            ExplorerTreeState.select(path)
+                            // Row-local → window coords: the scene is full-window at Density(1f),
+                            // so a row's window position is its layout position. Using the raw local
+                            // offset would anchor every menu near the panel's left edge.
+                            menu.open(path, IntOffset(local.x.toInt(), local.y.toInt()))
+                        },
                     )
                 }
+                ExplorerContextMenu(
+                    state = menu,
+                    onNew = { parent, kind ->
+                        // The field is inside the folder, so the folder has to be open to see it.
+                        ExplorerTreeState.treeState.openNodes += parent
+                        edit = ExplorerEdit.Creating(parent, kind)
+                    },
+                    onRename = { path ->
+                        edit = ExplorerEdit.Renaming(path, path.substringAfterLast('/'))
+                    },
+                )
             }
-            val status = ProjectTreeState.status
-            if (status.isNotEmpty()) Text(status, Modifier.padding(top = 4.dp))
+            val message = editError ?: ProjectTreeState.status
+            if (message.isNotEmpty()) Text(message, Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -128,8 +172,10 @@ private fun TreeRow(
     path: String,
     currentSubpath: String?,
     edit: ExplorerEdit?,
+    editError: String?,
     onCommit: (String) -> Unit,
     onCancel: () -> Unit,
+    onSecondaryClick: (String, Offset) -> Unit,
 ) {
     val creatingHere = edit is ExplorerEdit.Creating && ExplorerEdit.isPendingId(path)
     val renamingHere = edit is ExplorerEdit.Renaming && edit.path == path
@@ -144,13 +190,31 @@ private fun TreeRow(
             Icon(kindIcon, contentDescription = null)
             InlineNameField(
                 initial = (edit as? ExplorerEdit.Renaming)?.original.orEmpty(),
+                error = editError,
                 onCommit = onCommit,
                 onCancel = onCancel,
             )
         }
         return
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    var rowOrigin by remember { mutableStateOf(Offset.Zero) }
+    Row(
+        Modifier
+            .onGloballyPositioned { rowOrigin = it.positionInWindow() }
+            .pointerInput(path) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Press && event.button == PointerButton.Secondary) {
+                            val position = event.changes.first().position
+                            event.changes.forEach { it.consume() }
+                            onSecondaryClick(path, rowOrigin + position)
+                        }
+                    }
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         when (node) {
             is FolderNode -> Icon(AllIconsKeys.Nodes.Folder, contentDescription = null)
             is FileNode ->
@@ -172,7 +236,12 @@ private fun TreeRow(
  * and `setTextAndPlaceCursorAtEnd` does not fire a responder, so seeding [initial] is safe.
  */
 @Composable
-private fun RowScope.InlineNameField(initial: String, onCommit: (String) -> Unit, onCancel: () -> Unit) {
+private fun RowScope.InlineNameField(
+    initial: String,
+    error: String?,
+    onCommit: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
     val state = rememberTextFieldState()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -181,6 +250,7 @@ private fun RowScope.InlineNameField(initial: String, onCommit: (String) -> Unit
     }
     TextField(
         state = state,
+        outline = if (error != null) Outline.Error else Outline.None,
         modifier = Modifier
             .weight(1f)
             .focusRequester(focusRequester)
