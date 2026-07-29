@@ -6,6 +6,7 @@ import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.garnet.project.FileNode
 import com.breadmoirai.garnet.project.FolderNode
 import com.breadmoirai.garnet.testing.ClientSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldNotContain
@@ -75,6 +76,16 @@ class ExplorerTreeStateSpec : ClientSpec({
             ExplorerTreeState.select("does/not/exist")
         }
         ExplorerTreeState.selectedHasUnsaved() shouldBe false
+    }
+
+    test("collapseAll clears every open node") {
+        ExplorerTreeState.reset()
+        ExplorerTreeState.treeState.openNodes = setOf("adders", "adders/full-adder", "clocks")
+        ExplorerTreeState.expandedPaths shouldBe setOf("adders", "adders/full-adder", "clocks")
+
+        ExplorerTreeState.collapseAll()
+
+        ExplorerTreeState.expandedPaths.shouldBeEmpty()
     }
 
     test("reset clears selection and expansion") {

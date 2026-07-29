@@ -151,12 +151,12 @@ whole dock (rendering and input) silently no-ops back to vanilla, never crashing
 
 ## First real panel: the Project Explorer (live-data pattern, now on Jewel)
 
-`client/ide/ProjectExplorerPanel.kt` + `client/ide/ProjectTreeState.kt` +
-`client/ide/ExplorerTreeState.kt` are the first non-demo panel and the template future panels
-(debugger, timeline) should copy. As of the jewel-widget-layer migration, the panel is built
-entirely from JetBrains Jewel components (`LazyTree`, `Dropdown`, `TextField`, `DefaultButton`/
-`OutlinedButton`, `IconButton`) under one `IntUiTheme(isDark = true)`, not hand-rolled
-`BasicText`/`Box.clickable` rows. The pattern:
+`client/ide/ProjectExplorerPanel.kt` + `client/ide/ExplorerToolbar.kt` +
+`client/ide/ProjectTreeState.kt` + `client/ide/ExplorerTreeState.kt` are the first non-demo panel
+and the template future panels (debugger, timeline) should copy. As of the jewel-widget-layer
+migration, the panel is built entirely from JetBrains Jewel components (`LazyTree`, `PopupMenu`,
+`IconButton`) under one `IntUiTheme(isDark = true)`, not hand-rolled `BasicText`/`Box.clickable`
+rows. The pattern:
 
 - **State is split across two `mutableStateOf`-backed singletons**, neither of which is the
   panel. `ProjectTreeState` holds only the server-driven data: `snapshot:
@@ -201,36 +201,31 @@ entirely from JetBrains Jewel components (`LazyTree`, `Dropdown`, `TextField`, `
   path equals `snapshot.currentSubpath` or (for a `.nbt` file) `node.hasUnsaved` is true, and shows
   a Jewel `AllIconsKeys` icon per node kind (`Nodes.Folder`, `FileTypes.Archive` for `.nbt`,
   `FileTypes.Text` otherwise).
-- **`StructureActions()`**, rendered under `Header()`, provides "+ Structure" (a Jewel `TextField`
-  backed by `rememberTextFieldState()` — the `TextField(value: String, onValueChange, ...)`
-  overload does not exist in this Jewel version, only `TextFieldState`- and `TextFieldValue`-keyed
-  overloads do — plus a `DefaultButton` that sends `NewStructureC2S(name)` to write an empty `.nbt`
-  into the active folder and clears the field via the `TextFieldState.clearText()` extension) and
-  "Save"/"Discard" `OutlinedButton`s (send `SaveStructureC2S`/`DiscardStructureC2S(selectedPath)`
-  when `ExplorerTreeState.selectedPath` ends with `.nbt`; Discard is additionally gated on
-  `ExplorerTreeState.selectedHasUnsaved()` and dims via Jewel's own disabled-button styling).
-  **The row is width-critical and already at its floor**: slim button variants
-  (`DefaultSlimButton`/`OutlinedSlimButton`), a 48.dp name field (~6 characters), a shortened
-  "+ New" label, and fixed 4px gaps rather than a flex `Spacer` (a flex spacer cannot go negative,
-  so it does not prevent overflow). Even so it needs ~268px of panel to render intact — which is why
-  `DockState.DEFAULT_LEFT` is 280. Below that, the failure mode is **not** a control falling off the
-  canvas: Jewel squeezes the last button's inner width and its *label* truncates ("Discard" →
-  "Discar") while the button's border still draws in full. A bounding-box check does not see that, so
-  the regression test compares the action row pixel-for-pixel against a capture at a width that
-  definitely fits.
-  `StructureResultS2C` for all four structure packets (place/save/new/discard) surfaces through
-  `ProjectTreeState.onStructureResult` into the same status line as folder load/save results. See
+- **`ExplorerToolbar()`** is the panel's single top row (replacing the earlier root-name `Dropdown`
+  header plus a separate `StructureActions()` "+ New"/"Save"/"Discard" row): a kebab `IconButton`
+  (`AllIconsKeys.Actions.More` — the *vertical* three-dot kebab; `Actions.MoreHorizontal` is a
+  different icon) opens a Jewel `PopupMenu` with a single "Open Folder…" item
+  (`RootPickerController.openFolder()`), and a right-aligned pair of icon buttons: Refresh
+  (`ListProjectTreeC2S.INSTANCE` — send the `INSTANCE`, never a fresh unit payload, see
+  `ProjectPackets`) and Collapse All (`ExplorerTreeState.collapseAll()`, which clears
+  `treeState.openNodes` and leaves selection untouched). `PopupMenu`'s `onDismissRequest` takes an
+  `(InputMode) -> Boolean` in this Jewel version, not a no-arg lambda.
+  **The "+ New"/"Save"/"Discard" structure-action controls have no client UI trigger as of this
+  writing** — `NewStructureC2S`/`SaveStructureC2S`/`DiscardStructureC2S` are still fully wired
+  server-side (`ProjectNetworkRegistry`) and covered by `ProjectStructureNetworkSpec`; a later step
+  in the explorer-toolbar-context-menu work reintroduces them as a tree-row context menu.
+  `StructureResultS2C` still surfaces through `ProjectTreeState.onStructureResult` into the same
+  status line as folder load/save results whenever those packets fire (e.g. from gametest
+  coverage). See
   [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
-  for the region-placement model these actions drive.
-- **The panel has a header bar** (`Header` in `ProjectExplorerPanel.kt`): a Jewel `Dropdown`
-  labeled with the current root's folder name, and an `IconButton` (`AllIconsKeys.Actions.Refresh`)
-  for the refresh action. The dropdown's `menuContent` offers "Open Folder" (runs
-  `RootPickerController.openFolder()`, a native folder picker that swaps the single server root via
-  `SetProjectRootC2S` → `handleSetRoot`) and a disabled "Attach Folder (soon)" placeholder pending
-  multi-root (Plan B). This replaced a hand-rolled `RootMenu` overlay (`RootPickerController.
-  menuOpen`/`toggleMenu`/`closeMenu`, since deleted) that existed only because Compose `Popup`s were
-  believed unable to render inside the embedded scene — see [dock-dialogs.md](dock-dialogs.md) for
-  why that premise turned out to be wrong and how the native picker is threaded.
+  for the region-placement model those packets drive.
+- **"Open Folder…" runs `RootPickerController.openFolder()`**, a native folder picker that swaps
+  the single server root via `SetProjectRootC2S` → `handleSetRoot`. Multi-root / "Attach Folder" is
+  still pending (Plan B). The kebab `PopupMenu` (and, before it, a root-name `Dropdown`) replaced a
+  hand-rolled `RootMenu` overlay (`RootPickerController.menuOpen`/`toggleMenu`/`closeMenu`, since
+  deleted) that existed only because Compose `Popup`s were believed unable to render inside the
+  embedded scene — see [dock-dialogs.md](dock-dialogs.md) for why that premise turned out to be
+  wrong and how the native picker is threaded.
 
 ## `ImageComposeScene` input API (verified against 1.11.0, formerly 1.12.0-beta02)
 

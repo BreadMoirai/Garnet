@@ -48,6 +48,11 @@ object ExplorerTreeState {
 
     fun toggleExpanded(path: String) = treeState.toggleNode(path)
 
+    /** Collapse every expanded node. Selection is left alone — IntelliJ's Collapse All does the same. */
+    fun collapseAll() {
+        treeState.openNodes = emptySet()
+    }
+
     /** True when [selectedPath] resolves to a `.nbt` file flagged dirty in the current snapshot. */
     fun selectedHasUnsaved(): Boolean {
         val path = selectedPath ?: return false

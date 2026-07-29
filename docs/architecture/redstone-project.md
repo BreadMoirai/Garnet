@@ -91,31 +91,31 @@ Network:
   `network/Packets.kt`.
 
 Client:
-- `client/ide/ProjectExplorerPanel` + `client/ide/ProjectTreeState` + `client/ide/ExplorerTreeState`
-  — the Compose dock panel, built on Jewel widgets (`LazyTree`, `Dropdown`, `TextField`, buttons),
-  that renders `snapshot.root` (`FolderNode`/`FileNode`) via `ExplorerTreeState.buildTreeFrom`, with
-  per-folder expand/collapse (LEFT region, hidden by default — Shift+1 reveals it).
-  `ProjectTreeState` is `mutableStateOf`-backed server-driven state (snapshot + status) fed by the
-  S2C receivers; `ExplorerTreeState` owns selection/expansion by wrapping a single Jewel
-  `TreeState`; `explorerPanel()` returns the LEFT-dock `Panel`. A folder is a "spec-folder"
-  (loadable) iff it directly contains a `FileNode` named `*.spec.kts`: clicking it sends
-  `LoadProjectFolderC2S(path)`; other folders just toggle expand (Jewel `LazyTree`'s own
+- `client/ide/ProjectExplorerPanel` + `client/ide/ExplorerToolbar` + `client/ide/ProjectTreeState` +
+  `client/ide/ExplorerTreeState` — the Compose dock panel, built on Jewel widgets (`LazyTree`,
+  `PopupMenu`, `IconButton`), that renders `snapshot.root` (`FolderNode`/`FileNode`) via
+  `ExplorerTreeState.buildTreeFrom`, with per-folder expand/collapse (LEFT region, hidden by
+  default — Shift+1 reveals it). `ProjectTreeState` is `mutableStateOf`-backed server-driven state
+  (snapshot + status) fed by the S2C receivers; `ExplorerTreeState` owns selection/expansion by
+  wrapping a single Jewel `TreeState`; `explorerPanel()` returns the LEFT-dock `Panel`. A folder is
+  a "spec-folder" (loadable) iff it directly contains a `FileNode` named `*.spec.kts`: clicking it
+  sends `LoadProjectFolderC2S(path)`; other folders just toggle expand (Jewel `LazyTree`'s own
   click-to-toggle behavior). Clicking a file calls `ExplorerTreeState.select(path)` (highlight
   only, no packet) — except a `.nbt` `FileNode` (`node.extension == "nbt"`), which selects **and**
-  sends
-  `PlaceStructureC2S(path)` (rendered with a Jewel `AllIconsKeys.FileTypes.Archive` icon, plus a
-  leading `● ` dirty dot when `node.hasUnsaved` is true, or when the row is `currentSubpath`). A
-  `StructureActions()` row under `Header()` provides "+ Structure" (a Jewel `TextField` name input
-  that sends `NewStructureC2S(name)`), "Save" (sends `SaveStructureC2S(selectedPath)` when
-  `ExplorerTreeState.selectedPath` ends with `.nbt`), and "Discard" (sends
-  `DiscardStructureC2S(selectedPath)` under the same `.nbt`-selected condition; disabled unless
-  `ExplorerTreeState.selectedHasUnsaved()` is true, which resolves `selectedPath` against the
-  current snapshot via `FolderNode.resolve` and checks `FileNode.hasUnsaved`). Paths are
-  `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
-  `currentSubpath`. The Refresh `IconButton` sends `ListProjectTreeC2S`. This is the **only** live
-  client UI for browsing the project tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy
-  folder-browser GUI and world-list-screen root picker) were deleted in the Compose-dock hard-cut.
-  See [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the
+  sends `PlaceStructureC2S(path)` (rendered with a Jewel `AllIconsKeys.FileTypes.Archive` icon, plus
+  a leading `● ` dirty dot when `node.hasUnsaved` is true, or when the row is `currentSubpath`).
+  Paths are `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
+  `currentSubpath`. `ExplorerToolbar()` is the panel's single top row: a kebab `IconButton` opening
+  a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Refresh
+  (sends `ListProjectTreeC2S`) and Collapse All (`ExplorerTreeState.collapseAll()`) icon buttons.
+  This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
+  row — those controls have no client UI trigger as of this writing (`NewStructureC2S` /
+  `SaveStructureC2S` / `DiscardStructureC2S` are still fully wired server-side and covered by
+  `ProjectStructureNetworkSpec`; a later step in the explorer-toolbar-context-menu work reintroduces
+  them as a tree-row context menu). This is the **only** live client UI for browsing the project
+  tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy folder-browser GUI and
+  world-list-screen root picker) were deleted in the Compose-dock hard-cut. See
+  [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the
   `ExplorerTreeState`/`ProjectTreeState` split.
 - `client/project/ProjectClientNetworking` — S2C receivers. They feed `ProjectTreeState`
   (snapshot/folder-loaded/save-report/error/structure-result); no client screen is opened in

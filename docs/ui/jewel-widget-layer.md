@@ -80,16 +80,17 @@ plug into anyway).
 
 ## Popups render in-scene
 
-Jewel's `Dropdown` (used for the Explorer's root-folder menu) is built on Compose's own `Popup`.
-The dock's `ImageComposeScene` is internally a `CanvasLayersComposeScene`, so popup layers draw
-into the *same* raster canvas as the rest of the scene rather than opening a separate desktop
+Jewel's `Dropdown` and `PopupMenu` (the latter now used for the Explorer toolbar's kebab overflow
+menu; a root-name `Dropdown` filled this role before the toolbar rework) are built on Compose's own
+`Popup`. The dock's `ImageComposeScene` is internally a `CanvasLayersComposeScene`, so popup layers
+draw into the *same* raster canvas as the rest of the scene rather than opening a separate desktop
 window — Jewel menus render in-scene with no extra plumbing. See
 [dock-dialogs.md](dock-dialogs.md) for the full writeup (including the hand-rolled `RootMenu`
 overlay this replaced) and why that used to be assumed impossible.
 
 **The lifecycle is the sharp edge, not the rendering.** A popup layer belongs to the composition
 that opened it, and the dock composes into a long-lived singleton scene that only advances during a
-rendered frame. So an open `Dropdown` menu will happily outlive the panel that created it — repainting
+rendered frame. So an open `Dropdown`/`PopupMenu` will happily outlive the panel that created it — repainting
 over the *next* mount — unless the dock explicitly ends the composition. Two guards in the dock make
 that impossible (`DockState.mountEpoch` + `ComposeSurface.markSceneStale()`); see
 [dock-framework.md](dock-framework.md#panel-composition-must-not-outlive-its-mount). If you add

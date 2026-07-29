@@ -3,13 +3,9 @@ package com.breadmoirai.garnet.client.ide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.input.clearText
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -17,25 +13,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.breadmoirai.garnet.client.ui.compose.dock.Panel
-import com.breadmoirai.garnet.network.project.DiscardStructureC2S
-import com.breadmoirai.garnet.network.project.ListProjectTreeC2S
 import com.breadmoirai.garnet.network.project.LoadProjectFolderC2S
-import com.breadmoirai.garnet.network.project.NewStructureC2S
 import com.breadmoirai.garnet.network.project.PlaceStructureC2S
-import com.breadmoirai.garnet.network.project.SaveStructureC2S
 import com.breadmoirai.garnet.project.FileNode
 import com.breadmoirai.garnet.project.FolderNode
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
-import org.jetbrains.jewel.ui.component.Dropdown
-import org.jetbrains.jewel.ui.component.DefaultSlimButton
 import org.jetbrains.jewel.ui.component.Icon
-import org.jetbrains.jewel.ui.component.IconButton
 import org.jetbrains.jewel.ui.component.LazyTree
-import org.jetbrains.jewel.ui.component.OutlinedSlimButton
 import org.jetbrains.jewel.ui.component.Text
-import org.jetbrains.jewel.ui.component.TextField
-import org.jetbrains.jewel.ui.component.separator
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 
 /** Panel background, matching the IntelliJ dark tool-window colour. */
@@ -48,8 +34,7 @@ fun explorerPanel(): Panel = Panel("garnet.explorer", "Explorer") { ProjectExplo
 private fun ProjectExplorer() {
     IntUiTheme(isDark = true) {
         Column(Modifier.fillMaxSize().background(PANEL_BG).padding(4.dp)) {
-            Header()
-            StructureActions()
+            ExplorerToolbar()
             val snap = ProjectTreeState.snapshot
             if (snap == null) {
                 Text("(no project loaded — Refresh)", Modifier.padding(vertical = 2.dp))
@@ -111,72 +96,3 @@ private fun TreeRow(node: com.breadmoirai.garnet.project.FileTreeNode, path: Str
     }
 }
 
-@Composable
-private fun Header() {
-    val rootName = ProjectTreeState.snapshot?.root?.name ?: "(no root)"
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        // Real Jewel Dropdown. This replaces the hand-rolled RootMenu overlay, which only existed
-        // because Compose Popups were believed unable to render in the embedded scene.
-        Dropdown(
-            menuContent = {
-                selectableItem(selected = false, onClick = { RootPickerController.openFolder() }) {
-                    Text("Open Folder")
-                }
-                separator()
-                selectableItem(selected = false, enabled = false, onClick = {}) {
-                    Text("Attach Folder  (soon)")
-                }
-            },
-        ) {
-            Text(rootName)
-        }
-        Spacer(Modifier.weight(1f))
-        IconButton(onClick = { ClientPlayNetworking.send(ListProjectTreeC2S.INSTANCE) }) {
-            Icon(AllIconsKeys.Actions.Refresh, contentDescription = "Refresh")
-        }
-    }
-}
-
-@Composable
-private fun StructureActions() {
-    val newName = rememberTextFieldState()
-    val selected = ExplorerTreeState.selectedPath
-    val isStructure = selected != null && selected.endsWith(".nbt")
-    // All four controls must stay reachable at the dock's typical 300px LEFT-panel width without
-    // shrinking the tree area or scrolling this row — slim button variants (Jewel's
-    // DefaultSlimButton/OutlinedSlimButton, a narrower min-height/padding than the default
-    // buttons used elsewhere in this panel), a narrower name field, a shorter "+ New" label, and a
-    // fixed (not flex) inter-button gap buy back enough width for Save AND Discard to render fully
-    // on-canvas, label included. A flex Spacer(weight = 1f) here would still overflow the row when
-    // the fixed-width children alone exceed 300px, since it can only shrink to zero, never negative
-    // — packing everything left-aligned with a small fixed gap is what actually guarantees no
-    // clipping. Verified visually via the client-test screenshots (see task-5-report.md), not just
-    // by compiling.
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextField(
-            state = newName,
-            modifier = Modifier.width(48.dp),
-        )
-        DefaultSlimButton(
-            onClick = {
-                val name = newName.text.toString()
-                if (name.isNotBlank()) {
-                    ClientPlayNetworking.send(NewStructureC2S(name))
-                    newName.clearText()
-                }
-            },
-            modifier = Modifier.padding(horizontal = 2.dp),
-        ) { Text("+ New") }
-        Spacer(Modifier.width(4.dp))
-        OutlinedSlimButton(
-            onClick = { if (isStructure) ClientPlayNetworking.send(SaveStructureC2S(selected!!)) },
-            enabled = isStructure,
-            modifier = Modifier.padding(horizontal = 1.dp),
-        ) { Text("Save") }
-        OutlinedSlimButton(
-            onClick = { if (isStructure) ClientPlayNetworking.send(DiscardStructureC2S(selected!!)) },
-            enabled = isStructure && ExplorerTreeState.selectedHasUnsaved(),
-            modifier = Modifier.padding(horizontal = 1.dp),
-        ) { Text("Discard") }
-    }
-}

@@ -63,46 +63,30 @@ object PanelPixelProbe {
     }
 
     /**
-     * The region the root Dropdown's menu card covers when open (measured from
-     * `jewel_explorer_dropdown.png`), sampled on a fixed 20x8 grid → 170 samples.
+     * The region the kebab menu's `PopupMenu` card covers when open (measured from
+     * `jewel_explorer_dropdown.png` after task 3 replaced the root-name Dropdown with the kebab
+     * overflow menu), sampled on a fixed 18x9 grid → 162 samples.
      *
-     * Discriminating: an open menu fills it almost entirely (measured 170/170), while the same panel
-     * with the menu closed scores ~62/170 (the actions row and the first tree rows also live here).
+     * Discriminating: an open menu fills it almost entirely (measured 162/162), while the same panel
+     * with the menu closed scores ~31/162 (the toolbar row and the first tree rows also live here).
      * Use [MENU_OPEN_MIN] / [MENU_CLOSED_MAX] rather than raw numbers so cosmetic drift does not
      * break every call site.
      */
-    fun menuRegionDiffCount(png: Path): Int = regionDiffCount(png, 16..150 step 8, 58..112 step 6)
+    fun menuRegionDiffCount(png: Path): Int = regionDiffCount(png, 10..112 step 6, 36..68 step 4)
 
     /** Above this, a menu card is definitely painted over the region. */
     const val MENU_OPEN_MIN = 140
 
-    /** Below this, no menu card is painted (only the normal actions row / tree rows show through). */
-    const val MENU_CLOSED_MAX = 120
+    /** Below this, no menu card is painted (only the normal toolbar / tree rows show through). */
+    const val MENU_CLOSED_MAX = 60
 
     /**
-     * The header row: the root-name Dropdown anchor (box outline + label). Non-zero only if the
+     * The first tree row (folder icon + name, e.g. "adders" or "set"). Task 3 dropped the root-name
+     * Dropdown that used to anchor this check — the toolbar's icon buttons are individually only a
+     * few sparse pixels wide (a 3-dot kebab, thin chevrons), too thin to sample reliably on a coarse
+     * grid, whereas the first row's label text is a dense, reliable glyph block. Non-zero only if the
      * panel actually composed and painted — the check that makes "the Explorer rendered" assertable
-     * instead of merely assuming it from the state the test just set. 20x5 grid → 100 samples.
+     * instead of merely assuming it from the state the test just set. 27x4 grid → 108 samples.
      */
-    fun headerRegionDiffCount(png: Path): Int = regionDiffCount(png, 8..84 step 4, 28..44 step 4)
-
-    /**
-     * Pixels in the Explorer's action row that differ between two captures taken at different panel
-     * widths.
-     *
-     * The row is packed left with fixed-width children and fixed gaps, so at any width that actually
-     * fits it, every control lands on identical coordinates and this is **exactly zero**. When the
-     * width is too small the row does not simply clip at the panel edge — Jewel squeezes the last
-     * button's inner width and its label truncates ("Discard" → "Discar"), which shifts pixels and
-     * makes this non-zero. That is the failure a bounding-box check misses, which is why the shipped
-     * default width is verified by comparison against a known-good wide capture rather than by a
-     * "did something paint here" count.
-     */
-    fun actionRowMismatch(a: Path, b: Path): Int {
-        val imgA = ImageIO.read(awaitDecodable(a).toFile())
-        val imgB = ImageIO.read(awaitDecodable(b).toFile())
-        return (56..78).sumOf { y ->
-            (4..255).count { x -> imgA.getRGB(x, y) != imgB.getRGB(x, y) }
-        }
-    }
+    fun headerRegionDiffCount(png: Path): Int = regionDiffCount(png, 4..108 step 4, 36..48 step 4)
 }

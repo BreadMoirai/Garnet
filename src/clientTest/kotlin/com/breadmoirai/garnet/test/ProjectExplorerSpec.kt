@@ -73,9 +73,9 @@ class ProjectExplorerSpec : ClientSpec({
         val shot = capture("explorer_tree.png")
         val header = PanelPixelProbe.headerRegionDiffCount(shot)
         val menu = PanelPixelProbe.menuRegionDiffCount(shot)
-        println("[explorer] tree capture: header=$header/100 menu=$menu/170")
-        // The panel actually painted: the root-name Dropdown anchor is on-screen.
-        header shouldBeGreaterThan 20
+        println("[explorer] tree capture: header=$header/108 menu=$menu/162")
+        // The panel actually painted: the first tree row's folder icon + label are on-screen.
+        header shouldBeGreaterThan 8
         // ...and NO dropdown menu is open. This spec never clicks the dropdown, so a menu card here
         // means a popup leaked in from another spec's mount (final-review Critical 1).
         menu shouldBeLessThan PanelPixelProbe.MENU_CLOSED_MAX
@@ -87,6 +87,9 @@ class ProjectExplorerSpec : ClientSpec({
         waitClientTicks(6)
     }
 
+    // Named for the root-name Dropdown this used to cover (task 3 removed it — the root name is no
+    // longer rendered anywhere in the panel, only tracked in ProjectTreeState). Kept as a distinct
+    // fresh-mount scenario: this is where the leaked-popup regression first showed itself.
     test("Explorer header renders the root name") {
         closeClientScreen(); waitClientTicks(2)
         val tree = FolderNode("myroot", listOf(
@@ -106,10 +109,10 @@ class ProjectExplorerSpec : ClientSpec({
         val shot = capture("explorer_root_header.png")
         val header = PanelPixelProbe.headerRegionDiffCount(shot)
         val menu = PanelPixelProbe.menuRegionDiffCount(shot)
-        println("[explorer] header capture: header=$header/100 menu=$menu/170")
+        println("[explorer] header capture: header=$header/108 menu=$menu/162")
         // Same pairing as above: the header genuinely painted, and it painted CLOSED. This capture is
         // where the leaked-popup regression showed itself first.
-        header shouldBeGreaterThan 20
+        header shouldBeGreaterThan 8
         menu shouldBeLessThan PanelPixelProbe.MENU_CLOSED_MAX
         runOnClient { mc ->
             RootPickerController.resetForTest()
