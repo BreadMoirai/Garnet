@@ -153,4 +153,36 @@ object DockState {
         // popup/widget state from the previous mount can bleed through (see [mountEpochs]).
         DockRegion.entries.forEach { bumpMountEpoch(it) }
     }
+
+    /**
+     * Ends the dock's **world session**: hides every edge region, clears the CENTER documents, and
+     * drops input focus. Called when the client disconnects (see `registerDockWorldLifecycle` in
+     * `viewport/DockKeybinds.kt`).
+     *
+     * Deliberately narrower than [reset]. The panel lists and splitter sizes are user *layout*, not
+     * world state — and the Project Explorer is only ever added at `onInitializeClient`, so a full
+     * [reset] here would leave LEFT permanently empty for the rest of the process. CENTER *is*
+     * cleared: its panels are per-world documents that mean nothing without the session that opened
+     * them. [setVisible] already bumps a hidden region's mount epoch; CENTER never goes through it,
+     * so its epoch is bumped here (see [mountEpochs] for the ghost-popup failure mode).
+     *
+     * [focusedRegion] is cleared directly instead of via `DockInputRouter.clearFocus()`: that helper
+     * re-grabs the mouse when no [net.minecraft.client.gui.screens.Screen] is open, and at disconnect
+     * time the title screen is not reliably installed yet, so it would capture the cursor on the
+     * title screen. `DockInputRouter.captured` reads through to this field, so clearing it is enough
+     * to stop the input mixins. Keeping this method free of `Minecraft` calls also keeps it testable.
+     *
+     * Idempotent: calling it on an already-closed dock changes nothing.
+     */
+    fun closeAll() {
+        setVisible(DockRegion.LEFT, false)
+        setVisible(DockRegion.RIGHT, false)
+        setVisible(DockRegion.BOTTOM, false)
+        if (centerPanels.isNotEmpty()) {
+            centerPanels.clear()
+            bumpMountEpoch(DockRegion.CENTER)
+        }
+        centerActiveTab = 0
+        focusedRegion = null
+    }
 }
