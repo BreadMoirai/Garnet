@@ -51,6 +51,15 @@ object ExplorerActions {
         return null
     }
 
+    /**
+     * The names already present in [parentPath], for duplicate-name validation.
+     *
+     * Three distinct situations all degrade to "no known siblings" here: no snapshot loaded yet,
+     * [parentPath] resolving to a file rather than a folder, and [parentPath] not resolving at all
+     * (a stale client snapshot pointing at a folder the server has since renamed/removed). That is
+     * safe only because [commitCreate]/[commitRename] are a pre-check, not the source of truth — the
+     * server re-validates against the real filesystem and rejects what this silently waved through.
+     */
     private fun siblingsOf(parentPath: String): List<String> {
         val root = ProjectTreeState.snapshot?.root ?: return emptyList()
         val node = root.resolve(parentPath) as? FolderNode ?: return emptyList()

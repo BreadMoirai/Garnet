@@ -89,4 +89,26 @@ object PanelPixelProbe {
      * instead of merely assuming it from the state the test just set. 27x4 grid → 108 samples.
      */
     fun headerRegionDiffCount(png: Path): Int = regionDiffCount(png, 4..108 step 4, 36..48 step 4)
+
+    /**
+     * The region the right-click `New`/`Rename` context menu's `PopupMenu` card covers when open,
+     * anchored at ExplorerContextMenuSpec's click point (60, 40) rather than the kebab menu's
+     * toolbar-relative position — the two menus anchor differently (fixed-offset-at-click vs.
+     * horizontal-under-a-button) so [menuRegionDiffCount]'s region is the wrong place to look here.
+     *
+     * Measured directly from `explorer_context_menu_{closed,open}.png`: a pixel-level diff between the
+     * two captures (not just vs. background) bounded the card's actual footprint to roughly
+     * x[16,137] y[32,115], which is *not* centered on the click point — the popup's content (a "New"
+     * row with a submenu chevron, a separator, and "Rename") extends left and above it. Sampled on a
+     * 21x21 grid → 441 samples over that footprint: closed reads 40/441 (the tree row underneath),
+     * open reads 314/441. Use [CONTEXT_MENU_OPEN_MIN]/[CONTEXT_MENU_CLOSED_MAX] rather than the raw
+     * counts so cosmetic drift does not break every call site.
+     */
+    fun contextMenuRegionDiffCount(png: Path): Int = regionDiffCount(png, 16..136 step 6, 32..112 step 4)
+
+    /** Above this, the context-menu card is definitely painted over the region (measured 314/441 open). */
+    const val CONTEXT_MENU_OPEN_MIN = 250
+
+    /** Below this, no context-menu card is painted (measured 40/441 closed — the tree row underneath). */
+    const val CONTEXT_MENU_CLOSED_MAX = 100
 }
