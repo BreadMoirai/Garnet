@@ -182,6 +182,10 @@ object DockState {
             centerPanels.clear()
             bumpMountEpoch(DockRegion.CENTER)
         }
+        // Only centerActiveTab is zeroed: CENTER's panels were just cleared above, so index 0 is the
+        // only sane value. left/right/bottomActiveTab are left alone on purpose — those regions' panel
+        // lists survive closeAll() (see the class doc above), so their active-tab index still points at
+        // a real panel and resetting it would just discard the user's edge-panel tab choice for nothing.
         centerActiveTab = 0
         focusedRegion = null
     }

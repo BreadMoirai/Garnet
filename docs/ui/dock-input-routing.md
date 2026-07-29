@@ -119,6 +119,9 @@ One `KeyMapping` on `1`; the Alt/Shift distinction is read from live GLFW modifi
 - **Shift+1** — toggle LEFT visibility; if hiding a focused region, also `clearFocus()`, then
   `garnet$updateScaledFramebuffer(true)` so the world inset resizes immediately.
 - Bare `1` falls through to the vanilla hotbar slot.
+- Both branches are no-ops while `mc.level == null` (no world loaded) — see
+  [dock-framework.md](dock-framework.md#world-session-lifecycle) for the disconnect-time teardown
+  this guard pairs with.
 
 Both branches also call `syncDockViewport()` (defined in `DockKeybinds.kt`) right after mutating
 `DockState` and before the framebuffer-resize call — see "Render enablement is derived from

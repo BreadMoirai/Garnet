@@ -1,5 +1,7 @@
 package com.breadmoirai.garnet.client.viewport
 
+import com.breadmoirai.garnet.client.ide.ExplorerTreeState
+import com.breadmoirai.garnet.client.ide.ProjectTreeState
 import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
 import com.breadmoirai.garnet.client.ui.compose.dock.DockState
@@ -75,11 +77,25 @@ fun registerDockKeybinds() {
  *
  * The `garnet$updateScaledFramebuffer(true)` follow-up mirrors both keybind branches above: without
  * it the shrink survives until something else resizes the framebuffer.
+ *
+ * The whole body runs inside `mc.execute { ... }` because `fabric-networking-api-v1` fires this
+ * event from two sites in `ClientConnectionMixin` — `handleDisconnection` on the main thread, or
+ * `channelInactive` on a **Netty event-loop thread**, whichever wins the CAS — and
+ * `garnet$updateScaledFramebuffer` reaches `eventHandler.resizeGui()`, which is unsafe to call
+ * concurrently with rendering off the render thread.
  */
 fun registerDockWorldLifecycle() {
     ClientPlayConnectionEvents.DISCONNECT.register { _, mc ->
-        DockState.closeAll()
-        syncDockViewport()
-        (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        mc.execute {
+            DockState.closeAll()
+            // Per-world Explorer state: the tree snapshot and its expansion/selection are stale once
+            // the session that produced them ends, and nothing else refreshes them on the next join
+            // (the tree only reloads on an explicit user click). Reset here, not in
+            // DockState.closeAll(), which stays free of IDE-state and Minecraft dependencies.
+            ProjectTreeState.reset()
+            ExplorerTreeState.reset()
+            syncDockViewport()
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
     }
 }

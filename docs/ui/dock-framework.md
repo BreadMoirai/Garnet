@@ -93,6 +93,19 @@ stale menu is still painting.
 and `garnet$updateScaledFramebuffer(true)`. Without it the dock keeps painting over the title screen,
 the viewport stays shrunk, and a focused region keeps eating GLFW input through the mixins.
 
+The whole callback runs inside `mc.execute { ... }`. `fabric-networking-api-v1` fires `DISCONNECT`
+from two sites in `ClientConnectionMixin` — `handleDisconnection` on the main thread, or
+`channelInactive` on a **Netty event-loop thread** — whichever wins the CAS, so the handler cannot
+assume it is already on the client thread; `garnet$updateScaledFramebuffer` reaches
+`eventHandler.resizeGui()`, which is unsafe to call concurrently with rendering.
+
+The same `mc.execute` block also resets the Project Explorer's per-world state:
+`ProjectTreeState.reset()` and `ExplorerTreeState.reset()` (`client/ide/`), clearing the previous
+session's tree snapshot and its expansion/selection so a join into a different world or server does
+not show a stale tree or send packets built from the old root's paths. Both live in the disconnect
+handler rather than `DockState.closeAll()` — `closeAll()` stays free of IDE-state and `Minecraft`
+dependencies, which is what keeps it unit-testable.
+
 `closeAll()` is deliberately narrower than `reset()`:
 
 | Dropped on disconnect | Kept |
