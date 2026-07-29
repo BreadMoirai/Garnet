@@ -118,12 +118,22 @@ Client:
   resolves `folder` strictly via `ProjectRoot.resolveSubpath(payload.parentSubpath)` and no longer
   reads `ProjectSession.activeSubpath` or `ProjectWorld.folderAbsoluteByPath` at all.
   `CreateFolderC2S(parentSubpath, name)` and `RenamePathC2S(subpath, newName)` are new payloads
-  registered alongside it (`PayloadTypeRegistry.serverboundPlay()`); `CreateFolderC2S` now has a
-  server receiver (`handleCreateFolder`, same folder-resolution path); `RenamePathC2S` still has
-  none — that lands with the "Rename" context-menu action. Both `handleNewStructure` and
-  `handleCreateFolder` re-validate the final name server-side through `ProjectNames.validate`
-  against the destination folder's real directory listing, since the client's tree snapshot can be
-  stale. This is the **only** live client UI for browsing the project
+  registered alongside it (`PayloadTypeRegistry.serverboundPlay()`); both now have server receivers:
+  `handleCreateFolder` (same folder-resolution path) and `handleRename`. `handleNewStructure`,
+  `handleCreateFolder`, and `handleRename` all re-validate the final name server-side through
+  `ProjectNames.validate` against the destination folder's real directory listing, since the
+  client's tree snapshot can be stale. `handleRename` additionally: refuses `subpath == ""` (the
+  client already disables the menu item for the root, but the server does not trust that), moves
+  the `<name>.nbt.unsaved` sidecar with a renamed structure (`StructurePersistence.unsavedSidecarOf`)
+  so unsaved edits stay attached, unloads and re-places a currently-placed structure under the new
+  subpath (`ProjectDimRegistry.unplaceStructure` then `placeStructureFrom` — the structure lands in
+  a fresh region since `nextStructureIndex` is never recycled), and repoints
+  `ProjectSession.activeSubpath` when it equals or is nested under the renamed subpath (boundary-safe:
+  matching on `"$oldSubpath/"` so renaming `redstone` repoints `redstone/clocks` but not a sibling
+  like `redstoneworks/clocks`). See [use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md)
+  (UC-MAN-10) for the structure-unload/reload detail and
+  [use-cases/redstone-project.md](../use-cases/redstone-project.md) for the folder-rename/session
+  detail. This is the **only** live client UI for browsing the project
   tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy folder-browser GUI and
   world-list-screen root picker) were deleted in the Compose-dock hard-cut. See
   [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the

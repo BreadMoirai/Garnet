@@ -2,7 +2,12 @@ package com.breadmoirai.garnet.test.project
 
 import com.breadmoirai.garnet.network.project.CreateFolderC2S
 import com.breadmoirai.garnet.network.project.NewStructureC2S
+import com.breadmoirai.garnet.network.project.PlaceStructureC2S
 import com.breadmoirai.garnet.network.project.ProjectNetworkRegistry
+import com.breadmoirai.garnet.network.project.RenamePathC2S
+import com.breadmoirai.garnet.persistence.StructurePersistence
+import com.breadmoirai.garnet.project.ProjectDimRegistry
+import com.breadmoirai.garnet.project.ProjectNewStructure
 import com.breadmoirai.garnet.project.ProjectRoot
 import com.breadmoirai.garnet.project.ProjectServerContext
 import com.breadmoirai.garnet.project.ProjectSession
@@ -13,6 +18,8 @@ import com.breadmoirai.garnet.testing.GarnetTestSpec
 import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
@@ -20,6 +27,7 @@ import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
+import kotlin.io.path.writeBytes
 
 /**
  * Model of `ProjectStructureNetworkSpec`'s harness: temp project root + a mock server player,
@@ -85,6 +93,72 @@ class ProjectFileOpsNetworkSpec : GarnetTestSpec({
         withServer { server, player, root ->
             ProjectNetworkRegistry.handleNewStructure(server, player, NewStructureC2S("", "gadget.nbt"))
             root.resolve("gadget.nbt").exists().shouldBeTrue()
+        }
+    }
+
+    test("handleRename renames a folder") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            root.resolve("logic").isDirectory().shouldBeTrue()
+            root.resolve("redstone").exists().shouldBeFalse()
+        }
+    }
+
+    test("handleRename moves a structure's unsaved sidecar with it") {
+        withServer { server, player, root ->
+            val nbt = root.resolve("clock.nbt")
+            ProjectNewStructure.create(root, "clock")
+            StructurePersistence.unsavedSidecarOf(nbt).writeBytes(byteArrayOf(1, 2, 3))
+
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+
+            root.resolve("ring.nbt").exists().shouldBeTrue()
+            StructurePersistence.unsavedSidecarOf(root.resolve("ring.nbt")).exists().shouldBeTrue()
+            StructurePersistence.unsavedSidecarOf(nbt).exists().shouldBeFalse()
+        }
+    }
+
+    test("handleRename rejects a new name that already exists") {
+        withServer { server, player, root ->
+            root.resolve("a").createDirectories()
+            root.resolve("b").createDirectories()
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("a", "b"))
+            root.resolve("a").isDirectory().shouldBeTrue()   // untouched
+        }
+    }
+
+    test("handleRename rejects a new name containing a separator") {
+        withServer { server, player, root ->
+            root.resolve("a").createDirectories()
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("a", "x/y"))
+            root.resolve("a").isDirectory().shouldBeTrue()
+        }
+    }
+
+    test("renaming a placed structure unloads it and reloads it under the new name") {
+        withServer { server, player, root ->
+            ProjectNewStructure.create(root, "clock")
+            ProjectNetworkRegistry.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            val registry = ProjectDimRegistry.of(server)
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+
+            registry.placedBoxOf("clock.nbt").shouldBeNull()
+            registry.placedBoxOf("ring.nbt").shouldNotBeNull()
+            registry.structureRegionOriginOf("clock.nbt").shouldBeNull()
+        }
+    }
+
+    test("renaming an ancestor folder repoints the active session") {
+        withServer { server, player, root ->
+            root.resolve("redstone/clocks").createDirectories()
+            ProjectSession.setActive(player.uuid, "redstone/clocks")
+
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+
+            ProjectSession.get(player.uuid)!!.activeSubpath shouldBe "logic/clocks"
         }
     }
 })

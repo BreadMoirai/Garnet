@@ -88,6 +88,20 @@ class ProjectDimRegistry(private val server: MinecraftServer) {
     /** Subpaths with a recorded placed box this session (the set to flush on world-save). */
     fun placedStructureSubpaths(): Set<String> = placedBoxes.keys.toSet()
 
+    /**
+     * Forget everything about a placed structure: its footprint record and its region assignment.
+     * Returns the removed [PlacedBox] so the caller can clear those blocks, or null if it was not
+     * placed.
+     *
+     * The freed region index is **not** recycled — [nextStructureIndex] is monotonic, so a structure
+     * re-placed after this lands in a fresh region. That matches how every other assignment in this
+     * registry behaves and keeps region identity from being reused while blocks may still linger.
+     */
+    fun unplaceStructure(subpath: String): PlacedBox? {
+        structureBySubpath.remove(subpath)
+        return placedBoxes.remove(subpath)
+    }
+
     companion object {
         const val REGION_PAD = 64  // empty void between adjacent regions
 

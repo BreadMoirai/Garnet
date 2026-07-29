@@ -16,6 +16,7 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.moveTo
 import kotlin.io.path.name
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
@@ -80,6 +81,9 @@ object ProjectNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(CreateFolderC2S.TYPE) { payload, ctx ->
             ctx.server().execute { handleCreateFolder(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(RenamePathC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { handleRename(ctx.server(), ctx.player(), payload) }
         }
         ServerPlayNetworking.registerGlobalReceiver(DiscardStructureC2S.TYPE) { payload, ctx ->
             ctx.server().execute { handleDiscardStructure(ctx.server(), ctx.player(), payload) }
@@ -299,6 +303,72 @@ object ProjectNetworkRegistry {
             ServerPlayNetworking.send(player, ProjectErrorS2C("create-folder failed: ${e.message}")); return
         }
         sendTree(server, player)
+    }
+
+    fun handleRename(server: MinecraftServer, player: ServerPlayer, payload: RenamePathC2S) {
+        val root = rootFor(server) ?: run {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("project-root not configured")); return
+        }
+        val source = root.resolveSubpath(payload.subpath) ?: run {
+            ServerPlayNetworking.send(
+                player,
+                ProjectErrorS2C("path not found or escapes root: ${payload.subpath}"),
+            ); return
+        }
+        if (payload.subpath.isEmpty()) {
+            ServerPlayNetworking.send(player, ProjectErrorS2C("cannot rename the project root")); return
+        }
+        val newName = payload.newName.trim()
+        val parent = source.parent
+        // Exclude the node itself so re-committing an unchanged name is a no-op, not a collision.
+        val siblings = siblingNames(parent).filterNot { it == source.name }
+        ProjectNames.validate(newName, siblings)?.let {
+            ServerPlayNetworking.send(player, ProjectErrorS2C(it)); return
+        }
+
+        val parentSubpath = payload.subpath.substringBeforeLast('/', "")
+        val newSubpath = if (parentSubpath.isEmpty()) newName else "$parentSubpath/$newName"
+
+        // A placed structure is keyed by subpath in ProjectDimRegistry, so renaming under it would
+        // strand both the placed box and the region assignment. Unload first, re-place after.
+        val registry = ProjectDimRegistry.of(server)
+        val wasPlaced = registry.placedBoxOf(payload.subpath)
+        if (wasPlaced != null) {
+            StructurePersistence.clearBounds(registry.projectLevel(), wasPlaced.origin, wasPlaced.size)
+            registry.unplaceStructure(payload.subpath)
+        }
+
+        val target = parent.resolve(newName)
+        try {
+            source.moveTo(target)
+            // The dirty buffer lives beside the .nbt as "<name>.nbt.unsaved"; leaving it behind
+            // would silently detach a structure's unsaved edits from the structure.
+            val sidecar = StructurePersistence.unsavedSidecarOf(source)
+            if (sidecar.exists()) sidecar.moveTo(StructurePersistence.unsavedSidecarOf(target))
+        } catch (e: Exception) {
+            LOGGER.error("[project/rename] {} -> {}: {}", payload.subpath, newSubpath, e.message, e)
+            ServerPlayNetworking.send(player, ProjectErrorS2C("rename failed: ${e.message}")); return
+        }
+
+        repointSession(player, payload.subpath, newSubpath)
+
+        if (wasPlaced != null) {
+            placeStructureFrom(server, player, newSubpath, target, hasUnsaved = false, message = "renamed to $newSubpath")
+        }
+        sendTree(server, player)
+    }
+
+    /**
+     * Keep a loaded project reachable after one of its ancestors is renamed: an activeSubpath equal
+     * to [oldSubpath], or nested under it, is rewritten onto [newSubpath].
+     */
+    private fun repointSession(player: ServerPlayer, oldSubpath: String, newSubpath: String) {
+        val active = ProjectSession.get(player.uuid)?.activeSubpath ?: return
+        when {
+            active == oldSubpath -> ProjectSession.setActive(player.uuid, newSubpath)
+            active.startsWith("$oldSubpath/") ->
+                ProjectSession.setActive(player.uuid, newSubpath + active.removePrefix(oldSubpath))
+        }
     }
 
     /**
