@@ -166,17 +166,22 @@ rows. The pattern:
   `rememberTreeState()`'d inside composition, so packet handlers and tests can drive it from
   outside a composable): `selectedPath`/`select(path)` and `expandedPaths`/`toggleExpanded(path)`
   read/write `treeState.selectedKeys`/`openNodes` directly rather than mirroring them in a second
-  field, and `buildTreeFrom(root: FolderNode): Tree<FileTreeNode>` converts a snapshot into a
-  Jewel `Tree` (node `id`s are the same `/`-joined paths used everywhere else). Keep both state
-  objects separate from the `Panel` so packet handlers never touch Compose internals.
+  field, and `buildTreeFrom(root: FolderNode, edit: ExplorerEdit? = null): Tree<FileTreeNode>`
+  converts a snapshot into a Jewel `Tree` (node `id`s are the same `/`-joined paths used everywhere
+  else). The `edit` parameter is the in-tree rename/create field state — see
+  [jewel-widget-layer.md](jewel-widget-layer.md#tree-state-is-jewels-not-a-custom-model) for the
+  NUL-suffixed placeholder id it injects for a pending create. Keep both state objects separate
+  from the `Panel` so packet handlers never touch Compose internals.
 - **`explorerPanel(): Panel`** returns the tab (`Panel("garnet.explorer", "Explorer") { … }`);
   it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT stays
   hidden by default (Shift+1 reveals it).
 - **The tree renders via Jewel's `LazyTree`**, not a hand-written recursive composable.
-  `val tree = remember(snap.root) { ExplorerTreeState.buildTreeFrom(snap.root) }` builds the
-  `Tree<FileTreeNode>` — **`remember` it**: the enclosing scope also reads `ProjectTreeState.status`,
+  `val tree = remember(snap.root, edit) { ExplorerTreeState.buildTreeFrom(snap.root, edit) }` builds
+  the `Tree<FileTreeNode>` — **`remember` it**: the enclosing scope also reads `ProjectTreeState.status`,
   which changes on every S2C packet, so an un-remembered call rebuilds the whole project tree
-  recursively (and makes `LazyTree` re-flatten it) on each packet. `buildTreeFrom` emits the project
+  recursively (and makes `LazyTree` re-flatten it) on each packet; keying on `edit` too means the
+  pending-create placeholder row appears and disappears without an unrelated rebuild being needed.
+  `buildTreeFrom` emits the project
   root itself as the tree's single top-level element (id `ExplorerTreeState.ROOT_PATH`, `""`), with
   its children nested beneath — the root's name is what makes the panel show the project name at
   all, and it is the right-click target that will mean "create at the project root". That same

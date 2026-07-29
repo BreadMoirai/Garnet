@@ -1,11 +1,16 @@
 package com.breadmoirai.garnet.test
 
+import com.breadmoirai.garnet.client.ide.ExplorerEdit
 import com.breadmoirai.garnet.client.ide.ExplorerTreeState
 import com.breadmoirai.garnet.client.ide.ProjectTreeState
 import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.garnet.project.FileNode
+import com.breadmoirai.garnet.project.FileTreeNode
 import com.breadmoirai.garnet.project.FolderNode
+import com.breadmoirai.garnet.project.NewNodeKind
 import com.breadmoirai.garnet.testing.ClientSpec
+import io.kotest.matchers.booleans.shouldBeFalse
+import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
@@ -121,5 +126,46 @@ class ExplorerTreeStateSpec : ClientSpec({
         }
         ExplorerTreeState.selectedPath shouldBe null
         ExplorerTreeState.expandedPaths shouldBe emptySet()
+    }
+
+    test("a pending create injects a placeholder row into the target folder") {
+        val root = FolderNode("myproject", listOf(
+            FolderNode("redstone", listOf(FileNode("clock.nbt", "nbt"))),
+        ))
+        val edit = ExplorerEdit.Creating("redstone", NewNodeKind.FOLDER)
+
+        val tree = ExplorerTreeState.buildTreeFrom(root, edit)
+
+        val rootNode = tree.roots.single() as Tree.Element.Node<FileTreeNode>
+        rootNode.open()
+        val redstone = rootNode.children!!.single() as Tree.Element.Node<FileTreeNode>
+        redstone.open()
+        ExplorerTreeState.pathOf(redstone.children!!.last()) shouldBe ExplorerEdit.pendingIdFor("redstone")
+    }
+
+    test("a pending create at the root injects the placeholder at top level") {
+        val root = FolderNode("myproject", listOf(FileNode("clock.nbt", "nbt")))
+        val edit = ExplorerEdit.Creating(ExplorerTreeState.ROOT_PATH, NewNodeKind.STRUCTURE)
+
+        val tree = ExplorerTreeState.buildTreeFrom(root, edit)
+
+        val rootNode = tree.roots.single() as Tree.Element.Node<FileTreeNode>
+        rootNode.open()
+        ExplorerTreeState.pathOf(rootNode.children!!.last()) shouldBe
+            ExplorerEdit.pendingIdFor(ExplorerTreeState.ROOT_PATH)
+    }
+
+    test("the pending id can never collide with a real path") {
+        ExplorerEdit.isPendingId(ExplorerEdit.pendingIdFor("redstone")).shouldBeTrue()
+        ExplorerEdit.isPendingId("redstone/clock.nbt").shouldBeFalse()
+        ExplorerEdit.isPendingId(ExplorerTreeState.ROOT_PATH).shouldBeFalse()
+    }
+
+    test("no pending create leaves the tree untouched") {
+        val root = FolderNode("myproject", listOf(FileNode("clock.nbt", "nbt")))
+        val rootNode = ExplorerTreeState.buildTreeFrom(root, null).roots.single()
+            as Tree.Element.Node<FileTreeNode>
+        rootNode.open()
+        rootNode.children!!.map { ExplorerTreeState.pathOf(it) } shouldBe listOf("clock.nbt")
     }
 })

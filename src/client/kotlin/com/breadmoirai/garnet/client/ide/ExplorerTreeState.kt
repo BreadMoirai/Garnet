@@ -66,12 +66,20 @@ object ExplorerTreeState {
 
     /**
      * Convert a snapshot root into a Jewel [Tree]. The root folder is emitted as the single
-     * top-level node under id [ROOT_PATH] (`""`), with its children nested beneath — so the root's
-     * name is visible and the root is itself a right-click target for "create at project root".
+     * top-level node under id [ROOT_PATH] (`""`), with its children nested beneath.
+     *
+     * When [edit] is a pending [ExplorerEdit.Creating], a placeholder child is appended to the
+     * target folder so the name field renders at the depth and position the new item will occupy.
+     * The placeholder's data is a throwaway [FileNode]; only its id is meaningful, and `TreeRow`
+     * switches on that id to draw a field instead of a label.
      */
-    fun buildTreeFrom(root: FolderNode): Tree<FileTreeNode> = buildTree {
-        addNode(root, ROOT_PATH) {
-            root.children.forEach { child -> addFileTreeNode(child, child.name) }
+    fun buildTreeFrom(root: FolderNode, edit: ExplorerEdit? = null): Tree<FileTreeNode> {
+        val pendingParent = (edit as? ExplorerEdit.Creating)?.parentPath
+        return buildTree {
+            addNode(root, ROOT_PATH) {
+                root.children.forEach { child -> addFileTreeNode(child, child.name, pendingParent) }
+                if (pendingParent == ROOT_PATH) addPendingLeaf(ROOT_PATH)
+            }
         }
     }
 
@@ -84,15 +92,29 @@ object ExplorerTreeState {
     }
 }
 
+/** The placeholder row a pending create renders into. */
+private fun TreeGeneratorScope<FileTreeNode>.addPendingLeaf(parentPath: String) {
+    addLeaf(FileNode(PENDING_NODE_NAME, ""), ExplorerEdit.pendingIdFor(parentPath))
+}
+
+/** Name carried by the placeholder's throwaway FileNode; never displayed (TreeRow draws a field). */
+private const val PENDING_NODE_NAME = ""
+
 /**
  * Recursive builder. Both `TreeBuilder` and `ChildrenGeneratorScope` implement [TreeGeneratorScope],
  * so one extension covers every depth. The `id` is the node's path, which is what makes Jewel's
- * selection/expansion sets path-keyed.
+ * selection/expansion sets path-keyed. [pendingParent], when it matches a folder's path, appends
+ * that folder's pending-create placeholder after its real children.
  */
-private fun TreeGeneratorScope<FileTreeNode>.addFileTreeNode(node: FileTreeNode, path: String) {
+private fun TreeGeneratorScope<FileTreeNode>.addFileTreeNode(
+    node: FileTreeNode,
+    path: String,
+    pendingParent: String?,
+) {
     when (node) {
         is FolderNode -> addNode(node, path) {
-            node.children.forEach { child -> addFileTreeNode(child, "$path/${child.name}") }
+            node.children.forEach { child -> addFileTreeNode(child, "$path/${child.name}", pendingParent) }
+            if (pendingParent == path) addPendingLeaf(path)
         }
         is FileNode -> addLeaf(node, path)
     }

@@ -155,6 +155,21 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
   `TextFieldState`- and `TextFieldValue`-keyed overloads exist. The Explorer's "+ Structure" name
   field uses `rememberTextFieldState()` and the `TextFieldState.clearText()` extension rather than
   a plain `String` state hoist.
+- **Inline rename/create uses a NUL-suffixed synthetic id, never a real path.** `ExplorerEdit` (the
+  in-tree name-field state — `Creating(parentPath, kind)` or `Renaming(path, original)`) needs
+  `Renaming` to swap the label of an *existing* row for a field, which is a pure render-time switch
+  on `path`. `Creating` has no existing row to swap, though — the item doesn't exist yet — so
+  `ExplorerTreeState.buildTreeFrom(root, edit)` appends a placeholder leaf as the last child of the
+  target folder (or as the last root-level child, when `parentPath == ROOT_PATH`), and `TreeRow`
+  detects that placeholder by id and renders the field in its place. The placeholder's id is
+  `ExplorerEdit.pendingIdFor(parentPath)`, literally `"$parentPath/\0new"` — NUL is illegal in a
+  filename on every filesystem this mod supports, so this id can never collide with a real
+  `/`-joined path. That matters because ids are Jewel's selection/expansion key space (see above);
+  a colliding id would let the placeholder silently inherit or corrupt a real node's tree state.
+  `ExplorerEdit.isPendingId(id)` is the inverse check. The placeholder's `FileTreeNode` payload is a
+  throwaway empty-named `FileNode` — `TreeRow` never reads its name, only its id — so `buildTreeFrom`
+  takes `edit: ExplorerEdit? = null` and only synthesizes the placeholder when `edit` is a pending
+  `Creating` targeting that folder.
 
 ## Keyboard delivery into Jewel widgets
 
