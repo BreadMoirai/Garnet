@@ -151,6 +151,32 @@ class ProjectFileOpsNetworkSpec : GarnetTestSpec({
         }
     }
 
+    test("a failed rename leaves a placed structure's registry state and blocks intact") {
+        withServer { server, player, root ->
+            ProjectNewStructure.create(root, "clock")
+            ProjectNetworkRegistry.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            val registry = ProjectDimRegistry.of(server)
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+            registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+
+            // Force a real moveTo failure: hold the source file open without FILE_SHARE_DELETE, the
+            // same "Windows file lock" failure mode the review that prompted this test called out.
+            // RandomAccessFile on Windows does not request share-delete, so Files.move onto/of this
+            // path fails with a genuine FileSystemException while the handle is held.
+            val lock = java.io.RandomAccessFile(root.resolve("clock.nbt").toFile(), "rw")
+            try {
+                ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+            } finally {
+                lock.close()
+            }
+
+            root.resolve("clock.nbt").exists().shouldBeTrue()
+            root.resolve("ring.nbt").exists().shouldBeFalse()
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+            registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+        }
+    }
+
     test("renaming an ancestor folder repoints the active session") {
         withServer { server, player, root ->
             root.resolve("redstone/clocks").createDirectories()

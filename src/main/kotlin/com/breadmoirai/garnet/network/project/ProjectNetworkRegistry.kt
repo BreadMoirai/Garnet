@@ -330,13 +330,15 @@ object ProjectNetworkRegistry {
         val newSubpath = if (parentSubpath.isEmpty()) newName else "$parentSubpath/$newName"
 
         // A placed structure is keyed by subpath in ProjectDimRegistry, so renaming under it would
-        // strand both the placed box and the region assignment. Unload first, re-place after.
+        // strand both the placed box and the region assignment if we don't unload/reload it. But the
+        // move (an IO op — can fail on a lock, permission problem, etc.) must succeed FIRST: tearing
+        // down the placed-structure state (clearing its blocks, dropping its registry keys) before
+        // the move is confirmed would leave the structure's blocks erased and its registry entry gone
+        // while the player is told the rename failed and the (untouched, still-old-named) file sits
+        // there unrecoverably out of sync with the world. Only touch that state once the file (and
+        // its sidecar) have actually moved.
         val registry = ProjectDimRegistry.of(server)
         val wasPlaced = registry.placedBoxOf(payload.subpath)
-        if (wasPlaced != null) {
-            StructurePersistence.clearBounds(registry.projectLevel(), wasPlaced.origin, wasPlaced.size)
-            registry.unplaceStructure(payload.subpath)
-        }
 
         val target = parent.resolve(newName)
         try {
@@ -348,6 +350,11 @@ object ProjectNetworkRegistry {
         } catch (e: Exception) {
             LOGGER.error("[project/rename] {} -> {}: {}", payload.subpath, newSubpath, e.message, e)
             ServerPlayNetworking.send(player, ProjectErrorS2C("rename failed: ${e.message}")); return
+        }
+
+        if (wasPlaced != null) {
+            StructurePersistence.clearBounds(registry.projectLevel(), wasPlaced.origin, wasPlaced.size)
+            registry.unplaceStructure(payload.subpath)
         }
 
         repointSession(player, payload.subpath, newSubpath)
