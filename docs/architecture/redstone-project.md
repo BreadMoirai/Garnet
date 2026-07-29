@@ -109,10 +109,11 @@ Client:
   a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Refresh
   (sends `ListProjectTreeC2S`) and Collapse All (`ExplorerTreeState.collapseAll()`) icon buttons.
   This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
-  row — those controls have no client UI trigger as of this writing (`NewStructureC2S` /
-  `SaveStructureC2S` / `DiscardStructureC2S` are still fully wired server-side and covered by
-  `ProjectStructureNetworkSpec`; a later step in the explorer-toolbar-context-menu work reintroduces
-  them as a tree-row context menu). `NewStructureC2S` was reshaped to
+  row. `New`/`Rename` now have a client UI trigger again — the right-click `ExplorerContextMenu` (see
+  [ui/explorer-toolbar-and-context-menu.md](../ui/explorer-toolbar-and-context-menu.md)) — while
+  `Save`/`Discard` still have none: `SaveStructureC2S`/`DiscardStructureC2S` remain fully wired
+  server-side and covered by `ProjectStructureNetworkSpec`, with no tree-row action sending them yet.
+  `NewStructureC2S` was reshaped to
   `NewStructureC2S(parentSubpath, name)` so the context-menu "New Structure" action targets the
   folder that was right-clicked instead of the session's active folder; `handleNewStructure` now
   resolves `folder` strictly via `ProjectRoot.resolveSubpath(payload.parentSubpath)` and no longer

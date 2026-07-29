@@ -133,10 +133,12 @@ A player opens the Explorer header's option button, chooses **Open Folder**, and
 in the OS dialog; the workspace root switches to it. **Attach Folder** is present but disabled
 (multi-root is Plan B).
 
-- **UC-MAN-09.a** The option button is a Jewel `Dropdown` (replacing the earlier hand-rolled
-  `RootMenu` overlay + `RootPickerController.menuOpen`/`toggleMenu`, deleted once the dock's
-  `ImageComposeScene` was confirmed to render Compose `Popup`s in-scene — see
-  [ui/dock-dialogs.md](../ui/dock-dialogs.md)); clicking it opens the menu itself. **Open Folder**
+- **UC-MAN-09.a** The option button is the toolbar's kebab `IconButton`, opening a Jewel
+  `PopupMenu` (a Jewel `Dropdown` filled this role briefly, before the toolbar rework replaced the
+  root-name header entirely; both replaced the earlier hand-rolled `RootMenu` overlay +
+  `RootPickerController.menuOpen`/`toggleMenu`, deleted once the dock's `ImageComposeScene` was
+  confirmed to render Compose `Popup`s in-scene — see [ui/dock-dialogs.md](../ui/dock-dialogs.md));
+  clicking it opens the menu itself. **Open Folder**
   calls `RootPickerController.openFolder`, which runs the injectable `FolderPicker` (default
   `TinyfdFolderPicker` → `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
 - **UC-MAN-09.b** On a non-null pick, the controller normalizes the path to absolute (matching

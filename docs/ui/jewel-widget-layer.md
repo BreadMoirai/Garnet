@@ -152,9 +152,9 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
   `LazyTree` — will find `children` empty on an unopened node even though its `id` is already
   assigned.
 - Jewel also has no `TextField(value: String, onValueChange: (String) -> Unit)` overload — only
-  `TextFieldState`- and `TextFieldValue`-keyed overloads exist. The Explorer's "+ Structure" name
-  field uses `rememberTextFieldState()` and the `TextFieldState.clearText()` extension rather than
-  a plain `String` state hoist.
+  `TextFieldState`- and `TextFieldValue`-keyed overloads exist. The Explorer's inline rename/create
+  field (below) uses `rememberTextFieldState()` and the `TextFieldState.clearText()` extension
+  rather than a plain `String` state hoist.
 - **Inline rename/create uses a NUL-suffixed synthetic id, never a real path.** `ExplorerEdit` (the
   in-tree name-field state — `Creating(parentPath, kind)` or `Renaming(path, original)`) needs
   `Renaming` to swap the label of an *existing* row for a field, which is a pure render-time switch

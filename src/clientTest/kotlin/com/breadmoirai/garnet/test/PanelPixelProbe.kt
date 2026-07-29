@@ -97,12 +97,17 @@ object PanelPixelProbe {
      * horizontal-under-a-button) so [menuRegionDiffCount]'s region is the wrong place to look here.
      *
      * Measured directly from `explorer_context_menu_{closed,open}.png`: a pixel-level diff between the
-     * two captures (not just vs. background) bounded the card's actual footprint to roughly
-     * x[16,137] y[32,115], which is *not* centered on the click point — the popup's content (a "New"
-     * row with a submenu chevron, a separator, and "Rename") extends left and above it. Sampled on a
-     * 21x21 grid → 441 samples over that footprint: closed reads 40/441 (the tree row underneath),
-     * open reads 314/441. Use [CONTEXT_MENU_OPEN_MIN]/[CONTEXT_MENU_CLOSED_MAX] rather than the raw
-     * counts so cosmetic drift does not break every call site.
+     * two captures (not just vs. background) bounded the changed area to roughly x[16,137] y[32,115].
+     * The popup card itself is *not* what reaches x=16 — `FixedOffsetPositionProvider` places the
+     * card's top-left at the click point (60, 40) with the clamp a no-op this far from any window
+     * edge, so the "New"/"Rename" card's left edge sits at x≈60, matching the click. The extra width
+     * to the left comes from a second, unrelated repaint: right-clicking also calls
+     * `ExplorerTreeState.select(path)`, and Jewel's tree row selection highlight is a full-width bar
+     * starting at the panel's left edge (x=0), not just under the card. The footprint recorded here is
+     * the union of that highlight sliver and the card, not the card alone. Sampled on a 21x21 grid →
+     * 441 samples over that footprint: closed reads 40/441 (the tree row underneath), open reads
+     * 314/441. Use [CONTEXT_MENU_OPEN_MIN]/[CONTEXT_MENU_CLOSED_MAX] rather than the raw counts so
+     * cosmetic drift does not break every call site.
      */
     fun contextMenuRegionDiffCount(png: Path): Int = regionDiffCount(png, 16..136 step 6, 32..112 step 4)
 

@@ -223,10 +223,14 @@ rows. The pattern:
   `ProjectPackets`) and Collapse All (`ExplorerTreeState.collapseAll()`, which clears
   `treeState.openNodes` and leaves selection untouched). `PopupMenu`'s `onDismissRequest` takes an
   `(InputMode) -> Boolean` in this Jewel version, not a no-arg lambda.
-  **The "+ New"/"Save"/"Discard" structure-action controls have no client UI trigger as of this
-  writing** — `NewStructureC2S`/`SaveStructureC2S`/`DiscardStructureC2S` are still fully wired
-  server-side (`ProjectNetworkRegistry`) and covered by `ProjectStructureNetworkSpec`; a later step
-  in the explorer-toolbar-context-menu work reintroduces them as a tree-row context menu.
+  **`New`/`Rename` now have a client UI trigger: the right-click context menu**, not a toolbar
+  button — see [explorer-toolbar-and-context-menu.md](explorer-toolbar-and-context-menu.md) for the
+  full `ExplorerContextMenu`/inline-field write-up. `NewStructureC2S` was reshaped to
+  `NewStructureC2S(parentSubpath, name)` (folder-targeted, not session-active-folder-targeted) and
+  `CreateFolderC2S`/`RenamePathC2S` are new alongside it; all three are handled in
+  `ProjectNetworkRegistry` and covered by client and gametest specs. **`Save`/`Discard` still have no
+  client UI trigger** — `SaveStructureC2S`/`DiscardStructureC2S` remain fully wired server-side and
+  covered by `ProjectStructureNetworkSpec`, with no tree-row action that sends them yet.
   `StructureResultS2C` still surfaces through `ProjectTreeState.onStructureResult` into the same
   status line as folder load/save results whenever those packets fire (e.g. from gametest
   coverage). See
