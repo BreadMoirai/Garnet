@@ -112,7 +112,15 @@ Client:
   row — those controls have no client UI trigger as of this writing (`NewStructureC2S` /
   `SaveStructureC2S` / `DiscardStructureC2S` are still fully wired server-side and covered by
   `ProjectStructureNetworkSpec`; a later step in the explorer-toolbar-context-menu work reintroduces
-  them as a tree-row context menu). This is the **only** live client UI for browsing the project
+  them as a tree-row context menu). `NewStructureC2S` was reshaped to
+  `NewStructureC2S(parentSubpath, name)` so the eventual context-menu "New Structure" action can
+  target the folder that was right-clicked instead of the session's active folder; the payload
+  carries `parentSubpath` but `handleNewStructure` still resolves the target from
+  `ProjectSession`'s active folder — the field isn't consumed until the handler is rewired.
+  `CreateFolderC2S(parentSubpath, name)` and `RenamePathC2S(subpath, newName)` are new payloads
+  registered alongside it (`PayloadTypeRegistry.serverboundPlay()`); neither has a server receiver
+  yet — that lands with the "New Folder" and "Rename" context-menu actions. This is the **only**
+  live client UI for browsing the project
   tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy folder-browser GUI and
   world-list-screen root picker) were deleted in the Compose-dock hard-cut. See
   [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the

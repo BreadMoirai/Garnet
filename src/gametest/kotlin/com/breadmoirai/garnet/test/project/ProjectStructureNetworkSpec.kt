@@ -132,7 +132,7 @@ class ProjectStructureNetworkSpec : GarnetTestSpec({
                 val player = makeMockServerPlayer(this)
                 ProjectSession.setActive(player.uuid, "")  // active folder = root
                 drainPayloads(player)
-                ProjectNetworkRegistry.handleNewStructure(this, player, NewStructureC2S("fresh"))
+                ProjectNetworkRegistry.handleNewStructure(this, player, NewStructureC2S("", "fresh"))
                 tmp.resolve("fresh.nbt").exists() shouldBe true
                 drainPayloads(player).filterIsInstance<ProjectTreeSnapshotS2C>() shouldHaveSize 1
                 ProjectSession.clear(player.uuid)

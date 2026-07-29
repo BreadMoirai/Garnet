@@ -1,8 +1,10 @@
 package com.breadmoirai.garnet.network
 
+import com.breadmoirai.garnet.network.project.CreateFolderC2S
 import com.breadmoirai.garnet.network.project.DiscardStructureC2S
 import com.breadmoirai.garnet.network.project.NewStructureC2S
 import com.breadmoirai.garnet.network.project.PlaceStructureC2S
+import com.breadmoirai.garnet.network.project.RenamePathC2S
 import com.breadmoirai.garnet.network.project.SaveStructureC2S
 import com.breadmoirai.garnet.network.project.StructureResultS2C
 import io.kotest.core.spec.style.FunSpec
@@ -24,9 +26,30 @@ class StructurePacketsTest : FunSpec({
     }
     test("NewStructureC2S codec round-trips") {
         val buf = Unpooled.buffer()
-        val orig = NewStructureC2S("gadget")
+        val orig = NewStructureC2S("redstone/clocks", "gadget")
         NewStructureC2S.STREAM_CODEC.encode(buf, orig)
         NewStructureC2S.STREAM_CODEC.decode(buf) shouldBe orig
+    }
+
+    test("CreateFolderC2S codec round-trips") {
+        val buf = Unpooled.buffer()
+        val orig = CreateFolderC2S("redstone", "clocks")
+        CreateFolderC2S.STREAM_CODEC.encode(buf, orig)
+        CreateFolderC2S.STREAM_CODEC.decode(buf) shouldBe orig
+    }
+
+    test("CreateFolderC2S round-trips an empty parent (the project root)") {
+        val buf = Unpooled.buffer()
+        val orig = CreateFolderC2S("", "toplevel")
+        CreateFolderC2S.STREAM_CODEC.encode(buf, orig)
+        CreateFolderC2S.STREAM_CODEC.decode(buf) shouldBe orig
+    }
+
+    test("RenamePathC2S codec round-trips") {
+        val buf = Unpooled.buffer()
+        val orig = RenamePathC2S("redstone/clock.nbt", "ring-clock.nbt")
+        RenamePathC2S.STREAM_CODEC.encode(buf, orig)
+        RenamePathC2S.STREAM_CODEC.decode(buf) shouldBe orig
     }
     test("StructureResultS2C codec round-trips") {
         val buf = Unpooled.buffer()

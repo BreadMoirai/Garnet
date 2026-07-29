@@ -205,12 +205,40 @@ data class SaveStructureC2S(val subpath: String) : CustomPacketPayload {
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
-data class NewStructureC2S(val name: String) : CustomPacketPayload {
+/** Create an empty `<name>.nbt` inside [parentSubpath] (`""` = the project root). */
+data class NewStructureC2S(val parentSubpath: String, val name: String) : CustomPacketPayload {
     companion object {
         val TYPE = CustomPacketPayload.Type<NewStructureC2S>(id("new_structure"))
         val STREAM_CODEC: StreamCodec<ByteBuf, NewStructureC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, NewStructureC2S::parentSubpath,
             ByteBufCodecs.STRING_UTF8, NewStructureC2S::name,
             ::NewStructureC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+/** Create a folder named [name] inside [parentSubpath] (`""` = the project root). */
+data class CreateFolderC2S(val parentSubpath: String, val name: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<CreateFolderC2S>(id("create_folder"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, CreateFolderC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, CreateFolderC2S::parentSubpath,
+            ByteBufCodecs.STRING_UTF8, CreateFolderC2S::name,
+            ::CreateFolderC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
+/** Rename the file or folder at [subpath] to [newName] (a bare name, not a path). */
+data class RenamePathC2S(val subpath: String, val newName: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<RenamePathC2S>(id("rename_path"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, RenamePathC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, RenamePathC2S::subpath,
+            ByteBufCodecs.STRING_UTF8, RenamePathC2S::newName,
+            ::RenamePathC2S,
         )
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
