@@ -84,6 +84,37 @@ visible and rendering; (2) covers everything frozen by rendering stopping. Both 
 in `JewelExplorerSpec`, and necessarily by **pixel probe** — every state flag reads clean while the
 stale menu is still painting.
 
+## World-session lifecycle
+
+`DockState` is a client-lifetime singleton — the Project Explorer is seeded once in
+`GarnetClient.onInitializeClient` and never re-added — but its *visibility* is world-scoped.
+`registerDockWorldLifecycle()` (`viewport/DockKeybinds.kt`) hooks
+`ClientPlayConnectionEvents.DISCONNECT` and calls `DockState.closeAll()`, then `syncDockViewport()`
+and `garnet$updateScaledFramebuffer(true)`. Without it the dock keeps painting over the title screen,
+the viewport stays shrunk, and a focused region keeps eating GLFW input through the mixins.
+
+`closeAll()` is deliberately narrower than `reset()`:
+
+| Dropped on disconnect | Kept |
+|---|---|
+| Region visibility (LEFT/RIGHT/BOTTOM hidden) | Splitter sizes (`leftWidth`, …) |
+| CENTER panels — per-world documents | LEFT/RIGHT/BOTTOM panel registrations |
+| Input focus (`focusedRegion`) | |
+
+A full `reset()` would clear `leftPanels`, and since the Explorer is only added at client init that
+would leave LEFT permanently empty for the rest of the process.
+
+Two non-obvious details. `closeAll()` bumps CENTER's mount epoch by hand — `setVisible` covers the
+edges, but CENTER's visibility is derived from `centerPanels.isNotEmpty()` and never goes through it,
+so without the explicit bump a popup opened in a center panel could outlive the world. And it clears
+`focusedRegion` directly rather than calling `DockInputRouter.clearFocus()`: that helper re-grabs the
+mouse when no `Screen` is open, and at `DISCONNECT` time the title screen is not reliably installed
+yet, so it would capture the cursor on the title screen. `DockInputRouter.captured` reads through to
+the field, so clearing it is sufficient.
+
+The `Alt+1` / `Shift+1` keybinds are likewise no-ops while `mc.level == null`, so the dock cannot be
+re-opened from the title screen. The click is still consumed so presses do not fire on the next join.
+
 ## Input routing and the OFF-by-default guard
 
 The dock never steals input on its own. `DockInputRouter.captured` (`= DockState.focusedRegion !=

@@ -6,6 +6,7 @@ import com.breadmoirai.garnet.client.ui.compose.dock.DockState
 import com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.KeyMapping
 import org.lwjgl.glfw.GLFW
 
@@ -43,6 +44,9 @@ fun registerDockKeybinds() {
             val alt = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_ALT) == GLFW.GLFW_PRESS ||
                 GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_ALT) == GLFW.GLFW_PRESS
             when {
+                // No world: the dock's panels describe a session that does not exist. The click is
+                // still consumed above so presses do not stack up and fire on the next world join.
+                mc.level == null -> {}
                 shift -> {
                     DockState.toggleVisible(DockRegion.LEFT)
                     if (!DockState.isVisible(DockRegion.LEFT) && DockState.focusedRegion == DockRegion.LEFT) {
@@ -60,5 +64,22 @@ fun registerDockKeybinds() {
                 else -> {} // bare "1" is the vanilla hotbar slot; do nothing here
             }
         }
+    }
+}
+
+/**
+ * Closes the dock when the client leaves a world. `DISCONNECT` covers every exit path that matters:
+ * quit-to-title from singleplayer, a multiplayer disconnect, and a server kick. Without this the
+ * dock keeps painting over the title screen and the viewport stays shrunk, because [DockState] is a
+ * client-lifetime singleton with no notion of a world.
+ *
+ * The `garnet$updateScaledFramebuffer(true)` follow-up mirrors both keybind branches above: without
+ * it the shrink survives until something else resizes the framebuffer.
+ */
+fun registerDockWorldLifecycle() {
+    ClientPlayConnectionEvents.DISCONNECT.register { _, mc ->
+        DockState.closeAll()
+        syncDockViewport()
+        (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
     }
 }

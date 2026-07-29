@@ -7,6 +7,7 @@ import com.breadmoirai.garnet.client.render.registerBoundsRenderer
 import com.breadmoirai.garnet.client.render.registerHudOverlay
 import com.breadmoirai.garnet.client.viewport.registerCursorFocusToggle
 import com.breadmoirai.garnet.client.viewport.registerDockKeybinds
+import com.breadmoirai.garnet.client.viewport.registerDockWorldLifecycle
 import com.breadmoirai.garnet.client.viewport.registerViewportToggle
 import net.fabricmc.api.ClientModInitializer
 import org.slf4j.LoggerFactory
@@ -25,6 +26,7 @@ class GarnetClient : ClientModInitializer {
         registerViewportToggle()
         registerCursorFocusToggle()
         registerDockKeybinds()
+        registerDockWorldLifecycle()
         // Seed the Project Explorer into the LEFT dock (region stays hidden until Shift+1 reveals it).
         com.breadmoirai.garnet.client.ui.compose.dock.DockState.leftPanels
             .add(com.breadmoirai.garnet.client.ide.explorerPanel())
