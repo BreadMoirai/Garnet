@@ -208,11 +208,24 @@ Rename has two sharp edges that the handler must address explicitly:
 - **Sidecars.** Renaming `x.nbt` must also move `x.nbt.unsaved` if it exists
   (`StructurePersistence.unsavedSidecarOf`), or the unsaved edits silently detach from their
   structure.
-- **Placed structures.** `ProjectDimRegistry` keys placed structures by subpath
-  (`placedStructureSubpaths()`, `structureRegionOriginOf(subpath)`). Renaming a currently-placed
-  structure would strand those entries. Rather than rekeying live world state, **the handler refuses
-  the rename** with `ProjectErrorS2C("structure is placed — unplace it first")`. Rekeying is a
-  larger change than this spec should carry.
+- **Placed structures — unload and reload.** `ProjectDimRegistry` keys placed structures by subpath
+  (`placedBoxes`, `structureBySubpath`), so renaming a currently-placed structure would strand both
+  entries under the old key. The handler therefore **unloads the structure and reloads it under its
+  new name**, which is also the behaviour a user expects to see in-world:
+
+  1. Before moving the file, if `registry.placedBoxOf(oldSubpath)` is non-null, clear its footprint
+     with `StructurePersistence.clearBounds(level, box.origin, box.size)`.
+  2. Drop the old keys via a new `ProjectDimRegistry.unplaceStructure(subpath): PlacedBox?`, which
+     removes the subpath from both `placedBoxes` and `structureBySubpath` and returns the old box.
+  3. Move the file (and its sidecar).
+  4. Re-place under the new subpath through the existing `placeStructureFrom(...)`, which assigns a
+     fresh structure region via `getOrAssignStructureRegion`, records the new `PlacedBox`, and
+     teleports the player to it.
+
+  The structure lands in a *new* region rather than its old one — `nextStructureIndex` is a
+  monotonic counter and regions are never recycled, matching how every other placement in this
+  registry already behaves. A rename of a structure that is **not** currently placed skips all of
+  this and only moves the file.
 - **Active session.** Renaming a folder that is, or contains, `ProjectSession.activeSubpath`
   invalidates that session's path. The handler repoints the stored `activeSubpath` to the new path
   when it is a prefix match, so a loaded project survives a rename of one of its ancestors.
@@ -254,7 +267,8 @@ The plan sequences this in three reviewable phases:
   this spec exists for.
 - Rename a file and a folder; assert the `.nbt.unsaved` sidecar moves with its structure.
 - Reject a subpath that escapes the root.
-- Refuse renaming a placed structure.
+- Rename a *placed* structure: assert its old footprint is cleared, `placedBoxOf(old)` is null,
+  `placedBoxOf(new)` is non-null, and the blocks appear at the new region.
 - Repoint `ProjectSession.activeSubpath` when an ancestor folder is renamed.
 - `ProjectStructureNetworkSpec` updated for the new `NewStructureC2S` shape.
 
