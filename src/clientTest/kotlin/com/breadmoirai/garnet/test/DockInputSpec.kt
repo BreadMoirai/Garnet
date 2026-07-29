@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
@@ -6,6 +8,7 @@ import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
 import com.breadmoirai.garnet.client.ui.compose.dock.DockState
 import com.breadmoirai.garnet.client.ui.compose.dock.Panel
 import com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter
+import com.breadmoirai.garnet.client.ui.compose.input.glfwMouseButtonToPointerButton
 import com.breadmoirai.garnet.client.viewport.ViewportState
 import com.breadmoirai.garnet.client.viewport.WindowViewportExt
 import com.breadmoirai.garnet.client.viewport.syncDockViewport
@@ -36,6 +39,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.kotest.matchers.shouldBe
@@ -44,6 +50,59 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class DockInputSpec : ClientSpec({
+    test("GLFW mouse buttons map to Compose pointer buttons") {
+        glfwMouseButtonToPointerButton(GLFW.GLFW_MOUSE_BUTTON_LEFT) shouldBe PointerButton.Primary
+        glfwMouseButtonToPointerButton(GLFW.GLFW_MOUSE_BUTTON_RIGHT) shouldBe PointerButton.Secondary
+        glfwMouseButtonToPointerButton(GLFW.GLFW_MOUSE_BUTTON_MIDDLE) shouldBe PointerButton.Tertiary
+        glfwMouseButtonToPointerButton(7) shouldBe null
+    }
+
+    test("a secondary press reaches the scene as Secondary") {
+        val seen = mutableListOf<PointerButton?>()
+        val panel = Panel("garnet.test.buttonprobe", "ButtonProbe") {
+            Box(
+                Modifier.fillMaxSize().pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            if (e.type == PointerEventType.Press) seen += e.button
+                        }
+                    }
+                },
+            )
+        }
+        runOnClient { mc ->
+            DockState.reset()
+            DockState.leftPanels.add(panel)
+            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.setSize(DockRegion.LEFT, 300)
+            ViewportState.active = true
+            ComposeOverlay.enabled = true
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(12)
+        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(4)
+        runOnClient {
+            DockInputRouter.onGlfwMove(60.0, 200.0)
+            DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+        }
+        waitClientTicks(4)
+        runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT) }
+        waitClientTicks(2)
+
+        seen shouldBe listOf(PointerButton.Secondary)
+        ComposeSurface.disabled.shouldBeFalse()
+
+        runOnClient { mc ->
+            ComposeOverlay.enabled = false; ViewportState.active = false
+            DockInputRouter.clearFocus()
+            DockState.reset()
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(2)
+    }
+
     test("focused Left panel receives routed pointer clicks") {
         closeClientScreen(); waitClientTicks(2)
         val clicks = AtomicInteger(0)

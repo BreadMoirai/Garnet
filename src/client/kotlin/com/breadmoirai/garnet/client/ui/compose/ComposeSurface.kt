@@ -7,6 +7,7 @@ import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTextureView
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerButton
 import org.jetbrains.skia.BackendRenderTarget
 import org.jetbrains.skia.ColorSpace
 import org.jetbrains.skia.DirectContext
@@ -267,8 +268,11 @@ object ComposeSurface {
     // + flipV blit presents it upright, so no Y flip is needed for hit-testing).
 
     fun sendPointerMove(pos: Offset) = guardedInput { host?.pointerMove(pos) }
-    fun sendPointerPress(pos: Offset) = guardedInput { host?.pointerPress(pos) }
-    fun sendPointerRelease(pos: Offset) = guardedInput { host?.pointerRelease(pos) }
+    fun sendPointerPress(pos: Offset, button: PointerButton? = null) =
+        guardedInput { host?.pointerPress(pos, button) }
+
+    fun sendPointerRelease(pos: Offset, button: PointerButton? = null) =
+        guardedInput { host?.pointerRelease(pos, button) }
     fun sendScroll(pos: Offset, delta: Offset) = guardedInput { host?.scroll(pos, delta) }
     /**
      * Deliver a key event to the scene and report whether the scene **consumed** it. The return value

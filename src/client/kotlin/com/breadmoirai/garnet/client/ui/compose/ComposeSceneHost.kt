@@ -5,6 +5,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import org.jetbrains.skia.Image
@@ -31,8 +32,11 @@ class ComposeSceneHost(
     fun render(nanos: Long): Image = scene.render(nanos)
 
     fun pointerMove(pos: Offset) = scene.sendPointerEvent(PointerEventType.Move, pos)
-    fun pointerPress(pos: Offset) = scene.sendPointerEvent(PointerEventType.Press, pos)
-    fun pointerRelease(pos: Offset) = scene.sendPointerEvent(PointerEventType.Release, pos)
+    fun pointerPress(pos: Offset, button: PointerButton? = null) =
+        scene.sendPointerEvent(PointerEventType.Press, pos, button = button)
+
+    fun pointerRelease(pos: Offset, button: PointerButton? = null) =
+        scene.sendPointerEvent(PointerEventType.Release, pos, button = button)
     fun scroll(pos: Offset, delta: Offset) = scene.sendPointerEvent(PointerEventType.Scroll, pos, scrollDelta = delta)
     fun sendKey(event: KeyEvent): Boolean = scene.sendKeyEvent(event)
 

@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.pointer.PointerButton
 import com.breadmoirai.garnet.client.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
 import com.breadmoirai.garnet.client.ui.compose.dock.DockState
@@ -50,11 +51,15 @@ object DockInputRouter {
     }
 
     fun onGlfwPress(button: Int) {
-        if (captured) ComposeSurface.sendPointerPress(Offset(lastX.toFloat(), lastY.toFloat()))
+        if (!captured) return
+        val composeButton = glfwMouseButtonToPointerButton(button) ?: return
+        ComposeSurface.sendPointerPress(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
     }
 
     fun onGlfwRelease(button: Int) {
-        if (captured) ComposeSurface.sendPointerRelease(Offset(lastX.toFloat(), lastY.toFloat()))
+        if (!captured) return
+        val composeButton = glfwMouseButtonToPointerButton(button) ?: return
+        ComposeSurface.sendPointerRelease(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
     }
 
     fun onGlfwScroll(dx: Double, dy: Double) {
@@ -197,4 +202,15 @@ object DockInputRouter {
             ),
         )
     }
+}
+
+/**
+ * GLFW mouse-button index → Compose [PointerButton]. Returns null for buttons Compose has no
+ * concept of (GLFW exposes 8), so callers drop them rather than mislabelling them as Primary.
+ */
+fun glfwMouseButtonToPointerButton(button: Int): PointerButton? = when (button) {
+    GLFW.GLFW_MOUSE_BUTTON_LEFT -> PointerButton.Primary
+    GLFW.GLFW_MOUSE_BUTTON_RIGHT -> PointerButton.Secondary
+    GLFW.GLFW_MOUSE_BUTTON_MIDDLE -> PointerButton.Tertiary
+    else -> null
 }
