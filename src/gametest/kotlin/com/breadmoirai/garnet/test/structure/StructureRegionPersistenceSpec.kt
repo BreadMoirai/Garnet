@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.test.structure
 
 import com.breadmoirai.garnet.structure.StructurePersistence
-import com.breadmoirai.garnet.project.ProjectDimRegistry
+import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.mc.onServer
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -18,7 +18,7 @@ class StructureRegionPersistenceSpec : GarnetTestSpec({
             val level = overworld()
             val file = Files.createTempFile("struct-roundtrip", ".nbt")
             // Use a small 32-wide region far out in the structure lane to keep the scan cheap.
-            val region = BlockPos(200_000, 64, ProjectDimRegistry.STRUCTURE_LANE_Z)
+            val region = BlockPos(200_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
             val sizeXZ = 32
             val minY = level.minY
             val maxY = level.maxY
@@ -51,7 +51,7 @@ class StructureRegionPersistenceSpec : GarnetTestSpec({
         onServer {
             val level = overworld()
             val file = Files.createTempFile("struct-empty", ".nbt")
-            val region = BlockPos(210_000, 64, ProjectDimRegistry.STRUCTURE_LANE_Z)
+            val region = BlockPos(210_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
             val sizeXZ = 16
             StructurePersistence.clearBounds(level, BlockPos(region.x, level.minY, region.z), Vec3i(sizeXZ, level.maxY - level.minY + 1, sizeXZ))
             val result = StructurePersistence.saveAutoFitToFile(file, level, region, sizeXZ, level.minY, level.maxY)

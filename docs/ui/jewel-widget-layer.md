@@ -117,7 +117,7 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
 - `ExplorerTreeState.buildTreeFrom` emits the project root itself as the tree's single top-level
   element, under id `ExplorerTreeState.ROOT_PATH` (`""`) — the root's children nest beneath it,
   rather than becoming top-level rows themselves. This needs no translation on the resolve side:
-  `FolderNode.resolve("")` and `ProjectRoot.resolveSubpath("")` already both mean "the root". Making
+  `FolderNode.resolve("")` and `EditorRoot.resolveSubpath("")` already both mean "the root". Making
   the root a real node (rather than omitting it) restores a place to show the project name and gives
   a right-click target that means "create at the project root".
 - **Opening a node before first composition must happen synchronously, not via `LaunchedEffect`.**
@@ -199,7 +199,7 @@ picks *what* to edit, the field does the actual typing.
   `PointerEvent.button` is `@ExperimentalComposeUiApi` in this Compose version, hence the
   file-level `@file:OptIn(ExperimentalComposeUiApi::class)` on `ProjectExplorerPanel.kt`.
 - **`ExplorerActions` is the validate-then-send seam** for `commitCreate`/`commitRename`, called
-  from the inline field's `onCommit`. It re-runs `ProjectNames.validate` against the client's own
+  from the inline field's `onCommit`. It re-runs `EditorNames.validate` against the client's own
   tree snapshot before sending a C2S packet — a pre-check, not a replacement for the server's own
   validation, since the client's snapshot can be stale. `ExplorerActions.sender` is swappable
   (mirrors `RootPickerController`'s pattern) so clientTests can assert on payloads without a live

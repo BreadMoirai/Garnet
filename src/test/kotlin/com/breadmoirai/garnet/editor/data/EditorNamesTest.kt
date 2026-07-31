@@ -1,0 +1,56 @@
+package com.breadmoirai.garnet.editor.data
+
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.nulls.shouldNotBeNull
+import io.kotest.matchers.shouldBe
+
+class EditorNamesTest : FunSpec({
+
+    test("a plain name against no siblings is valid") {
+        EditorNames.validate("clocks", emptyList()) shouldBe null
+    }
+
+    test("blank and whitespace-only names are rejected") {
+        EditorNames.validate("", emptyList()).shouldNotBeNull()
+        EditorNames.validate("   ", emptyList()).shouldNotBeNull()
+    }
+
+    test("path separators are rejected") {
+        EditorNames.validate("a/b", emptyList()).shouldNotBeNull()
+        EditorNames.validate("a\\b", emptyList()).shouldNotBeNull()
+    }
+
+    test("dot and dot-dot are rejected") {
+        EditorNames.validate(".", emptyList()).shouldNotBeNull()
+        EditorNames.validate("..", emptyList()).shouldNotBeNull()
+    }
+
+    test("a name matching an existing sibling is rejected, case-insensitively") {
+        EditorNames.validate("clocks", listOf("adders", "clocks")).shouldNotBeNull()
+        EditorNames.validate("CLOCKS", listOf("clocks")).shouldNotBeNull()
+    }
+
+    test("resolveFinalName appends .nbt for structures and leaves folders alone") {
+        EditorNames.resolveFinalName("gadget", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
+        EditorNames.resolveFinalName("gadget.nbt", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
+        EditorNames.resolveFinalName("clocks", NewNodeKind.FOLDER) shouldBe "clocks"
+    }
+
+    test("resolveFinalName normalizes an existing .nbt extension to lowercase") {
+        // Regression: a case-insensitively-ACCEPTED but un-normalized extension left
+        // handleNewStructure's case-sensitive removeSuffix(".nbt") a no-op for "gadget.NBT", so
+        // create() appended its own ".nbt" on top and the file landed on disk as "gadget.NBT.nbt".
+        EditorNames.resolveFinalName("gadget.NBT", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
+        EditorNames.resolveFinalName("gadget.Nbt", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
+    }
+
+    test("resolveFinalName trims surrounding whitespace") {
+        EditorNames.resolveFinalName("  clocks  ", NewNodeKind.FOLDER) shouldBe "clocks"
+    }
+
+    test("the sibling check runs against the resolved name, not the typed one") {
+        // "gadget" resolves to "gadget.nbt", which collides.
+        val final = EditorNames.resolveFinalName("gadget", NewNodeKind.STRUCTURE)
+        EditorNames.validate(final, listOf("gadget.nbt")).shouldNotBeNull()
+    }
+})

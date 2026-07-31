@@ -107,7 +107,7 @@ assume it is already on the client thread; `garnet$updateScaledFramebuffer` reac
 `eventHandler.resizeGui()`, which is unsafe to call concurrently with rendering.
 
 The same `mc.execute` block also resets the Project Explorer's per-world state:
-`ProjectTreeState.reset()` and `ExplorerTreeState.reset()` (`client/ide/`), clearing the previous
+`ProjectTreeState.reset()` and `ExplorerTreeState.reset()` (`editor/ui/`), clearing the previous
 session's tree snapshot and its expansion/selection so a join into a different world or server does
 not show a stale tree or send packets built from the old root's paths. Both live in the disconnect
 handler rather than `DockState.closeAll()` — `closeAll()` stays free of IDE-state and `Minecraft`
@@ -154,8 +154,8 @@ whole dock (rendering and input) silently no-ops back to vanilla, never crashing
 
 ## First real panel: the Project Explorer (live-data pattern, now on Jewel)
 
-`client/ide/ProjectExplorerPanel.kt` + `client/ide/ExplorerToolbar.kt` +
-`client/ide/ProjectTreeState.kt` + `client/ide/ExplorerTreeState.kt` are the first non-demo panel
+`editor/ui/ProjectExplorerPanel.kt` + `editor/ui/ExplorerToolbar.kt` +
+`editor/ui/ProjectTreeState.kt` + `editor/ui/ExplorerTreeState.kt` are the first non-demo panel
 and the template future panels (debugger, timeline) should copy. As of the jewel-widget-layer
 migration, the panel is built entirely from JetBrains Jewel components (`LazyTree`, `PopupMenu`,
 `IconButton`) under one `IntUiTheme(isDark = true)`, not hand-rolled `BasicText`/`Box.clickable`
@@ -163,7 +163,7 @@ rows. The pattern:
 
 - **State is split across two `mutableStateOf`-backed singletons**, neither of which is the
   panel. `ProjectTreeState` holds only the server-driven data: `snapshot:
-  ProjectTreeSnapshotS2C?` and `status: String`, mutated by its S2C packet handlers
+  EditorTreeSnapshotS2C?` and `status: String`, mutated by its S2C packet handlers
   (`onSnapshot/onFolderLoaded/onSaveReport/onError`). `ExplorerTreeState` owns all UI-only tree
   state — selection and expansion — by wrapping a single Jewel `TreeState` (hoisted, not
   `rememberTreeState()`'d inside composition, so packet handlers and tests can drive it from
@@ -205,15 +205,15 @@ rows. The pattern:
 - **Clicks dispatch by node kind** (`onElementClick` in `ProjectExplorerPanel.kt`): a folder is a
   "spec-folder" (directly contains a `FileNode` named `*.spec.kts`) iff `node.children.any { it is
   FileNode && it.name.endsWith(".spec.kts") }`; clicking a spec-folder sends
-  `LoadProjectFolderC2S(path)`, other folders just expand/collapse (`LazyTree`'s own click-to-toggle
+  `LoadEditorFolderC2S(path)`, other folders just expand/collapse (`LazyTree`'s own click-to-toggle
   behavior). Clicking a file row is highlight-only, no packet sent — and `onElementClick` deliberately
   does **not** call `ExplorerTreeState.select(path)`: `LazyTree` has already written the clicked
   element's id into `TreeState.selectedKeys` before invoking the callback, and Jewel's `TreeState` is
   the declared single source of truth for selection, so a second writer here is at best redundant.
   The exception is a `.nbt` `FileNode` (`node.extension == "nbt"`), which additionally sends
   `PlaceStructureC2S(path)` to place the standalone structure centered in its auto-assigned region.
-  The Refresh `IconButton` sends `ListProjectTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh
-  unit payload — see `ProjectPackets`). `TreeRow` prefixes a row's label with `●` when the row's
+  The Refresh `IconButton` sends `ListEditorTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh
+  unit payload — see `EditorPackets`). `TreeRow` prefixes a row's label with `●` when the row's
   path equals `snapshot.currentSubpath` or (for a `.nbt` file) `node.hasUnsaved` is true, and shows
   a Jewel `AllIconsKeys` icon per node kind (`Nodes.Folder`, `FileTypes.Archive` for `.nbt`,
   `FileTypes.Text` otherwise).
@@ -222,8 +222,8 @@ rows. The pattern:
   (`AllIconsKeys.Actions.More` — the *vertical* three-dot kebab; `Actions.MoreHorizontal` is a
   different icon) opens a Jewel `PopupMenu` with a single "Open Folder…" item
   (`RootPickerController.openFolder()`), and a right-aligned pair of icon buttons: Refresh
-  (`ListProjectTreeC2S.INSTANCE` — send the `INSTANCE`, never a fresh unit payload, see
-  `ProjectPackets`) and Collapse All (`ExplorerTreeState.collapseAll()`, which clears
+  (`ListEditorTreeC2S.INSTANCE` — send the `INSTANCE`, never a fresh unit payload, see
+  `EditorPackets`) and Collapse All (`ExplorerTreeState.collapseAll()`, which clears
   `treeState.openNodes` and leaves selection untouched). `PopupMenu`'s `onDismissRequest` takes an
   `(InputMode) -> Boolean` in this Jewel version, not a no-arg lambda.
   **`New`/`Rename` now have a client UI trigger: the right-click context menu**, not a toolbar
@@ -231,16 +231,16 @@ rows. The pattern:
   full `ExplorerContextMenu`/inline-field write-up. `NewStructureC2S` was reshaped to
   `NewStructureC2S(parentSubpath, name)` (folder-targeted, not session-active-folder-targeted) and
   `CreateFolderC2S`/`RenamePathC2S` are new alongside it; all three are handled in
-  `ProjectNetworkRegistry` and covered by client and gametest specs. **`Save`/`Discard` still have no
+  `EditorNetworking` and covered by client and gametest specs. **`Save`/`Discard` still have no
   client UI trigger** — `SaveStructureC2S`/`DiscardStructureC2S` remain fully wired server-side and
-  covered by `ProjectStructureNetworkSpec`, with no tree-row action that sends them yet.
+  covered by `EditorStructureNetworkSpec`, with no tree-row action that sends them yet.
   `StructureResultS2C` still surfaces through `ProjectTreeState.onStructureResult` into the same
   status line as folder load/save results whenever those packets fire (e.g. from gametest
   coverage). See
   [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
   for the region-placement model those packets drive.
 - **"Open Folder…" runs `RootPickerController.openFolder()`**, a native folder picker that swaps
-  the single server root via `SetProjectRootC2S` → `handleSetRoot`. Multi-root / "Attach Folder" is
+  the single server root via `SetEditorRootC2S` → `handleSetRoot`. Multi-root / "Attach Folder" is
   still pending (Plan B). The kebab `PopupMenu` (and, before it, a root-name `Dropdown`) replaced a
   hand-rolled `RootMenu` overlay (`RootPickerController.menuOpen`/`toggleMenu`/`closeMenu`, since
   deleted) that existed only because Compose `Popup`s were believed unable to render inside the

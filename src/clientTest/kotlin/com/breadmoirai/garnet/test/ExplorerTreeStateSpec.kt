@@ -1,13 +1,13 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.client.ide.ExplorerEdit
-import com.breadmoirai.garnet.client.ide.ExplorerTreeState
-import com.breadmoirai.garnet.client.ide.ProjectTreeState
-import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.garnet.project.FileNode
-import com.breadmoirai.garnet.project.FileTreeNode
-import com.breadmoirai.garnet.project.FolderNode
-import com.breadmoirai.garnet.project.NewNodeKind
+import com.breadmoirai.garnet.editor.ui.ExplorerEdit
+import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.ui.ProjectTreeState
+import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.data.FileNode
+import com.breadmoirai.garnet.editor.data.FileTreeNode
+import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.data.NewNodeKind
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -45,7 +45,7 @@ class ExplorerTreeStateSpec : ClientSpec({
     test("selectedHasUnsaved is derived from the snapshot, not stored") {
         runOnClient {
             ProjectTreeState.reset(); ExplorerTreeState.reset()
-            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(tree, currentSubpath = null))
+            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, currentSubpath = null))
             ExplorerTreeState.select("dirty.nbt")
         }
         ExplorerTreeState.selectedHasUnsaved() shouldBe true
@@ -69,14 +69,14 @@ class ExplorerTreeStateSpec : ClientSpec({
         rootElement.data shouldBe root
 
         // Tree.Element.Node.children is lazy — open() materializes it.
-        val node = rootElement as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        val node = rootElement as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
         node.open()
         node.children!!.map { ExplorerTreeState.pathOf(it) } shouldBe listOf("adders", "clock.nbt")
     }
 
     test("buildTreeFrom mirrors the snapshot with path ids, folders keeping their children") {
         val built = ExplorerTreeState.buildTreeFrom(tree)
-        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
         rootElement.open(false)
         val ids = (rootElement.children ?: emptyList()).map { it.id }
         ids shouldContainExactly listOf("adders", "dirty.nbt", "clean.nbt")
@@ -84,14 +84,14 @@ class ExplorerTreeStateSpec : ClientSpec({
 
     test("buildTreeFrom nests folder children with /-joined ids, matching select/toggleExpanded's format") {
         val built = ExplorerTreeState.buildTreeFrom(tree)
-        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
         rootElement.open(false)
         val rootChildren = rootElement.children ?: emptyList()
-        val adders = rootChildren.first { it.id == "adders" } as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        val adders = rootChildren.first { it.id == "adders" } as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
         adders.open(false) // children are lazily evaluated on open, per Jewel's Tree.Element.Node
         val addersChildren = adders.children ?: emptyList()
         addersChildren.map { it.id } shouldContainExactly listOf("adders/full-adder")
-        val fullAdder = addersChildren.first() as Tree.Element.Node<com.breadmoirai.garnet.project.FileTreeNode>
+        val fullAdder = addersChildren.first() as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
         fullAdder.open(false)
         val fullAdderChildren = fullAdder.children ?: emptyList()
         fullAdderChildren.map { it.id } shouldContainExactly listOf("adders/full-adder/full.spec.kts")
@@ -101,7 +101,7 @@ class ExplorerTreeStateSpec : ClientSpec({
         runOnClient { ProjectTreeState.reset(); ExplorerTreeState.reset(); ExplorerTreeState.select("dirty.nbt") }
         ExplorerTreeState.selectedHasUnsaved() shouldBe false
         runOnClient {
-            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(tree, currentSubpath = null))
+            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, currentSubpath = null))
             ExplorerTreeState.select("does/not/exist")
         }
         ExplorerTreeState.selectedHasUnsaved() shouldBe false

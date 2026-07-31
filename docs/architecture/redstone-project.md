@@ -17,7 +17,7 @@ See `docs/superpowers/specs/2026-05-08-managed-redstone-worlds-design.md` for th
 ## Canvas: a mod-created flat-void singleplayer save
 
 The mod creates the singleplayer save itself. From the main menu, the "Redstone Projects…"
-button calls `ProjectIntegratedBoot.bootWorkspace()`, which opens (or creates) a single
+button calls `EditorIntegratedBoot.bootWorkspace()`, which opens (or creates) a single
 shared flat-void workspace save named `garnet-workspace` — root-agnostic; project
 folders are loaded/unloaded in-world. `bootWorkspace()` uses the private `openOrCreateWorld`
 helper: either re-open the existing save, or create a fresh flat-void singleplayer save
@@ -30,17 +30,17 @@ bounds is preserved between opens. Spec contents are re-placed from disk on each
 
 The canvas is `server.overworld()` directly — no custom dimension type, no datapack. Each
 loaded folder maps to a distinct **region** in the overworld via counter-based assignment in
-`ProjectDimRegistry.getOrAssignRegion`. Multiple folders coexist spatially.
+`EditorDimRegistry.getOrAssignRegion`. Multiple folders coexist spatially.
 
 ## Key invariants
 
 - **Save scope = spec bounds.** AABB = `cellOrigin..cellOrigin+spec.bounds`. Anything outside
-  that AABB is ignored by `ProjectCellSaver`. No decoration in the cell margin persists to
+  that AABB is ignored by `EditorCellSaver`. No decoration in the cell margin persists to
   the spec file.
 - **No persisted slot.** Slot index = filename-sorted index, recomputed each `placeFolder`.
   Renaming a spec shuffles slots.
 - **Server-authoritative.** Same model as `network/Packets.kt`: clients propose, server
-  validates against `ProjectRoot.resolveSubpath` (path-traversal guard) and acts.
+  validates against `EditorRoot.resolveSubpath` (path-traversal guard) and acts.
 - **`SpecBlockEntity.projectSourcePath`** binds a recorder/runner block in a project cell
   back to its source `.spec.kts`. NOT persisted to NBT — set directly on the BE during
   `placeFolder` and reset on every re-place.
@@ -49,57 +49,57 @@ loaded folder maps to a distinct **region** in the overworld via counter-based a
 ## Components
 
 Pure data:
-- `ProjectRoot` — absolute folder + path-traversal-safe `resolveSubpath` (with symlink defeat
+- `EditorRoot` — absolute folder + path-traversal-safe `resolveSubpath` (with symlink defeat
   and `InvalidPathException` guard).
-- `ProjectFolderTree` — leaves vs intermediates scan; used by `ProjectDimLifecycle.placeAll` for
+- `EditorFolderTree` — leaves vs intermediates scan; used by `EditorDimLifecycle.placeAll` for
   region placement. Separate concern from the Explorer's tree model (below).
 - `FileTree` — recursive tree model (`FolderNode`/`FileNode` under sealed `FileTreeNode`, package
-  `com.breadmoirai.garnet.project`) built by `scanFolder(path)`; mirrors the whole folder
+  `com.breadmoirai.garnet.editor.data`) built by `scanFolder(path)`; mirrors the whole folder
   (all files/folders, incl. empty), folders-first ordering. Paths are **computed, not stored** —
   `FolderNode.walk()` (node→path) and `FolderNode.resolve(path)` (path→node), both relative to
   whichever folder is the root, so re-rooting is free. This is the tree carried by
-  `ProjectTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` and rendered recursively by
+  `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` and rendered recursively by
   `ProjectExplorerPanel` (below) — the old flat `leaves`/`intermediates`/`ProjectLeafEntry` payload
   fields are gone. `FileNode.hasUnsaved: Boolean = false` flags a `<name>.nbt` node that has a
   sibling `<name>.nbt.unsaved` dirty-buffer sidecar; `scanFolder` sets it and omits the sidecar
-  file itself from the tree. `FILE_TREE_STREAM_CODEC` (in `ProjectPackets.kt`) serializes it as a
+  file itself from the tree. `FILE_TREE_STREAM_CODEC` (in `EditorPackets.kt`) serializes it as a
   trailing boolean on the file-node tag.
 - `GridLayout` — `(specs, cellSize, gap, rowMax, yBase) → cells`.
-- `ProjectCell` — pure cell record (origin + size).
-- `ProjectSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation (pure
+- `EditorCell` — pure cell record (origin + size).
+- `EditorSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation (pure
   data; no live caller since the per-root boot entry was removed — retained with its unit test).
 
 Server state and lifecycle:
-- `ProjectWorld` — server-wide. `perFolder: Map<subpath, Map<specId, LoadedSpec>>`,
+- `EditorWorld` — server-wide. `perFolder: Map<subpath, Map<specId, LoadedSpec>>`,
   `folderAbsoluteByPath`, helpers like `absoluteCellOrigin`. Attached to the `MinecraftServer`.
 - `LoadedSpec` — `(cell, spec, sourceFile, loadedSnapshot)`. Snapshot is the cell-volume
   template captured right after placement, used by the dirty diff.
-- `ProjectSession` — lightweight per-player active-folder pointer (`playerId, activeSubpath?`).
-- `ProjectDimRegistry` — per-server. `projectLevel()` returns `server.overworld()`;
+- `EditorSession` — lightweight per-player active-folder pointer (`playerId, activeSubpath?`).
+- `EditorDimRegistry` — per-server. `projectLevel()` returns `server.overworld()`;
   `getOrAssignRegion(subpath)` assigns a region origin via counter on first placement.
-- `ProjectDimLifecycle` — `placeAll(server, root)`, `placeFolder(server, root, subpath)`,
+- `EditorDimLifecycle` — `placeAll(server, root)`, `placeFolder(server, root, subpath)`,
   `saveAll(server)`, `saveFolder(server, subpath)`.
-- `ProjectCellSaver` — diff cell volume vs snapshot; rewrite `.spec.kts` + structure NBT iff
+- `EditorCellSaver` — diff cell volume vs snapshot; rewrite `.spec.kts` + structure NBT iff
   dirty.
-- `ProjectTeleport` — `toFolder(server, player, subpath)`. Separate concern from placement.
-- `ProjectNewSpec` — stub `.spec.kts` writer.
-- `ProjectServerContext` — per-server pin for the active root.
-- `ProjectCommand` — `/garnet project`.
+- `EditorTeleport` — `toFolder(server, player, subpath)`. Separate concern from placement.
+- `EditorNewSpec` — stub `.spec.kts` writer.
+- `EditorServerContext` — per-server pin for the active root.
+- `EditorCommand` — `/garnet project`.
 
 Network:
-- `network/project/ProjectPackets` + `ProjectNetworkRegistry` — same authority pattern as
+- `editor/network/EditorPackets` + `EditorNetworking` — same authority pattern as
   `network/Packets.kt`.
 
 Client:
-- `client/ide/ProjectExplorerPanel` + `client/ide/ExplorerToolbar` + `client/ide/ProjectTreeState` +
-  `client/ide/ExplorerTreeState` — the Compose dock panel, built on Jewel widgets (`LazyTree`,
+- `editor/ui/ProjectExplorerPanel` + `editor/ui/ExplorerToolbar` + `editor/ui/ProjectTreeState` +
+  `editor/ui/ExplorerTreeState` — the Compose dock panel, built on Jewel widgets (`LazyTree`,
   `PopupMenu`, `IconButton`), that renders `snapshot.root` (`FolderNode`/`FileNode`) via
   `ExplorerTreeState.buildTreeFrom`, with per-folder expand/collapse (LEFT region, hidden by
   default — Shift+1 reveals it). `ProjectTreeState` is `mutableStateOf`-backed server-driven state
   (snapshot + status) fed by the S2C receivers; `ExplorerTreeState` owns selection/expansion by
   wrapping a single Jewel `TreeState`; `explorerPanel()` returns the LEFT-dock `Panel`. A folder is
   a "spec-folder" (loadable) iff it directly contains a `FileNode` named `*.spec.kts`: clicking it
-  sends `LoadProjectFolderC2S(path)`; other folders just toggle expand (Jewel `LazyTree`'s own
+  sends `LoadEditorFolderC2S(path)`; other folders just toggle expand (Jewel `LazyTree`'s own
   click-to-toggle behavior). Clicking a file calls `ExplorerTreeState.select(path)` (highlight
   only, no packet) — except a `.nbt` `FileNode` (`node.extension == "nbt"`), which selects **and**
   sends `PlaceStructureC2S(path)` (rendered with a Jewel `AllIconsKeys.FileTypes.Archive` icon, plus
@@ -107,34 +107,34 @@ Client:
   Paths are `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
   `currentSubpath`. `ExplorerToolbar()` is the panel's single top row: a kebab `IconButton` opening
   a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Refresh
-  (sends `ListProjectTreeC2S`) and Collapse All (`ExplorerTreeState.collapseAll()`) icon buttons.
+  (sends `ListEditorTreeC2S`) and Collapse All (`ExplorerTreeState.collapseAll()`) icon buttons.
   This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
   row. `New`/`Rename` now have a client UI trigger again — the right-click `ExplorerContextMenu` (see
   [ui/explorer-toolbar-and-context-menu.md](../ui/explorer-toolbar-and-context-menu.md)) — while
   `Save`/`Discard` still have none: `SaveStructureC2S`/`DiscardStructureC2S` remain fully wired
-  server-side and covered by `ProjectStructureNetworkSpec`, with no tree-row action sending them yet.
+  server-side and covered by `EditorStructureNetworkSpec`, with no tree-row action sending them yet.
   `NewStructureC2S` was reshaped to
   `NewStructureC2S(parentSubpath, name)` so the context-menu "New Structure" action targets the
   folder that was right-clicked instead of the session's active folder; `handleNewStructure` now
-  resolves `folder` strictly via `ProjectRoot.resolveSubpath(payload.parentSubpath)` and no longer
-  reads `ProjectSession.activeSubpath` or `ProjectWorld.folderAbsoluteByPath` at all.
+  resolves `folder` strictly via `EditorRoot.resolveSubpath(payload.parentSubpath)` and no longer
+  reads `EditorSession.activeSubpath` or `EditorWorld.folderAbsoluteByPath` at all.
   `CreateFolderC2S(parentSubpath, name)` and `RenamePathC2S(subpath, newName)` are new payloads
   registered alongside it (`PayloadTypeRegistry.serverboundPlay()`); both now have server receivers:
   `handleCreateFolder` (same folder-resolution path) and `handleRename`. `handleNewStructure`,
   `handleCreateFolder`, and `handleRename` all re-validate the final name server-side through
-  `ProjectNames.validate` against the destination folder's real directory listing, since the
+  `EditorNames.validate` against the destination folder's real directory listing, since the
   client's tree snapshot can be stale. `handleRename` additionally: refuses `subpath == ""` (the
   client already disables the menu item for the root, but the server does not trust that), moves
   the `<name>.nbt.unsaved` sidecar with a renamed structure (`StructurePersistence.unsavedSidecarOf`)
   so unsaved edits stay attached, unloads and re-places a currently-placed structure under the new
-  subpath (`ProjectDimRegistry.unplaceStructure` then `placeStructureFrom` — the structure lands in
+  subpath (`EditorDimRegistry.unplaceStructure` then `placeStructureFrom` — the structure lands in
   a fresh region since `nextStructureIndex` is never recycled — and, like `handlePlaceStructure`,
   prefers the moved `.nbt.unsaved` sidecar over the saved file when one exists, so a placed *and*
   dirty structure re-places from its unsaved edits rather than reverting to the last save), rekeys
   every OTHER registry entry nested under a renamed folder onto the new subpath
-  (`ProjectDimRegistry.rekeyForRename`, same `"$oldSubpath/"` boundary as below — a pure bookkeeping
+  (`EditorDimRegistry.rekeyForRename`, same `"$oldSubpath/"` boundary as below — a pure bookkeeping
   move that never touches the world, since only the file's path changed, not its placed position),
-  and repoints `ProjectSession.activeSubpath` when it equals or is nested under the renamed subpath
+  and repoints `EditorSession.activeSubpath` when it equals or is nested under the renamed subpath
   (boundary-safe: matching on `"$oldSubpath/"` so renaming `redstone` repoints `redstone/clocks` but
   not a sibling like `redstoneworks/clocks`). See [use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md)
   (UC-MAN-10) for the structure-unload/reload detail and
@@ -144,29 +144,29 @@ Client:
   world-list-screen root picker) were deleted in the Compose-dock hard-cut. See
   [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the
   `ExplorerTreeState`/`ProjectTreeState` split.
-- `client/project/ProjectClientNetworking` — S2C receivers. They feed `ProjectTreeState`
+- `editor/network/EditorClientNetworking` — S2C receivers. They feed `ProjectTreeState`
   (snapshot/folder-loaded/save-report/error/structure-result); no client screen is opened in
   response. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
   `r.message` (place/save/new-structure outcomes all surface through the same status line as
   folder load/save results).
-- `client/project/ProjectIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
+- `editor/network/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
   the UI via `TitleScreenMixin`) opens/creates the single shared `garnet-workspace` save
-  with no root pinned. The dormant `pendingRoot`/`ProjectServerContext` pinning machinery is
+  with no root pinned. The dormant `pendingRoot`/`EditorServerContext` pinning machinery is
   retained for programmatic use, but no caller sets `pendingRoot`, so the SERVER_STARTING listener
   is a no-op.
 - `client/mixin/TitleScreenMixin` (Java) — injects "Redstone Projects…" button into the main
-  menu (calls `ProjectIntegratedBoot.bootWorkspace()` directly) so it is reachable even with no
+  menu (calls `EditorIntegratedBoot.bootWorkspace()` directly) so it is reachable even with no
   singleplayer worlds.
 
 ## Standalone structure files
 
 `.nbt` files are also first-class in the Explorer, independent of specs. Clicking a `.nbt`
 places it (`StructurePersistence.placeStructureCentered`) centered in an auto-assigned region
-(`ProjectDimRegistry.getOrAssignStructureRegion`, a disjoint +X lane at
+(`EditorDimRegistry.getOrAssignStructureRegion`, a disjoint +X lane at
 `z = STRUCTURE_LANE_Z = 4096`), floored at `projectGridYBase` (64) — or vertically centered when
 the structure's height ≥ `TALL_THRESHOLD` (256). "Save Structure" auto-fits the tight non-air box
 in the region (`StructurePersistence.saveAutoFitToFile` → `project.autoFit`) and rewrites the file.
-"New Structure" (`ProjectNewStructure.create`) writes an empty `<name>.nbt` into the folder named
+"New Structure" (`EditorNewStructure.create`) writes an empty `<name>.nbt` into the folder named
 by `NewStructureC2S.parentSubpath` (`""` = the project root).
 
 - **Region size:** `SharedSettings.structureRegionChunks` (default 9 → 144×144 blocks), full
@@ -175,28 +175,28 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
   re-placing clears only that footprint, not the whole region.
 - **Packets:** `PlaceStructureC2S` / `SaveStructureC2S` / `NewStructureC2S` / `DiscardStructureC2S`
   → `StructureResultS2C`, handled by
-  `ProjectNetworkRegistry.handlePlaceStructure/handleSaveStructure/handleNewStructure/handleDiscardStructure`.
+  `EditorNetworking.handlePlaceStructure/handleSaveStructure/handleNewStructure/handleDiscardStructure`.
 - **Dirty sidecar lifecycle:** placing a `.nbt` prefers its `.nbt.unsaved` sidecar when present
   (`StructurePersistence.unsavedSidecarOf`) and reports `hasUnsaved = true`; "Save Structure"
   writes the committed `.nbt` and deletes the sidecar; "Discard" deletes the sidecar and
   re-places from the committed `.nbt`. On `ServerLifecycleEvents.BEFORE_SAVE`,
-  `ProjectNetworkRegistry.flushDirtyStructures` captures every placed structure's region into its
+  `EditorNetworking.flushDirtyStructures` captures every placed structure's region into its
   sidecar via `StructurePersistence.flushUnsavedSidecar` (world-save is the only auto-persist
   point for in-progress structure edits — there is no autosave on disconnect, matching UC-MAN-07).
-  `ProjectDimRegistry.placedStructureSubpaths()` is the set flushed each world-save.
+  `EditorDimRegistry.placedStructureSubpaths()` is the set flushed each world-save.
 
 ## Where to start reading
 
-- *"How is the world created?"* → `ProjectIntegratedBoot.bootWorkspace` and its private
+- *"How is the world created?"* → `EditorIntegratedBoot.bootWorkspace` and its private
   `openOrCreateWorld`.
-- *"How does placement work for the whole tree?"* → `ProjectDimLifecycle.placeAll`.
-- *"How does placement work for one folder?"* → `ProjectDimLifecycle.placeFolder` (and
+- *"How does placement work for the whole tree?"* → `EditorDimLifecycle.placeAll`.
+- *"How does placement work for one folder?"* → `EditorDimLifecycle.placeFolder` (and
   internal `placeFolderInto` / `placeCell`).
-- *"What gets saved?"* → `ProjectCellSaver.captureAndSaveIfDirty`, called from
-  `ProjectDimLifecycle.saveFolder`.
-- *"How are folders placed in the overworld?"* → `ProjectDimRegistry.getOrAssignRegion`.
+- *"What gets saved?"* → `EditorCellSaver.captureAndSaveIfDirty`, called from
+  `EditorDimLifecycle.saveFolder`.
+- *"How are folders placed in the overworld?"* → `EditorDimRegistry.getOrAssignRegion`.
 - *"How does the GUI show the folder tree?"* → `ProjectExplorerPanel` reading `ProjectTreeState`
-  (fed from `ProjectTreeSnapshotS2C`) — the only client UI for this since the legacy `ProjectScreen`
+  (fed from `EditorTreeSnapshotS2C`) — the only client UI for this since the legacy `ProjectScreen`
   was hard-cut.
 
 ## Known limitations (v1)

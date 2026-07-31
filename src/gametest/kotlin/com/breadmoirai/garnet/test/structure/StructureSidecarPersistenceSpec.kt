@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.test.structure
 
 import com.breadmoirai.garnet.structure.StructurePersistence
-import com.breadmoirai.garnet.project.ProjectDimRegistry
+import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.mc.onServer
 import io.kotest.matchers.shouldBe
@@ -25,7 +25,7 @@ class StructureSidecarPersistenceSpec : GarnetTestSpec({
             val level = overworld()
             val dir = createTempDirectory("sidecar-roundtrip")
             val bounds = Vec3i(3, 1, 3)
-            val origin = BlockPos(220_000, 64, ProjectDimRegistry.STRUCTURE_LANE_Z)
+            val origin = BlockPos(220_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
 
             StructurePersistence.clearBounds(level, origin, bounds)
             level.setBlock(origin.offset(0, 0, 0), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
@@ -51,7 +51,7 @@ class StructureSidecarPersistenceSpec : GarnetTestSpec({
             val level = overworld()
             val dir = createTempDirectory("sidecar-haschanges")
             val bounds = Vec3i(2, 1, 2)
-            val origin = BlockPos(230_000, 64, ProjectDimRegistry.STRUCTURE_LANE_Z)
+            val origin = BlockPos(230_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
 
             StructurePersistence.clearBounds(level, origin, bounds)
             level.setBlock(origin, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
@@ -73,7 +73,7 @@ class StructureSidecarPersistenceSpec : GarnetTestSpec({
             val level = overworld()
             val dir = createTempDirectory("sidecar-missing")
             val bounds = Vec3i(2, 1, 2)
-            val origin = BlockPos(240_000, 64, ProjectDimRegistry.STRUCTURE_LANE_Z)
+            val origin = BlockPos(240_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
 
             StructurePersistence.clearBounds(level, origin, bounds)
             level.setBlock(origin, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
@@ -90,7 +90,7 @@ class StructureSidecarPersistenceSpec : GarnetTestSpec({
             val level = overworld()
             val dir = createTempDirectory("sidecar-corrupt")
             val bounds = Vec3i(2, 1, 2)
-            val origin = BlockPos(250_000, 64, ProjectDimRegistry.STRUCTURE_LANE_Z)
+            val origin = BlockPos(250_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
             Files.write(dir.resolve("corrupt.nbt"), byteArrayOf(1, 2, 3, 4, 5))
             // A bad gzip header surfaces as IOException, which load swallows: no exception escapes.
             StructurePersistence.load(dir, "corrupt", level, origin, bounds)
@@ -103,7 +103,7 @@ class StructureSidecarPersistenceSpec : GarnetTestSpec({
             val level = overworld()
             val dir = createTempDirectory("sidecar-haschanges-absent")
             val bounds = Vec3i(2, 1, 2)
-            val origin = BlockPos(260_000, 64, ProjectDimRegistry.STRUCTURE_LANE_Z)
+            val origin = BlockPos(260_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
             StructurePersistence.hasChanges(dir, "absent", level, origin, bounds) shouldBe true
             dir.toFile().deleteRecursively()
         }

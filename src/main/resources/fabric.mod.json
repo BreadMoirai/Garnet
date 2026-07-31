@@ -14,7 +14,7 @@
       "com.breadmoirai.garnet.Garnet"
     ],
     "client": [
-      "com.breadmoirai.garnet.client.GarnetClient"
+      "com.breadmoirai.garnet.GarnetClient"
     ],
     "modmenu": [
       "com.breadmoirai.garnet.config.ModMenuIntegration"

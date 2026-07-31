@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.testing.data
 
-import com.breadmoirai.garnet.project.ProjectCell
+import com.breadmoirai.garnet.editor.data.EditorCell
 import com.breadmoirai.garnet.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -12,7 +12,7 @@ import java.nio.file.Path
 class LoadedSpecTest : FunSpec({
 
     test("copy with refreshed snapshot preserves other fields") {
-        val cell = ProjectCell("id", BlockPos(0, 0, 0), Vec3i(5, 5, 5), "id.spec.kts")
+        val cell = EditorCell("id", BlockPos(0, 0, 0), Vec3i(5, 5, 5), "id.spec.kts")
         val spec = GarnetSpec(id = "id", bounds = Vec3i(5, 5, 5), lifespan = 20, structure = null, strict = false, block = {})
         val source = Path.of("/tmp/id.spec.kts")
         val snap1 = StructureTemplate()

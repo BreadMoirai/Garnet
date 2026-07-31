@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.client.ide.ExplorerTreeState
-import com.breadmoirai.garnet.client.ide.ProjectTreeState
-import com.breadmoirai.garnet.client.ide.explorerPanel
+import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.ui.ProjectTreeState
+import com.breadmoirai.garnet.editor.ui.explorerPanel
 import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.ui.dock.DockRegion
@@ -10,9 +10,9 @@ import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.input.DockInputRouter
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
-import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.garnet.project.FileNode
-import com.breadmoirai.garnet.project.FolderNode
+import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.data.FileNode
+import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -80,7 +80,7 @@ class JewelExplorerSpec : ClientSpec({
     fun mountExplorer(width: Int = 320) {
         runOnClient { mc ->
             DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
-            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root = tree, currentSubpath = "adders/full-adder"))
+            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(root = tree, currentSubpath = "adders/full-adder"))
             ExplorerTreeState.toggleExpanded("adders")
             DockState.leftPanels.add(explorerPanel())
             DockState.setVisible(DockRegion.LEFT, true)

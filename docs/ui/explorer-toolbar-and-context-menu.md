@@ -16,9 +16,9 @@ article covers the *why* behind five decisions that aren't visible just from rea
 
 ## Why validation runs on both client and server
 
-`ExplorerActions.commitCreate`/`commitRename` re-run `ProjectNames.validate` against the client's
+`ExplorerActions.commitCreate`/`commitRename` re-run `EditorNames.validate` against the client's
 own tree snapshot before sending `CreateFolderC2S`/`NewStructureC2S`/`RenamePathC2S`. This looks
-redundant next to `ProjectNetworkRegistry.handleCreateFolder`/`handleNewStructure`/`handleRename`,
+redundant next to `EditorNetworking.handleCreateFolder`/`handleNewStructure`/`handleRename`,
 which validate the *same* name again server-side. It isn't: the two checks run against different
 data with different trust levels.
 
@@ -28,7 +28,7 @@ degrades to "no known siblings" whenever the snapshot doesn't resolve the parent
 snapshot loaded, the path resolves to a file, or the folder was since renamed/removed server-side).
 That's a legitimate return value, not a bug, precisely *because* the client check is a pre-check,
 not the source of truth. Its only job is to let the inline field stay open and show an error
-immediately, instead of closing, sending a doomed packet, and surfacing a `ProjectErrorS2C` a
+immediately, instead of closing, sending a doomed packet, and surfacing a `EditorErrorS2C` a
 network round-trip later. The server re-validates against the real directory listing and is the
 only check that can actually refuse a write — the client check exists purely for latency, not
 correctness.
@@ -68,7 +68,7 @@ null`, for free, instead of needing an explicit reset call site to remember.
 
 ## Why renaming a placed structure unloads and reloads it — and why renaming a folder rekeys instead
 
-`ProjectDimRegistry` tracks placed structures in three maps keyed by subpath: `bySubpath` (a
+`EditorDimRegistry` tracks placed structures in three maps keyed by subpath: `bySubpath` (a
 loaded folder's own region), `structureBySubpath` (a standalone structure's assigned region), and
 `placedBoxes` (the last-placed footprint, used for cheap re-clearing). All three are keyed by
 subpath, so a rename that only moves the file on disk without touching the registry strands every
@@ -81,7 +81,7 @@ second copy in a brand-new region, orphaning the first in the world.
 
 - **The renamed node itself is a placed structure** (`registry.placedBoxOf(payload.subpath) !=
   null`): an unload/reload, not a rekey. `handleRename` calls
-  `ProjectDimRegistry.unplaceStructure(oldSubpath)` (clearing `structureBySubpath` and
+  `EditorDimRegistry.unplaceStructure(oldSubpath)` (clearing `structureBySubpath` and
   `placedBoxes`), then re-places it under the new subpath via `placeStructureFrom` — which prefers
   the `.nbt.unsaved` sidecar over the saved file when one exists (mirroring
   `handlePlaceStructure`'s own preference), so a structure that is both placed *and* dirty
@@ -90,7 +90,7 @@ second copy in a brand-new region, orphaning the first in the world.
   rather than reusing the old one — intended, matching how every other region assignment in the
   registry behaves.
 - **Descendants of a renamed folder** (a structure or sub-folder nested *under* the renamed path,
-  not the renamed path itself): `ProjectDimRegistry.rekeyForRename(oldSubpath, newSubpath)`
+  not the renamed path itself): `EditorDimRegistry.rekeyForRename(oldSubpath, newSubpath)`
   rewrites every entry across all three maps whose subpath is `oldSubpath` or begins with
   `"$oldSubpath/"` — the same path-segment boundary `repointSession` uses (a bare `startsWith`
   would wrongly also rekey an unrelated sibling like `redstoneworks/clocks` when renaming
@@ -102,7 +102,7 @@ second copy in a brand-new region, orphaning the first in the world.
 
 **The teardown must run only after the file move succeeds, never before.** `handleRename` moves the
 `.nbt` (and its `.nbt.unsaved` sidecar, if present) first, inside a `try`, and only calls
-`ProjectDimRegistry.unplaceStructure`/`rekeyForRename` in the success path afterward. A file move is
+`EditorDimRegistry.unplaceStructure`/`rekeyForRename` in the success path afterward. A file move is
 an IO operation that can fail (a lock, a permission problem, a full disk) for reasons the server
 can't always predict up front. If the registry teardown ran first — clearing the placed blocks and
 dropping the registry keys before the move was confirmed — a failed move would leave the player told

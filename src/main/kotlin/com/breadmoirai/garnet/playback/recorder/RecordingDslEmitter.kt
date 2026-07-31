@@ -268,7 +268,7 @@ object RecordingDslEmitter {
 
     /**
      * Emits a minimal stub `.spec.kts` source for a new spec with the given [id].
-     * Used by [com.breadmoirai.garnet.project.ProjectNewSpec.create] to initialize a file
+     * Used by [com.breadmoirai.garnet.editor.data.EditorNewSpec.create] to initialize a file
      * before the first recording.
      */
     fun emitStub(id: String): String {

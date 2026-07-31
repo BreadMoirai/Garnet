@@ -1,12 +1,12 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.test.project.ProjectCellSaverSpec
-import com.breadmoirai.garnet.test.project.ProjectCommandSpec
-import com.breadmoirai.garnet.test.project.ProjectDimSpec
-import com.breadmoirai.garnet.test.project.ProjectFileOpsNetworkSpec
-import com.breadmoirai.garnet.test.project.ProjectNetworkRegistrySpec
-import com.breadmoirai.garnet.test.project.ProjectStructureNetworkSpec
-import com.breadmoirai.garnet.test.project.ProjectTeleportSpec
+import com.breadmoirai.garnet.test.editor.EditorCellSaverSpec
+import com.breadmoirai.garnet.test.editor.EditorCommandSpec
+import com.breadmoirai.garnet.test.editor.EditorDimSpec
+import com.breadmoirai.garnet.test.editor.EditorFileOpsNetworkSpec
+import com.breadmoirai.garnet.test.editor.EditorNetworkRegistrySpec
+import com.breadmoirai.garnet.test.editor.EditorStructureNetworkSpec
+import com.breadmoirai.garnet.test.editor.EditorTeleportSpec
 import com.breadmoirai.garnet.test.structure.StructureRegionPersistenceSpec
 import com.breadmoirai.garnet.test.structure.StructureSidecarPersistenceSpec
 import com.breadmoirai.garnet.mc.McLifecycle
@@ -46,13 +46,13 @@ class GametestSentinel {
                         reportsDir = Path.of("build/reports/garnet/gametest"),
                         specs = listOf(
                             SmokeSpec::class,
-                            ProjectDimSpec::class,
-                            ProjectCellSaverSpec::class,
-                            ProjectTeleportSpec::class,
-                            ProjectNetworkRegistrySpec::class,
-                            ProjectStructureNetworkSpec::class,
-                            ProjectFileOpsNetworkSpec::class,
-                            ProjectCommandSpec::class,
+                            EditorDimSpec::class,
+                            EditorCellSaverSpec::class,
+                            EditorTeleportSpec::class,
+                            EditorNetworkRegistrySpec::class,
+                            EditorStructureNetworkSpec::class,
+                            EditorFileOpsNetworkSpec::class,
+                            EditorCommandSpec::class,
                             StructureRegionPersistenceSpec::class,
                             StructureSidecarPersistenceSpec::class,
                         ),

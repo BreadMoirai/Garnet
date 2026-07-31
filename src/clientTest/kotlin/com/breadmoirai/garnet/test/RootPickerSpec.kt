@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.client.ide.FolderPicker
-import com.breadmoirai.garnet.client.ide.RootPickerController
-import com.breadmoirai.garnet.network.project.SetProjectRootC2S
+import com.breadmoirai.garnet.editor.ui.FolderPicker
+import com.breadmoirai.garnet.editor.ui.RootPickerController
+import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -13,7 +13,7 @@ class RootPickerSpec : ClientSpec({
 
     afterTest { RootPickerController.resetForTest() }
 
-    test("openFolder sends SetProjectRootC2S and persists the picked path") {
+    test("openFolder sends SetEditorRootC2S and persists the picked path") {
         val sent = mutableListOf<CustomPacketPayload>()
         val persisted = mutableListOf<String>()
         val picked = "/abs/picked"
@@ -29,7 +29,7 @@ class RootPickerSpec : ClientSpec({
 
         RootPickerController.openFolder()
 
-        sent.filterIsInstance<SetProjectRootC2S>().single().path shouldBe expected
+        sent.filterIsInstance<SetEditorRootC2S>().single().path shouldBe expected
         persisted.single() shouldBe expected
         RootPickerController.picking shouldBe false
     }

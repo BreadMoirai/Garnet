@@ -33,7 +33,7 @@ public abstract class TitleScreenMixin extends Screen {
         Component label = Component.literal("Redstone Projects...");
         GarnetIconButton button = new GarnetIconButton(
                 this.width / 2 + 104, topPos, 20, label,
-                b -> com.breadmoirai.garnet.client.project.ProjectIntegratedBoot.INSTANCE.bootWorkspace()
+                b -> com.breadmoirai.garnet.editor.world.EditorIntegratedBoot.INSTANCE.bootWorkspace()
         );
         button.setTooltip(Tooltip.create(label));
         this.addRenderableWidget(button);

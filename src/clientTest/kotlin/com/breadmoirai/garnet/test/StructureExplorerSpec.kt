@@ -1,11 +1,11 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.client.ide.ExplorerTreeState
-import com.breadmoirai.garnet.client.ide.ProjectTreeState
-import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.garnet.network.project.StructureResultS2C
-import com.breadmoirai.garnet.project.FileNode
-import com.breadmoirai.garnet.project.FolderNode
+import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.ui.ProjectTreeState
+import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.data.FileNode
+import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.shouldBe
 
@@ -29,7 +29,7 @@ class StructureExplorerSpec : ClientSpec({
                 FileNode("dirty.nbt", "nbt", hasUnsaved = true),
                 FileNode("clean.nbt", "nbt", hasUnsaved = false),
             ))
-            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(root, currentSubpath = null))
+            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(root, currentSubpath = null))
             ExplorerTreeState.select("dirty.nbt")
         }
         ExplorerTreeState.selectedHasUnsaved() shouldBe true
