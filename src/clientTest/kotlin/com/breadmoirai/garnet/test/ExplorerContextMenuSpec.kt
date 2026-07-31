@@ -135,7 +135,7 @@ class ExplorerContextMenuSpec : ClientSpec({
         waitClientTicks(6)
     }
 
-    test("New > Folder end-to-end: right-click, hover New, click Folder, type a name, press Enter -- the payload reaches ExplorerActions.sender") {
+    test("New Folder end-to-end: right-click, click New Folder, type a name, press Enter -- the payload reaches ExplorerActions.sender") {
         // REGRESSION coverage for the "everFocused" fix on InlineNameField. Before that fix,
         // FocusChangedNode's synthetic first Inactive event fired onCancel() the instant the field
         // mounted -- before LaunchedEffect ever got to call requestFocus() -- so `edit` was reset to
@@ -170,14 +170,9 @@ class ExplorerContextMenuSpec : ClientSpec({
         runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT) }
         waitClientTicks(8)
 
-        // Hover "New" (measured at x[62,138] y[42,66] in calib_1_menu_open.png) to fly out its
-        // submenu -- Jewel opens it on hover, not click (calib_2_hover_new.png).
-        runOnClient { DockInputRouter.onGlfwMove(80.0, 52.0) }
-        waitClientTicks(10)
-
-        // Click "Folder" in the flown-out submenu (measured at x[142,215] y[48,70]).
+        // Click "New Folder" -- the first row of the card, which starts at the click point (60, 40).
         runOnClient {
-            DockInputRouter.onGlfwMove(150.0, 52.0)
+            DockInputRouter.onGlfwMove(80.0, 52.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(2)
@@ -232,13 +227,8 @@ class ExplorerContextMenuSpec : ClientSpec({
         waitClientTicks(6)
     }
 
-    /**
-     * Right-click at ([x], [y]), hover "New" (offset +30/+12, measured in calib_1/calib_2), and click
-     * "Folder" in the flown-out submenu (offset +90/+12) -- the same real, hover-then-click path the
-     * end-to-end test above calibrated against the project-root row. Any row anchors the popup at its
-     * own click point, so the same relative offsets apply regardless of which row was right-clicked.
-     */
-    fun rightClickThenNewFolder(x: Double, y: Double) {
+    /** Right-click at ([x], [y]) and open the menu there, leaving it up. */
+    fun rightClick(x: Double, y: Double) {
         runOnClient {
             DockInputRouter.onGlfwMove(x, y)
             DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
@@ -246,15 +236,27 @@ class ExplorerContextMenuSpec : ClientSpec({
         waitClientTicks(2)
         runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT) }
         waitClientTicks(8)
-        runOnClient { DockInputRouter.onGlfwMove(x + 20.0, y + 12.0) }
-        waitClientTicks(10)
+    }
+
+    /** Left-click at ([x], [y]). */
+    fun click(x: Double, y: Double) {
         runOnClient {
-            DockInputRouter.onGlfwMove(x + 90.0, y + 12.0)
+            DockInputRouter.onGlfwMove(x, y)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(2)
         runOnClient { DockInputRouter.onGlfwRelease(0) }
         waitClientTicks(8)
+    }
+
+    /**
+     * Right-click at ([x], [y]) and click "New Folder", the card's first row (offset +20/+12 from the
+     * click point, measured in calib_1_menu_open.png). `FixedOffsetPositionProvider` puts the card's
+     * top-left at the click point, so the same relative offset applies to any row.
+     */
+    fun rightClickThenNewFolder(x: Double, y: Double) {
+        rightClick(x, y)
+        click(x + 20.0, y + 12.0)
     }
 
     fun type(text: String) {
@@ -313,6 +315,54 @@ class ExplorerContextMenuSpec : ClientSpec({
         type("gadget")
         pressEnter()
         sent shouldBe listOf(CreateFolderC2S("", "gadget"))
+
+        unmountFromContextMenu()
+    }
+
+    test("hover moves between context-menu rows, and the row under the cursor is the one that acts") {
+        // REGRESSION coverage for the nested-popup freeze. The menu used to be `New > (Folder |
+        // Structure)` plus `Rename`, and Jewel's submenu flyout is a second `focusable = true` popup
+        // layer. The dock's ImageComposeScene is a CanvasLayersComposeScene, whose isInteractive()
+        // returns false for every layer BELOW the focused one, so the instant the flyout opened the
+        // parent card stopped receiving pointer input entirely: hovering New left it highlighted
+        // forever, Rename never lit up, and clicking Rename only dismissed the flyout. Both halves are
+        // asserted here -- the highlight has to move (pixels) and the click has to land on the row the
+        // cursor is actually over (payload).
+        val sent = captureSends()
+        mountForContextMenu()
+
+        // "redstone", not the project root: the root's Rename is disabled, and a disabled Jewel menu
+        // item emits no hover interactions at all, which would make the pixel half of this vacuous.
+        rightClick(90.0, 68.0)
+
+        runOnClient { DockInputRouter.onGlfwMove(110.0, 87.0) } // "New Folder", row 1
+        waitClientTicks(10)
+        val onNew = capture("context_menu_hover_new_folder.png")
+
+        runOnClient { DockInputRouter.onGlfwMove(110.0, 144.0) } // "Rename", row 3
+        waitClientTicks(10)
+        val onRename = capture("context_menu_hover_rename.png")
+
+        fun newFolderRow(png: Path) = PanelPixelProbe.selectionPixelCount(
+            png, PanelPixelProbe.CONTEXT_MENU_ROW_XS, PanelPixelProbe.CONTEXT_MENU_NEW_FOLDER_YS,
+        )
+        fun renameRow(png: Path) = PanelPixelProbe.selectionPixelCount(
+            png, PanelPixelProbe.CONTEXT_MENU_ROW_XS, PanelPixelProbe.CONTEXT_MENU_RENAME_YS,
+        )
+        println("[context-menu] hover New Folder: newRow=${newFolderRow(onNew)} renameRow=${renameRow(onNew)}")
+        println("[context-menu] hover Rename:     newRow=${newFolderRow(onRename)} renameRow=${renameRow(onRename)}")
+
+        newFolderRow(onNew) shouldBeGreaterThan PanelPixelProbe.MENU_ROW_HOVERED_MIN
+        renameRow(onNew) shouldBe 0
+        newFolderRow(onRename) shouldBe 0 // the whole bug: this used to stay lit
+        renameRow(onRename) shouldBeGreaterThan PanelPixelProbe.MENU_ROW_HOVERED_MIN
+
+        // ...and the click lands on Rename, not on a stale flyout. The field seeds with the current
+        // name and places the cursor at the end, so typing "2" commits "redstone2".
+        click(110.0, 144.0)
+        type("2")
+        pressEnter()
+        sent shouldBe listOf(RenamePathC2S("redstone", "redstone2"))
 
         unmountFromContextMenu()
     }

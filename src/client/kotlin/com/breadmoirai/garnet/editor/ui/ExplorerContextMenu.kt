@@ -40,11 +40,23 @@ class ExplorerMenuState {
 }
 
 /**
- * The `New ▸ (Folder | Structure)` / `Rename` menu, anchored at the click point.
+ * The `New Folder` / `New Structure` / `Rename` menu, anchored at the click point.
  *
- * `New` targets the clicked folder, or a clicked file's parent folder — the IDE convention. `Rename`
- * targets the clicked node itself and is disabled on the project root, which has no parent to be
- * renamed within.
+ * The `New` actions target the clicked folder, or a clicked file's parent folder — the IDE
+ * convention. `Rename` targets the clicked node itself and is disabled on the project root, which has
+ * no parent to be renamed within.
+ *
+ * **The two `New` actions are deliberately flat, not a `New ▸ (Folder | Structure)` submenu.** Jewel's
+ * `submenu { }` opens its flyout as a second, `focusable = true` popup layer, and the dock composes
+ * into an [androidx.compose.ui.ImageComposeScene], i.e. a `CanvasLayersComposeScene`. That scene
+ * routes pointer input through an `isInteractive(owner)` check which returns **false for every layer
+ * below the focused one** — so the instant the flyout opens, the parent menu stops receiving pointer
+ * events entirely. Jewel deselects a submenu row from the *sibling* row's hover
+ * (`LaunchedEffect(isHovered) { deselectSubmenu() }`), and that hover never arrives: `New` keeps its
+ * selection highlight, `Rename` never highlights, and a click on `Rename` only dismisses the flyout.
+ * Nothing at this call site can fix that — `focusable = true` is hardcoded inside Jewel's `internal
+ * fun Submenu`, and the layer-blocking is internal to the scene. Any nested popup in this dock has
+ * the same defect; keep menus one level deep. See docs/ui/jewel-widget-layer.md.
  */
 @Composable
 fun ExplorerContextMenu(
@@ -58,15 +70,11 @@ fun ExplorerContextMenu(
         onDismissRequest = { state.close(); true },
         popupPositionProvider = FixedOffsetPositionProvider(state.anchor),
     ) {
-        submenu(submenu = {
-            selectableItem(selected = false, onClick = { state.close(); onNew(parent, NewNodeKind.FOLDER) }) {
-                Text("Folder")
-            }
-            selectableItem(selected = false, onClick = { state.close(); onNew(parent, NewNodeKind.STRUCTURE) }) {
-                Text("Structure")
-            }
-        }) {
-            Text("New")
+        selectableItem(selected = false, onClick = { state.close(); onNew(parent, NewNodeKind.FOLDER) }) {
+            Text("New Folder")
+        }
+        selectableItem(selected = false, onClick = { state.close(); onNew(parent, NewNodeKind.STRUCTURE) }) {
+            Text("New Structure")
         }
         separator()
         selectableItem(

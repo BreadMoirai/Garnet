@@ -116,4 +116,39 @@ object PanelPixelProbe {
 
     /** Below this, no context-menu card is painted (measured 40/441 closed — the tree row underneath). */
     const val CONTEXT_MENU_CLOSED_MAX = 100
+
+    /**
+     * Samples whose blue channel leads red by more than [margin] — i.e. IntUi's *selection* blue.
+     *
+     * Deliberately not a background-difference count like [regionDiffCount]: inside an open menu card
+     * every pixel already differs from the panel fill, so "differs from background" cannot tell a
+     * hovered row from an idle one. The menu card, its border, and its label glyphs are all neutral
+     * greys (r≈g≈b), so a blue-lead test isolates exactly the hover/selection bar and nothing else.
+     */
+    fun selectionPixelCount(png: Path, xs: IntProgression, ys: IntProgression, margin: Int = 30): Int {
+        val img = ImageIO.read(awaitDecodable(png).toFile())
+        return ys.sumOf { y ->
+            xs.count { x ->
+                val p = img.getRGB(x, y)
+                val r = (p shr 16) and 0xFF
+                val b = p and 0xFF
+                b - r > margin
+            }
+        }
+    }
+
+    /**
+     * The three rows of the right-click context-menu card as anchored by a right-click on the
+     * "redstone" row at (90, 68) — `FixedOffsetPositionProvider` puts the card's top-left at the click
+     * point, so these are click-point offsets: the card spans x[90,207] y[74,162], with row centres at
+     * +19 ("New Folder"), +43 ("New Structure") and +76 ("Rename"). Measured from
+     * `context_menu_hover_new_folder.png`. Each grid is 26x8 → 208 samples; a hovered row reads well
+     * over half of them blue, an idle row reads 0.
+     */
+    val CONTEXT_MENU_ROW_XS: IntProgression = 96..196 step 4
+    val CONTEXT_MENU_NEW_FOLDER_YS: IntProgression = 80..94 step 2
+    val CONTEXT_MENU_RENAME_YS: IntProgression = 138..152 step 2
+
+    /** Above this, the sampled menu row is carrying the hover highlight. */
+    const val MENU_ROW_HOVERED_MIN = 100
 }

@@ -7,7 +7,7 @@ summary: The Project Explorer's kebab/Refresh/Collapse-All toolbar, its right-cl
 # Explorer toolbar and context menu
 
 `ExplorerToolbar.kt` (the panel's single top row: kebab overflow, Refresh, Collapse All) and
-`ExplorerContextMenu.kt` (the right-click `New ▸ (Folder | Structure)` / `Rename` menu) together
+`ExplorerContextMenu.kt` (the right-click `New Folder` / `New Structure` / `Rename` menu) together
 replaced the old root-name `Dropdown` header and the `+ New`/`Save`/`Discard` structure-action row.
 See [dock-framework.md](dock-framework.md#first-real-panel-the-project-explorer-live-data-pattern-now-on-jewel)
 for the panel walkthrough and [jewel-widget-layer.md](jewel-widget-layer.md) for the Jewel

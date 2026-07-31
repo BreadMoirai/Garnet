@@ -212,12 +212,26 @@ button at the (14, 12) hit point `JewelExplorerSpec` clicks.
 
 ## Right-click context menu drives the inline field
 
-`ExplorerContextMenu` (in `ExplorerContextMenu.kt`) is a Jewel `PopupMenu` with a `New ▸
-(Folder | Structure)` submenu and a `Rename` item, opened by a right-click on a `TreeRow`. It sets
+`ExplorerContextMenu` (in `ExplorerContextMenu.kt`) is a Jewel `PopupMenu` with `New Folder`, `New
+Structure` and `Rename` items, opened by a right-click on a `TreeRow`. It sets
 `edit` on `ProjectExplorerPanel`'s hoisted `ExplorerEdit?` state — the same state the previous
 section describes — so the menu and the inline field are two faces of one mechanism: the menu
 picks *what* to edit, the field does the actual typing.
 
+- **Nested popups do not work in this scene: keep every menu one level deep.** The menu's two `New`
+  actions are flat rather than a `New ▸ (Folder | Structure)` submenu, and that is forced, not a
+  style choice. Jewel's `MenuScope.submenu { }` opens its flyout as a second popup layer with
+  `PopupProperties(focusable = true)` — hardcoded inside Jewel's `internal fun Submenu`. The dock
+  composes into an `ImageComposeScene`, i.e. a `CanvasLayersComposeScene`, and that scene's
+  `processMove`/`processPress` gate every layer through `isInteractive(owner)`, which returns
+  **false for every layer below the focused one**. So the moment the flyout opens, the parent menu
+  card stops receiving pointer input entirely. Jewel clears a submenu row's selection from the
+  *sibling* row's hover (`LaunchedEffect(isHovered) { deselectSubmenu() }`), and that hover never
+  arrives: `New` kept its highlight indefinitely, `Rename` never highlighted, and a click on
+  `Rename` only dismissed the flyout. Nothing at the call site can change this — both the
+  `focusable` flag and the layer gating are internal. The same trap applies to any nested popup,
+  dropdown-inside-a-menu, or tooltip-over-a-popup in this dock. `ExplorerContextMenuSpec`'s "hover
+  moves between context-menu rows" test pins the behaviour with a pixel probe on the hover bar.
 - **`ExplorerMenuState` (`target`, `anchor`) is `remember`-ed inside `ProjectExplorer()`, never a
   top-level `object`.** Same reasoning as the mount-lifecycle guards above: a popup layer belongs
   to the composition that opened it, and a global menu-state object would survive a panel
