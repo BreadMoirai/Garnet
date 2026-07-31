@@ -134,4 +134,202 @@ class ExplorerContextMenuSpec : ClientSpec({
         }
         waitClientTicks(6)
     }
+
+    test("New > Folder end-to-end: right-click, hover New, click Folder, type a name, press Enter -- the payload reaches ExplorerActions.sender") {
+        // REGRESSION coverage for the "everFocused" fix on InlineNameField. Before that fix,
+        // FocusChangedNode's synthetic first Inactive event fired onCancel() the instant the field
+        // mounted -- before LaunchedEffect ever got to call requestFocus() -- so `edit` was reset to
+        // null on the very frame New/Rename opened. New was completely dead: the field would open and
+        // instantly vanish, and no keystroke could ever reach it. This test drives the whole real path
+        // (right-click -> hover New -> click Folder -> type -> Enter) so it can only pass if a real,
+        // live, focused InlineNameField survives from the moment it mounts through to commit.
+        val sent = captureSends()
+        runOnClient { mc ->
+            DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
+            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(
+                FolderNode("myproject", listOf(FolderNode("redstone", listOf(FileNode("clock.nbt", "nbt"))))),
+                null,
+            ))
+            DockState.leftPanels.add(explorerPanel())
+            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.setSize(DockRegion.LEFT, 320)
+            ViewportState.active = true
+            ComposeOverlay.enabled = true
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+            DockInputRouter.focus(DockRegion.LEFT)
+        }
+        waitClientTicks(16)
+
+        // Right-click the project root row (same point ExplorerContextMenuSpec's other test uses,
+        // already verified above to paint the New/Rename card there).
+        runOnClient {
+            DockInputRouter.onGlfwMove(60.0, 40.0)
+            DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+        }
+        waitClientTicks(2)
+        runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT) }
+        waitClientTicks(8)
+
+        // Hover "New" (measured at x[62,138] y[42,66] in calib_1_menu_open.png) to fly out its
+        // submenu -- Jewel opens it on hover, not click (calib_2_hover_new.png).
+        runOnClient { DockInputRouter.onGlfwMove(80.0, 52.0) }
+        waitClientTicks(10)
+
+        // Click "Folder" in the flown-out submenu (measured at x[142,215] y[48,70]).
+        runOnClient {
+            DockInputRouter.onGlfwMove(150.0, 52.0)
+            DockInputRouter.onGlfwPress(0)
+        }
+        waitClientTicks(2)
+        runOnClient { DockInputRouter.onGlfwRelease(0) }
+        waitClientTicks(8)
+
+        // The whole point: if InlineNameField cancelled itself on mount, `edit` is already null here
+        // and every keystroke below lands on nothing. Capture proof either way.
+        val fieldShot = capture("explorer_new_folder_field_open.png")
+        println("[new-folder-e2e] field-open probe: diffCount=${PanelPixelProbe.contextMenuRegionDiffCount(fieldShot)}")
+
+        runOnClient { "gadget".forEach { c -> DockInputRouter.onGlfwChar(c.code) } }
+        waitClientTicks(6)
+        runOnClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ENTER, GLFW.GLFW_PRESS) }
+        waitClientTicks(8)
+
+        sent shouldBe listOf(CreateFolderC2S("", "gadget"))
+
+        runOnClient { mc ->
+            DockInputRouter.clearFocus()
+            ComposeOverlay.enabled = false; ViewportState.active = false; DockState.reset()
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(6)
+    }
+
+    /** Mounts the Explorer with one root -> "redstone" -> "clock.nbt", focused and ready to click. */
+    fun mountForContextMenu() {
+        runOnClient { mc ->
+            DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
+            ProjectTreeState.onSnapshot(ProjectTreeSnapshotS2C(
+                FolderNode("myproject", listOf(FolderNode("redstone", listOf(FileNode("clock.nbt", "nbt"))))),
+                null,
+            ))
+            DockState.leftPanels.add(explorerPanel())
+            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.setSize(DockRegion.LEFT, 320)
+            ViewportState.active = true
+            ComposeOverlay.enabled = true
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+            DockInputRouter.focus(DockRegion.LEFT)
+        }
+        waitClientTicks(16)
+    }
+
+    fun unmountFromContextMenu() {
+        runOnClient { mc ->
+            DockInputRouter.clearFocus()
+            ComposeOverlay.enabled = false; ViewportState.active = false; DockState.reset()
+            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+        }
+        waitClientTicks(6)
+    }
+
+    /**
+     * Right-click at ([x], [y]), hover "New" (offset +30/+12, measured in calib_1/calib_2), and click
+     * "Folder" in the flown-out submenu (offset +90/+12) -- the same real, hover-then-click path the
+     * end-to-end test above calibrated against the project-root row. Any row anchors the popup at its
+     * own click point, so the same relative offsets apply regardless of which row was right-clicked.
+     */
+    fun rightClickThenNewFolder(x: Double, y: Double) {
+        runOnClient {
+            DockInputRouter.onGlfwMove(x, y)
+            DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+        }
+        waitClientTicks(2)
+        runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT) }
+        waitClientTicks(8)
+        runOnClient { DockInputRouter.onGlfwMove(x + 20.0, y + 12.0) }
+        waitClientTicks(10)
+        runOnClient {
+            DockInputRouter.onGlfwMove(x + 90.0, y + 12.0)
+            DockInputRouter.onGlfwPress(0)
+        }
+        waitClientTicks(2)
+        runOnClient { DockInputRouter.onGlfwRelease(0) }
+        waitClientTicks(8)
+    }
+
+    fun type(text: String) {
+        runOnClient { text.forEach { c -> DockInputRouter.onGlfwChar(c.code) } }
+        waitClientTicks(6)
+    }
+
+    fun pressEnter() {
+        runOnClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ENTER, GLFW.GLFW_PRESS) }
+        waitClientTicks(8)
+    }
+
+    fun pressEscape() {
+        runOnClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS) }
+        waitClientTicks(8)
+    }
+
+    test("New > Folder on a nested folder auto-expands it and targets it, not the root") {
+        // The panel opens the field by adding the target folder's path to treeState.openNodes (see
+        // ProjectExplorer's onNew callback) so the field is visible without a separate click to
+        // expand. Right-click "redstone" itself (row 1, y=68). x=90 lands on the row's LABEL text --
+        // "redstone" is indented one level deeper than the root, so its own chevron/folder-icon sit
+        // where x=60 (safe for the unindented root row) would land instead, and a right-click there
+        // never reaches TreeRow's own secondary-click handler.
+        val sent = captureSends()
+        mountForContextMenu()
+
+        rightClickThenNewFolder(90.0, 68.0)
+        type("clocks")
+        pressEnter()
+
+        ExplorerTreeState.treeState.openNodes.contains("redstone").shouldBeTrue()
+        sent shouldBe listOf(CreateFolderC2S("redstone", "clocks"))
+
+        unmountFromContextMenu()
+    }
+
+    test("an invalid name from a real New flow keeps the inline field open for correction") {
+        // Only half of this was covered before: commitCreate("a/b") sends nothing, asserted directly
+        // against ExplorerActions. This drives the same rejection through the real mounted field and
+        // proves the field itself survives the rejection -- a second, valid commit in the SAME
+        // interaction must still reach the sender. If the field had actually closed (or never
+        // survived to receive the first Enter), this second attempt would have nowhere to land and
+        // `sent` would stay empty.
+        val sent = captureSends()
+        mountForContextMenu()
+
+        rightClickThenNewFolder(60.0, 40.0)
+        type("   ") // trims to blank -- rejected
+        pressEnter()
+        sent.shouldBeEmpty()
+
+        // The field's text isn't cleared on a rejected commit, so this appends onto the still-queued
+        // "   " rather than replacing it -- "   gadget" trims to a perfectly valid "gadget". Committing
+        // successfully here is only possible if the SAME field survived the rejection above.
+        type("gadget")
+        pressEnter()
+        sent shouldBe listOf(CreateFolderC2S("", "gadget"))
+
+        unmountFromContextMenu()
+    }
+
+    test("Escape cancels a real New field: nothing is sent and no stale text lingers") {
+        val sent = captureSends()
+        mountForContextMenu()
+
+        rightClickThenNewFolder(60.0, 40.0)
+        type("abandoned")
+        pressEscape()
+        // If Escape had not actually cancelled the field (e.g. the same "cancels on mount" class of
+        // bug reappearing), the field would still be open with "abandoned" queued, and this bare
+        // Enter would commit it. A genuinely cancelled field has nothing left to commit.
+        pressEnter()
+        sent.shouldBeEmpty()
+
+        unmountFromContextMenu()
+    }
 })

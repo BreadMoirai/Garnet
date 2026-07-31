@@ -102,6 +102,47 @@ class ProjectDimRegistry(private val server: MinecraftServer) {
         return placedBoxes.remove(subpath)
     }
 
+    /**
+     * Rewrite every registry entry keyed by [oldSubpath], or nested under it, onto [newSubpath] —
+     * called after a rename's file move succeeds. `ProjectDimRegistry` keys every map by full
+     * subpath string, so renaming a folder without this strands every structure beneath it: its
+     * placed-box and region-assignment entries stay keyed by the OLD path forever, which orphans
+     * its in-world blocks from `flushDirtyStructures` (which does
+     * `resolveSubpath(oldSubpath) ?: continue` and silently skips it) and lets a click on the new
+     * path re-place a second copy in a fresh region.
+     *
+     * The boundary is a full path segment, matching [repointSession]'s logic: renaming "redstone"
+     * must rekey "redstone" and "redstone/clock.nbt", but never "redstoneworks/clocks" — a plain
+     * `startsWith(oldSubpath)` would wrongly catch that sibling.
+     *
+     * Deliberately does NOT touch the world: only in-memory bookkeeping moves. A rekeyed structure's
+     * blocks stay exactly where they were placed — the structure never moved in the world, only its
+     * file path changed — so registry state and world state still agree once this returns.
+     */
+    fun rekeyForRename(oldSubpath: String, newSubpath: String) {
+        fun rekeyedKey(subpath: String): String? = when {
+            subpath == oldSubpath -> newSubpath
+            subpath.startsWith("$oldSubpath/") -> newSubpath + subpath.removePrefix(oldSubpath)
+            else -> null
+        }
+
+        for (key in bySubpath.keys.toList()) {
+            val newKey = rekeyedKey(key) ?: continue
+            val entry = bySubpath.remove(key) ?: continue
+            bySubpath[newKey] = entry.copy(subpath = newKey)
+        }
+        for (key in structureBySubpath.keys.toList()) {
+            val newKey = rekeyedKey(key) ?: continue
+            val origin = structureBySubpath.remove(key) ?: continue
+            structureBySubpath[newKey] = origin
+        }
+        for (key in placedBoxes.keys.toList()) {
+            val newKey = rekeyedKey(key) ?: continue
+            val box = placedBoxes.remove(key) ?: continue
+            placedBoxes[newKey] = box
+        }
+    }
+
     companion object {
         const val REGION_PAD = 64  // empty void between adjacent regions
 

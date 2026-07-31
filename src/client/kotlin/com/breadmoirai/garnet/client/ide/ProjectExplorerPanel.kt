@@ -244,6 +244,8 @@ private fun RowScope.InlineNameField(
 ) {
     val state = rememberTextFieldState()
     val focusRequester = remember { FocusRequester() }
+    // See the "first frame" note on [onFocusChanged] below.
+    var everFocused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         state.setTextAndPlaceCursorAtEnd(initial)
         focusRequester.requestFocus()
@@ -254,7 +256,21 @@ private fun RowScope.InlineNameField(
         modifier = Modifier
             .weight(1f)
             .focusRequester(focusRequester)
-            .onFocusChanged { if (!it.isFocused) onCancel() }
+            // Cancel only on a focused -> unfocused TRANSITION, never on the first event.
+            //
+            // Compose's FocusChangedNode starts with null stored state, so the very first focus event
+            // a freshly attached node sees (Inactive) counts as a "change" and fires this callback
+            // with isFocused == false. That dispatch happens in onEndApplyChanges, synchronously after
+            // the composition's changes are applied — strictly BEFORE the LaunchedEffect above gets a
+            // chance to run requestFocus(), because a LaunchedEffect body is only *scheduled* on the
+            // frame dispatcher during applyChanges. A naive `if (!it.isFocused) onCancel()` therefore
+            // tears the field down on the frame it appears, killing both New and Rename outright.
+            // Gating on everFocused keeps the intended behaviour — an abandoned field still cancels
+            // when the user clicks away — while ignoring that synthetic initial Inactive.
+            .onFocusChanged {
+                if (it.isFocused) everFocused = true
+                else if (everFocused) onCancel()
+            }
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
@@ -265,4 +281,3 @@ private fun RowScope.InlineNameField(
             },
     )
 }
-

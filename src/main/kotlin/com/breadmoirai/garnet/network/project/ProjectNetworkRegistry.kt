@@ -282,6 +282,9 @@ object ProjectNetworkRegistry {
         }
         try {
             // ProjectNewStructure.create appends ".nbt" itself, so hand it the bare stem.
+            // resolveFinalName normalizes the extension to lowercase ".nbt", so this case-sensitive
+            // removeSuffix is safe -- see resolveFinalName's doc for why normalizing there, rather than
+            // stripping case-insensitively here, is the fix.
             ProjectNewStructure.create(folder, finalName.removeSuffix(".nbt"))
         } catch (e: Exception) {
             LOGGER.error("[project/new-structure] create {}/{}: {}", payload.parentSubpath, finalName, e.message, e)
@@ -357,11 +360,27 @@ object ProjectNetworkRegistry {
             registry.unplaceStructure(payload.subpath)
         }
 
+        if (wasPlaced != null) {
+            // Mirror handlePlaceStructure: prefer the just-moved ".nbt.unsaved" sidecar over the saved
+            // file. The move above already relocated the sidecar alongside the renamed file, so a
+            // dirty structure must re-place FROM that sidecar and report hasUnsaved = true — otherwise
+            // the world repaints from the stale saved .nbt, and the next flushDirtyStructures captures
+            // that reverted region right back over the sidecar, permanently losing the unsaved edits.
+            val sidecar = StructurePersistence.unsavedSidecarOf(target)
+            val hasUnsaved = sidecar.exists()
+            val source = if (hasUnsaved) sidecar else target
+            val message = if (hasUnsaved) "renamed to $newSubpath — unsaved changes" else "renamed to $newSubpath"
+            placeStructureFrom(server, player, newSubpath, source, hasUnsaved, message)
+        }
+
+        // Rekey every OTHER registry entry nested under the renamed path (e.g. structures placed
+        // inside a renamed folder). The renamed node's own entry, if any, was already handled above by
+        // the wasPlaced block, so by this point rekeyForRename's exact-match branch is a no-op for it —
+        // only descendants still keyed under the old subpath remain to be moved.
+        registry.rekeyForRename(payload.subpath, newSubpath)
+
         repointSession(player, payload.subpath, newSubpath)
 
-        if (wasPlaced != null) {
-            placeStructureFrom(server, player, newSubpath, target, hasUnsaved = false, message = "renamed to $newSubpath")
-        }
         sendTree(server, player)
     }
 

@@ -33,8 +33,15 @@ class ProjectNamesTest : FunSpec({
     test("resolveFinalName appends .nbt for structures and leaves folders alone") {
         ProjectNames.resolveFinalName("gadget", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
         ProjectNames.resolveFinalName("gadget.nbt", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
-        ProjectNames.resolveFinalName("gadget.NBT", NewNodeKind.STRUCTURE) shouldBe "gadget.NBT"
         ProjectNames.resolveFinalName("clocks", NewNodeKind.FOLDER) shouldBe "clocks"
+    }
+
+    test("resolveFinalName normalizes an existing .nbt extension to lowercase") {
+        // Regression: a case-insensitively-ACCEPTED but un-normalized extension left
+        // handleNewStructure's case-sensitive removeSuffix(".nbt") a no-op for "gadget.NBT", so
+        // create() appended its own ".nbt" on top and the file landed on disk as "gadget.NBT.nbt".
+        ProjectNames.resolveFinalName("gadget.NBT", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
+        ProjectNames.resolveFinalName("gadget.Nbt", NewNodeKind.STRUCTURE) shouldBe "gadget.nbt"
     }
 
     test("resolveFinalName trims surrounding whitespace") {

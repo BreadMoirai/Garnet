@@ -5,6 +5,7 @@ import com.breadmoirai.garnet.network.project.NewStructureC2S
 import com.breadmoirai.garnet.network.project.PlaceStructureC2S
 import com.breadmoirai.garnet.network.project.ProjectNetworkRegistry
 import com.breadmoirai.garnet.network.project.RenamePathC2S
+import com.breadmoirai.garnet.network.project.StructureResultS2C
 import com.breadmoirai.garnet.persistence.StructurePersistence
 import com.breadmoirai.garnet.project.ProjectDimRegistry
 import com.breadmoirai.garnet.project.ProjectNewStructure
@@ -23,6 +24,7 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.level.block.Blocks
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
@@ -64,8 +66,14 @@ class ProjectFileOpsNetworkSpec : GarnetTestSpec({
 
     test("handleCreateFolder rejects a parent that escapes the root") {
         withServer { server, player, root ->
+            // REGRESSION: the escape target must genuinely EXIST. ProjectRoot.resolveSubpath checks
+            // exists() BEFORE the containment check, so a non-existent "../evil" would return null at
+            // the existence check alone and never exercise containment at all -- a test using a
+            // non-existent target passes even if the containment check were deleted outright. Create a
+            // real directory outside the root so this only passes if containment itself rejects it.
+            val evil = root.resolveSibling("evil").also { it.createDirectories() }
             ProjectNetworkRegistry.handleCreateFolder(server, player, CreateFolderC2S("../evil", "x"))
-            root.resolveSibling("evil").exists().shouldBeFalse()
+            evil.resolve("x").exists().shouldBeFalse()
         }
     }
 
@@ -148,6 +156,61 @@ class ProjectFileOpsNetworkSpec : GarnetTestSpec({
             registry.placedBoxOf("clock.nbt").shouldBeNull()
             registry.placedBoxOf("ring.nbt").shouldNotBeNull()
             registry.structureRegionOriginOf("clock.nbt").shouldBeNull()
+        }
+    }
+
+    test("renaming a placed AND dirty structure re-places from its sidecar, not the stale saved file") {
+        // REGRESSION: handlePlaceStructure already prefers the ".nbt.unsaved" sidecar over the saved
+        // file when one exists (see its own body). handleRename's re-place call used to hard-code
+        // hasUnsaved = false and pass the SAVED file unconditionally -- so renaming a structure with
+        // unsaved edits repainted the world from the stale save, and the next flushDirtyStructures
+        // would then capture that reverted region right back over the (still-present) sidecar,
+        // destroying the unsaved edits for good. This covers the intersection the suite otherwise
+        // misses: a structure that is BOTH placed AND dirty, then renamed.
+        withServer { server, player, root ->
+            ProjectNewStructure.create(root, "clock")
+            ProjectNetworkRegistry.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            // Make the placed region genuinely dirty via the REAL path (StructurePersistence's
+            // flush), not a hand-written garbage sidecar the re-place below could never actually load
+            // as a structure: place a block inside the region, then flush.
+            val registry = ProjectDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            registry.projectLevel().setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            ProjectNetworkRegistry.flushDirtyStructures(server)
+            StructurePersistence.unsavedSidecarOf(root.resolve("clock.nbt")).exists().shouldBeTrue()
+
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+
+            val result = drainPayloads(player).filterIsInstance<StructureResultS2C>().last()
+            result.subpath shouldBe "ring.nbt"
+            result.hasUnsaved.shouldBeTrue()
+            StructurePersistence.unsavedSidecarOf(root.resolve("ring.nbt")).exists().shouldBeTrue()
+        }
+    }
+
+    test("renaming a folder rekeys every structure placed beneath it onto the new subpath") {
+        // REGRESSION: ProjectDimRegistry keys placedBoxes/structureBySubpath by full subpath.
+        // handleRename only ever checked registry.placedBoxOf(payload.subpath) -- the EXACT renamed
+        // path -- so a placed structure nested under a renamed FOLDER kept its old-path registry key
+        // forever: its blocks orphan in-world, flushDirtyStructures does
+        // `resolveSubpath(oldSubpath) ?: continue` and silently skips it, and clicking the new path
+        // re-places a second copy in a fresh region.
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            ProjectNewStructure.create(root.resolve("redstone"), "clock")
+            ProjectNetworkRegistry.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            val registry = ProjectDimRegistry.of(server)
+            registry.placedBoxOf("redstone/clock.nbt").shouldNotBeNull()
+            registry.structureRegionOriginOf("redstone/clock.nbt").shouldNotBeNull()
+
+            ProjectNetworkRegistry.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+
+            registry.placedBoxOf("redstone/clock.nbt").shouldBeNull()
+            registry.structureRegionOriginOf("redstone/clock.nbt").shouldBeNull()
+            registry.placedBoxOf("logic/clock.nbt").shouldNotBeNull()
+            registry.structureRegionOriginOf("logic/clock.nbt").shouldNotBeNull()
         }
     }
 

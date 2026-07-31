@@ -66,28 +66,47 @@ current right-click behind it, anchored at a coordinate from a previous session.
 to the composable that owns it means a re-mount gets a fresh `ExplorerMenuState` with `target =
 null`, for free, instead of needing an explicit reset call site to remember.
 
-## Why renaming a placed structure unloads and reloads it
+## Why renaming a placed structure unloads and reloads it — and why renaming a folder rekeys instead
 
-`ProjectDimRegistry` tracks a placed structure in two separate maps keyed by subpath:
-`structureBySubpath` (the assigned region) and `placedBoxes` (the last-placed footprint, used for
-cheap re-clearing). Both keys are the file's subpath *before* the rename. If `handleRename` moved
-the file on disk without touching the registry, both maps would keep stale entries under the old
-subpath forever — the structure's placed blocks in the world would become unreachable by its new
-name (a fresh `PlaceStructureC2S(newSubpath)` would look up a registry entry that doesn't exist and
-re-place from scratch in a brand-new region, orphaning the old one in the world), and the old
-subpath's entries would leak until server shutdown. So `handleRename` calls
-`ProjectDimRegistry.unplaceStructure(oldSubpath)` (clearing both maps) and then, if the structure
-was placed, re-places it under the new subpath via `placeStructureFrom` — an unload/reload, not an
-in-place rekey, because the registry has no rekey operation and one isn't worth adding for a path
-that's already doing an IO move.
+`ProjectDimRegistry` tracks placed structures in three maps keyed by subpath: `bySubpath` (a
+loaded folder's own region), `structureBySubpath` (a standalone structure's assigned region), and
+`placedBoxes` (the last-placed footprint, used for cheap re-clearing). All three are keyed by
+subpath, so a rename that only moves the file on disk without touching the registry strands every
+entry under the OLD subpath: the structure's placed blocks become unreachable by the new name
+(`flushDirtyStructures` does `resolveSubpath(oldSubpath) ?: continue` and silently skips it
+forever), and a fresh `PlaceStructureC2S(newSubpath)` finds no registry entry and re-places a
+second copy in a brand-new region, orphaning the first in the world.
+
+`handleRename` handles two distinct shapes of this problem differently:
+
+- **The renamed node itself is a placed structure** (`registry.placedBoxOf(payload.subpath) !=
+  null`): an unload/reload, not a rekey. `handleRename` calls
+  `ProjectDimRegistry.unplaceStructure(oldSubpath)` (clearing `structureBySubpath` and
+  `placedBoxes`), then re-places it under the new subpath via `placeStructureFrom` — which prefers
+  the `.nbt.unsaved` sidecar over the saved file when one exists (mirroring
+  `handlePlaceStructure`'s own preference), so a structure that is both placed *and* dirty
+  re-places from its unsaved edits rather than reverting to the last save. This lands the
+  structure in a freshly-assigned region (`nextStructureIndex` is monotonic and never recycled)
+  rather than reusing the old one — intended, matching how every other region assignment in the
+  registry behaves.
+- **Descendants of a renamed folder** (a structure or sub-folder nested *under* the renamed path,
+  not the renamed path itself): `ProjectDimRegistry.rekeyForRename(oldSubpath, newSubpath)`
+  rewrites every entry across all three maps whose subpath is `oldSubpath` or begins with
+  `"$oldSubpath/"` — the same path-segment boundary `repointSession` uses (a bare `startsWith`
+  would wrongly also rekey an unrelated sibling like `redstoneworks/clocks` when renaming
+  `redstone`). This is a pure in-memory bookkeeping move: it does **not** touch the world. The
+  structure's blocks stay exactly where they were placed — only the file's path changed, not its
+  position — so registry state and world state still agree once it returns. `handleRename` calls
+  it after the file move and after the "renamed node itself" handling above, so by the time it
+  runs, that case's exact-match key is already gone and only descendants remain to rekey.
 
 **The teardown must run only after the file move succeeds, never before.** `handleRename` moves the
 `.nbt` (and its `.nbt.unsaved` sidecar, if present) first, inside a `try`, and only calls
-`ProjectDimRegistry.unplaceStructure` in the success path afterward. A file move is an IO operation
-that can fail (a lock, a permission problem, a full disk) for reasons the server can't always
-predict up front. If the registry teardown ran first — clearing the placed blocks and dropping the
-registry keys before the move was confirmed — a failed move would leave the player told "rename
-failed" while the structure's blocks are already erased from the world and its (untouched,
+`ProjectDimRegistry.unplaceStructure`/`rekeyForRename` in the success path afterward. A file move is
+an IO operation that can fail (a lock, a permission problem, a full disk) for reasons the server
+can't always predict up front. If the registry teardown ran first — clearing the placed blocks and
+dropping the registry keys before the move was confirmed — a failed move would leave the player told
+"rename failed" while the structure's blocks are already erased from the world and its (untouched,
 still-old-named) file sits on disk unrecoverably out of sync with what the player just saw. Ordering
 the teardown strictly after a successful move means a failed rename is a true no-op: the file didn't
 move, so the registry and the world are left exactly as they were.

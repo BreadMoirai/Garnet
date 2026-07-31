@@ -23,14 +23,12 @@ object DockState {
     /**
      * Default reserved sizes (px) when a region is first shown.
      *
-     * [DEFAULT_LEFT] is 280, not 260, because the Explorer's action row (name field, `+ New`, `Save`,
-     * `Discard`) needs ~268px of content to render intact. At 260 every control is on-canvas and the
-     * Discard button's box draws in full, but Jewel squeezes the button's inner width and its label
-     * clips to "Discar" — a defect a "does it fit" bounds check does not catch. The row is already at
-     * its floor (slim button variants, a 48.dp name field ≈ 6 characters, fixed 4px gaps), so the
-     * default width was raised to meet the row rather than shrinking the row further. Widths below
-     * ~268 still clip the label; [MIN_EDGE] permits them, since a user dragging the splitter narrow
-     * is making that trade deliberately.
+     * [DEFAULT_LEFT] is 280, not 260. That value was originally sized to fit the Explorer's old
+     * action row (name field, `+ New`, `Save`, `Discard`) without clipping. That row is gone; the
+     * current toolbar (kebab menu + refresh + collapse-all, all compact icon buttons -- see
+     * `ExplorerToolbar.kt`) has no content anywhere near this wide. The value is kept at 280 anyway,
+     * purely to avoid changing a user-visible default width with no user-facing reason to: nothing
+     * about today's toolbar requires it, and [MIN_EDGE] already lets a user drag narrower if they want.
      */
     const val DEFAULT_LEFT = 280
     const val DEFAULT_RIGHT = 220

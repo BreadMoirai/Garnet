@@ -128,10 +128,15 @@ Client:
   the `<name>.nbt.unsaved` sidecar with a renamed structure (`StructurePersistence.unsavedSidecarOf`)
   so unsaved edits stay attached, unloads and re-places a currently-placed structure under the new
   subpath (`ProjectDimRegistry.unplaceStructure` then `placeStructureFrom` — the structure lands in
-  a fresh region since `nextStructureIndex` is never recycled), and repoints
-  `ProjectSession.activeSubpath` when it equals or is nested under the renamed subpath (boundary-safe:
-  matching on `"$oldSubpath/"` so renaming `redstone` repoints `redstone/clocks` but not a sibling
-  like `redstoneworks/clocks`). See [use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md)
+  a fresh region since `nextStructureIndex` is never recycled — and, like `handlePlaceStructure`,
+  prefers the moved `.nbt.unsaved` sidecar over the saved file when one exists, so a placed *and*
+  dirty structure re-places from its unsaved edits rather than reverting to the last save), rekeys
+  every OTHER registry entry nested under a renamed folder onto the new subpath
+  (`ProjectDimRegistry.rekeyForRename`, same `"$oldSubpath/"` boundary as below — a pure bookkeeping
+  move that never touches the world, since only the file's path changed, not its placed position),
+  and repoints `ProjectSession.activeSubpath` when it equals or is nested under the renamed subpath
+  (boundary-safe: matching on `"$oldSubpath/"` so renaming `redstone` repoints `redstone/clocks` but
+  not a sibling like `redstoneworks/clocks`). See [use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md)
   (UC-MAN-10) for the structure-unload/reload detail and
   [use-cases/redstone-project.md](../use-cases/redstone-project.md) for the folder-rename/session
   detail. This is the **only** live client UI for browsing the project

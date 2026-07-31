@@ -14,12 +14,23 @@ enum class NewNodeKind { FOLDER, STRUCTURE }
  */
 object ProjectNames {
 
-    /** The typed text turned into the actual on-disk name: trimmed, with `.nbt` added for structures. */
+    /**
+     * The typed text turned into the actual on-disk name: trimmed, with a lowercase `.nbt` extension
+     * for structures.
+     *
+     * Normalizing the case here -- not just detecting it -- matters: this is the one place that
+     * decides the final extension, and every consumer (e.g. `handleNewStructure`'s
+     * `removeSuffix(".nbt")`) assumes a lowercase suffix it can strip with a plain, case-sensitive
+     * call. Accepting "clock.NBT" case-insensitively but returning it un-normalized would leave that
+     * removeSuffix a no-op, so `create()` appends its own ".nbt" on top and the file lands on disk as
+     * "clock.NBT.nbt". Normalizing here keeps that a one-line, case-sensitive strip everywhere else.
+     */
     fun resolveFinalName(typed: String, kind: NewNodeKind): String {
         val trimmed = typed.trim()
         if (kind != NewNodeKind.STRUCTURE) return trimmed
         if (trimmed.isEmpty()) return trimmed
-        return if (trimmed.substringAfterLast('.', "").equals("nbt", ignoreCase = true)) trimmed
+        return if (trimmed.substringAfterLast('.', "").equals("nbt", ignoreCase = true))
+            trimmed.substringBeforeLast('.') + ".nbt"
         else "$trimmed.nbt"
     }
 

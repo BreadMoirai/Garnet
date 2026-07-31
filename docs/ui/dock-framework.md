@@ -57,8 +57,11 @@ does not make the region visible — only `setVisible`/`toggleVisible` (driven b
 keybinds, see `dock-input-routing.md`) does that, so the dock is off-by-default even once panels exist.
 
 Default region sizes live on `DockState` (`DEFAULT_LEFT` = **280**, `DEFAULT_RIGHT`, `DEFAULT_BOTTOM`).
-`DEFAULT_LEFT` is 280 rather than a rounder 260 because the Explorer's action row needs ~268px of
-content to render intact; see the Project Explorer section below.
+`DEFAULT_LEFT` is 280 rather than a rounder 260 for historical reasons only: it was originally sized
+to fit the Explorer's old action row (name field, `+ New`, `Save`, `Discard`) without clipping. That
+row is gone — the current toolbar (`ExplorerToolbar`: kebab menu + refresh + collapse-all, all compact
+icon buttons) needs nowhere near that width — and the value is kept at 280 purely to avoid changing a
+user-visible default with no functional reason to.
 
 ## Panel composition must not outlive its mount
 
