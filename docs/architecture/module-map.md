@@ -76,11 +76,12 @@ Construction is via `garnetSpec(id) { … }`.
 ## `config/`
 
 - `config/SharedSettings.kt` (main) — config read by both client and server: project root path,
-  grid/cell sizing, structure-region sizing.
-- `config/ModConfig.kt` (client) — client-side persisted config (`garnet.json`): loads/saves the
-  project root path and mirrors it into `SharedSettings`. There is no Mod Menu screen — the
-  Explorer's root-picker header (`editor/ui/RootPickerController.kt`) is the only editor for this
-  value, so a duplicate YACL screen was removed as dead weight.
+  grid/cell sizing, structure-region sizing, auto-save tuning, and local-history retention.
+- `config/ModConfig.kt` (client) — client-side persisted config (`garnet.json`): round-trips every
+  `SharedSettings` field (project root path, grid/cell sizing, structure-region sizing, auto-save,
+  local history) on `load()`/`save()`; absent keys leave the in-memory value untouched. There is no
+  Mod Menu screen — the Explorer's root-picker header (`editor/ui/RootPickerController.kt`) is the
+  only editor for the project-root value, so a duplicate YACL screen was removed as dead weight.
 
 ## `playback/` — the record → emit pipeline (engine intact, no in-game caller)
 

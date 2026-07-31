@@ -9,4 +9,32 @@ object SharedSettings {
 
     /** Side length, in chunks, of a standalone structure's build region (full world height). */
     var structureRegionChunks: Int = 9
+
+    // === Auto-save ===
+
+    /** When false, structures commit only via SaveStructureC2S and the world-save/stop backstops. */
+    var autoSaveEnabled: Boolean = true
+
+    /** Ticks of quiet after the last edit before a dirty structure commits. 20 ticks = 1s. */
+    var autoSaveDebounceTicks: Int = 20
+
+    /**
+     * Ticks a structure may stay continuously dirty before committing regardless of the debounce,
+     * so an uninterrupted build session still checkpoints. 600 ticks = 30s.
+     */
+    var autoSaveMaxDirtyTicks: Int = 600
+
+    // === Local history ===
+
+    /** When false, commits still happen but no revisions are recorded. */
+    var localHistoryEnabled: Boolean = true
+
+    /** Revisions older than this many days are pruned on write. Matches JetBrains' default. */
+    var localHistoryDays: Int = 5
+
+    /** Hard cap on revisions kept per structure, applied after the age cutoff. */
+    var localHistoryMaxRevisions: Int = 100
+
+    /** Blank means `<gameDir>/.garnet/local-history`. */
+    var localHistoryDir: String = ""
 }
