@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.spec
 
-import com.breadmoirai.garnet.runner.tryApplyAsPlayerInteraction
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.block.state.properties.Property

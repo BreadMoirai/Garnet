@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.runner
+package com.breadmoirai.garnet.spec
 
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
