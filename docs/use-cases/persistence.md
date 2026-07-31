@@ -119,10 +119,10 @@ in UC-PER-01.
 | UC-PER-01.b | `StructurePersistence.save` captures region and writes `.nbt` | `StructureSidecarPersistenceSpec."UC-PER-06: save captures the region and load restores it byte-for-byte at the origin"` (same call; see [structure-lifecycle.md](structure-lifecycle.md)) | covered |
 | UC-PER-01.c | `RecordingSidecar.save` writes `.recording.nbt` for editor timeline | `RecordingSidecarTest."save then load yields an equivalent recording"`, `SpecPersistenceTest."writeSpecKts with sidecar recording roundtrips"` | covered |
 | UC-PER-01.d | Both files share the same `saveDir` and stem `id` | `SpecPersistenceTest."writeSpecKts with sidecar recording roundtrips"` | covered |
-| UC-PER-02 | Load `.spec.kts` via scripting host | `KtsSpecLoaderTest."loadGarnetSpec returns a dsl.GarnetSpec from new-style source"` | covered |
-| UC-PER-02.a | `KtsSpecLoader.evalOrThrow` feeds source to `BasicJvmScriptingHost.eval` | `KtsSpecLoaderTest."loadGarnetSpec returns a dsl.GarnetSpec from new-style source"` | covered |
+| UC-PER-02 | Load `.spec.kts` via scripting host | `KtsSpecLoaderTest."loadGarnetSpec returns a spec.GarnetSpec from new-style source"` | covered |
+| UC-PER-02.a | `KtsSpecLoader.evalOrThrow` feeds source to `BasicJvmScriptingHost.eval` | `KtsSpecLoaderTest."loadGarnetSpec returns a spec.GarnetSpec from new-style source"` | covered |
 | UC-PER-02.b | `ResultWithDiagnostics.Failure` throws `IllegalStateException`; `SpecPersistence.load` returns `null` | `KtsSpecLoaderTest."loadGarnetSpec surfaces compilation errors"` | **GAP-PARTIAL** |
-| UC-PER-02.c | Success casts `ResultValue.Value.value` to `GarnetSpec` | `KtsSpecLoaderTest."loadGarnetSpec returns a dsl.GarnetSpec from new-style source"` | covered |
+| UC-PER-02.c | Success casts `ResultValue.Value.value` to `GarnetSpec` | `KtsSpecLoaderTest."loadGarnetSpec returns a spec.GarnetSpec from new-style source"` | covered |
 | UC-PER-02.d | `SpecPersistence.load` wraps path in `runCatching` so broken script returns `null` | `SpecPersistenceTest."writeSpecKts then load round-trips a new-dsl spec"` | **GAP-PARTIAL** |
 | UC-PER-03 | Scan spec directory for available specs | `SpecDirectoryScanTest."lists only .spec.kts files, sorted"` | covered |
 | UC-PER-03.a | `SpecDirectoryScan.list` returns `emptyList()` when directory not found | `SpecDirectoryScanTest."returns empty list when directory does not exist"` | covered |
