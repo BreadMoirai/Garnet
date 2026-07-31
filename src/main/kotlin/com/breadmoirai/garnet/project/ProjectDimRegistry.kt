@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.project
 
 import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.structure.PlacedBox
 import net.minecraft.core.BlockPos
-import net.minecraft.core.Vec3i
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
@@ -10,9 +10,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
-
-/** A structure's placed footprint in the world: absolute [origin] and [size]. */
-data class PlacedBox(val origin: BlockPos, val size: Vec3i)
 
 /**
  * One per `MinecraftServer`. Owns folder → region-origin assignment within the overworld

@@ -4,11 +4,11 @@ import com.breadmoirai.garnet.client.ide.ExplorerTreeState
 import com.breadmoirai.garnet.client.ide.ProjectTreeState
 import com.breadmoirai.garnet.client.ide.RootPickerController
 import com.breadmoirai.garnet.client.ide.explorerPanel
-import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay
-import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
-import com.breadmoirai.garnet.client.ui.compose.dock.DockState
-import com.breadmoirai.garnet.client.viewport.ViewportState
-import com.breadmoirai.garnet.client.viewport.WindowViewportExt
+import com.breadmoirai.garnet.ui.compose.ComposeOverlay
+import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.viewport.ViewportState
+import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
 import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.garnet.project.FileNode
 import com.breadmoirai.garnet.project.FolderNode

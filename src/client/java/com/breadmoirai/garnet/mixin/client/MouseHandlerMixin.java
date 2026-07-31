@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.garnet.client.ui.compose.input.DockInputRouter;
+import com.breadmoirai.garnet.ui.input.DockInputRouter;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.input.MouseButtonInfo;
 import org.lwjgl.glfw.GLFW;

@@ -6,7 +6,7 @@ import com.breadmoirai.garnet.network.project.PlaceStructureC2S
 import com.breadmoirai.garnet.network.project.ProjectNetworkRegistry
 import com.breadmoirai.garnet.network.project.RenamePathC2S
 import com.breadmoirai.garnet.network.project.StructureResultS2C
-import com.breadmoirai.garnet.persistence.StructurePersistence
+import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.project.ProjectDimRegistry
 import com.breadmoirai.garnet.project.ProjectNewStructure
 import com.breadmoirai.garnet.project.ProjectRoot

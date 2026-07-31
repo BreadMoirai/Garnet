@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.runner
 
-import com.breadmoirai.garnet.dsl.Phase
-import com.breadmoirai.garnet.dsl.SimTime
-import com.breadmoirai.garnet.dsl.captureBlockStateProps
+import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.spec.SimTime
+import com.breadmoirai.garnet.spec.captureBlockStateProps
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.core.registries.BuiltInRegistries

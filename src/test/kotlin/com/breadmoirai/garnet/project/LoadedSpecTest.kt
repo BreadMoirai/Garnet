@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.project
 
-import com.breadmoirai.garnet.dsl.GarnetSpec
+import com.breadmoirai.garnet.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos

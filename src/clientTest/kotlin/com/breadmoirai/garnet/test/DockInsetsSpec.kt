@@ -1,9 +1,9 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
-import com.breadmoirai.garnet.client.ui.compose.dock.DockState
-import com.breadmoirai.garnet.client.ui.compose.dock.insets
-import com.breadmoirai.garnet.client.viewport.ViewportState
+import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.insets
+import com.breadmoirai.garnet.ui.viewport.ViewportState
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 
@@ -16,14 +16,14 @@ class DockInsetsSpec : StringSpec({
 
     "hidden regions reserve no space" {
         DockState.reset()
-        DockState.insets() shouldBe com.breadmoirai.garnet.client.ui.compose.dock.DockInsets(0, 0, 0, 0)
+        DockState.insets() shouldBe com.breadmoirai.garnet.ui.dock.DockInsets(0, 0, 0, 0)
     }
 
     "a visible left region reserves its width" {
         DockState.reset()
         DockState.setVisible(DockRegion.LEFT, true)
         DockState.setSize(DockRegion.LEFT, 260)
-        DockState.insets() shouldBe com.breadmoirai.garnet.client.ui.compose.dock.DockInsets(260, 0, 0, 0)
+        DockState.insets() shouldBe com.breadmoirai.garnet.ui.dock.DockInsets(260, 0, 0, 0)
     }
 
     "insets drive the content rect, clamped to the minimum" {

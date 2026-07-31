@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.runner
 
-import com.breadmoirai.garnet.dsl.Phase
-import com.breadmoirai.garnet.dsl.SimTime
-import com.breadmoirai.garnet.dsl.applyPropertyFromString
+import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.spec.SimTime
+import com.breadmoirai.garnet.spec.applyPropertyFromString
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.level.block.state.BlockState
@@ -11,18 +11,18 @@ import net.minecraft.world.level.block.state.properties.Property
 class StateRecordingView(
     val initialSnapshot: Map<BlockPos, BlockState>,
     private val changes: List<BlockStateChange>,
-) {
+) : com.breadmoirai.garnet.spec.StateRecordingViewLike {
     /**
      * Reconstructs [BlockState] at [pos] as of [simTime] by replaying diffs from [initialSnapshot].
      *
      * REQUIRES: [changes] must be globally sorted by [SimTime] ascending — as guaranteed
      * by [StateRecorder]'s sequential append. Violations silently produce wrong results.
      */
-    fun stateAt(pos: BlockPos, simTime: SimTime): BlockState {
+    override fun stateAt(pos: BlockPos, time: SimTime): BlockState {
         var state = initialSnapshot[pos] ?: error("Position $pos not in recording bounds")
         for (change in changes) {
             if (change.pos != pos) continue
-            if (change.simTime > simTime) break
+            if (change.simTime > time) break
             if (change.toBlock != null) {
                 state = BuiltInRegistries.BLOCK.getValue(change.toBlock).defaultBlockState()
             }
@@ -34,6 +34,9 @@ class StateRecordingView(
         }
         return state
     }
+
+    override fun initialAt(pos: BlockPos): BlockState =
+        initialSnapshot[pos] ?: error("Position $pos not in recording bounds")
 
     fun changesAt(pos: BlockPos): List<BlockStateChange> =
         changes.filter { it.pos == pos }

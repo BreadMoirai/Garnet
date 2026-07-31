@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.network.project
 
 import com.breadmoirai.garnet.config.SharedSettings
-import com.breadmoirai.garnet.persistence.StructurePersistence
+import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.project.*
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking

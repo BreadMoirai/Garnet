@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.persistence
 
 import com.breadmoirai.garnet.persistence.KtsSpecLoader
-import com.breadmoirai.garnet.dsl.GarnetSpec
+import com.breadmoirai.garnet.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -12,7 +12,7 @@ class KtsSpecLoaderTest : FunSpec({
 
     test("loadGarnetSpec returns a dsl.GarnetSpec from new-style source") {
         val source = """
-            import com.breadmoirai.garnet.dsl.*
+            import com.breadmoirai.garnet.spec.*
             import net.minecraft.core.Vec3i
 
             garnetSpec(id = "loader-1", bounds = Vec3i(2, 2, 2), lifespan = 4) {}
@@ -24,7 +24,7 @@ class KtsSpecLoaderTest : FunSpec({
 
     test("loadGarnetSpec extracts id and lifespan from new-style source") {
         val source = """
-            import com.breadmoirai.garnet.dsl.*
+            import com.breadmoirai.garnet.spec.*
             import net.minecraft.core.Vec3i
 
             garnetSpec(id = "loader-2", bounds = Vec3i(3, 3, 3), lifespan = 6) {}
@@ -36,7 +36,7 @@ class KtsSpecLoaderTest : FunSpec({
 
     test("loadGarnetSpec parses a minimal spec") {
         val source = """
-            import com.breadmoirai.garnet.dsl.*
+            import com.breadmoirai.garnet.spec.*
             import net.minecraft.core.Vec3i
 
             garnetSpec(id = "with-entries", bounds = Vec3i(3, 3, 3), lifespan = 5) {}
@@ -48,7 +48,7 @@ class KtsSpecLoaderTest : FunSpec({
 
     test("loadGarnetSpec surfaces compilation errors") {
         val source = """
-            import com.breadmoirai.garnet.dsl.*
+            import com.breadmoirai.garnet.spec.*
 
             not_a_function()
         """.trimIndent()

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.persistence
 
-import com.breadmoirai.garnet.dsl.GarnetSpec
+import com.breadmoirai.garnet.spec.GarnetSpec
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.ScriptCompilationConfiguration
 import kotlin.script.experimental.api.defaultImports
@@ -9,7 +9,7 @@ import kotlin.script.experimental.jvm.jvm
 
 object SpecScriptCompilationConfig : ScriptCompilationConfiguration({
     defaultImports(
-        "com.breadmoirai.garnet.dsl.*",
+        "com.breadmoirai.garnet.spec.*",
         "net.minecraft.core.Vec3i",
     )
     jvm {

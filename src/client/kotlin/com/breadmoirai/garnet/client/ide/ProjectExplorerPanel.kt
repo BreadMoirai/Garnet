@@ -37,7 +37,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.breadmoirai.garnet.client.ui.compose.dock.Panel
+import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.network.project.LoadProjectFolderC2S
 import com.breadmoirai.garnet.network.project.PlaceStructureC2S
 import com.breadmoirai.garnet.project.FileNode

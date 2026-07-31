@@ -7,8 +7,8 @@ import com.breadmoirai.garnet.test.project.ProjectFileOpsNetworkSpec
 import com.breadmoirai.garnet.test.project.ProjectNetworkRegistrySpec
 import com.breadmoirai.garnet.test.project.ProjectStructureNetworkSpec
 import com.breadmoirai.garnet.test.project.ProjectTeleportSpec
-import com.breadmoirai.garnet.test.persistence.StructureRegionPersistenceSpec
-import com.breadmoirai.garnet.test.persistence.StructureSidecarPersistenceSpec
+import com.breadmoirai.garnet.test.structure.StructureRegionPersistenceSpec
+import com.breadmoirai.garnet.test.structure.StructureSidecarPersistenceSpec
 import com.breadmoirai.garnet.mc.McLifecycle
 import com.breadmoirai.garnet.harness.launcher.launchKotest
 import net.fabricmc.fabric.api.gametest.v1.GameTest

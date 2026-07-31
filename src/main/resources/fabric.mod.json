@@ -17,7 +17,7 @@
       "com.breadmoirai.garnet.client.GarnetClient"
     ],
     "modmenu": [
-      "com.breadmoirai.garnet.client.config.ModMenuIntegration"
+      "com.breadmoirai.garnet.config.ModMenuIntegration"
     ]
   },
   "mixins": [

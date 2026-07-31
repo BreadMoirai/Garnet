@@ -1,6 +1,7 @@
 package com.breadmoirai.garnet.project
 
 import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.structure.PlacedBox
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe

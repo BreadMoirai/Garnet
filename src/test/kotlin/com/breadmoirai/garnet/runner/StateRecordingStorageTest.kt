@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.runner
 
-import com.breadmoirai.garnet.dsl.Phase
-import com.breadmoirai.garnet.dsl.SimTime
+import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.spec.SimTime
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe

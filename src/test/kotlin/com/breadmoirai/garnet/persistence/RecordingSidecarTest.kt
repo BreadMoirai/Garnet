@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.persistence
 
-import com.breadmoirai.garnet.dsl.Phase
-import com.breadmoirai.garnet.dsl.SimTime
+import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.spec.SimTime
 import com.breadmoirai.garnet.runner.BlockStateChange
 import com.breadmoirai.garnet.runner.PropertyDiff
 import com.breadmoirai.garnet.runner.StateRecording

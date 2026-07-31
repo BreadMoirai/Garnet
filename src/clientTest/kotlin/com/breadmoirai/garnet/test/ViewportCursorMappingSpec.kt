@@ -1,9 +1,9 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
-import com.breadmoirai.garnet.client.ui.compose.dock.DockState
-import com.breadmoirai.garnet.client.viewport.ViewportState
-import com.breadmoirai.garnet.client.viewport.WindowViewportExt
+import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.viewport.ViewportState
+import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe

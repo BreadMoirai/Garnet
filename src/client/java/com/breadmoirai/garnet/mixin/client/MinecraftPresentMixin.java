@@ -1,9 +1,9 @@
 package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.garnet.client.ui.compose.ComposeOverlay;
-import com.breadmoirai.garnet.client.viewport.BlitUvPipeline;
-import com.breadmoirai.garnet.client.viewport.CompositeTarget;
-import com.breadmoirai.garnet.client.viewport.ViewportState;
+import com.breadmoirai.garnet.ui.compose.ComposeOverlay;
+import com.breadmoirai.garnet.ui.viewport.BlitUvPipeline;
+import com.breadmoirai.garnet.ui.viewport.CompositeTarget;
+import com.breadmoirai.garnet.ui.viewport.ViewportState;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.pipeline.RenderTarget;

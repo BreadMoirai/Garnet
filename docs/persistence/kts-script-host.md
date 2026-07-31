@@ -12,7 +12,7 @@ by a custom `BasicJvmScriptingHost` configured via `SpecScriptCompilationConfig`
 
 ## Why a custom host (vs JSR-223)
 
-- Pre-imports the DSL (`com.breadmoirai.garnet.dsl.*`) so script
+- Pre-imports the DSL (`com.breadmoirai.garnet.spec.*`) so script
   authors don't need import lines.
 - Better error reporting: diagnostics flow through `ResultWithDiagnostics`,
   not buried in `ScriptException`.

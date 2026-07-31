@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.client.ide
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.garnet.client.config.ModConfig
+import com.breadmoirai.garnet.config.ModConfig
 import com.breadmoirai.garnet.network.project.SetProjectRootC2S
 import java.nio.file.Path
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking

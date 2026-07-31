@@ -9,7 +9,7 @@ import com.breadmoirai.garnet.network.project.StructureResultS2C
 import com.breadmoirai.garnet.network.project.ProjectErrorS2C
 import com.breadmoirai.garnet.network.project.ProjectNetworkRegistry
 import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
-import com.breadmoirai.garnet.persistence.StructurePersistence
+import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.project.ProjectDimRegistry
 import com.breadmoirai.garnet.project.ProjectNewStructure
 import com.breadmoirai.garnet.project.ProjectRoot
@@ -147,7 +147,7 @@ class ProjectStructureNetworkSpec : GarnetTestSpec({
             SharedSettings.structureRegionChunks = 1
             ProjectNewStructure.create(tmp, "widget") // empty widget.nbt at root
             val committed = tmp.resolve("widget.nbt")
-            val sidecar = com.breadmoirai.garnet.persistence.StructurePersistence.unsavedSidecarOf(committed)
+            val sidecar = com.breadmoirai.garnet.structure.StructurePersistence.unsavedSidecarOf(committed)
             onServer {
                 ProjectServerContext.set(this, ProjectServerContext(ProjectRoot(tmp)))
                 val player = makeMockServerPlayer(this)

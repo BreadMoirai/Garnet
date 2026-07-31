@@ -10,7 +10,7 @@ class KtsSpecLoaderRoundtripTest : FunSpec({
         // Source produced by RecordingDslEmitter (new-DSL path): a top-level
         // `garnetSpec(...) { }` expression whose value is the script's return value.
         val source = """
-            import com.breadmoirai.garnet.dsl.*
+            import com.breadmoirai.garnet.spec.*
             import net.minecraft.core.Vec3i
 
             garnetSpec(id = "roundtrip-1", bounds = Vec3i(4, 3, 2), lifespan = 8) {}

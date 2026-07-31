@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.persistence
 
-import com.breadmoirai.garnet.dsl.Phase
-import com.breadmoirai.garnet.dsl.SimTime
+import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.spec.SimTime
 import com.breadmoirai.garnet.runner.BlockStateChange
 import com.breadmoirai.garnet.runner.PropertyDiff
 import com.breadmoirai.garnet.runner.StateRecording
@@ -30,7 +30,7 @@ class SpecPersistenceTest : FunSpec({
         val tmp = createTempDirectory("SpecPersistenceTest")
         // New-DSL path: write raw .spec.kts source, then load it back.
         val source = """
-            import com.breadmoirai.garnet.dsl.*
+            import com.breadmoirai.garnet.spec.*
             import net.minecraft.core.Vec3i
 
             garnetSpec(id = "rt", bounds = Vec3i(3, 3, 3), lifespan = 10) {}
@@ -48,7 +48,7 @@ class SpecPersistenceTest : FunSpec({
     test("writeSpecKts with sidecar recording roundtrips") {
         val tmp = createTempDirectory("SpecPersistenceTest-recording")
         val source = """
-            import com.breadmoirai.garnet.dsl.*
+            import com.breadmoirai.garnet.spec.*
             import net.minecraft.core.Vec3i
 
             garnetSpec(id = "rec", bounds = Vec3i(3, 3, 3), lifespan = 5) {}
@@ -85,7 +85,7 @@ class SpecPersistenceTest : FunSpec({
 
     test("no sidecar without explicit save") {
         val tmp = createTempDirectory("SpecPersistenceTest-no-recording")
-        SpecPersistence.writeSpecKts(tmp, "norec", "import com.breadmoirai.garnet.dsl.*\ngarnetSpec(id = \"norec\", lifespan = 5) {}")
+        SpecPersistence.writeSpecKts(tmp, "norec", "import com.breadmoirai.garnet.spec.*\ngarnetSpec(id = \"norec\", lifespan = 5) {}")
         tmp.resolve("norec.recording.nbt").exists() shouldBe false
         SpecPersistence.loadRecording(tmp, "norec") shouldBe null
     }

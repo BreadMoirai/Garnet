@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.client.viewport;
+package com.breadmoirai.garnet.ui.viewport;
 
 /**
  * Implemented by {@code WindowMixin} so client code can reach the viewport-shrink hook without

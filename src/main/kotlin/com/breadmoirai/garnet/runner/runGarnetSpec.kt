@@ -1,10 +1,10 @@
 package com.breadmoirai.garnet.runner
 
-import com.breadmoirai.garnet.dsl.Phase
-import com.breadmoirai.garnet.dsl.GarnetSpec
-import com.breadmoirai.garnet.dsl.SimTime
-import com.breadmoirai.garnet.dsl.SpecRun
-import com.breadmoirai.garnet.dsl.StateRecordingViewLike
+import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.spec.GarnetSpec
+import com.breadmoirai.garnet.spec.SimTime
+import com.breadmoirai.garnet.spec.SpecRun
+import com.breadmoirai.garnet.spec.StateRecordingViewLike
 import com.breadmoirai.garnet.mc.McDispatchers
 import com.breadmoirai.garnet.mc.awaitTickEnd
 import kotlinx.coroutines.withContext
@@ -89,7 +89,7 @@ private fun recorderLiveView(recorder: StateRecorder): StateRecordingViewLike {
     // on StateRecorder. Until that exists, fall back to building a recording
     // snapshot on each call (slower but correct for short tests).
     return object : StateRecordingViewLike {
-        override fun stateAt(pos: net.minecraft.core.BlockPos, time: com.breadmoirai.garnet.dsl.SimTime) =
+        override fun stateAt(pos: net.minecraft.core.BlockPos, time: com.breadmoirai.garnet.spec.SimTime) =
             StateRecordingView.of(recorder.toRecording()).stateAt(pos, time)
 
         override fun initialAt(pos: net.minecraft.core.BlockPos) =
@@ -112,7 +112,7 @@ private fun scanForUnexpectedChanges(
             val cur = view.stateAt(pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
             if (cur != prev && t !in declaredTicks) {
                 run.reportFailure(
-                    com.breadmoirai.garnet.dsl.SpecFailure(
+                    com.breadmoirai.garnet.spec.SpecFailure(
                         label = pos.toString(),
                         time = SimTime(t, Phase.END_OF_TICK),
                         message = "unexpected change (expected no change, got changed)",

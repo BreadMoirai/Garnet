@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.harness
 
-import com.breadmoirai.garnet.dsl.GarnetSpec
+import com.breadmoirai.garnet.spec.GarnetSpec
 import com.breadmoirai.garnet.runner.StateRecording
 import com.breadmoirai.garnet.runner.runGarnetSpec as runEngine
 import net.minecraft.core.BlockPos

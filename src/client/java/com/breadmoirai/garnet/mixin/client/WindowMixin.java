@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.garnet.client.viewport.ViewportState;
-import com.breadmoirai.garnet.client.viewport.WindowViewportExt;
+import com.breadmoirai.garnet.ui.viewport.ViewportState;
+import com.breadmoirai.garnet.ui.viewport.WindowViewportExt;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.platform.WindowEventHandler;
 import org.spongepowered.asm.mixin.Final;

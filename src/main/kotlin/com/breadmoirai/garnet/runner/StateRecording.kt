@@ -7,10 +7,10 @@ import net.minecraft.resources.Identifier
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.level.block.state.properties.Property
-import com.breadmoirai.garnet.dsl.Phase
-import com.breadmoirai.garnet.dsl.SimTime
-import com.breadmoirai.garnet.dsl.applyPropertyFromString
-import com.breadmoirai.garnet.dsl.captureBlockStateProps
+import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.spec.SimTime
+import com.breadmoirai.garnet.spec.applyPropertyFromString
+import com.breadmoirai.garnet.spec.captureBlockStateProps
 import java.util.UUID
 
 data class PropertyDiff(val name: String, val to: String)

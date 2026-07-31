@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.client.ui.compose.dock.DockRegion
-import com.breadmoirai.garnet.client.ui.compose.dock.DockState
-import com.breadmoirai.garnet.client.ui.compose.dock.Panel
+import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.Panel
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 

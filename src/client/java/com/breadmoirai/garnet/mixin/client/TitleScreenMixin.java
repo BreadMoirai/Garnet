@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.garnet.client.screen.GarnetIconButton;
+import com.breadmoirai.garnet.ui.widget.GarnetIconButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.persistence
 
-import com.breadmoirai.garnet.dsl.GarnetSpec
+import com.breadmoirai.garnet.spec.GarnetSpec
 import com.breadmoirai.garnet.runner.StateRecording
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
