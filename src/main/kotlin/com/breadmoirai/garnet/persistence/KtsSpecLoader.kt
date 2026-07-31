@@ -1,10 +1,8 @@
 package com.breadmoirai.garnet.persistence
 
 import com.breadmoirai.garnet.dsl.GarnetSpec
-import io.kotest.core.spec.Spec
 import java.nio.file.Path
 import kotlin.io.path.readText
-import kotlin.reflect.KClass
 import kotlin.script.experimental.api.EvaluationResult
 import kotlin.script.experimental.api.ResultValue
 import kotlin.script.experimental.api.ResultWithDiagnostics
@@ -22,18 +20,6 @@ object KtsSpecLoader {
         jvm {
             baseClassLoader(GarnetSpec::class.java.classLoader)
         }
-    }
-
-    /**
-     * Evaluates a `.spec.kts` source and returns the declared [Spec] subclass.
-     *
-     * The old emitted form declares `class XSpec : GarnetTestSpec(...)` as a nested class
-     * of the script object. This function locates that class via reflection on the script
-     * instance's declared nested classes.
-     */
-    fun loadSpec(source: String, name: String = "spec.kts"): KClass<out Spec> {
-        val eval = evalOrThrow(source, name)
-        return findFirstSpecClass(eval, name)
     }
 
     /**
@@ -59,10 +45,6 @@ object KtsSpecLoader {
                 "Ensure the script ends with a `garnetSpec(...) { ... }` expression from com.breadmoirai.garnet.dsl.")
     }
 
-    /** Loads a `.spec.kts` file and returns the declared [Spec] class. */
-    fun loadFile(path: Path): KClass<out Spec> =
-        loadSpec(path.readText(), name = path.fileName.toString())
-
     /** Loads a `.spec.kts` file and returns its [GarnetSpec] value. */
     fun loadFileAsGarnetSpec(path: Path): GarnetSpec =
         loadGarnetSpec(path.readText(), name = path.fileName.toString())
@@ -77,30 +59,6 @@ object KtsSpecLoader {
                 val msg = result.reports.joinToString("\n") { "  ${it.severity}: ${it.message}" }
                 error("Failed to load $name:\n$msg")
             }
-        }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun findFirstSpecClass(eval: EvaluationResult, name: String): KClass<out Spec> {
-        // After eval, scriptInstance is a property on the base ResultValue class.
-        // The class declared inside the .kts (e.g. `class FooSpec : GarnetTestSpec(...)`)
-        // appears as a declared nested class on the script object's Class.
-        val rv = eval.returnValue
-        when (rv) {
-            is ResultValue.Error -> throw rv.error
-            is ResultValue.NotEvaluated -> error("$name: script was not evaluated")
-            else -> { /* continue */ }
-        }
-        val scriptInstance = rv.scriptInstance
-            ?: error("$name: script produced no instance (returnValue=$rv)")
-
-        val specClasses = scriptInstance.javaClass.declaredClasses
-            .filter { Spec::class.java.isAssignableFrom(it) }
-        return when (specClasses.size) {
-            0 -> error("$name: no Spec class declared in script (expected `class XSpec : GarnetTestSpec(...)`)")
-            1 -> specClasses.single().kotlin as KClass<out Spec>
-            else -> error("$name: expected exactly 1 Spec subclass, found ${specClasses.size}: " +
-                "${specClasses.map { it.simpleName }}")
         }
     }
 }
