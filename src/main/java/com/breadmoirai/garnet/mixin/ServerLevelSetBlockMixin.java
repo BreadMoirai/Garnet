@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.mixin;
 
+import com.breadmoirai.garnet.editor.world.StructureEditWatcher;
 import com.breadmoirai.garnet.playback.recorder.StateRecorder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -61,6 +62,15 @@ abstract class ServerLevelSetBlockMixin {
     ) {
         Deque<Object> stack = BEFORE_STATE_STACK.get();
         Object fromObj = stack.isEmpty() ? SKIP_SENTINEL : stack.pop();
+
+        // Auto-save cares about every successful server-side change, not only positions some
+        // StateRecorder is watching -- so this must run BEFORE the sentinel return below, which
+        // fires for the common "no recorder interested" case. The watcher needs no before-state,
+        // only the position and the fact that the write actually landed.
+        if (cir.getReturnValue() && ((Object) this) instanceof ServerLevel) {
+            StructureEditWatcher.onBlockChanged((ServerLevel) (Object) this, pos);
+        }
+
         if (fromObj == SKIP_SENTINEL) return; // client level, out of bounds, or no recorder
         if (!cir.getReturnValue()) return; // block did not actually change
         BlockState before = (BlockState) fromObj;

@@ -7,6 +7,7 @@ import com.breadmoirai.garnet.test.editor.EditorFileOpsNetworkSpec
 import com.breadmoirai.garnet.test.editor.EditorNetworkRegistrySpec
 import com.breadmoirai.garnet.test.editor.EditorStructureNetworkSpec
 import com.breadmoirai.garnet.test.editor.EditorTeleportSpec
+import com.breadmoirai.garnet.test.editor.StructureAutoSaveSpec
 import com.breadmoirai.garnet.test.history.LocalHistoryStoreSpec
 import com.breadmoirai.garnet.test.structure.StructureRegionPersistenceSpec
 import com.breadmoirai.garnet.test.structure.StructureSidecarPersistenceSpec
@@ -57,6 +58,7 @@ class GametestSentinel {
                             StructureRegionPersistenceSpec::class,
                             StructureSidecarPersistenceSpec::class,
                             LocalHistoryStoreSpec::class,
+                            StructureAutoSaveSpec::class,
                         ),
                     )
                 }

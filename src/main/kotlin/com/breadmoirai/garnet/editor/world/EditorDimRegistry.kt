@@ -78,6 +78,21 @@ class EditorDimRegistry(private val server: MinecraftServer) {
 
     fun structureRegionOriginOf(subpath: String): BlockPos? = structureBySubpath[subpath]
 
+    /**
+     * The structure whose assigned region contains [pos], or null. Regions span the full world
+     * height, so only X/Z are tested. Linear in the number of placed structures — a handful in
+     * practice, and the overwhelmingly common answer is "none", reached in a couple of comparisons.
+     */
+    fun structureSubpathAt(pos: BlockPos): String? {
+        val width = SharedSettings.structureRegionChunks * 16
+        for ((subpath, origin) in structureBySubpath) {
+            if (pos.x < origin.x || pos.x >= origin.x + width) continue
+            if (pos.z < origin.z || pos.z >= origin.z + width) continue
+            return subpath
+        }
+        return null
+    }
+
     fun placedBoxOf(subpath: String): PlacedBox? = placedBoxes[subpath]
 
     fun setPlacedBox(subpath: String, box: PlacedBox) { placedBoxes[subpath] = box }
