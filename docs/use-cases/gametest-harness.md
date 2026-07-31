@@ -22,7 +22,7 @@ These UCs describe how author-written tests interact with the harness. They are 
 - UC-GT-01.a — For a server-gametest spec, the author adds the spec's `KClass` to the `specs = listOf(...)` argument in `GametestSentinel.runAll`; failure to do so causes the spec to be silently ignored — it will never appear in results or failures.
 - UC-GT-01.b — For a client-gametest spec, the author adds the spec's `KClass` to the `specs = listOf(...)` argument in `ClientTestSentinel.runKotestOnWorker`; the same silent-skip applies.
 - UC-GT-01.c — `launchKotest(sourceSet, reportsDir, specs)` forwards the explicit list to `TestEngineLauncher.withClasses(specs)`, bypassing the classpath walker entirely; the `specs` list is the only discovery mechanism for these source sets.
-- UC-GT-01.d — `GarnetTestLifecycle.registerWithServer(server)` must have been called before any spec in the list is executed; `GametestSentinel` calls it at the top of `runAll` after obtaining the live `MinecraftServer`; `ClientTestSentinel` calls `GarnetTestLifecycle.register()` at the top of `runTest` (before `SERVER_STARTED` fires, via the singleplayer world created by `SpecTestContext.createWorld`).
+- UC-GT-01.d — `McLifecycle.registerWithServer(server)` must have been called before any spec in the list is executed; `GametestSentinel` calls it at the top of `runAll` after obtaining the live `MinecraftServer`; `ClientTestSentinel` calls `McLifecycle.register()` at the top of `runTest` (before `SERVER_STARTED` fires, via the singleplayer world created by `SpecTestContext.createWorld`).
 
 **Invariants:** [gametest/kotest-bridge.md](../gametest/kotest-bridge.md), [gametest/unit-vs-gametest-split.md](../gametest/unit-vs-gametest-split.md)
 
@@ -91,7 +91,7 @@ These UCs describe how author-written tests interact with the harness. They are 
 | UC-GT-01.a | Author adds spec `KClass` to `GametestSentinel.runAll` specs list | `GametestSentinel.runAll` | **GAP-PARTIAL** |
 | UC-GT-01.b | Author adds spec `KClass` to `ClientTestSentinel.runKotestOnWorker` specs list | `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
 | UC-GT-01.c | `launchKotest` forwards explicit list to `TestEngineLauncher.withClasses`; classpath walker bypassed | — | **GAP** |
-| UC-GT-01.d | `GarnetTestLifecycle.registerWithServer` called before any spec executes | `GametestSentinel.runAll`, `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
+| UC-GT-01.d | `McLifecycle.registerWithServer` called before any spec executes | `GametestSentinel.runAll`, `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
 | UC-GT-02 | Drive a spec body via `runGarnetSpec` | `RunGarnetSpecSmokeTest."runGarnetSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
 | UC-GT-02.a | `GarnetTestSpec` installs `CoroutineDispatcherFactory` wrapping body in `McDispatchers.Server + RecordingHolder()` | `RecordingHolderTest."holder set in outer scope is visible in nested suspend functions"` | **GAP-PARTIAL** |
 | UC-GT-02.b | `runGarnetSpec` delegates to engine and stores recording in `RecordingHolder` | `RunGarnetSpecSmokeTest."runGarnetSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |

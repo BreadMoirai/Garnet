@@ -68,8 +68,8 @@ The drain happens after each tick, which means any worker call to `onClient` add
 
 - `docs/gametest/kotest-bridge.md` — the `GarnetTestSpec` dispatcher and `awaitTicks`/`onServer` cookbook (server-side counterpart).
 - `docs/gametest/spec-test-context.md` — `SpecTestContext` helpers (note: those assert the Fabric test thread, so they're only legal inside `onClient`/`runOnClient` closures or via the pump).
-- `src/main/kotlin/.../testing/ClientSpec.kt` — base class.
-- `src/main/kotlin/.../testing/core/FabricTestThreadPump.kt` — the pump.
+- `src/testSupport/kotlin/.../harness/ClientSpec.kt` — base class.
+- `src/testSupport/kotlin/.../harness/client/FabricTestThreadPump.kt` — the pump.
 - `src/clientTest/.../ClientTestSupport.kt` — general helpers (`onClient`, `runOnClient`, `waitForClientScreen`, `closeClientScreen`, `takeClientScreenshot`, `waitClientTicks`, `clientContext`, `currentWorld`).
 - `src/clientTest/.../ClientNetworkTestSupport.kt` — network helpers (`sendX` family + `drainClientPayloads`).
 - `src/clientTest/.../ClientNetworkSpec.kt` — example consumer covering UC-NET-01.c / UC-NET-03.e / UC-NET-04.a.
