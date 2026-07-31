@@ -1,7 +1,7 @@
 ---
 title: Jewel — the dock's widget layer
-tags: [compose, jewel, dock, icons, popup, skiko, versions]
-summary: The dock's IntelliJ-look widget layer. Covers the load-bearing Jewel/Compose/skiko version triple, why component icons need a separate artwork artifact, and the Jewel-authoritative tree-state model.
+tags: [compose, jewel, dock, icons, popup, skiko, versions, layout]
+summary: The dock's IntelliJ-look widget layer. Covers the load-bearing Jewel/Compose/skiko version triple, why component icons need a separate artwork artifact, the Jewel-authoritative tree-state model, and how IntUi's default tree metrics inset every row.
 ---
 
 # Jewel — the dock's widget layer
@@ -170,6 +170,45 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
   throwaway empty-named `FileNode` — `TreeRow` never reads its name, only its id — so `buildTreeFrom`
   takes `edit: ExplorerEdit? = null` and only synthesizes the placeholder when `edit` is a pending
   `Creating` targeting that folder.
+
+## IntUi's default tree metrics inset every row by 16 px
+
+Out of the box a `LazyTree` row does **not** start at its panel's left edge. `LazyTreeMetrics`
+splits a row's horizontal inset in two, and IntUi's defaults set both:
+
+| Metric | IntUi default | What it does |
+|---|---|---|
+| `elementPadding` (→ `SimpleListItemMetrics.outerPadding`) | `PaddingValues(horizontal = 12.dp)` | Sits **outside** the selection background, so it insets the highlight too |
+| `elementContentPadding` (→ `innerPadding`) | `PaddingValues(4.dp)` | Sits **inside** the highlight — the icon's inset from the row edge |
+| `indentSize` | `23.dp` | Multiplied by `Tree.Element.depth`; zero for the root row |
+
+`BasicLazyTree` applies them in that order (`padding(outerPadding)` → `padding(innerPadding)` →
+`padding(start = depth * indentSize)`). Because the dock's Compose scene runs at `Density(1f)`, the
+two fixed paddings are a flat **16 physical pixels** of gutter on the left of every row before the
+folder icon — dead space in a tool window only a couple hundred pixels wide — and, because the outer
+12 dp is outside the background shape, a selected row's highlight never reaches the panel edge the
+way IntelliJ's own Project view does.
+
+`ProjectExplorerPanel.flushTreeStyle()` fixes both by rebuilding the ambient
+`LocalLazyTreeStyle.current` with `elementPadding = PaddingValues(horizontal = 0.dp)` and passing it
+as `LazyTree(style = …)`. Zeroing the **outer** padding (not the content padding) is the whole trick:
+the row background goes edge-to-edge while the 4 dp content padding survives as the icon's inset.
+
+Two things that constrain how this is written:
+
+- **`LazyTreeMetrics`/`SimpleListItemMetrics` have private constructors.** The only way to build one
+  is the IntUi extension `LazyTreeMetrics.Companion.defaults(...)` from
+  `org.jetbrains.jewel.intui.standalone.styling`. Its parameter order is `indentSize`,
+  `elementBackgroundCornerSize`, `elementPadding`, then content padding / min height / gaps — so the
+  first three are passed positionally (read back off the base style) and everything after
+  `elementPadding` is left at IntUi's defaults.
+- **Passing an explicit `style` selects `LazyTree`'s experimental overload**, so the file needs
+  `@file:OptIn(ExperimentalJewelApi::class)`. The default-`style` call site does not.
+
+The panel's own `Column` therefore carries `padding(vertical = 4.dp)` only — a uniform inset there
+would put the margin straight back. The toolbar and the status/empty-state `Text`s carry their own
+horizontal padding instead. Keeping the toolbar's start inset at 4 dp is also what holds the kebab
+button at the (14, 12) hit point `JewelExplorerSpec` clicks.
 
 ## Right-click context menu drives the inline field
 

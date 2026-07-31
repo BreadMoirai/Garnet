@@ -29,7 +29,9 @@ import org.jetbrains.jewel.ui.icons.AllIconsKeys
 @Composable
 fun ExplorerToolbar() {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        // The start inset lives here rather than on the panel Column: the tree below is full-bleed,
+        // so the Column can't carry horizontal padding without putting the dead left margin back.
+        Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         KebabMenu()

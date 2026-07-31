@@ -1,9 +1,11 @@
-@file:OptIn(ExperimentalComposeUiApi::class)
+// ExperimentalJewelApi: passing an explicit `style` to LazyTree selects its experimental overload.
+@file:OptIn(ExperimentalComposeUiApi::class, ExperimentalJewelApi::class)
 
 package com.breadmoirai.garnet.editor.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,12 +46,17 @@ import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.data.NewNodeKind
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+import org.jetbrains.jewel.foundation.ExperimentalJewelApi
+import org.jetbrains.jewel.intui.standalone.styling.defaults
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.Outline
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.LazyTree
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.styling.LazyTreeMetrics
+import org.jetbrains.jewel.ui.component.styling.LazyTreeStyle
+import org.jetbrains.jewel.ui.component.styling.LocalLazyTreeStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 
 /** Panel background, matching the IntelliJ dark tool-window colour. */
@@ -61,14 +68,17 @@ fun explorerPanel(): Panel = Panel("garnet.explorer", "Explorer") { ProjectExplo
 @Composable
 private fun ProjectExplorer() {
     IntUiTheme(isDark = true) {
-        Column(Modifier.fillMaxSize().background(PANEL_BG).padding(4.dp)) {
+        // Vertical-only padding: the tree below is deliberately full-bleed horizontally (see
+        // [flushTreeStyle]), so a uniform inset here would reintroduce the very margin it removes.
+        // The toolbar carries its own start inset instead.
+        Column(Modifier.fillMaxSize().background(PANEL_BG).padding(vertical = 4.dp)) {
             ExplorerToolbar()
             var edit by remember { mutableStateOf<ExplorerEdit?>(null) }
             var editError by remember { mutableStateOf<String?>(null) }
             val menu = remember { ExplorerMenuState() }
             val snap = ProjectTreeState.snapshot
             if (snap == null) {
-                Text("(no project loaded — Refresh)", Modifier.padding(vertical = 2.dp))
+                Text("(no project loaded — Refresh)", Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
             } else {
                 // The root node carries the project name and is the "create at root" target, so it
                 // is useless collapsed. Opening it here — synchronously inside this remember block —
@@ -97,6 +107,7 @@ private fun ProjectExplorer() {
                     tree = tree,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     treeState = ExplorerTreeState.treeState,
+                    style = flushTreeStyle(),
                     onElementClick = { element -> onElementClick(element.data, ExplorerTreeState.pathOf(element)) },
                 ) { element ->
                     TreeRow(
@@ -141,8 +152,39 @@ private fun ProjectExplorer() {
                 )
             }
             val message = editError ?: ProjectTreeState.status
-            if (message.isNotEmpty()) Text(message, Modifier.padding(top = 4.dp))
+            if (message.isNotEmpty()) Text(message, Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp))
         }
+    }
+}
+
+/**
+ * The ambient [LazyTreeStyle] with its horizontal *element padding* zeroed out.
+ *
+ * IntUi's default tree metrics wrap every row in `elementPadding = PaddingValues(horizontal = 12.dp)`
+ * on top of `elementContentPadding = PaddingValues(4.dp)`. Because the scene runs at `Density(1f)`,
+ * that is a flat 16 px of empty gutter on the left of every row before the folder icon — dead space
+ * in a tool window that is only a couple hundred pixels wide — and it also insets the selection
+ * highlight, so a selected row never reaches the panel edge the way IntelliJ's Project view does.
+ *
+ * Zeroing the *outer* padding (not the content padding) is what fixes both: the row background goes
+ * edge-to-edge, and the 4.dp content padding survives as the icon's inset from the panel border.
+ *
+ * Only the first three parameters of `LazyTreeMetrics.defaults` are passed positionally — everything
+ * after `elementPadding` (content padding, min height, gaps) keeps IntUi's own defaults.
+ */
+@Composable
+private fun flushTreeStyle(): LazyTreeStyle {
+    val base = LocalLazyTreeStyle.current
+    return remember(base) {
+        LazyTreeStyle(
+            colors = base.colors,
+            metrics = LazyTreeMetrics.defaults(
+                base.metrics.indentSize,
+                base.metrics.simpleListItemMetrics.selectionBackgroundCornerSize,
+                PaddingValues(horizontal = 0.dp),
+            ),
+            icons = base.icons,
+        )
     }
 }
 
