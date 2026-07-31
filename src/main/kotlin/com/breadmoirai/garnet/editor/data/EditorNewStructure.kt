@@ -17,8 +17,11 @@ object EditorNewStructure {
      */
     fun create(folder: Path, name: String): Path {
         require(name.isNotBlank()) { "structure name must not be blank" }
-        require(name.matches(Regex("[a-zA-Z0-9_\\-]+"))) {
-            "structure name must match [a-zA-Z0-9_-]+, got: '$name'"
+        // Spaces are allowed: EditorNames.validate -- the rule the Explorer's create/rename field
+        // actually enforces -- only rejects path separators, "." and "..", so a stricter charset
+        // here would reject names the UI had already accepted.
+        require(name.matches(Regex("[a-zA-Z0-9_ \\-]+"))) {
+            "structure name must match [a-zA-Z0-9_ -]+, got: '$name'"
         }
         val file = folder.resolve("$name.nbt")
         require(!file.exists()) { "structure file already exists: $file" }

@@ -2194,8 +2194,18 @@ Expected: all pass.
 
 - [ ] **Step 7: Commit**
 
+Stage explicit paths only — the working tree may hold unrelated in-progress edits that must not be swept into this commit.
+
 ```bash
-git add -A src/
+git add src/main/kotlin/com/breadmoirai/garnet/structure/StructurePersistence.kt \
+        src/main/kotlin/com/breadmoirai/garnet/editor/data/FileTree.kt \
+        src/main/kotlin/com/breadmoirai/garnet/editor/network/EditorPackets.kt \
+        src/main/kotlin/com/breadmoirai/garnet/editor/network/EditorNetworking.kt \
+        src/client/kotlin/com/breadmoirai/garnet/editor/ui/ProjectExplorerPanel.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/editor/EditorStructureNetworkSpec.kt \
+        src/gametest/kotlin/com/breadmoirai/garnet/test/editor/EditorFileOpsNetworkSpec.kt
+# Plus any clientTest spec whose FileNode(...) constructions Step 5 had to amend.
+git status --short  # confirm nothing unrelated is staged
 git commit -m "refactor(editor): remove the .nbt.unsaved sidecar model"
 ```
 
