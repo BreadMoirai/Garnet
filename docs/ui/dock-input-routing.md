@@ -7,7 +7,7 @@ summary: How raw GLFW pointer/key/char callbacks are routed into the dock Compos
 # Dock input routing
 
 Raw GLFW input reaches the full-window dock `ComposeScene` through `DockInputRouter`
-(`src/client/kotlin/.../ui/compose/input/DockInputRouter.kt`), fed by two HEAD-injecting mixins on
+(`src/client/kotlin/.../ui/input/DockInputRouter.kt`), fed by two HEAD-injecting mixins on
 MC's input handlers. The whole path is **active-only and OFF by default**: it does nothing until a
 region is focused, so uncaptured input stays byte-for-byte vanilla.
 

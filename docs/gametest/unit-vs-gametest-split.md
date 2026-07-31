@@ -6,9 +6,12 @@ summary: Which logic belongs in src/test/, src/gametest/, or src/clientTest/, an
 
 # Unit-test vs gametest split
 
-All three source sets run Kotest specs; see `kotest-bridge.md` for the DSL and `awaitTicks`/`onServer`/`spawnStructure` cookbook.
-
-The repo uses three separate source sets:
+Three source sets run Kotest specs against the game; see `kotest-bridge.md` for the DSL and
+`awaitTicks`/`onServer`/`spawnStructure` cookbook. A fourth, `src/testSupport/`, holds the bridge
+itself (`GarnetTestSpec`, `ClientSpec`, `launchKotest`, and friends, package
+`com.breadmoirai.garnet.harness`) rather than any of the mod's own tests — it is a dependency of
+the other three, not a test suite in its own right, and it is the only place Kotest is a
+dependency; `main`/`client` do not ship it in the jar.
 
 - `src/test/` — Kotest unit specs, run on the JVM with no MC client or
   server. Bootstrap MC via `SharedConstants.tryDetectVersion()` +
@@ -20,6 +23,9 @@ The repo uses three separate source sets:
 - `src/clientTest/` — Kotest specs driven by a `FabricClientGameTest`
   sentinel that runs inside a full MC client (`runClientTest`). Use
   `ClientContextHolder` to access `ClientGameTestContext`.
+- `src/testSupport/` — the harness itself (`GarnetTestSpec`, `GarnetTestSpecContext`,
+  `ClientSpec`, `RecordingHolder`, `launcher/` helpers). Not a test suite; see
+  [architecture/module-map.md](../architecture/module-map.md#test-source-sets).
 
 ## Decision rule
 
@@ -38,16 +44,16 @@ keybinds, payload round-trips driven from the client — it belongs in
   `StateRecordingViewTest`, `GridLayoutTest`, `SimTimeTest`. All
   pure data / algorithm checks; no level, no runner.
 - **Server gametest (`src/gametest/`):** the `*Spec` classes registered in
-  `GametestSentinel` (`SmokeSpec`, `project/*Spec`, `persistence/*Spec`,
-  `recorder/*Spec`, `network/*Spec`). These need a real level: only the live MC
-  tick loop produces accurate scheduled-tick cadence, neighbor-update
+  `GametestSentinel` (`SmokeSpec`, `editor/*Spec`, `structure/*Spec`). These need a real level:
+  only the live MC tick loop produces accurate scheduled-tick cadence, neighbor-update
   ordering, and comparator/piston timing. Author new tests using
   `runGarnetSpec` with the DSL lambda; see
   [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
 - **Client gametest (`src/clientTest/`):** the `*Spec` classes registered in
-  `ClientTestSentinel` (`RunGarnetSpecSmokeTest`, `ClientNetworkSpec`,
-  `Dock*Spec`, `Viewport*Spec`, `ProjectExplorerSpec`, …). Runs via
-  `runClientTest`; exercises the full recorder screen → runner block flow.
+  `ClientTestSentinel` (`RunGarnetSpecSmokeTest`, `Dock*Spec`, `Viewport*Spec`,
+  `*ExplorerSpec`, `RootPickerSpec`, …). Runs via `runClientTest`; exercises the Compose dock
+  (viewport, input routing, Explorer) — there is no recorder-screen/runner-block flow to exercise
+  anymore, since that UI and its blocks were deleted.
 
 ## Why DSL/algorithm logic is unit-tested but circuit behaviour is gametested
 
@@ -73,7 +79,7 @@ the real-world circuit behaviour.
   or scheduling? Add a gametest spec under `src/gametest/`
   using `GarnetTestSpec` + `awaitTicks`/`spawnStructure`, and register it
   in `GametestSentinel`.
-- New screen, widget, payload, or marker-tool flow? Add a `ClientSpec`
+- New dock panel, widget, or payload flow? Add a `ClientSpec`
   under `src/clientTest/` (uses `ClientContextHolder` to access
   `ClientGameTestContext`), and register it in `ClientTestSentinel`.
 - See `kotest-bridge.md` for the full DSL reference and cookbook.

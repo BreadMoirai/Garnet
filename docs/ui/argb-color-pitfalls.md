@@ -52,5 +52,5 @@ deferred-render-state rules this pitfall lives inside.
 
 ## Files
 
-- `/mnt/h/Repo/garnet/src/client/kotlin/com/breadmoirai/garnet/client/ui/compose/dock/GarnetDock.kt`
-- `/mnt/h/Repo/garnet/src/client/kotlin/com/breadmoirai/garnet/client/screen/GarnetIconButton.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/ui/dock/GarnetDock.kt`
+- `src/client/kotlin/com/breadmoirai/garnet/ui/widget/GarnetIconButton.kt`

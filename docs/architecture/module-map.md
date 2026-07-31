@@ -6,78 +6,203 @@ summary: Tour of the source tree — which package owns what, the dependency dir
 
 # Module map
 
-A guided tour of `src/main/kotlin/com/breadmoirai/garnet/`. Use this as the entry point when you don't yet know which file to open.
+A guided tour of `com.breadmoirai.garnet` across all six source sets
+(`main`, `client`, `gametest`, `clientTest`, `test`, `testSupport`). Use this as the entry
+point when you don't yet know which file to open.
 
-## Top level
+**There is currently no in-world way to record or run a spec.** The blocks, block entity, and
+wire protocol that used to be the product surface (`GarnetRecorderBlock`, `GarnetRunnerBlock`,
+`SpecBlockEntity`, `SpecMarkerTool`, `network/Packets.kt`) were deleted. The engine underneath —
+`spec/`, `playback/`, `testing/` below — is intact and fully test-covered, but the only product
+callers today are the Explorer (`editor/`) and the Kotest harness (`testSupport/`). A future
+Compose dock panel is the intended replacement caller for `playback`/`testing`; see
+[recording-pipeline.md](recording-pipeline.md).
 
-- `garnet.kt` — Fabric mod entry, registers blocks/items/network, wires lifecycle hooks.
-- `ModRegistries.kt` — registry handles for blocks, items, block-entity types, payload types.
+## Top level (`src/main/kotlin/com/breadmoirai/garnet/`)
 
-## `block/` — two world-anchor blocks + their BE
+- `Garnet.kt` — `ModInitializer`. Registers `EditorNetworking`, `McLifecycle`, the
+  `SubTickPhaseEvents.PHASE` listener that still drives any active `StateRecorder` (there is
+  currently nothing that creates one outside tests), the project-root `SERVER_STARTING`/
+  `SERVER_STARTED`/`SERVER_STOPPED`/`BEFORE_SAVE` hooks, `/garnet project`, and the per-player
+  session cleanup on disconnect.
 
-- `GarnetRecorderBlock.kt` — places a recorder; records world state into a `StateRecording` and emits `.spec.kts` via `RecordingDslEmitter`.
-- `GarnetRunnerBlock.kt` — places a runner; loads the `.spec.kts` and calls `runGarnetSpec`.
-- `SpecBlockEntity.kt` — the BE used by both blocks. Holds the active `GarnetSpec`, the bounding region, and the spec-id reference. The `originPos` of the BE is the trust anchor for every C2S payload (see persistence/network-payload-contract.md).
-- `SpecBlockKind.kt` — the enum used inside the BE to remember which block kind owns it.
+## `spec/` — the spec DSL (the spec *is* the lambda)
 
-## `dsl/` — the spec DSL (the spec *is* the lambda)
+A true leaf: imports nothing else in the project. `GarnetSpec` holds a
+`SpecRun.() -> Unit` lambda — the user's declared inputs and assertions — not a flat entry list.
+Construction is via `garnetSpec(id) { … }`.
 
-`GarnetSpec` no longer holds a flat entry list. Instead it holds a `SpecRun.() -> Unit` lambda — the user's declared inputs and assertions. Construction is via `garnetSpec(id) { … }`.
+- `GarnetSpec.kt` — id, `Vec3i` bounds, lifespan, optional structure id, strict flag, and the
+  `block: SpecRun.() -> Unit` lambda.
+- `SpecRun.kt` — execution context for one `block` invocation. `input(x,y,z) { … }` /
+  `output(x,y,z) { … }` register tick-keyed callbacks into sorted maps; `SpecFailure` records
+  assertion failures.
+- `InputScope.kt` / `OutputScope.kt` — DSL receiver types; schedule actions / assertions against
+  `SimTime` keys.
+- `ConditionScope.kt` — condition leaf builders (`powered`, `prop`, `range`, `block`,
+  `containerHas`) and combinators (`all` / `any` / `not`).
+- `StateCondition.kt` — recursive predicate AST; `ConditionEvaluator.kt` evaluates it against a
+  live `BlockState`.
+- `SpecTime.kt` — `SimTime(tick, phase, order)` with `START` / `END` sentinels; `Phase` enum.
+  Order within a phase is load-bearing for sequencing multiple actions.
+- `PlayerInteractionDispatch.kt` — `tryApplyAsPlayerInteraction`: buttons go through
+  `ButtonBlock.press` so scheduled-tick paths fire correctly; other blocks fall through to
+  `setBlock`. See [runner/player-interaction-dispatch.md](../runner/player-interaction-dispatch.md).
 
-- `GarnetSpec.kt` — top-level value: id, `Vec3i` bounds, lifespan, optional structure id, strict flag, and the `block: SpecRun.() -> Unit` lambda.
-- `SpecRun.kt` — execution context for one `block` invocation. `input(x,y,z) { … }` and `output(x,y,z) { … }` register tick-keyed callbacks into sorted maps; `SpecFailure` records assertion failures.
-- `InputScope.kt` / `OutputScope.kt` — DSL receiver types; schedule actions / assertions against `SimTime` keys.
-- `ConditionScope.kt` — condition leaf builders (`powered`, `prop`, `range`, `block`, `containerHas`) and combinators (`all` / `any` / `not`).
-- `StateCondition.kt` — recursive predicate AST; `ConditionEvaluator.kt` evaluates it against a live `BlockState`.
-- `SpecTime.kt` — `SimTime(tick, phase, order)` with `START` / `END` sentinels; `Phase` enum. Order within a phase is load-bearing for sequencing multiple actions.
+## `mc/` — MC coroutine + tick plumbing
 
-The `dsl/` package depends on nothing else in the project and is the foundation everything else builds on.
+- `McLifecycle.kt` — registers the level-tick hooks that drive `McDispatchers` and
+  `SubTickPhaseEvents` against a live `MinecraftServer`.
+- `Dispatchers.kt` (`McDispatchers`) — coroutine dispatchers bound to the server thread.
+- `SubTickPhaseEvents.kt` — the `Phase` emitter (level tick → recorder `onPhase`); `PHASE` is
+  registered once in `Garnet.onInitialize`.
+- `Suspending.kt` — `awaitTicks`/`awaitTickEnd` primitives used by both the test harness and
+  `runGarnetSpec`'s tick loop.
+- `Ticks.kt` — tick-counting helpers.
 
-## `runner/` — the record → emit → run → verify pipeline
+## `structure/` — structure NBT + region math
 
-- `StateRecorder.kt` — captures per-phase block-state snapshots while the recorder is active.
-- `StateRecording.kt` / `StateRecordingStorage.kt` / `StateRecordingView.kt` / `SpecSnapshot.kt` — the recorded data in flight + persisted form.
-- `RecordingDslEmitter.kt` — derives `.spec.kts` source text from a `StateRecording`. Walks the recording, diffs adjacent snapshots, emits `input(…) { … }` and `output(…) { … }` blocks.
-- `runGarnetSpec.kt` — top-level suspend fun; snapshots the region, restores it, invokes `spec.block` once to populate callbacks, drives the tick loop, fires assertions inline, and throws `AssertionError` on failure.
-- `PlayerInteractionDispatch.kt` — `tryApplyAsPlayerInteraction`: buttons go through `ButtonBlock.press` so scheduled-tick paths fire correctly; other blocks fall through to `setBlock`. See [runner/player-interaction-dispatch.md](../runner/player-interaction-dispatch.md).
+- `StructurePersistence.kt` — compressed-NBT structure template save/load (`save`/`load`,
+  origin-fixed 1:1) and the standalone-file path (`saveAutoFitToFile`/`placeStructureCentered`,
+  auto-fit + re-center), plus the `.nbt.unsaved` dirty-sidecar helpers
+  (`unsavedSidecarOf`/`flushUnsavedSidecar`) used only by the Explorer's standalone-`.nbt` flow.
+- `StructureDiff.kt` — palette-order-insensitive NBT comparison (`structuresDiffer`) used to
+  decide whether a placed structure is actually dirty.
+- `StructureRegionMath.kt` — `centeredStart`/`anchorY`/`autoFit`: pure geometry for centering and
+  tight-boxing a structure inside an assigned region.
+- `PlacedBox.kt` — `(origin, size)` record for a structure's last-placed footprint.
 
-## `persistence/` — disk I/O
+## `config/`
 
-- `SpecPersistence.kt` — `.spec.kts` save/load via `RecordingDslEmitter` / `KtsSpecLoader` + emitter-flow auto-save. JSON is **not** used on disk.
-- `StructurePersistence.kt` — compressed-NBT structure template (the recorded world snapshot). Takes `Vec3i` size; positions are origin-local.
-- `KtsSpecLoader.kt` — evaluates a `.spec.kts` source via `BasicJvmScriptingHost` and unwraps the result as `GarnetSpec`. Pins the script's `baseClassLoader` to `GarnetSpec`'s loader so the cast works under Fabric's mod ("knot") classloader. See [persistence/kts-script-host.md](../persistence/kts-script-host.md).
-- `SpecScript.kt` — `@KotlinScript` type + `ScriptCompilationConfiguration` (pre-imports the DSL package).
+- `config/SharedSettings.kt` (main) — config read by both client and server: project root path,
+  grid/cell sizing, structure-region sizing.
+- `config/ModConfig.kt` (client) — client-side persisted config (`garnet.json`), including the
+  client's mirror of the project root path.
+- `config/ModMenuIntegration.kt` (client) — YACL config screen registration for Mod Menu.
 
-Both are used by the recorder block and the runner block.
+## `playback/` — the record → emit pipeline (engine intact, no in-game caller)
 
-## `network/` — wire protocol
+- `recorder/StateRecorder.kt` — captures per-phase block-state snapshots while a recorder is
+  active. Wired to `SubTickPhaseEvents` from `Garnet.onInitialize`, but nothing in `main`,
+  `client`, or `gametest` currently constructs one — the only caller is its own unit test.
+- `recorder/RecordingDslEmitter.kt` — derives `.spec.kts` source text from a `StateRecording`.
+  Pure function: walks the recording, diffs adjacent snapshots, emits `input(…) { … }` /
+  `output(…) { … }` blocks. Also emits the empty-spec stub used by `EditorNewSpec`.
+- `data/StateRecording.kt` / `StateRecordingStorage.kt` / `StateRecordingView.kt` — the recorded
+  data in flight and its persisted/queryable forms.
+- `data/RecordingSidecar.kt` — saves/loads the authorship-time `StateRecording` as
+  `<id>.recording.nbt`, consulted only by the (not-yet-built) editor timeline, not on the
+  execution path.
 
-- `Packets.kt` — every C2S/S2C payload as a Kotlin data class with a stream codec. All transforms are server-authoritative; clients only ever propose. Server validation pivots on the `originPos` → BE lookup (see persistence/network-payload-contract.md).
-- `NetworkRegistry.kt` — payload-type registration.
+## `testing/` — load a spec from disk and replay it
 
-## `event/`, `config/`, `item/`
+- `runner/runGarnetSpec.kt` — top-level suspend fun; snapshots the region, restores it, invokes
+  `spec.block` once to populate callbacks, drives the tick loop, fires assertions inline, and
+  throws `AssertionError` on failure. Called today only from the `testSupport` harness
+  (`GarnetTestSpec`) and gametest/unit specs — there is no product (UI) caller yet.
+- `runner/SpecSnapshot.kt` — captures/restores a region so a run starts from and returns to a
+  known state.
+- `data/SpecPersistence.kt` — `.spec.kts` save/load (`writeSpecKts`/`load`/`loadRecording`/
+  `listIds`) via `RecordingDslEmitter`/`KtsSpecLoader`. JSON is **not** used on disk.
+- `data/KtsSpecLoader.kt` — evaluates a `.spec.kts` source via `BasicJvmScriptingHost` and
+  unwraps the result as `GarnetSpec`. Pins the script's `baseClassLoader` to `GarnetSpec`'s
+  loader so the cast works under Fabric's mod ("knot") classloader. See
+  [persistence/kts-script-host.md](../persistence/kts-script-host.md).
+- `data/SpecScript.kt` — `@KotlinScript` type + `ScriptCompilationConfiguration` (pre-imports
+  the DSL package).
+- `data/SpecDirectoryScan.kt` — lists `.spec.kts` files in a directory, sorted.
 
-- `event/SubTickPhaseEvents.kt` — Phase-emitter wiring (level tick → recorder/runner `onPhase`).
-- `config/SharedSettings.kt` — config loaded by both client and server (YACL on the client).
-- `item/SpecMarkerTool.kt` — the in-world bounds-marking tool; `UndoStack.kt` is its undo history.
+## `editor/` — the redstone-project workspace (the live product surface)
 
-## Client and tests
+The Explorer and the void-workspace grid are the only reachable in-game feature today. See
+[redstone-project.md](redstone-project.md) for the full design; summary of package layout:
 
-- `src/client/kotlin/...` — every screen widget and the client-side payload sender. See [ui/INDEX.md](../ui/INDEX.md).
-- `src/test/kotlin/...` — pure JUnit (DSL, JSON codec, kts loader/emitter, persistence). See [gametest/unit-vs-gametest-split.md](../gametest/unit-vs-gametest-split.md).
-- `src/gametest/kotlin/...` — server-side `@GameTest` flows (`runGameTest`). See [gametest/INDEX.md](../gametest/INDEX.md).
-- `src/clientTest/kotlin/...` — client-side `FabricClientGameTest` flows (`runClientTest`). See [gametest/INDEX.md](../gametest/INDEX.md).
+- `data/` — pure data: `EditorRoot` (path-traversal-safe `resolveSubpath`), `EditorSession`
+  (per-player active-folder pointer), `EditorCell`, `FileTree`/`EditorFolderTree` (tree scan
+  models), `EditorNames` (name validation), `EditorNewSpec`/`EditorNewStructure` (stub writers),
+  `EditorSaveNaming`, `LoadedSpec`.
+- `world/` — server-side lifecycle and state: `EditorWorld` (per-server loaded-folder map),
+  `EditorDimRegistry` (region assignment in `server.overworld()`), `EditorDimLifecycle`
+  (place/save the grid), `EditorCellSaver` (dirty-diff a cell and rewrite its structure NBT),
+  `EditorTeleport`, `EditorServerContext`, `GridLayout` (pure row-major slot math).
+- `command/EditorCommand.kt` — `/garnet project`.
+- `network/EditorPackets.kt` + `EditorNetworking.kt` (main) — the wire protocol and its server
+  handlers. See [persistence/network-payload-contract.md](../persistence/network-payload-contract.md)
+  for the authority model — a *different* one from the deleted block-entity trust anchor.
+- `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ProjectTreeState`.
+- `ui/` (client) — `ProjectExplorerPanel.kt`, `ExplorerToolbar.kt`, `ExplorerContextMenu.kt`,
+  `ExplorerEdit.kt`, `ExplorerLifecycle.kt`, `ExplorerTreeState.kt`, `ProjectTreeState.kt`,
+  `FolderPicker.kt`, `RootPickerController.kt` — the Compose LEFT-dock panel and its state. Note
+  these classes keep the `Project*`/legacy names deliberately (the `/garnet project` command
+  literal and "redstone project" domain term are unchanged); they are not `Editor*`.
+- `world/EditorIntegratedBoot.kt` (client) — `bootWorkspace()`, the "Redstone Projects…" title-screen
+  entry point.
+
+## `ui/` — the Compose dock shell (client only)
+
+- `compose/` — `ComposeOverlay.kt` (render/enable gate), `ComposeSceneHost.kt` (generic
+  `ImageComposeScene` wrapper), `ComposeSurface.kt` (blit + input entry points).
+- `dock/` — `GarnetDock.kt` (the root composable), `DockState.kt`, `DockRegion.kt`,
+  `DockInsets.kt`, `Panel.kt`.
+- `input/` — `DockInputRouter.kt`, `GlfwKeyMap.kt`.
+- `viewport/` — `ViewportState.kt`, `ViewportToggle.kt`, `DockKeybinds.kt`,
+  `CursorFocusToggle.kt`, `CompositeTarget.kt`, `BlitUvPipeline.kt` (blend pipeline).
+- `widget/GarnetIconButton.kt` — the one surviving legacy-style (`GuiGraphicsExtractor`-based)
+  widget, the title-screen "Redstone Projects…" button.
+
+See [ui/INDEX.md](../ui/INDEX.md) for the detailed dock articles.
+
+## `mixin/` (main, Java) and `mixin/client/` (client, Java)
+
+Server-side: `ConnectionAccessor`, `ServerCommonPacketListenerImplAccessor`,
+`ServerLevelPhaseMixin`, `ServerLevelSetBlockMixin`. Client-side:
+`ClientCommonPacketListenerImplAccessor`, `KeyboardHandlerMixin`, `MinecraftPresentMixin`,
+`MouseHandlerMixin`, `MouseHandlerViewportMixin`, `TitleScreenMixin`, `WindowMixin` — the
+GLFW-input and viewport-shrink/composite mixins backing `ui/`. See
+[architecture/shrink-viewport-compose-model.md](shrink-viewport-compose-model.md) and
+[ui/dock-input-routing.md](../ui/dock-input-routing.md).
+
+## Test source sets
+
+- `src/test/kotlin/...` — pure JUnit/Kotest (DSL, kts loader/emitter, persistence, structure
+  math, editor data). Mirrors the main-package layout under `com.breadmoirai.garnet`. See
+  [gametest/unit-vs-gametest-split.md](../gametest/unit-vs-gametest-split.md).
+- `src/gametest/kotlin/.../test/` — server-side Kotest specs driven by a `@GameTest` sentinel
+  (`GametestSentinel`, `runGameTest`), under `test/editor/` and `test/structure/`.
+- `src/clientTest/kotlin/.../test/` — client-side Kotest specs driven by `runClientTest`
+  (`ClientTestSentinel`) — dock, viewport, and Explorer coverage.
+- `src/testSupport/kotlin/.../harness/` — the Kotest bridge itself (not the mod's tests):
+  `GarnetTestSpec`, `GarnetTestSpecContext`, `ClientSpec`, `RecordingHolder`, `RunGarnetSpec.kt`,
+  `client/` (`ClientContextHolder`, `FabricTestThreadPump`, `WorldHolder`),
+  `launcher/` (`KotestLauncher`, `ResultCollector`, `DiagnosticRecorderListener`). This sourceset
+  does not ship in the mod jar; Kotest itself is only a dependency here, not on `main`. See
+  [gametest/kotest-bridge.md](../gametest/kotest-bridge.md).
 
 ## Dependency direction
 
 ```
-dsl/  ←  runner/  ←  persistence/  ←  block/  ←  network/  ←  client/
+spec/  mc/  structure/  config/  ui/   →   playback/   →   testing/   →   editor/
 ```
 
-`dsl/` is the leaf — no other package may depend up the chain. `runner/` consumes only `dsl/`. `persistence/` consumes `dsl/` + `runner/` (for `RecordingDslEmitter`). The client never reaches into `runner/` directly; it goes through `network/Packets.kt`.
+`spec/`, `mc/`, `structure/`, `config/`, and `ui/` are the base packages — none of them depends
+on any of the others in this list, and none depends up the chain. `playback/` consumes `spec/`
+and `mc/`. `testing/` consumes `playback/` (for `RecordingDslEmitter`) plus `spec/`/`mc/`.
+`editor/` is the top of the stack: it consumes `structure/`, `config/`, and `testing/`'s
+persistence pieces, and its client half (`ui/` panels) drives the `ui/` dock shell. Nothing
+outside `editor/` depends on `editor/`.
 
 ## Where to start reading
 
-- *"How does a spec get from the world onto disk?"* → start at `block/GarnetRecorderBlock.kt`, then `runner/StateRecorder.kt` → `runner/RecordingDslEmitter.kt` → `persistence/SpecPersistence.kt`. See also [recording-pipeline.md](recording-pipeline.md).
-- *"How is a spec replayed and verified?"* → `block/GarnetRunnerBlock.kt` → `runner/runGarnetSpec.kt`; the spec's `block` lambda fires inputs and asserts outputs inline. See [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
-- *"Why is the GUI structured this way?"* → the legacy `RecorderScreen`/`RunnerScreen`/`ProjectScreen` were hard-cut in favor of a full-window Compose dock; start at [ui/dock-framework.md](../ui/dock-framework.md) and [ui/dock-input-routing.md](../ui/dock-input-routing.md).
+- *"How does a spec get from the world onto disk?"* — there is currently no in-game trigger.
+  Read `playback/recorder/StateRecorder.kt` → `playback/recorder/RecordingDslEmitter.kt` →
+  `testing/data/SpecPersistence.kt` for the intact pipeline, and see
+  [recording-pipeline.md](recording-pipeline.md) for why it has no caller today.
+- *"How is a spec replayed and verified?"* → `testing/runner/runGarnetSpec.kt`; the spec's
+  `block` lambda fires inputs and asserts outputs inline. Called from
+  `testSupport/harness/GarnetTestSpec.kt` and gametest/unit specs today. See
+  [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
+- *"How does the Explorer work?"* → `editor/network/EditorNetworking.kt` (server handlers) and
+  `editor/ui/ProjectExplorerPanel.kt` (client panel); see [redstone-project.md](redstone-project.md).
+- *"Why is the GUI structured this way?"* → the legacy `RecorderScreen`/`RunnerScreen`/
+  `ProjectScreen` were hard-cut in favor of a full-window Compose dock; start at
+  [ui/dock-framework.md](../ui/dock-framework.md) and [ui/dock-input-routing.md](../ui/dock-input-routing.md).

@@ -7,7 +7,7 @@ summary: Why the runner dispatches button-style inputs through ButtonBlock.press
 # Replaying player-interaction inputs through the runner
 
 The runner replay (`tryApplyAsPlayerInteraction` in
-`src/main/kotlin/com/breadmoirai/garnet/runner/PlayerInteractionDispatch.kt`)
+`src/main/kotlin/com/breadmoirai/garnet/spec/PlayerInteractionDispatch.kt`)
 has two paths for applying an input block-state change:
 
 1. The **generic path** — `level.setBlock(pos, target, 3)`.

@@ -6,7 +6,7 @@ summary: Why button input is replayed via ButtonBlock.press instead of raw setBl
 
 # Player-Interaction Dispatch
 
-`tryApplyAsPlayerInteraction` in `runner/PlayerInteractionDispatch.kt` applies
+`tryApplyAsPlayerInteraction` in `spec/PlayerInteractionDispatch.kt` applies
 a target `BlockState` to a position in two possible ways:
 
 1. **Block-type-specific dispatch** — for `ButtonBlock`, routes through
@@ -37,7 +37,7 @@ Why this matters at replay time: recordings of player-driven circuits are produc
 
 Anything driven by the button's redstone signal between those two events runs off a different cadence than the recording — neighbor updates fire at different SimTimes, and downstream comparators/repeaters fall out of sync. The verifier then explodes with `unexpected change` failures even though the spec is logically correct.
 
-## Current dispatch (`runner/PlayerInteractionDispatch.kt`)
+## Current dispatch (`spec/PlayerInteractionDispatch.kt`)
 
 ```kotlin
 if (block is ButtonBlock) {

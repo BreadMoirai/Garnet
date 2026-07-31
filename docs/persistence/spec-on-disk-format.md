@@ -30,9 +30,11 @@ garnetSpec("door_latch") {
 
 ## What's NOT on disk
 
-- **JSON.** No `.json` spec files. JSON survives in the codebase as
-  `SpecJsonCodec`, used **only** for C2S/S2C network payloads. There is no
-  on-disk JSON read or write path.
+- **JSON.** No `.json` spec files. There is no JSON codec for spec content anywhere in the
+  codebase anymore — `SpecJsonCodec` existed only to serialize the old recorder/runner wire
+  payloads and was deleted along with that protocol (see
+  [network-payload-contract.md](network-payload-contract.md)). There is no on-disk or on-wire
+  JSON path for spec content today.
 
 ## Companion files
 
@@ -51,11 +53,15 @@ garnetSpec("door_latch") {
 placed/captured/created directly from the tree without an owning spec. See
 [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files).
 
-## Editor save flow
+## Save flow
 
-When the in-game editor saves, `SpecPersistence.save` calls
-`KtsSpecEmitter.emit(spec)` (KotlinPoet-generated text) and writes the
-result as `<id>.spec.kts`. Reload reads the file via `KtsSpecLoader`.
+`SpecPersistence.writeSpecKts(saveDir, id, source)` writes `.spec.kts` source text verbatim (the
+text itself comes from `RecordingDslEmitter`, e.g. `emitStub` for a brand-new spec). Reload reads
+the file via `KtsSpecLoader`. There is currently no live caller that re-emits an *existing* spec's
+`.spec.kts` from edited world state — the redstone-project grid's "Save Now" flow
+(`EditorCellSaver`) only rewrites the companion `.nbt` structure file when the cell is dirty; the
+`.spec.kts` re-emission on that path is a known deferred piece (see
+[use-cases/redstone-project.md](../use-cases/redstone-project.md) UC-MAN-07.d).
 
 ## Migration
 

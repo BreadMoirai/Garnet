@@ -7,7 +7,7 @@ summary: How the kotlin-scripting host loads .spec.kts files; why a custom host 
 # .spec.kts Script Host
 
 `GarnetSpec` is authored as `.spec.kts` files in the world directory and
-loaded at runtime by `KtsSpecLoader` (in `persistence/`). Files are evaluated
+loaded at runtime by `KtsSpecLoader` (in `testing/data/`). Files are evaluated
 by a custom `BasicJvmScriptingHost` configured via `SpecScriptCompilationConfig`.
 
 ## Why a custom host (vs JSR-223)

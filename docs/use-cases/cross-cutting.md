@@ -11,16 +11,21 @@ These UCs describe full end-to-end flows touching record, persist, network, run,
 
 **Retired IDs referenced below:** `UC-REC-*`/`UC-RUN-*` were parent UCs in `recording.md`/`running.md`,
 deleted along with the `RecorderScreen`/`RunnerScreen` client UI they documented (see
-[INDEX.md](INDEX.md)). The journeys below still hold at the server/network layer — recorder and
-runner blocks still record and run specs exactly as described, only the client screen that used to
-trigger/display each step is gone (`ClientNetworkHandler` now no-ops the relevant S2C receivers; see
-[networking.md](networking.md)'s UC-NET-01/UC-NET-03 "UI status" note). Read `UC-REC-*`/`UC-RUN-*`
-below as historical journey labels for "the recording/running step happens here," not as resolvable
-links.
+[INDEX.md](INDEX.md)). Read `UC-REC-*`/`UC-RUN-*` below as historical journey labels for "the
+recording/running step happens here," not as resolvable links.
+
+**UC-X2X-01, UC-X2X-02, and UC-X2X-05 are UNREACHABLE today.** They all start by placing a
+recorder or runner block; those blocks, the block entity, and the whole C2S/S2C protocol they
+used were deleted (see [networking.md](networking.md), now marked UNREACHABLE, and
+[architecture/recording-pipeline.md](../architecture/recording-pipeline.md)). They are kept below,
+unmodified, as the specification for the end-to-end journey a future dock panel should reproduce
+— not as a description of anything reachable in the mod today. UC-X2X-03 (hand-authored spec in a
+redstone-project folder) and UC-X2X-04 (Kotest harness) remain fully reachable; they never went
+through the deleted blocks.
 
 ---
 
-### UC-X2X-01 — Singleplayer record, persist, restart, reload, and verify pass
+### UC-X2X-01 — Singleplayer record, persist, restart, reload, and verify pass (UNREACHABLE)
 
 **Actor:** Author (singleplayer)
 **Trigger:** Author completes a recording session and later reopens the world to run the spec.
@@ -34,7 +39,7 @@ links.
 
 ---
 
-### UC-X2X-02 — Dedicated-server record, client confirmation, server persist, second-client run
+### UC-X2X-02 — Dedicated-server record, client confirmation, server persist, second-client run (UNREACHABLE)
 
 **Actor:** Author on client A; Player on client B; dedicated server
 **Trigger:** Author initiates a recording on a dedicated server; a second client later loads the saved spec via a runner block.
@@ -79,7 +84,7 @@ links.
 
 ---
 
-### UC-X2X-05 — Overwrite-prompt handshake guards re-recording an existing spec
+### UC-X2X-05 — Overwrite-prompt handshake guards re-recording an existing spec (UNREACHABLE)
 
 **Actor:** Author (singleplayer or dedicated server)
 **Trigger:** Author attempts to finalize a recording whose target filename already exists on disk.
@@ -98,8 +103,8 @@ links.
 
 | UC ID | Description | Test | Status |
 |---|---|---|---|
-| UC-X2X-01 | Singleplayer record → persist → restart → reload → verify pass | see UC-REC-04, UC-REC-05, UC-PER-01, UC-PER-02, UC-PER-05, UC-RUN-01, UC-RUN-02, UC-RUN-04 | see refs |
-| UC-X2X-02 | Dedicated-server record → client confirmation → server persist → second-client run | see UC-REC-04, UC-REC-05, UC-NET-01, UC-NET-03, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02, UC-RUN-04 | see refs |
+| UC-X2X-01 | Singleplayer record → persist → restart → reload → verify pass | see UC-REC-04, UC-REC-05, UC-PER-01, UC-PER-02, UC-PER-05, UC-RUN-01, UC-RUN-02, UC-RUN-04 | UNREACHABLE — recorder/runner blocks deleted |
+| UC-X2X-02 | Dedicated-server record → client confirmation → server persist → second-client run | see UC-REC-04, UC-REC-05, UC-NET-01, UC-NET-03, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02, UC-RUN-04 | UNREACHABLE — recorder/runner blocks deleted |
 | UC-X2X-03 | Hand-authored spec → project root → grid projection → cell edit → save-back | see UC-PER-02, UC-PER-04, UC-PER-05, UC-MAN-02, UC-MAN-03, UC-MAN-04, UC-MAN-07, UC-MAN-08, UC-CMD-01, UC-CMD-03 | see refs |
 | UC-X2X-04 | Kotest spec registered → harness drives runGarnetSpec → diagnostic recording on failure | see UC-GT-01, UC-GT-02, UC-GT-04, UC-REC-05, UC-REC-06, UC-RUN-02, UC-RUN-05, UC-PER-02, UC-PER-05 | see refs |
-| UC-X2X-05 | Overwrite-prompt handshake guards re-recording an existing spec | see UC-REC-05, UC-NET-03, UC-NET-04, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02 | see refs |
+| UC-X2X-05 | Overwrite-prompt handshake guards re-recording an existing spec | see UC-REC-05, UC-NET-03, UC-NET-04, UC-NET-05, UC-PER-01, UC-PER-03, UC-RUN-01, UC-RUN-02 | UNREACHABLE — recorder/runner blocks deleted |

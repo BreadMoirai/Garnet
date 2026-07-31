@@ -67,8 +67,12 @@ origin.
 
 ### UC-PER-06 — Capture and restore a structure sidecar (`.nbt`)
 
-**Actor:** System (editor save / runner setup)
-**Trigger:** The editor saves a spec and the associated circuit region must be persisted; or the runner is about to execute a spec and needs to restore the initial block state.
+**Actor:** System (no live product caller today — the recorder-finalize save and the
+runner-pre-execution restore this describes both went with the deleted recorder/runner blocks;
+`StructurePersistence.save`/`load` are exercised only by `StructureSidecarPersistenceSpec` now)
+**Trigger:** Directly calling `StructurePersistence.save`/`load`. Historically: the editor saving
+a spec and the associated circuit region needing persistence; or the runner about to execute a
+spec and needing to restore the initial block state.
 **Preconditions:** For save: a `ServerLevel`, origin `BlockPos`, and bounding `Vec3i` are available. For restore: `<id>.nbt` exists in `saveDir`.
 **Outcome:** Save — `<id>.nbt` is written as a compressed NBT structure file usable by MC's `StructureTemplate` API. Restore — the block region is filled back to its saved state at the given origin before the spec runs.
 

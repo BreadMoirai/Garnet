@@ -12,10 +12,11 @@ lambda. The spec *is* the test.
 
 ## How a run starts
 
-`runGarnetSpec(level, origin, spec)` is a suspend fun in `runner/runGarnetSpec.kt`.
-It is called directly from a Kotest test body (or from the runner block's
-server coroutine). There is no coordinator singleton or per-run object —
-all state lives on the call stack.
+`runGarnetSpec(level, origin, spec)` is a suspend fun in `testing/runner/runGarnetSpec.kt`.
+It is called directly from a Kotest test body via the `testSupport` harness
+(`GarnetTestSpec`) — there is currently no in-game UI caller (the recorder/runner blocks that
+used to call it were deleted; see [architecture/recording-pipeline.md](../architecture/recording-pipeline.md)).
+There is no coordinator singleton or per-run object — all state lives on the call stack.
 
 1. Takes a `SpecSnapshot` of the region so it can be restored before and after.
 2. Restores the snapshot, activating a `StateRecorder` over the bounds.

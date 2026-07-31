@@ -7,7 +7,7 @@ summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real frameb
 # GarnetDock — full-window Compose dock
 
 The dock is a single `@Composable` (`GarnetDock(realW, realH)`,
-`src/client/kotlin/.../ui/compose/dock/GarnetDock.kt`) hosted full-window by
+`src/client/kotlin/.../ui/dock/GarnetDock.kt`) hosted full-window by
 `ComposeSceneHost` and blitted over the world composite by `ComposeSurface`. It replaced the
 feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was deleted.
 

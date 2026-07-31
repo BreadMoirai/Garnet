@@ -39,11 +39,14 @@ loaded folder maps to a distinct **region** in the overworld via counter-based a
   the spec file.
 - **No persisted slot.** Slot index = filename-sorted index, recomputed each `placeFolder`.
   Renaming a spec shuffles slots.
-- **Server-authoritative.** Same model as `network/Packets.kt`: clients propose, server
-  validates against `EditorRoot.resolveSubpath` (path-traversal guard) and acts.
-- **`SpecBlockEntity.projectSourcePath`** binds a recorder/runner block in a project cell
-  back to its source `.spec.kts`. NOT persisted to NBT — set directly on the BE during
-  `placeFolder` and reset on every re-place.
+- **Server-authoritative.** Clients propose, server validates against `EditorRoot.resolveSubpath`
+  (path-traversal guard) and acts — see
+  [persistence/network-payload-contract.md](../persistence/network-payload-contract.md) for the
+  full authority model (there is no block-entity trust anchor here; the old
+  recorder/runner blocks and their `SpecBlockEntity` were deleted along with the network protocol
+  that used to key off them).
+- **A cell is just its placed structure.** There is no anchor block bound to the spec file
+  anymore — `EditorDimLifecycle.placeCell` places the structure NBT and nothing else.
 - **Cell-origin Y is absolute** (`yBase`); X/Z are region-relative.
 
 ## Components
@@ -87,8 +90,8 @@ Server state and lifecycle:
 - `EditorCommand` — `/garnet project`.
 
 Network:
-- `editor/network/EditorPackets` + `EditorNetworking` — same authority pattern as
-  `network/Packets.kt`.
+- `editor/network/EditorPackets` + `EditorNetworking` — path-containment + per-player-session
+  authority; see [persistence/network-payload-contract.md](../persistence/network-payload-contract.md).
 
 Client:
 - `editor/ui/ProjectExplorerPanel` + `editor/ui/ExplorerToolbar` + `editor/ui/ProjectTreeState` +

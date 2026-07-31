@@ -47,8 +47,10 @@ The persistence layer turns in-memory specs into `.spec.kts` + `.nbt` file pairs
 
 ### UC-PER-03 — Scan a spec directory for available specs
 
-**Actor:** System (runner-screen picker, on screen open)
-**Trigger:** The runner UI needs to populate its spec dropdown; `SpecDirectoryScan.list(specsDir)` is called.
+**Actor:** System (no live caller today — the runner-screen picker that used to call this was
+deleted with the recorder/runner blocks; `SpecDirectoryScan` is exercised only by its own unit
+test now)
+**Trigger:** `SpecDirectoryScan.list(specsDir)` is called directly.
 **Preconditions:** `specsDir` may or may not exist; the caller handles both cases.
 **Outcome:** A sorted list of `.spec.kts` filenames (relative names, not full paths) is returned; an empty list is returned if the directory does not exist or contains no matching files.
 
