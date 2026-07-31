@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.testing.core.ClientContextHolder
-import com.breadmoirai.garnet.testing.core.FabricTestThreadPump
-import com.breadmoirai.garnet.testing.core.WorldHolder
+import com.breadmoirai.garnet.harness.client.ClientContextHolder
+import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
+import com.breadmoirai.garnet.harness.client.WorldHolder
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
 

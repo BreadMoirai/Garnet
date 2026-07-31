@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.testing.runner
+package com.breadmoirai.garnet.harness
 
 import com.breadmoirai.garnet.runner.StateRecording
 import io.kotest.core.spec.style.FunSpec

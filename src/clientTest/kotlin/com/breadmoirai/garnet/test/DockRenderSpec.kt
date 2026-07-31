@@ -7,7 +7,7 @@ import com.breadmoirai.garnet.client.ui.compose.dock.DockState
 import com.breadmoirai.garnet.client.ui.compose.dock.Panel
 import com.breadmoirai.garnet.client.viewport.ViewportState
 import com.breadmoirai.garnet.client.viewport.WindowViewportExt
-import com.breadmoirai.garnet.testing.ClientSpec
+import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import androidx.compose.foundation.background

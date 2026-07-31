@@ -1,8 +1,8 @@
 @file:OptIn(io.kotest.common.ExperimentalKotest::class)
 
-package com.breadmoirai.garnet.testing
+package com.breadmoirai.garnet.harness
 
-import com.breadmoirai.garnet.testing.runner.RecordingHolder
+import com.breadmoirai.garnet.harness.RecordingHolder
 import io.kotest.core.concurrency.CoroutineDispatcherFactory
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.core.test.TestCase

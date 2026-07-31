@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.testing.core.McDispatchers
 import com.breadmoirai.garnet.testing.server.awaitTickEnd
 import com.breadmoirai.garnet.testing.server.awaitTicks

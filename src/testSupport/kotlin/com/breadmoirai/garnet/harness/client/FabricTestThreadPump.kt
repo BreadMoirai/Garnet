@@ -1,6 +1,6 @@
 @file:Suppress("UnstableApiUsage")
 
-package com.breadmoirai.garnet.testing.core
+package com.breadmoirai.garnet.harness.client
 
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import java.util.concurrent.CompletableFuture

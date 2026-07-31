@@ -9,7 +9,7 @@ import com.breadmoirai.garnet.project.ProjectTeleport
 import com.breadmoirai.garnet.project.ProjectWorld
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
-import com.breadmoirai.garnet.testing.GarnetTestSpec
+import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.testing.server.onServer
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull

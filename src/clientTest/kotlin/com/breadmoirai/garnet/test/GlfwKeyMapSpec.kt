@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.test
 import androidx.compose.ui.input.key.Key
 import com.breadmoirai.garnet.client.ui.compose.input.GlfwMods
 import com.breadmoirai.garnet.client.ui.compose.input.glfwKeyToComposeKey
-import com.breadmoirai.garnet.testing.ClientSpec
+import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.nulls.shouldBeNull

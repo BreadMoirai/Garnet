@@ -8,7 +8,7 @@ import com.breadmoirai.garnet.project.FileNode
 import com.breadmoirai.garnet.project.FileTreeNode
 import com.breadmoirai.garnet.project.FolderNode
 import com.breadmoirai.garnet.project.NewNodeKind
-import com.breadmoirai.garnet.testing.ClientSpec
+import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty

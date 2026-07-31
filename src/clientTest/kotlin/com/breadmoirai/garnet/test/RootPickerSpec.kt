@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.test
 import com.breadmoirai.garnet.client.ide.FolderPicker
 import com.breadmoirai.garnet.client.ide.RootPickerController
 import com.breadmoirai.garnet.network.project.SetProjectRootC2S
-import com.breadmoirai.garnet.testing.ClientSpec
+import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path

@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.testing
+package com.breadmoirai.garnet.harness
 
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel

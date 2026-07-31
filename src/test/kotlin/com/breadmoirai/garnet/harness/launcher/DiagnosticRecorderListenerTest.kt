@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.testing.launcher
+package com.breadmoirai.garnet.harness.launcher
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.maps.shouldBeEmpty

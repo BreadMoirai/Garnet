@@ -1,11 +1,11 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.testing.core.ClientContextHolder
-import com.breadmoirai.garnet.testing.core.FabricTestThreadPump
+import com.breadmoirai.garnet.harness.client.ClientContextHolder
+import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
 import com.breadmoirai.garnet.testing.core.GarnetTestLifecycle
-import com.breadmoirai.garnet.testing.core.WorldHolder
-import com.breadmoirai.garnet.testing.launcher.LauncherResult
-import com.breadmoirai.garnet.testing.launcher.launchKotest
+import com.breadmoirai.garnet.harness.client.WorldHolder
+import com.breadmoirai.garnet.harness.launcher.LauncherResult
+import com.breadmoirai.garnet.harness.launcher.launchKotest
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import org.slf4j.LoggerFactory

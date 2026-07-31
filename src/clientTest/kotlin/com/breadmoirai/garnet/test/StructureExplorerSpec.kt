@@ -6,7 +6,7 @@ import com.breadmoirai.garnet.network.project.ProjectTreeSnapshotS2C
 import com.breadmoirai.garnet.network.project.StructureResultS2C
 import com.breadmoirai.garnet.project.FileNode
 import com.breadmoirai.garnet.project.FolderNode
-import com.breadmoirai.garnet.testing.ClientSpec
+import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.shouldBe
 
 class StructureExplorerSpec : ClientSpec({

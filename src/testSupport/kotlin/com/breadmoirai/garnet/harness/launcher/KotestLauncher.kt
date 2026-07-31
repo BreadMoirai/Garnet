@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.testing.launcher
+package com.breadmoirai.garnet.harness.launcher
 
 import io.kotest.core.spec.Spec
 import io.kotest.engine.TestEngineLauncher

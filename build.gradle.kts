@@ -28,6 +28,10 @@ java.toolchain.languageVersion.set(JavaLanguageVersion.of(requiredJava))
 // are created by loom.splitEnvironmentSourceSets() and fabricApi.configureTests()).
 val clientTestSourceSet = sourceSets.create("clientTest")
 
+// The Kotest harness (com.breadmoirai.garnet.harness) lives here rather than in `main` so that
+// Kotest never lands on the shipped jar's classpath. gametest, clientTest and test all consume it.
+val testSupportSourceSet = sourceSets.create("testSupport")
+
 loom {
     // Widens the package-private com.mojang.blaze3d.opengl GL-backend classes the Compose-in-MC spike
     // needs to fetch a raw GL framebuffer id (see garnet.accesswidener + ComposeSurface.kt).
@@ -44,6 +48,7 @@ loom {
         }
         register("garnet-clienttest") {
             sourceSet(clientTestSourceSet)
+            sourceSet(testSupportSourceSet)
         }
     }
 
@@ -91,20 +96,44 @@ configurations {
     named("clientTestRuntimeOnly") {
         extendsFrom(configurations["clientRuntimeOnly"])
     }
+    named("testSupportImplementation") {
+        extendsFrom(configurations["clientImplementation"])
+    }
+    named("testSupportCompileOnly") {
+        extendsFrom(configurations["clientCompileOnly"])
+    }
+    named("testSupportRuntimeOnly") {
+        extendsFrom(configurations["clientRuntimeOnly"])
+    }
 }
 
 afterEvaluate {
-    sourceSets.named("gametest") {
-        compileClasspath += sourceSets["client"].output
-        runtimeClasspath += sourceSets["client"].output
-    }
-    clientTestSourceSet.apply {
+    // testSupport must be wired before the three source sets that consume its output.
+    testSupportSourceSet.apply {
         compileClasspath += sourceSets["main"].output +
             sourceSets["client"].output +
             sourceSets["client"].compileClasspath
         runtimeClasspath += sourceSets["main"].output +
             sourceSets["client"].output +
             sourceSets["client"].runtimeClasspath
+    }
+    sourceSets.named("gametest") {
+        compileClasspath += sourceSets["client"].output + testSupportSourceSet.output
+        runtimeClasspath += sourceSets["client"].output + testSupportSourceSet.output
+    }
+    clientTestSourceSet.apply {
+        compileClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].compileClasspath +
+            testSupportSourceSet.output
+        runtimeClasspath += sourceSets["main"].output +
+            sourceSets["client"].output +
+            sourceSets["client"].runtimeClasspath +
+            testSupportSourceSet.output
+    }
+    sourceSets.named("test") {
+        compileClasspath += testSupportSourceSet.output
+        runtimeClasspath += testSupportSourceSet.output
     }
 }
 
@@ -161,9 +190,17 @@ dependencies {
     implementation("com.squareup:kotlinpoet:1.18.1")
 
     implementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
-    // Kotest engine + assertions ship in main: used by .spec.kts at runtime AND by all dev test source sets.
-    implementation("io.kotest:kotest-runner-junit5:5.9.1")
-    implementation("io.kotest:kotest-assertions-core:5.9.1")
+    // Kotest is a DEV-ONLY dependency: it is declared per source set so it never reaches `main`'s
+    // (or `client`'s) compile/runtime classpath and therefore never ships in the mod jar. The
+    // harness that needs it lives in `testSupport` (com.breadmoirai.garnet.harness).
+    "testSupportImplementation"("io.kotest:kotest-runner-junit5:5.9.1")
+    "testSupportImplementation"("io.kotest:kotest-assertions-core:5.9.1")
+    testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
+    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    "gametestImplementation"("io.kotest:kotest-runner-junit5:5.9.1")
+    "gametestImplementation"("io.kotest:kotest-assertions-core:5.9.1")
+    "clientTestImplementation"("io.kotest:kotest-runner-junit5:5.9.1")
+    "clientTestImplementation"("io.kotest:kotest-assertions-core:5.9.1")
 
     // kotlinx-coroutines-core (also pulled by fabric-language-kotlin transitively, declared explicitly).
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
@@ -172,6 +209,8 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.14.2")
 
     "clientTestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
+    // harness.client.{FabricTestThreadPump,ClientContextHolder} drive the Fabric client-gametest API.
+    "testSupportImplementation"(fabricApi.module("fabric-client-gametest-api-v1", project.property("fabric_version") as String))
 
     // MixinExtras (@WrapOperation etc.) is bundled inside fabric-loader at runtime, so it is only
     // needed on the compile/annotation-processor classpath — hence compileOnly, not implementation,
@@ -231,7 +270,7 @@ dependencies {
 // pluginClasspath — this is what lets `runtime-desktop` above stay client-scoped instead of
 // sitting on the base `implementation` for every source set. See
 // docs/build/compose-runtime-scoping.md for what was tried and why this approach was chosen.
-listOf("compileKotlin", "compileTestKotlin", "compileGametestKotlin").forEach { name ->
+listOf("compileKotlin", "compileTestKotlin", "compileGametestKotlin", "compileTestSupportKotlin").forEach { name ->
     tasks.findByName(name)?.let { t ->
         (t as org.jetbrains.kotlin.gradle.tasks.KotlinCompile).pluginClasspath.setFrom(
             t.pluginClasspath.filter { !it.name.contains("compose") }

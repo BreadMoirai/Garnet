@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.client.viewport.cursorFocusActive
-import com.breadmoirai.garnet.testing.ClientSpec
-import com.breadmoirai.garnet.testing.core.FabricTestThreadPump
+import com.breadmoirai.garnet.harness.ClientSpec
+import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import org.lwjgl.glfw.GLFW
