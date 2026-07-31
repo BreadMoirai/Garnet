@@ -13,7 +13,7 @@ object SpecScriptCompilationConfig : ScriptCompilationConfiguration({
         "net.minecraft.core.Vec3i",
     )
     jvm {
-        // Anchor to dsl.GarnetSpec's classloader so the script's GarnetSpec
+        // Anchor to spec.GarnetSpec's classloader so the script's GarnetSpec
         // identity matches the host's GarnetSpec identity. With
         // dependenciesFromCurrentContext the test/run environment can pick
         // a different loader (mod jar vs. system) and the cast fails.

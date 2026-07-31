@@ -10,7 +10,7 @@ import net.minecraft.core.Vec3i
 
 class KtsSpecLoaderTest : FunSpec({
 
-    test("loadGarnetSpec returns a dsl.GarnetSpec from new-style source") {
+    test("loadGarnetSpec returns a spec.GarnetSpec from new-style source") {
         val source = """
             import com.breadmoirai.garnet.spec.*
             import net.minecraft.core.Vec3i

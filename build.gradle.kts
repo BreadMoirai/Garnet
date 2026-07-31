@@ -148,9 +148,6 @@ repositories {
     maven("https://maven.gegy.dev") {
         name = "Gegy"
     }
-    maven("https://maven.terraformersmc.com/releases/") {
-        name = "TerraformersMC"
-    }
     maven("https://maven.isxander.dev/releases") {
         name = "Xander Maven"
     }
@@ -178,7 +175,6 @@ dependencies {
     implementation("com.livefront.autoemit:annotation:0.1.0")
     ksp("com.livefront.autoemit:generate:0.1.0")
 
-    implementation("com.terraformersmc:modmenu:${property("modmenu_version")}")
     implementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
 
     // Kotlin scripting host for .spec.kts authoring (data/serial/KtsSpecLoader.kt)

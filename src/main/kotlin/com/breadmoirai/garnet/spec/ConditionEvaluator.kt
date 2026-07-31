@@ -25,7 +25,7 @@ fun evaluateCondition(
 
 /**
  * Evaluates a [StateCondition] purely against a [BlockState] snapshot (no world access).
- * Used by [com.breadmoirai.garnet.harness.assertOutputsMatch].
+ * Used by [OutputScope]'s `at`/`atStart` assertion scheduling (see `OutputScope.kt`).
  */
 fun evaluateConditionOnState(condition: StateCondition, state: BlockState): Boolean = when (condition) {
     is StateCondition.All -> condition.conditions.all { evaluateConditionOnState(it, state) }

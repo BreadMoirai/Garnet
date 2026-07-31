@@ -10,13 +10,14 @@ This is the system's spine. Every other concern (UI, persistence, networking) fe
 one of the four stages below. Each stage is documented in detail elsewhere; this article exists to
 show how they compose.
 
-**No stage below has an in-game entry point today.** `GarnetRecorderBlock`, `GarnetRunnerBlock`,
+**No *product* surface drives this pipeline today.** `GarnetRecorderBlock`, `GarnetRunnerBlock`,
 and `SpecBlockEntity` — the blocks that used to drive Stages 1 and 3 — were deleted; there is
 currently no product surface that places a recorder, starts a capture, or launches a replay. The
 pipeline itself is intact and exercised by unit/gametest coverage (`StateRecorder`,
-`RecordingDslEmitter`, `runGarnetSpec` are all directly callable and directly tested), but the only
-callers today are tests: the `testSupport` Kotest harness calls `runGarnetSpec` directly, and
-nothing calls `StateRecorder.start`/`StateRecorder.stop` outside its own unit test. A future
+`RecordingDslEmitter`, `runGarnetSpec` are all directly callable and directly tested). The live
+caller today is on the test-execution path, not a product path: `testing/runner/runGarnetSpec.kt`
+constructs a `StateRecorder` via `StateRecorder.forSpec`, calls `recorder.start(...)`, and
+activates/deactivates it around every gametest/clientTest run (see Stage 1 below). A future
 Compose dock panel is the intended replacement for the deleted blocks; see
 [architecture/module-map.md](module-map.md) for where each piece now lives.
 
@@ -34,8 +35,11 @@ Compose dock panel is the intended replacement for the deleted blocks; see
 
 **Owner:** `playback/recorder/StateRecorder.kt`, driven by `mc/SubTickPhaseEvents.kt` (registered
 once in `Garnet.onInitialize`, which forwards every `Phase` tick to
-`StateRecorder.onPhaseForActiveRecorders`). **No caller currently activates a recorder** — the
-plumbing that would drive it (the recorder block) is gone.
+`StateRecorder.onPhaseForActiveRecorders`). **No product caller activates a recorder** — the
+plumbing that would drive it from a product surface (the recorder block) is gone. The live caller
+is `testing/runner/runGarnetSpec.kt`, on the test-execution path: it calls `StateRecorder.start`,
+`StateRecorder.activate`, and (in a `finally`) `StateRecorder.deactivate` around every
+gametest/clientTest run.
 
 Per server tick, for each `Phase` of interest, an active recorder samples block states inside its
 bounding region and appends them to a `StateRecording`. Output is in-memory; nothing is written to

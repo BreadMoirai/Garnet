@@ -152,7 +152,7 @@ Client:
   response. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
   `r.message` (place/save/new-structure outcomes all surface through the same status line as
   folder load/save results).
-- `editor/network/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
+- `editor/world/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
   the UI via `TitleScreenMixin`) opens/creates the single shared `garnet-workspace` save
   with no root pinned. The dormant `pendingRoot`/`EditorServerContext` pinning machinery is
   retained for programmatic use, but no caller sets `pendingRoot`, so the SERVER_STARTING listener

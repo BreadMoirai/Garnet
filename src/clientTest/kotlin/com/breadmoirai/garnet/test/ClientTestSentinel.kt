@@ -57,13 +57,6 @@ class ClientTestSentinel : FabricClientGameTest {
 
         val worker = Thread({
             try {
-                // RunnerBlockEngineE2ETest and DiagnosticRecordingE2ETest call EngineDrivenRun.run
-                // synchronously from inside a Kotest test body. EngineDrivenRun launches another
-                // Kotest engine that dispatches to McDispatchers.Server — but the outer test body
-                // is already on the server thread, producing a recursive deadlock. The production
-                // path (SpecRunnerCoordinator.startRun) avoids this by spawning a worker thread.
-                // We exclude these tests here; their underlying behavior is exercised by JVM tests
-                // (EngineDrivenRunToTestResultTest) and by hand testing the in-game Run button.
                 result = launchKotest(
                     sourceSet = "clientTest",
                     reportsDir = Path.of("build/reports/garnet/clientTest"),

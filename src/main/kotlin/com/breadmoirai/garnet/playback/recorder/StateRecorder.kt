@@ -87,12 +87,13 @@ class StateRecorder(
         StateRecording(specId, System.currentTimeMillis(), initialSnapshot, _changes.toList())
 
     companion object {
-        // Multiple recorders may be active at once (e.g. concurrent gametests, or a
-        // user-triggered recording on one BE while another BE's spec is replaying).
-        // The mixin dispatches each setBlock to every recorder whose bounds contain
-        // the position; SpecRunnerCoordinator advances tick state on every recorder
-        // each phase. ConcurrentHashMap-backed set is safe for the rare case of
-        // activate/deactivate happening from a different thread than iteration.
+        // Multiple recorders may be active at once (e.g. concurrent gametest/clientTest
+        // runs, each running its own runGarnetSpec against a disjoint region of the
+        // shared test world). The mixin dispatches each setBlock to every recorder
+        // whose bounds contain the position; onPhaseForActiveRecorders (called each
+        // sub-tick phase from Garnet) advances tick state on every active recorder.
+        // ConcurrentHashMap-backed set is safe for the rare case of activate/deactivate
+        // happening from a different thread than iteration.
         private val activeRecorders: MutableSet<StateRecorder> =
             java.util.concurrent.ConcurrentHashMap.newKeySet()
 

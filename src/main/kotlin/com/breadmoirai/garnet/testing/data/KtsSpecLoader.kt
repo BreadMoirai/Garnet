@@ -15,7 +15,7 @@ import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 object KtsSpecLoader {
     private val host = BasicJvmScriptingHost()
     private val evalConfig = ScriptEvaluationConfiguration {
-        // Pin the script's runtime classloader to dsl.GarnetSpec's loader so that
+        // Pin the script's runtime classloader to spec.GarnetSpec's loader so that
         // type identity is shared between host and script.
         jvm {
             baseClassLoader(GarnetSpec::class.java.classLoader)
@@ -41,7 +41,7 @@ object KtsSpecLoader {
             ?: error("$name: script did not produce a GarnetSpec value (got: $rv). " +
                 "Ensure the script ends with a `garnetSpec(...) { ... }` expression.")
         return value as? GarnetSpec
-            ?: error("$name: script result is not a dsl.GarnetSpec (got: ${value::class.qualifiedName}). " +
+            ?: error("$name: script result is not a spec.GarnetSpec (got: ${value::class.qualifiedName}). " +
                 "Ensure the script ends with a `garnetSpec(...) { ... }` expression from com.breadmoirai.garnet.spec.")
     }
 

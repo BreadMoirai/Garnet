@@ -1,2 +1,6 @@
 {
+  "key.garnet.cursor_focus_toggle": "Toggle Cursor Focus",
+  "key.garnet.dock_explorer_focus": "Focus Explorer",
+  "key.garnet.viewport_shrink_toggle": "Toggle Viewport Shrink",
+  "key.garnet.compose_overlay_toggle": "Toggle Compose Overlay"
 }

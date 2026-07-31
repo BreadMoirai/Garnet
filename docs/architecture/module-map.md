@@ -21,8 +21,9 @@ Compose dock panel is the intended replacement caller for `playback`/`testing`; 
 ## Top level (`src/main/kotlin/com/breadmoirai/garnet/`)
 
 - `Garnet.kt` — `ModInitializer`. Registers `EditorNetworking`, `McLifecycle`, the
-  `SubTickPhaseEvents.PHASE` listener that still drives any active `StateRecorder` (there is
-  currently nothing that creates one outside tests), the project-root `SERVER_STARTING`/
+  `SubTickPhaseEvents.PHASE` listener that still drives any active `StateRecorder` (no *product*
+  surface creates one today — the live caller is `testing/runner/runGarnetSpec.kt`, on the
+  test-execution path), the project-root `SERVER_STARTING`/
   `SERVER_STARTED`/`SERVER_STOPPED`/`BEFORE_SAVE` hooks, `/garnet project`, and the per-player
   session cleanup on disconnect.
 
@@ -76,15 +77,17 @@ Construction is via `garnetSpec(id) { … }`.
 
 - `config/SharedSettings.kt` (main) — config read by both client and server: project root path,
   grid/cell sizing, structure-region sizing.
-- `config/ModConfig.kt` (client) — client-side persisted config (`garnet.json`), including the
-  client's mirror of the project root path.
-- `config/ModMenuIntegration.kt` (client) — YACL config screen registration for Mod Menu.
+- `config/ModConfig.kt` (client) — client-side persisted config (`garnet.json`): loads/saves the
+  project root path and mirrors it into `SharedSettings`. There is no Mod Menu screen — the
+  Explorer's root-picker header (`editor/ui/RootPickerController.kt`) is the only editor for this
+  value, so a duplicate YACL screen was removed as dead weight.
 
 ## `playback/` — the record → emit pipeline (engine intact, no in-game caller)
 
 - `recorder/StateRecorder.kt` — captures per-phase block-state snapshots while a recorder is
-  active. Wired to `SubTickPhaseEvents` from `Garnet.onInitialize`, but nothing in `main`,
-  `client`, or `gametest` currently constructs one — the only caller is its own unit test.
+  active. Wired to `SubTickPhaseEvents` from `Garnet.onInitialize`. No *product* code constructs
+  one; the live caller is `testing/runner/runGarnetSpec.kt` (`StateRecorder.forSpec`, `.start`,
+  `.activate`/`.deactivate`), on the test-execution path — every gametest/clientTest run drives it.
 - `recorder/RecordingDslEmitter.kt` — derives `.spec.kts` source text from a `StateRecording`.
   Pure function: walks the recording, diffs adjacent snapshots, emits `input(…) { … }` /
   `output(…) { … }` blocks. Also emits the empty-spec stub used by `EditorNewSpec`.
@@ -185,11 +188,11 @@ spec/  mc/  structure/  config/  ui/   →   playback/   →   testing/   →   
 ```
 
 `spec/`, `mc/`, `structure/`, `config/`, and `ui/` are the base packages — none of them depends
-on any of the others in this list, and none depends up the chain. `playback/` consumes `spec/`
-and `mc/`. `testing/` consumes `playback/` (for `RecordingDslEmitter`) plus `spec/`/`mc/`.
-`editor/` is the top of the stack: it consumes `structure/`, `config/`, and `testing/`'s
-persistence pieces, and its client half (`ui/` panels) drives the `ui/` dock shell. Nothing
-outside `editor/` depends on `editor/`.
+on any of the others in this list, and none depends up the chain. `playback/` consumes only
+`spec/`. `testing/` consumes `playback/` (for `RecordingDslEmitter`) plus `spec/`/`mc/`.
+`editor/` is the top of the stack: it consumes `structure/`, `config/`, `testing/`'s
+persistence pieces, `spec/`, `playback/`, and `ui/` (its client half's panels drive the `ui/`
+dock shell). Nothing outside `editor/` depends on `editor/`.
 
 ## Where to start reading
 
