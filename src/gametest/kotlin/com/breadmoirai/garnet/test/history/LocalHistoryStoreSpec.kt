@@ -9,9 +9,11 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import net.minecraft.nbt.CompoundTag
 import kotlin.io.path.createDirectories
+import kotlin.io.path.createDirectory
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.moveTo
 import kotlin.io.path.writeText
 
 /**
@@ -212,6 +214,76 @@ class LocalHistoryStoreSpec : GarnetTestSpec({
             LocalHistoryStore.moveHistory(from, to)
 
             LocalHistoryStore.revisions(to).map { it.timestampMillis } shouldBe listOf(1L, 2L)
+            proj.toFile().deleteRecursively()
+        }
+    }
+
+    // --- Fix round 1 regressions ------------------------------------------------------------
+
+    test("moveHistory leaves a revision that fails to move intact at the source") {
+        withStore { _ ->
+            val proj = createTempDirectory("proj-move-fail")
+            val from = proj.resolve("clock.nbt")
+            val to = proj.resolve("ring.nbt")
+            LocalHistoryStore.writeRevision(from, tagWith("a"), 1, 1, 1, 1, LocalHistoryStore.REASON_AUTOSAVE, nowMillis = 1L)
+
+            // Real OS-level failure induction (locked files, read-only dirs) doesn't behave
+            // uniformly across platforms, so `move` is a testing seam: simulate every move failing.
+            LocalHistoryStore.moveHistory(from, to) { _, _ -> throw java.io.IOException("simulated move failure") }
+
+            // The blob never left the source: history must stay in place, not be silently dropped.
+            LocalHistoryStore.revisions(from) shouldHaveSize 1
+            LocalHistoryStore.revisions(from).single().timestampMillis shouldBe 1L
+            LocalHistoryStore.dirFor(from).exists() shouldBe true
+            LocalHistoryStore.revisions(to) shouldHaveSize 0
+
+            proj.toFile().deleteRecursively()
+        }
+    }
+
+    test("moveHistory partial failure keeps only the failed revisions at the source and moves the rest") {
+        withStore { _ ->
+            val proj = createTempDirectory("proj-move-partial")
+            val from = proj.resolve("clock.nbt")
+            val to = proj.resolve("ring.nbt")
+            LocalHistoryStore.writeRevision(from, tagWith("a"), 1, 1, 1, 1, LocalHistoryStore.REASON_AUTOSAVE, nowMillis = 1L)
+            LocalHistoryStore.writeRevision(from, tagWith("b"), 1, 1, 1, 1, LocalHistoryStore.REASON_AUTOSAVE, nowMillis = 2L)
+            val failingFile = LocalHistoryStore.revisions(from).first { it.timestampMillis == 1L }.file
+
+            LocalHistoryStore.moveHistory(from, to) { source, target ->
+                if (source.fileName.toString() == failingFile) throw java.io.IOException("simulated move failure")
+                source.moveTo(target)
+            }
+
+            // Only the revision whose move failed stays at the source; the other one relocated.
+            LocalHistoryStore.revisions(from).map { it.timestampMillis } shouldBe listOf(1L)
+            LocalHistoryStore.revisions(to).map { it.timestampMillis } shouldBe listOf(2L)
+            LocalHistoryStore.dirFor(from).exists() shouldBe true
+
+            proj.toFile().deleteRecursively()
+        }
+    }
+
+    test("writeRevision returns null and leaves no orphan blob when the index write fails") {
+        withStore { _ ->
+            val proj = createTempDirectory("proj-index-fail")
+            val file = proj.resolve("clock.nbt")
+
+            // Occupy index.json's path with a directory so the eventual writeText(...) fails with
+            // an IOException, deterministically and portably (no locking/permission tricks needed).
+            val dir = LocalHistoryStore.dirFor(file)
+            dir.createDirectories()
+            dir.resolve("index.json").createDirectory()
+
+            val result = LocalHistoryStore.writeRevision(
+                file, tagWith("x"), 1, 1, 1, 1, LocalHistoryStore.REASON_AUTOSAVE, nowMillis = 1L,
+            )
+
+            result shouldBe null
+            // The blob write succeeded before the index failed; it must not be left as an orphan
+            // that revisions() can never report.
+            dir.listDirectoryEntries("*.nbt") shouldHaveSize 0
+
             proj.toFile().deleteRecursively()
         }
     }

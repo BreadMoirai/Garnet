@@ -128,7 +128,19 @@ object LocalHistoryStore {
             dir.createDirectories()
             NbtIo.writeCompressed(tag, dir.resolve(name))
             val merged = (index.revisions + revision).sortedBy { it.timestampMillis }
-            writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), prune(dir, merged, nowMillis)))
+            try {
+                writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), prune(dir, merged, nowMillis)))
+            } catch (e: IOException) {
+                // The blob landed on disk but the index write failed, so revisions() would never
+                // see it — an invisible orphan. Delete it so disk state matches what revisions()
+                // reports, and fail honestly rather than returning a Revision nobody can find.
+                runCatching { dir.resolve(name).deleteIfExists() }
+                LOGGER.error(
+                    "[LocalHistoryStore] write index for '{}' after writing revision '{}': {}",
+                    structureFile, name, e.message,
+                )
+                return null
+            }
             revision
         } catch (e: IOException) {
             LOGGER.error("[LocalHistoryStore] write revision for '{}': {}", structureFile, e.message)
@@ -140,8 +152,17 @@ object LocalHistoryStore {
      * Move a structure's history to the key for [to] — called after a rename, since the absolute
      * path (and therefore the hash) changes. Merging rather than replacing keeps any history the
      * destination path already accumulated under a previous structure of the same name.
+     *
+     * [move] is a seam for tests to simulate a failing move without needing OS-specific tricks
+     * (locked files, read-only dirs) that don't behave uniformly across platforms; production
+     * callers never pass it and get a real [kotlin.io.path.moveTo].
+     *
+     * If any revision fails to move, its blob is left behind in `fromDir` on purpose: `fromDir` is
+     * NOT deleted, and its index is rewritten to name exactly what's still physically there, so the
+     * history stays recoverable instead of being silently destroyed by the unconditional cleanup
+     * that used to run regardless of per-revision failures.
      */
-    fun moveHistory(from: Path, to: Path) {
+    fun moveHistory(from: Path, to: Path, move: (source: Path, target: Path) -> Unit = { s, t -> s.moveTo(t) }) {
         val fromDir = dirFor(from)
         if (!fromDir.exists()) return
         val fromIndex = readIndex(from)
@@ -150,6 +171,7 @@ object LocalHistoryStore {
         val toIndex = readIndex(to)
 
         val moved = ArrayList<Revision>()
+        val remaining = ArrayList<Revision>()
         for (revision in fromIndex.revisions) {
             val source = fromDir.resolve(revision.file)
             if (!source.exists()) continue
@@ -159,14 +181,45 @@ object LocalHistoryStore {
             var name = "${revision.timestampMillis}-$seq.nbt"
             while (toDir.resolve(name).exists()) { seq++; name = "${revision.timestampMillis}-$seq.nbt" }
             try {
-                source.moveTo(toDir.resolve(name))
+                move(source, toDir.resolve(name))
                 moved += revision.copy(file = name)
             } catch (e: IOException) {
-                LOGGER.error("[LocalHistoryStore] move revision '{}': {}", source, e.message)
+                LOGGER.error("[LocalHistoryStore] move revision '{}' -> '{}': {}", source, toDir.resolve(name), e.message)
+                remaining += revision
             }
         }
+
         val merged = (toIndex.revisions + moved).sortedBy { it.timestampMillis }
-        writeIndex(to, HistoryIndex(normalizePath(to, onWindows()), merged))
+        try {
+            writeIndex(to, HistoryIndex(normalizePath(to, onWindows()), merged))
+        } catch (e: IOException) {
+            // The destination index couldn't be written even though some blobs may have already
+            // physically moved into toDir. We can't claim they're indexed there, and fromDir must
+            // not be wiped — it may hold the only surviving copy of revisions that failed to move,
+            // and even the ones that DID move are now unindexed at the destination. Log loudly and
+            // stop; both directories are left as-is rather than risking silent data loss.
+            LOGGER.error(
+                "[LocalHistoryStore] write destination index for '{}' after moving {} revision(s): {}",
+                to, moved.size, e.message,
+            )
+            return
+        }
+
+        if (remaining.isNotEmpty()) {
+            // Partial move: rewrite the source index to name exactly what's still there, and keep
+            // fromDir — do not delete history that failed to relocate.
+            try {
+                writeIndex(from, HistoryIndex(normalizePath(from, onWindows()), remaining.sortedBy { it.timestampMillis }))
+            } catch (e: IOException) {
+                LOGGER.error("[LocalHistoryStore] write source index for '{}' after partial move: {}", from, e.message)
+            }
+            LOGGER.error(
+                "[LocalHistoryStore] moveHistory '{}' -> '{}' was partial: {} revision(s) moved, {} left at source",
+                from, to, moved.size, remaining.size,
+            )
+            return
+        }
+
         fromDir.resolve(INDEX_FILE).deleteIfExists()
         runCatching { fromDir.toFile().deleteRecursively() }
     }
@@ -198,13 +251,14 @@ object LocalHistoryStore {
             }
     }
 
+    /**
+     * Writes `index.json`. Throws [IOException] on failure rather than swallowing it — callers
+     * must decide how to react (undo a just-written blob, abort a move, etc.); this function has
+     * no way to know what "recover" means for each caller, so it must not silently report success.
+     */
     private fun writeIndex(structureFile: Path, index: HistoryIndex) {
         val dir = dirFor(structureFile)
-        runCatching {
-            dir.createDirectories()
-            dir.resolve(INDEX_FILE).writeText(GSON.toJson(index))
-        }.onFailure { e ->
-            LOGGER.error("[LocalHistoryStore] write index for '{}': {}", structureFile, e.message)
-        }
+        dir.createDirectories()
+        dir.resolve(INDEX_FILE).writeText(GSON.toJson(index))
     }
 }
