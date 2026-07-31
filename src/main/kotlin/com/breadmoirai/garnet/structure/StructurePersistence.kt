@@ -19,6 +19,19 @@ import kotlin.io.path.*
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
 
+/**
+ * The result of scanning a volume: the saved [StructureTemplate] tag, the tight [box] enclosing all
+ * non-air (null when the volume was empty), and the non-air [blockCount].
+ *
+ * [blockCount] is counted during the scan rather than derived from the tag: `fillFromWorld` records
+ * every cell in its bounds, air included, so `tag.blocks.size` is the box volume, not the build size.
+ */
+data class CapturedStructure(
+    val tag: CompoundTag,
+    val box: PlacedBox?,
+    val blockCount: Int,
+)
+
 object StructurePersistence {
 
     fun save(saveDir: Path, id: String, level: ServerLevel, originPos: BlockPos, bounds: Vec3i) {
@@ -96,24 +109,48 @@ object StructurePersistence {
     fun unsavedSidecarOf(file: Path): Path = file.resolveSibling("${file.fileName}.unsaved")
 
     /**
-     * Auto-fit scans the region for non-air, returning the saved [StructureTemplate] tag plus the
-     * tight [PlacedBox] (null when the region is empty; the tag is still a valid empty structure).
-     * Does not write anything.
+     * Auto-fit within an arbitrary absolute [scan] volume, rather than a whole structure region.
+     *
+     * This is the auto-save path's capture: scanning `union(placedBox, dirtyBox)` reads a few
+     * thousand positions where scanning the full region reads ~8M, which is the difference between
+     * a viable per-edit debounce and an unusable one. A zero-size [scan] is empty by definition.
+     */
+    fun captureAutoFitIn(level: ServerLevel, scan: PlacedBox): CapturedStructure {
+        val template = StructureTemplate()
+        if (scan.size.x <= 0 || scan.size.y <= 0 || scan.size.z <= 0) {
+            return CapturedStructure(template.save(CompoundTag()), null, 0)
+        }
+        var blockCount = 0
+        val fit = autoFit(scan.size.x, scan.size.y, scan.size.z) { lx, ly, lz ->
+            val nonAir = !level.getBlockState(
+                BlockPos(scan.origin.x + lx, scan.origin.y + ly, scan.origin.z + lz),
+            ).`is`(Blocks.AIR)
+            if (nonAir) blockCount++
+            nonAir
+        }
+        if (fit == null) return CapturedStructure(template.save(CompoundTag()), null, 0)
+        val tightOrigin = BlockPos(
+            scan.origin.x + fit.minX, scan.origin.y + fit.minY, scan.origin.z + fit.minZ,
+        )
+        val size = Vec3i(fit.sizeX, fit.sizeY, fit.sizeZ)
+        template.fillFromWorld(level, tightOrigin, size, false, emptyList())
+        return CapturedStructure(template.save(CompoundTag()), PlacedBox(tightOrigin, size), blockCount)
+    }
+
+    /**
+     * Auto-fit across a whole structure region. Kept for the explicit-save path; the auto-save path
+     * uses [captureAutoFitIn] with a far smaller volume.
      */
     fun captureAutoFit(
         level: ServerLevel, regionOrigin: BlockPos,
         regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int,
     ): Pair<CompoundTag, PlacedBox?> {
-        val dimY = regionMaxY - regionMinY + 1
-        val fit = autoFit(regionSizeXZ, dimY, regionSizeXZ) { lx, ly, lz ->
-            !level.getBlockState(BlockPos(regionOrigin.x + lx, regionMinY + ly, regionOrigin.z + lz)).`is`(Blocks.AIR)
-        }
-        val template = StructureTemplate()
-        if (fit == null) return template.save(CompoundTag()) to null
-        val tightOrigin = BlockPos(regionOrigin.x + fit.minX, regionMinY + fit.minY, regionOrigin.z + fit.minZ)
-        val size = Vec3i(fit.sizeX, fit.sizeY, fit.sizeZ)
-        template.fillFromWorld(level, tightOrigin, size, false, emptyList())
-        return template.save(CompoundTag()) to PlacedBox(tightOrigin, size)
+        val scan = PlacedBox(
+            BlockPos(regionOrigin.x, regionMinY, regionOrigin.z),
+            Vec3i(regionSizeXZ, regionMaxY - regionMinY + 1, regionSizeXZ),
+        )
+        val captured = captureAutoFitIn(level, scan)
+        return captured.tag to captured.box
     }
 
     /**

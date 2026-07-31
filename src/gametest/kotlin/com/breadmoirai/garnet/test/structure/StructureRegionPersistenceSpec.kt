@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.test.structure
 
+import com.breadmoirai.garnet.structure.PlacedBox
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
@@ -58,6 +59,43 @@ class StructureRegionPersistenceSpec : GarnetTestSpec({
             (result == null) shouldBe true
             Files.exists(file) shouldBe true
             Files.deleteIfExists(file)
+        }
+    }
+
+    test("captureAutoFitIn fits tightly inside the scanned box and counts non-air blocks") {
+        onServer {
+            val level = overworld()
+            val origin = BlockPos(300_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
+            val scan = PlacedBox(origin, Vec3i(8, 4, 8))
+            StructurePersistence.clearBounds(level, scan.origin, scan.size)
+
+            level.setBlock(origin.offset(2, 0, 3), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+            level.setBlock(origin.offset(5, 1, 3), Blocks.IRON_BLOCK.defaultBlockState(), 2)
+
+            val captured = StructurePersistence.captureAutoFitIn(level, scan)
+
+            captured.blockCount shouldBe 2
+            val box = captured.box.shouldNotBeNull()
+            box.origin shouldBe origin.offset(2, 0, 3)
+            box.size shouldBe Vec3i(4, 2, 1)
+
+            StructurePersistence.clearBounds(level, scan.origin, scan.size)
+        }
+    }
+
+    test("captureAutoFitIn on an empty box returns a null box, zero blocks, and a valid tag") {
+        onServer {
+            val level = overworld()
+            val origin = BlockPos(310_000, 64, EditorDimRegistry.STRUCTURE_LANE_Z)
+            val scan = PlacedBox(origin, Vec3i(4, 4, 4))
+            StructurePersistence.clearBounds(level, scan.origin, scan.size)
+
+            val captured = StructurePersistence.captureAutoFitIn(level, scan)
+
+            captured.box shouldBe null
+            captured.blockCount shouldBe 0
+            // Still a loadable empty structure, not a malformed tag.
+            captured.tag.getListOrEmpty("blocks").size shouldBe 0
         }
     }
 })
