@@ -196,7 +196,9 @@ unregistered spec silently does not run):
   the same absolute file resolve to one history; Windows casing does not fork the history.
   Mostly filesystem work, needs no world.
 
-Deleted: `StructureSidecarPersistenceSpec`.
+Untouched: `StructureSidecarPersistenceSpec`, despite the name — it covers the spec-cell
+fixed-`bounds` `save`/`load`/`hasChanges` path used by recording finalize and runner restore, not
+the `.nbt.unsaved` dirty buffer this spec removes.
 
 Rewritten against the commit path: `EditorStructureNetworkSpec` and `EditorFileOpsNetworkSpec`, both
 of which assert sidecar behavior today (`flushDirtyStructures`, sidecar-survives-rename).
