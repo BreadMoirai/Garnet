@@ -2,7 +2,7 @@ package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.dsl.garnetSpec
 import com.breadmoirai.garnet.harness.ClientSpec
-import com.breadmoirai.garnet.testing.core.McDispatchers
+import com.breadmoirai.garnet.mc.McDispatchers
 import com.breadmoirai.garnet.harness.runGarnetSpec
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import net.minecraft.core.BlockPos

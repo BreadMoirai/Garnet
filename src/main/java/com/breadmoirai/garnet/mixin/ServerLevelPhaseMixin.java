@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.mixin;
 
 import com.breadmoirai.garnet.dsl.Phase;
-import com.breadmoirai.garnet.event.SubTickPhaseEvents;
+import com.breadmoirai.garnet.mc.SubTickPhaseEvents;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

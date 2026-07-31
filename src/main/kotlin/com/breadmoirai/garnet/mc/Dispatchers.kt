@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.testing.core
+package com.breadmoirai.garnet.mc
 
 import kotlinx.coroutines.CoroutineDispatcher
 import net.minecraft.server.MinecraftServer

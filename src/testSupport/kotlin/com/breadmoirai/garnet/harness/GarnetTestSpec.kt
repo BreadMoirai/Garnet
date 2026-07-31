@@ -2,7 +2,7 @@
 
 package com.breadmoirai.garnet.harness
 
-import com.breadmoirai.garnet.testing.core.McDispatchers
+import com.breadmoirai.garnet.mc.McDispatchers
 import com.breadmoirai.garnet.harness.RecordingHolder
 import io.kotest.core.concurrency.CoroutineDispatcherFactory
 import io.kotest.core.spec.style.FunSpec

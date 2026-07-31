@@ -5,8 +5,8 @@ import com.breadmoirai.garnet.dsl.GarnetSpec
 import com.breadmoirai.garnet.dsl.SimTime
 import com.breadmoirai.garnet.dsl.SpecRun
 import com.breadmoirai.garnet.dsl.StateRecordingViewLike
-import com.breadmoirai.garnet.testing.core.McDispatchers
-import com.breadmoirai.garnet.testing.server.awaitTickEnd
+import com.breadmoirai.garnet.mc.McDispatchers
+import com.breadmoirai.garnet.mc.awaitTickEnd
 import kotlinx.coroutines.withContext
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel

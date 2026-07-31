@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.test
 import com.breadmoirai.garnet.client.viewport.ViewportState
 import com.breadmoirai.garnet.client.viewport.WindowViewportExt
 import com.breadmoirai.garnet.harness.ClientSpec
-import com.breadmoirai.garnet.testing.server.onServer
+import com.breadmoirai.garnet.mc.onServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.nulls.shouldNotBeNull

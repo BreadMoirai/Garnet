@@ -1,13 +1,13 @@
 package com.breadmoirai.garnet
 
 import com.breadmoirai.garnet.config.SharedSettings
-import com.breadmoirai.garnet.event.SubTickPhaseEvents
+import com.breadmoirai.garnet.mc.SubTickPhaseEvents
 import com.breadmoirai.garnet.network.project.ProjectNetworkRegistry
 import com.breadmoirai.garnet.project.ProjectCommand
 import com.breadmoirai.garnet.project.ProjectDimLifecycle
 import com.breadmoirai.garnet.project.ProjectRoot
 import com.breadmoirai.garnet.project.ProjectServerContext
-import com.breadmoirai.garnet.testing.core.GarnetTestLifecycle
+import com.breadmoirai.garnet.mc.McLifecycle
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import com.breadmoirai.garnet.project.ProjectSession
@@ -23,7 +23,7 @@ class Garnet : ModInitializer {
     override fun onInitialize() {
         LOGGER.debug("[Garnet#onInitialize] initializing mod")
         ProjectNetworkRegistry.register()
-        GarnetTestLifecycle.register()
+        McLifecycle.register()
         SubTickPhaseEvents.PHASE.register { level, phase ->
             com.breadmoirai.garnet.runner.StateRecorder.onPhaseForActiveRecorders(level, phase)
         }

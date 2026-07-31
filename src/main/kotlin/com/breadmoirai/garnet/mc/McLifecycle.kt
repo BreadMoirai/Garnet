@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.testing.core
+package com.breadmoirai.garnet.mc
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
@@ -10,7 +10,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
  * automatically — it has no fabric.mod.json entrypoint). Each test source set's
  * sentinel arranges for this to be called exactly once per server lifecycle.
  */
-object GarnetTestLifecycle {
+object McLifecycle {
     @Volatile private var registered = false
 
     fun register() {

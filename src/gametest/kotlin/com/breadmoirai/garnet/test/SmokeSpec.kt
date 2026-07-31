@@ -1,9 +1,9 @@
 package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.testing.core.McDispatchers
-import com.breadmoirai.garnet.testing.server.awaitTickEnd
-import com.breadmoirai.garnet.testing.server.awaitTicks
+import com.breadmoirai.garnet.mc.McDispatchers
+import com.breadmoirai.garnet.mc.awaitTickEnd
+import com.breadmoirai.garnet.mc.awaitTicks
 import io.kotest.matchers.shouldBe
 
 class SmokeSpec : GarnetTestSpec({

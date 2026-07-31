@@ -9,7 +9,7 @@ import com.breadmoirai.garnet.test.project.ProjectStructureNetworkSpec
 import com.breadmoirai.garnet.test.project.ProjectTeleportSpec
 import com.breadmoirai.garnet.test.persistence.StructureRegionPersistenceSpec
 import com.breadmoirai.garnet.test.persistence.StructureSidecarPersistenceSpec
-import com.breadmoirai.garnet.testing.core.GarnetTestLifecycle
+import com.breadmoirai.garnet.mc.McLifecycle
 import com.breadmoirai.garnet.harness.launcher.launchKotest
 import net.fabricmc.fabric.api.gametest.v1.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
@@ -32,7 +32,7 @@ class GametestSentinel {
         val server = helper.level.server
         // SERVER_STARTED has already fired by the time a GameTest method runs.
         // Register tick events and install the dispatcher directly from the live server.
-        GarnetTestLifecycle.registerWithServer(server)
+        McLifecycle.registerWithServer(server)
         val worker = Thread.ofPlatform()
             .name("kotest-gametest")
             .uncaughtExceptionHandler { _, t ->

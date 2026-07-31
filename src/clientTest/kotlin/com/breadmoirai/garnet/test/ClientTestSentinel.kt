@@ -2,7 +2,7 @@ package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.harness.client.ClientContextHolder
 import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
-import com.breadmoirai.garnet.testing.core.GarnetTestLifecycle
+import com.breadmoirai.garnet.mc.McLifecycle
 import com.breadmoirai.garnet.harness.client.WorldHolder
 import com.breadmoirai.garnet.harness.launcher.LauncherResult
 import com.breadmoirai.garnet.harness.launcher.launchKotest
@@ -18,7 +18,7 @@ class ClientTestSentinel : FabricClientGameTest {
     private val logger = LoggerFactory.getLogger("Garnet")
 
     override fun runTest(context: ClientGameTestContext) {
-        GarnetTestLifecycle.register()
+        McLifecycle.register()
         ClientContextHolder.install(context)
         // Construct a singleplayer world to fire SERVER_STARTED, which installs McDispatchers.
         // `use { }` closes the world before runTest returns — Fabric asserts no server is still

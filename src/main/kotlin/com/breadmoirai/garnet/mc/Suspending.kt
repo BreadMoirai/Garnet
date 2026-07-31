@@ -1,7 +1,7 @@
-package com.breadmoirai.garnet.testing.server
+package com.breadmoirai.garnet.mc
 
-import com.breadmoirai.garnet.testing.core.McDispatchers
-import com.breadmoirai.garnet.testing.core.serverTickEnd
+import com.breadmoirai.garnet.mc.McDispatchers
+import com.breadmoirai.garnet.mc.serverTickEnd
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.take

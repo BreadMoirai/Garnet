@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.testing.core
+package com.breadmoirai.garnet.mc
 
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow

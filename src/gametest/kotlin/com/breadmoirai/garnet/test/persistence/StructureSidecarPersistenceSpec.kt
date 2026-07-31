@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.test.persistence
 import com.breadmoirai.garnet.persistence.StructurePersistence
 import com.breadmoirai.garnet.project.ProjectDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.testing.server.onServer
+import com.breadmoirai.garnet.mc.onServer
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
