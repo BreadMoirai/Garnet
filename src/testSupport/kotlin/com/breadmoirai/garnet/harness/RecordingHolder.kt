@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.harness
 
-import com.breadmoirai.garnet.runner.StateRecording
+import com.breadmoirai.garnet.playback.data.StateRecording
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 

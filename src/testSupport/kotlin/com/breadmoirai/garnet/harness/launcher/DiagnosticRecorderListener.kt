@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.harness.launcher
 
-import com.breadmoirai.garnet.runner.StateRecording
+import com.breadmoirai.garnet.playback.data.StateRecording
 import com.breadmoirai.garnet.harness.RecordingHolder
 import io.kotest.core.listeners.TestListener
 import io.kotest.core.test.TestCase

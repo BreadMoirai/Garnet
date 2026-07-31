@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.persistence
+package com.breadmoirai.garnet.testing.data
 
 import com.breadmoirai.garnet.spec.GarnetSpec
 import java.nio.file.Path
@@ -25,7 +25,7 @@ object KtsSpecLoader {
     /**
      * Evaluates a `.spec.kts` source and returns the [GarnetSpec] value.
      *
-     * New-style scripts (from [com.breadmoirai.garnet.runner.RecordingDslEmitter])
+     * New-style scripts (from [com.breadmoirai.garnet.playback.recorder.RecordingDslEmitter])
      * end with a `garnetSpec(...) { ... }` expression whose return value is extracted
      * directly from [ResultValue.Value].
      */

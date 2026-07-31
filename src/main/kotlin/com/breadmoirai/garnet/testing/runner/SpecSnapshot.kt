@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.runner
+package com.breadmoirai.garnet.testing.runner
 
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i

@@ -1,8 +1,8 @@
-package com.breadmoirai.garnet.persistence
+package com.breadmoirai.garnet.playback.data
 
-import com.breadmoirai.garnet.runner.StateRecording
-import com.breadmoirai.garnet.runner.stateRecordingFromNbt
-import com.breadmoirai.garnet.runner.toNbt
+import com.breadmoirai.garnet.playback.data.StateRecording
+import com.breadmoirai.garnet.playback.data.stateRecordingFromNbt
+import com.breadmoirai.garnet.playback.data.toNbt
 import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import org.slf4j.LoggerFactory

@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.runner
+package com.breadmoirai.garnet.playback.data
 
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.level.ServerLevel

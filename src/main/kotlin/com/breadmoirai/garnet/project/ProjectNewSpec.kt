@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.project
 
-import com.breadmoirai.garnet.runner.RecordingDslEmitter
+import com.breadmoirai.garnet.playback.recorder.RecordingDslEmitter
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.exists

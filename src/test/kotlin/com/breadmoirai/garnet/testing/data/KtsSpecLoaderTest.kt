@@ -1,6 +1,6 @@
-package com.breadmoirai.garnet.persistence
+package com.breadmoirai.garnet.testing.data
 
-import com.breadmoirai.garnet.persistence.KtsSpecLoader
+import com.breadmoirai.garnet.testing.data.KtsSpecLoader
 import com.breadmoirai.garnet.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

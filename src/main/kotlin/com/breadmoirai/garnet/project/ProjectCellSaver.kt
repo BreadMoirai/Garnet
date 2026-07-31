@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.project
 
+import com.breadmoirai.garnet.testing.data.LoadedSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtIo

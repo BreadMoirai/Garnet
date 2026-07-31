@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.harness
 
 import com.breadmoirai.garnet.spec.GarnetSpec
-import com.breadmoirai.garnet.runner.StateRecording
-import com.breadmoirai.garnet.runner.runGarnetSpec as runEngine
+import com.breadmoirai.garnet.playback.data.StateRecording
+import com.breadmoirai.garnet.testing.runner.runGarnetSpec as runEngine
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import kotlin.coroutines.coroutineContext

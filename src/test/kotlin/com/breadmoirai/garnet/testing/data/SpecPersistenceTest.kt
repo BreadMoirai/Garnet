@@ -1,10 +1,11 @@
-package com.breadmoirai.garnet.persistence
+package com.breadmoirai.garnet.testing.data
 
 import com.breadmoirai.garnet.spec.Phase
 import com.breadmoirai.garnet.spec.SimTime
-import com.breadmoirai.garnet.runner.BlockStateChange
-import com.breadmoirai.garnet.runner.PropertyDiff
-import com.breadmoirai.garnet.runner.StateRecording
+import com.breadmoirai.garnet.playback.data.BlockStateChange
+import com.breadmoirai.garnet.playback.data.PropertyDiff
+import com.breadmoirai.garnet.playback.data.RecordingSidecar
+import com.breadmoirai.garnet.playback.data.StateRecording
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe

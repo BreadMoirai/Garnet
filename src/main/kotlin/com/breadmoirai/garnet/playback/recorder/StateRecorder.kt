@@ -1,5 +1,8 @@
-package com.breadmoirai.garnet.runner
+package com.breadmoirai.garnet.playback.recorder
 
+import com.breadmoirai.garnet.playback.data.BlockStateChange
+import com.breadmoirai.garnet.playback.data.PropertyDiff
+import com.breadmoirai.garnet.playback.data.StateRecording
 import com.breadmoirai.garnet.spec.Phase
 import com.breadmoirai.garnet.spec.SimTime
 import com.breadmoirai.garnet.spec.captureBlockStateProps
@@ -57,7 +60,7 @@ class StateRecorder(
 
     /**
      * Converts a world position to a position relative to the recorder's origin block —
-     * the same coordinate space used by [com.breadmoirai.garnet.runner.EntryMarker.pos].
+     * the same coordinate space used by [com.breadmoirai.garnet.playback.recorder.EntryMarker.pos].
      */
     fun worldToOriginRelative(worldPos: BlockPos): BlockPos = BlockPos(
         worldPos.x - originPos.x,

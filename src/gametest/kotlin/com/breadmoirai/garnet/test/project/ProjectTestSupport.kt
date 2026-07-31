@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.test.project
 
-import com.breadmoirai.garnet.runner.RecordingDslEmitter
+import com.breadmoirai.garnet.playback.recorder.RecordingDslEmitter
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel

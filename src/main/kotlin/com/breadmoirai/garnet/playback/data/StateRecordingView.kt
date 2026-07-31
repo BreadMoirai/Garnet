@@ -1,5 +1,6 @@
-package com.breadmoirai.garnet.runner
+package com.breadmoirai.garnet.playback.data
 
+import com.breadmoirai.garnet.playback.recorder.StateRecorder
 import com.breadmoirai.garnet.spec.Phase
 import com.breadmoirai.garnet.spec.SimTime
 import com.breadmoirai.garnet.spec.applyPropertyFromString

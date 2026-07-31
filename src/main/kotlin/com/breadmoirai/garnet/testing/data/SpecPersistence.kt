@@ -1,7 +1,8 @@
-package com.breadmoirai.garnet.persistence
+package com.breadmoirai.garnet.testing.data
 
 import com.breadmoirai.garnet.spec.GarnetSpec
-import com.breadmoirai.garnet.runner.StateRecording
+import com.breadmoirai.garnet.playback.data.RecordingSidecar
+import com.breadmoirai.garnet.playback.data.StateRecording
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -14,7 +15,7 @@ object SpecPersistence {
 
     /**
      * Writes raw `.spec.kts` source text directly to disk.
-     * Used by the recording finalize path via [com.breadmoirai.garnet.runner.RecordingDslEmitter].
+     * Used by the recording finalize path via [com.breadmoirai.garnet.playback.recorder.RecordingDslEmitter].
      */
     fun writeSpecKts(saveDir: Path, id: String, source: String) {
         saveDir.createDirectories()

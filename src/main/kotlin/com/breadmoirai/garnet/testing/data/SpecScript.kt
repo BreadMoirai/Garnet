@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.persistence
+package com.breadmoirai.garnet.testing.data
 
 import com.breadmoirai.garnet.spec.GarnetSpec
 import kotlin.script.experimental.annotations.KotlinScript

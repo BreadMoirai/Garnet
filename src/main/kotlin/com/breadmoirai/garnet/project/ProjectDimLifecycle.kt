@@ -1,7 +1,8 @@
 package com.breadmoirai.garnet.project
 
 import com.breadmoirai.garnet.config.SharedSettings
-import com.breadmoirai.garnet.persistence.KtsSpecLoader
+import com.breadmoirai.garnet.testing.data.KtsSpecLoader
+import com.breadmoirai.garnet.testing.data.LoadedSpec
 import com.breadmoirai.garnet.spec.GarnetSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.Registries

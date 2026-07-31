@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.persistence
+package com.breadmoirai.garnet.testing.data
 
 import java.nio.file.Files
 import java.nio.file.Path

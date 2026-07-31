@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.mixin;
 
-import com.breadmoirai.garnet.runner.StateRecorder;
+import com.breadmoirai.garnet.playback.recorder.StateRecorder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;

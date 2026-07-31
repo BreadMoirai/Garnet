@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.harness
 
-import com.breadmoirai.garnet.runner.StateRecording
+import com.breadmoirai.garnet.playback.data.StateRecording
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe

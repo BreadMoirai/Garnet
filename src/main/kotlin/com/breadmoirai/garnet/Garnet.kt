@@ -25,7 +25,7 @@ class Garnet : ModInitializer {
         ProjectNetworkRegistry.register()
         McLifecycle.register()
         SubTickPhaseEvents.PHASE.register { level, phase ->
-            com.breadmoirai.garnet.runner.StateRecorder.onPhaseForActiveRecorders(level, phase)
+            com.breadmoirai.garnet.playback.recorder.StateRecorder.onPhaseForActiveRecorders(level, phase)
         }
         ServerLifecycleEvents.SERVER_STARTING.register { server ->
             val cfg = SharedSettings.projectRootPath

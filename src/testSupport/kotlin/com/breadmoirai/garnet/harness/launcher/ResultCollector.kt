@@ -11,7 +11,7 @@ data class LauncherResult(
     val passed: Int,
     val failed: Int,
     val errors: List<TestFailureRecord>,
-    val recordings: Map<String, com.breadmoirai.garnet.runner.StateRecording> = emptyMap(),
+    val recordings: Map<String, com.breadmoirai.garnet.playback.data.StateRecording> = emptyMap(),
 ) {
     val total: Int get() = passed + failed
     fun summary(): String = if (failed == 0) {
