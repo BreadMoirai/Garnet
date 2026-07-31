@@ -1,19 +1,14 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.ModRegistries
-import com.breadmoirai.garnet.block.SpecBlockEntity
 import com.breadmoirai.garnet.mixin.ConnectionAccessor
 import com.breadmoirai.garnet.mixin.ServerCommonPacketListenerImplAccessor
 import com.mojang.authlib.GameProfile
 import io.netty.channel.embedded.EmbeddedChannel
-import net.minecraft.core.BlockPos
-import net.minecraft.core.Vec3i
 import net.minecraft.network.Connection
 import net.minecraft.network.protocol.PacketFlow
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.server.MinecraftServer
-import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.server.network.CommonListenerCookie
 import net.minecraft.world.level.GameType
@@ -79,42 +74,4 @@ fun drainPayloads(player: ServerPlayer): List<CustomPacketPayload> {
         if (msg is ClientboundCustomPayloadPacket) out.add(msg.payload())
     }
     return out
-}
-
-/**
- * Places a recorder block + BE at [pos] in [level], applies setters, and returns the BE.
- * Caller is responsible for choosing a position not already occupied.
- */
-fun placeRecorderBE(
-    level: ServerLevel,
-    pos: BlockPos,
-    specId: String,
-    structureId: String? = null,
-    bounds: Vec3i = Vec3i(3, 3, 3),
-): SpecBlockEntity {
-    level.setBlock(pos, ModRegistries.GARNET_RECORDER_BLOCK.defaultBlockState(), 2)
-    val be = level.getBlockEntity(pos) as SpecBlockEntity
-    be.setSpecId(specId)
-    if (structureId != null) be.setStructure(structureId)
-    be.setSpecBounds(bounds)
-    return be
-}
-
-/**
- * Places a runner block + BE at [pos] in [level], applies setters, and returns the BE.
- * Caller is responsible for choosing a position not already occupied.
- */
-fun placeRunnerBE(
-    level: ServerLevel,
-    pos: BlockPos,
-    specId: String,
-    structureId: String? = null,
-    bounds: Vec3i = Vec3i(3, 3, 3),
-): SpecBlockEntity {
-    level.setBlock(pos, ModRegistries.GARNET_RUNNER_BLOCK.defaultBlockState(), 2)
-    val be = level.getBlockEntity(pos) as SpecBlockEntity
-    be.setSpecId(specId)
-    if (structureId != null) be.setStructure(structureId)
-    be.setSpecBounds(bounds)
-    return be
 }

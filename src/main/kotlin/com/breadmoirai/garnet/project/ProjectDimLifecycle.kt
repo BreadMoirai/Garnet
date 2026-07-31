@@ -1,7 +1,5 @@
 package com.breadmoirai.garnet.project
 
-import com.breadmoirai.garnet.ModRegistries
-import com.breadmoirai.garnet.block.SpecBlockEntity
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.persistence.KtsSpecLoader
 import com.breadmoirai.garnet.dsl.GarnetSpec
@@ -148,17 +146,8 @@ object ProjectDimLifecycle {
             tpl.placeInWorld(level, absOrigin, absOrigin, StructurePlaceSettings(), level.random, 2)
         }
 
-        // Anchor block: runner if structure exists, recorder if new spec.
-        val anchorPos = absOrigin.offset(spec.bounds.x, 0, 0)
-        val anchorBlock = if (structureExists) {
-            ModRegistries.GARNET_RUNNER_BLOCK
-        } else {
-            ModRegistries.GARNET_RECORDER_BLOCK
-        }
-        level.setBlock(anchorPos, anchorBlock.defaultBlockState(), 2)
-        val be = level.getBlockEntity(anchorPos) as? SpecBlockEntity
-        // TODO(Task 16+): bind spec to block entity via new dsl.GarnetSpec path
-        be?.projectSourcePath = folder.resolve(filename)
+        // Anchor blocks were removed with the pre-dock in-world surface; a cell is now
+        // just its structure. Binding a source path to a block entity went with them.
 
         // Snapshot the cell volume after placement.
         val snapshot = StructureTemplate()

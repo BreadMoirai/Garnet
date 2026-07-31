@@ -7,11 +7,8 @@ import com.breadmoirai.garnet.test.project.ProjectFileOpsNetworkSpec
 import com.breadmoirai.garnet.test.project.ProjectNetworkRegistrySpec
 import com.breadmoirai.garnet.test.project.ProjectStructureNetworkSpec
 import com.breadmoirai.garnet.test.project.ProjectTeleportSpec
-import com.breadmoirai.garnet.test.network.RecorderRunnerNetworkRegistrySpec
 import com.breadmoirai.garnet.test.persistence.StructureRegionPersistenceSpec
 import com.breadmoirai.garnet.test.persistence.StructureSidecarPersistenceSpec
-import com.breadmoirai.garnet.test.recorder.MarkerToolSpec
-import com.breadmoirai.garnet.test.recorder.RecordingLifecycleSpec
 import com.breadmoirai.garnet.testing.core.GarnetTestLifecycle
 import com.breadmoirai.garnet.testing.launcher.launchKotest
 import net.fabricmc.fabric.api.gametest.v1.GameTest
@@ -56,9 +53,6 @@ class GametestSentinel {
                             ProjectStructureNetworkSpec::class,
                             ProjectFileOpsNetworkSpec::class,
                             ProjectCommandSpec::class,
-                            RecorderRunnerNetworkRegistrySpec::class,
-                            RecordingLifecycleSpec::class,
-                            MarkerToolSpec::class,
                             StructureRegionPersistenceSpec::class,
                             StructureSidecarPersistenceSpec::class,
                         ),

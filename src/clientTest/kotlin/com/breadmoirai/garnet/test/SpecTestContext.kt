@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.block.SpecBlockEntity
 import dev.isxander.yacl3.api.ButtonOption
 import dev.isxander.yacl3.api.Option
 import dev.isxander.yacl3.gui.YACLScreen
@@ -145,12 +144,6 @@ class SpecTestContext(
 
     /** Takes a screenshot and saves it to the test screenshots directory. */
     fun screenshot(name: String): Path = context.takeScreenshot(name)
-
-    /** Reads the synced client-side BE (lastTestResult is synced via getUpdatePacket). */
-    fun getClientBe(pos: BlockPos): SpecBlockEntity? =
-        fromClient { mc ->
-            mc.level?.getBlockEntity(pos) as? SpecBlockEntity
-        }
 
     /**
      * Clicks a ButtonOption by name inside a YACLScreen's option list.

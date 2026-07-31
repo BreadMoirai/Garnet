@@ -2,9 +2,6 @@ package com.breadmoirai.garnet.client
 
 import com.breadmoirai.garnet.client.config.ModConfig
 import com.breadmoirai.garnet.client.project.ProjectClientNetworking
-import com.breadmoirai.garnet.client.network.registerClientNetworking
-import com.breadmoirai.garnet.client.render.registerBoundsRenderer
-import com.breadmoirai.garnet.client.render.registerHudOverlay
 import com.breadmoirai.garnet.client.viewport.registerCursorFocusToggle
 import com.breadmoirai.garnet.client.viewport.registerDockKeybinds
 import com.breadmoirai.garnet.client.viewport.registerDockWorldLifecycle
@@ -19,10 +16,7 @@ class GarnetClient : ClientModInitializer {
     override fun onInitializeClient() {
         LOGGER.debug("[GarnetClient#onInitializeClient] initializing client")
         ModConfig.load()
-        registerBoundsRenderer()
-        registerClientNetworking()
         ProjectClientNetworking.register()
-        registerHudOverlay()
         registerViewportToggle()
         registerCursorFocusToggle()
         registerDockKeybinds()
