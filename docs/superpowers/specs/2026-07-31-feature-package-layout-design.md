@@ -16,26 +16,38 @@ Three problems compound it:
    calls `GarnetTestLifecycle.register()` — the *product* registers those tick pumps. Half the
    package is live server infrastructure wearing a test name; the other half is genuinely
    dev-only and has no business shipping.
-2. **Dead code hides the boundaries.** The recorder/runner screens were hard-cut for the Compose
-   dock and left orphaned payloads, no-op receivers, and a legacy Kotest script-loading path
-   with zero callers. It is impossible to see which packages actually depend on which.
+2. **The pre-dock workflow is still in the tree.** The recorder/runner screens were hard-cut for
+   the Compose dock, but the blocks, block entity, marker tools, and their entire wire protocol
+   remain — driving a UI that no longer exists. They dominate the package graph while serving
+   no user-reachable flow.
 3. **The client tree is a fourth layer axis.** `client/ide` and `main/project` are two halves of
    one capability, split across sourcesets *and* across unrelated package roots.
 
 ## Goals
 
-- Package by capability: `testing`, `playback`, `editor`, each with `data` / `ui` / `network`
+- Package by capability: `playback`, `testing`, `editor`, each with `data` / `ui` / `network`
   style subpackages.
 - Shared infrastructure lives in named base packages, not in whichever feature happened to
   need it first.
 - Kotest ships in no jar the player loads.
 - Strict, acyclic dependency direction that a reader can state from memory.
+- Remove the pre-dock in-world surface so the editor can become the sole driver.
 
 ## Non-goals
 
-- No behavior change beyond what the dead-code trim removes.
 - No new features. The recorder and runner panels are out of scope; this makes room for them.
 - No Stonecutter/multi-version work. Single MC 26.2 slice throughout.
+- No rework of the record/run engine itself. It survives untouched, minus its callers.
+
+## Post-state
+
+After this work the mod can open a redstone-project workspace, browse and edit the file tree,
+create specs, folders, and structures, and place structures into the world. It **cannot record
+or run a spec from inside the game** — the engine is intact and fully test-covered, but its only
+entry point (the runner/recorder blocks) is gone until the dock panels are built.
+
+This is deliberate and is the direct continuation of cutting the screens. It is the single
+biggest consequence of this spec.
 
 ---
 
@@ -46,7 +58,8 @@ Three problems compound it:
 ```
 com.breadmoirai.garnet/
   Garnet.kt                 mod entrypoint
-  ModRegistries.kt          registry handles
+  GarnetClient.kt           client entrypoint
+  ModRegistries.kt          registry handles (much reduced — see Trim)
 
   spec/                     the spec DSL — shared vocabulary of testing and playback
   mc/                       MC coroutine + tick plumbing
@@ -66,18 +79,10 @@ because it was never test-only.
   playback/         capture, emit, store, replay world state
     recorder/       StateRecorder, RecordingDslEmitter
     data/           StateRecording, StateRecordingStorage, StateRecordingView, RecordingSidecar
-    ui/             GarnetBoundsRenderer, HudOverlayRenderer, SpecBoundsInteraction
 
   testing/          run a spec and verify it
     runner/         runGarnetSpec (engine), SpecSnapshot, PlayerInteractionDispatch
     data/           SpecPersistence, KtsSpecLoader, SpecScript, SpecDirectoryScan, LoadedSpec
-    ui/             (empty — the runner panel lands here)
-
-  anchor/           the in-world surface: blocks, block entity, marker tool
-    block/          GarnetRecorderBlock, GarnetRunnerBlock, SpecBlockEntity
-    item/           SpecMarkerTool, UndoStack
-    network/        recorder + runner payloads + registration
-    ui/             (client) ClientNetworkHandler — the surviving OverwritePrompt receiver
 
   editor/           workspace, project model, explorer
     data/           pure model — no server side effects, unit-testable
@@ -87,18 +92,13 @@ because it was never test-only.
     ui/             the Project Explorer
 ```
 
+`playback/` and `testing/` have no `ui/` and no `network/` after the trim — the panels and their
+wire protocol do not exist yet. Those subpackages are created when the panels are, not
+speculatively.
+
 `editor/` splits `data` from `world` because a flat `editor.data` would hold 20 files, which is
 the problem this restructure exists to fix. The split is along a real seam: `data` is pure and
 already has unit tests; `world` mutates dimensions and is gametest-covered.
-
-`anchor/` is the fourth package, and it exists because of a measured fact rather than a
-preference: `SpecBlockEntity` calls `SpecPersistence`, `runGarnetSpec`, `StateRecorder`, *and*
-`RecordingDslEmitter`. It is not a base class — it is the orchestrator that drives both
-features, and both blocks share it. Any base package holding it makes the base depend on
-everything. Lifting the whole in-world surface above both features resolves it with no logic
-change. Splitting `SpecBlockEntity` into a recorder BE and a runner BE is the architecturally
-correct fix, but it is a behavior-affecting refactor with BE-type and NBT migration; it needs
-its own spec and is explicitly out of scope here.
 
 ### Dependency direction
 
@@ -109,9 +109,7 @@ spec/ mc/ structure/ config/ ui/     ← base, no feature imports
        ↑
    testing/                           ← imports playback/, spec/
        ↑
-   anchor/                            ← imports testing/, playback/
-       ↑
-   editor/                            ← imports anchor/, testing/, playback/, structure/
+   editor/                            ← imports testing/, playback/, structure/, ui/
 ```
 
 Strictly one direction. `testing.runner.runGarnetSpec` drives a `playback.recorder.StateRecorder`
@@ -122,20 +120,17 @@ Features never import another feature's `ui`. Cross-feature reach goes through `
 
 ### Seam fixes
 
-The layering above does not hold today. An import audit of `src/main` + `src/client` found five
-violations that the current layer-based packaging conceals. Four are resolved by placement; one
-needs a small code change. These are prerequisites, not incidental cleanup — without them the
-new packages have cycles on day one.
+An import audit of `src/main` + `src/client` found five violations of the direction above. Two
+are resolved by the trim, since the offending files are deleted (`SpecBlockEntity` reaching into
+both features; `SpecMarkerTool` type-checking `GarnetRunnerBlock`). Three remain:
 
 | Violation | Resolution | Phase |
 | --- | --- | --- |
-| `SpecBlockEntity` → `SpecPersistence`, `runGarnetSpec`, `StateRecorder`, `RecordingDslEmitter` | `anchor/` sits above both features | 6 |
-| `SpecMarkerTool` → `GarnetRunnerBlock` (one `is` check) | both land in `anchor/` | 6 |
 | `StructurePersistence` → `project.PlacedBox`, `autoFit`, `anchorY`, `centeredStart` | these are structure-region geometry, not editor concerns. `StructureRegionMath.kt` → `structure/`; `PlacedBox` extracted out of `ProjectDimRegistry.kt` into `structure/` | 4 |
-| `ui.DockKeybinds` → `editor` Explorer state | the file does two jobs. Keybind registration stays in `ui/viewport/DockKeybinds.kt`; `registerDockWorldLifecycle`'s Explorer-state reset moves to `editor/ui/ExplorerLifecycle.kt` | 7 |
-| `dsl.ConditionEvaluator` → `runner.StateRecordingView` | **code change.** `SpecRun` already declares `StateRecordingViewLike` for this purpose; `StateRecordingView` does not implement it. Make it implement the interface and widen `ConditionEvaluator`'s parameter to the interface type | 4 |
+| `ui.DockKeybinds` → `editor` Explorer state | the file does two jobs. Keybind registration stays in `ui/viewport/DockKeybinds.kt`; `registerDockWorldLifecycle`'s Explorer-state reset moves to `editor/ui/ExplorerLifecycle.kt` | 6 |
+| `spec.ConditionEvaluator` → `playback.StateRecordingView` | **code change.** `SpecRun` already declares `StateRecordingViewLike` for this purpose; `StateRecordingView` does not implement it. Make it implement the interface and widen `ConditionEvaluator`'s parameter to the interface type | 4 |
 
-The `ConditionEvaluator` fix is the only non-mechanical edit in phases 3–8, and it is the one
+The `ConditionEvaluator` fix is the only non-mechanical edit in phases 3–6, and it is the one
 that makes `spec/` a true leaf.
 
 ### Client sourceset
@@ -186,27 +181,59 @@ What stays in `main` as `garnet.mc`: `McDispatchers`, `ServerThreadDispatcher`,
 
 ## Trim
 
-Deletions, in phase 1, before anything moves.
+All of this happens in phase 1, before anything moves.
+
+### The in-world entry surface
+
+The blocks, the block entity, the marker tools, and their whole wire protocol go.
+
+| Deleted | Notes |
+| --- | --- |
+| `block/GarnetRecorderBlock.kt`, `GarnetRunnerBlock.kt`, `SpecBlockEntity.kt` | the entire `block/` package |
+| `item/SpecMarkerTool.kt`, `UndoStack.kt` | the entire `item/` package, incl. `InputSpecMarkerItem` / `OutputSpecMarkerItem` |
+| `network/Packets.kt`, `network/NetworkRegistry.kt` | every payload is addressed to a block entity by `originPos`; with no BE, none has a referent |
+| `client/network/ClientNetworkHandler.kt` | receives only the deleted payloads |
+| `client/render/GarnetBoundsRenderer.kt`, `HudOverlayRenderer.kt` | render BE bounds and marker HUD |
+| `client/SpecBoundsInteraction.kt` | zero references already |
+| `client/state/ClientRunnerState.kt` | zero references already |
+| `ModRegistries` block, block-item, BE-type, and marker-item registrations | leaves `ModRegistries` nearly empty; delete the file if nothing survives |
+| `Garnet.onInitialize`: `registerNetworking()`, `registerAttackCallback()`, `registerUseBlockCallback()` | the marker-tool interaction callbacks |
+| `gametest/.../recorder/MarkerToolSpec.kt`, `RecordingLifecycleSpec.kt` | drive the deleted blocks/tools |
+| `gametest/.../network/RecorderRunnerNetworkRegistrySpec.kt` | asserts on the deleted payloads |
+| `clientTest/.../ClientNetworkSpec.kt`, `ClientNetworkTestSupport.kt` | same |
+| Sentinel registrations for all of the above | `GametestSentinel` and `ClientTestSentinel` explicit spec lists |
+
+**Assets.** `blockstates/{garnet_recorder,garnet_runner}.json`, the `models/block/`,
+`models/item/`, and `items/` entries for both blocks and all four markers,
+`textures/block/garnet_recorder.png`, `textures/item/{input,output,auto,breakpoint}_spec_marker.png`,
+and the matching `block.garnet.*` / `item.garnet.*` lang keys.
+
+The audit also found assets that are *already* orphaned and should go in the same pass:
+`garnet_editor` blockstate/model/item/texture (no such block class exists),
+`auto_spec_marker` and `breakpoint_spec_marker` (registered nowhere), and every
+`screen.garnet.*` lang key (the screens were cut).
+
+### What survives, and why
+
+- **`StateRecorder` and the whole recording pipeline.** The recorder is driven by a static
+  `StateRecorder.activeRecorders()` registry, not by block entities. `Garnet.onInitialize`'s
+  `SubTickPhaseEvents.PHASE` handler and `ServerLevelSetBlockMixin` both dispatch through that
+  registry and are unaffected. `runGarnetSpec` activates its own recorder.
+- **`runGarnetSpec`, the DSL, the emitter, persistence.** These have no product caller after
+  the trim. That is intentional — they are the engine the panels will drive, and they carry
+  substantial unit and gametest coverage. They are **not** to be treated as dead code by the
+  same standard applied to the deletions above.
+- **`RecordingDslEmitter`'s `markers` parameter.** Nothing produces `EntryMarker`s once the
+  marker tool is gone. The parameter and the emit path stay; supplying markers becomes the
+  editor's job.
+
+### Independent dead code
 
 | Target | Reason |
 | --- | --- |
-| `client/state/ClientRunnerState.kt` | zero references, whole file |
 | `KtsSpecLoader.loadSpec` / `loadFile` / `findFirstSpecClass` | legacy Kotest script form, zero callers; removing them drops the `io.kotest` import from `main` |
 | `SpecScript` `defaultImports` for `GarnetTestSpec`, `runGarnetSpec`, `awaitTicks`, `awaitTickEnd`, `spawnStructure` | pre-imports for a script form nothing emits |
 | `testing/server/Structures.kt` (`StructureGrid`, `StructureHandle`, slot acquire/release) | zero callers |
-| `RunSpecC2SPayload`, `ResetSpecC2SPayload`, `SetStructureC2SPayload`, `SetRunnerConfigC2S` | registered and handled server-side, no sender anywhere |
-| `OpenRecorderScreenS2C`, `OpenRunnerScreenS2C`, `RunnerStatusS2C` | client handlers are no-op log lines reading "UI removed" |
-| `RunnerMetaSnapshot` | exists only to populate `OpenRunnerScreenS2C` |
-| The three matching receivers in `ClientNetworkHandler` | dead with their payloads; leaves one receiver (`OverwritePrompt`) |
-| Gametest assertions covering the removed payloads | in `RecorderRunnerNetworkRegistrySpec` |
-
-Survivors in the spec-block wire protocol: `OverwritePromptS2CPayload`,
-`OverwriteDecisionC2SPayload`, `SetRecorderConfigC2S`, `RecorderCommandC2S`, `RunnerCommandC2S`.
-These are commands with live gametest coverage, not screen plumbing.
-
-**Behavior change:** `GarnetRunnerBlock.use` and `GarnetRecorderBlock.use` lose their
-open-screen sends. Right-clicking either block becomes a no-op until the panels are built.
-This is intended — it removes the pretence of a UI that was cut.
 
 ---
 
@@ -227,16 +254,6 @@ This is intended — it removes the pretence of a UI that was cut.
 | `PlacedBox` (extracted from `project/ProjectDimRegistry.kt`) | `structure/PlacedBox.kt` |
 | `config/SharedSettings.kt` | `config/` (unchanged) |
 
-### `src/main/kotlin` → `testing/`
-
-| From | To |
-| --- | --- |
-| `runner/runGarnetSpec.kt` | `testing/runner/` |
-| `runner/SpecSnapshot.kt` | `testing/runner/` |
-| `runner/PlayerInteractionDispatch.kt` | `testing/runner/` |
-| `persistence/SpecPersistence.kt`, `KtsSpecLoader.kt`, `SpecScript.kt`, `SpecDirectoryScan.kt` | `testing/data/` |
-| `project/LoadedSpec.kt` | `testing/data/` |
-
 ### `src/main/kotlin` → `playback/`
 
 | From | To |
@@ -246,20 +263,13 @@ This is intended — it removes the pretence of a UI that was cut.
 | `runner/StateRecording.kt`, `StateRecordingStorage.kt`, `StateRecordingView.kt` | `playback/data/` |
 | `persistence/RecordingSidecar.kt` | `playback/data/` |
 
-### `src/main/kotlin` → `anchor/`
+### `src/main/kotlin` → `testing/`
 
 | From | To |
 | --- | --- |
-| `block/GarnetRecorderBlock.kt`, `GarnetRunnerBlock.kt`, `SpecBlockEntity.kt` | `anchor/block/` |
-| `item/SpecMarkerTool.kt`, `UndoStack.kt` | `anchor/item/` |
-| `network/Packets.kt` (surviving payloads) | `anchor/network/AnchorPackets.kt` |
-| `network/NetworkRegistry.kt` (surviving handlers) | `anchor/network/AnchorNetworking.kt` |
-
-The trim removes every payload that would have split `Packets.kt` across two features. What
-survives — `OverwritePromptS2CPayload`, `OverwriteDecisionC2SPayload`, `SetRecorderConfigC2S`,
-`RecorderCommandC2S`, `RunnerCommandC2S` — is uniformly addressed to a block entity by
-`originPos`, so it belongs with the blocks. `NetworkRegistry` therefore splits **two** ways
-(`anchor` + `editor`), not three.
+| `runner/runGarnetSpec.kt`, `SpecSnapshot.kt`, `PlayerInteractionDispatch.kt` | `testing/runner/` |
+| `persistence/SpecPersistence.kt`, `KtsSpecLoader.kt`, `SpecScript.kt`, `SpecDirectoryScan.kt` | `testing/data/` |
+| `project/LoadedSpec.kt` | `testing/data/` |
 
 ### `src/main/kotlin` → `editor/` (with `Project` → `Editor` rename)
 
@@ -294,6 +304,9 @@ Two names keep `Project` deliberately: the `/garnet project …` command literal
 and `docs/architecture/redstone-project.md`'s "redstone project" concept (the domain term for
 a folder of specs). The *classes* are `Editor*`; the *concept* is still a project.
 
+With `NetworkRegistry.kt` deleted, `editor/network/EditorNetworking.kt` is the **only** payload
+registration left. `Garnet.onInitialize` calls it directly.
+
 ### `src/client/kotlin`
 
 | From | To |
@@ -305,29 +318,24 @@ a folder of specs). The *classes* are `Editor*`; the *concept* is still a projec
 | `client/viewport/DockKeybinds.kt` — `registerDockWorldLifecycle`'s Explorer reset only | `editor/ui/ExplorerLifecycle.kt` — see seam fixes |
 | `client/screen/GarnetIconButton.kt` | `ui/widget/` |
 | `client/config/ModConfig.kt`, `ModMenuIntegration.kt` | `config/` |
-| `client/render/GarnetBoundsRenderer.kt`, `HudOverlayRenderer.kt` | `playback/ui/` |
-| `client/SpecBoundsInteraction.kt` | `playback/ui/` |
-| `client/network/ClientNetworkHandler.kt` | `anchor/ui/AnchorClientNetworking.kt` |
 | `client/ide/*` (9 files) | `editor/ui/` |
 | `client/project/ProjectClientNetworking.kt` | `editor/network/EditorClientNetworking.kt` |
 | `client/project/ProjectIntegratedBoot.kt` | `editor/world/EditorIntegratedBoot.kt` |
 | `client/GarnetClient.kt` | stays at root next to `Garnet.kt` |
 
-`src/client/java` (mixins, `WindowViewportExt`) is unchanged — the mixin JSON pins
-`com.breadmoirai.garnet.mixin.client`.
-
-After the trim, `ClientNetworkHandler` holds one receiver (`OverwritePrompt`), which is
-addressed to a block entity; hence its move into `anchor/`.
+`src/client/java` is unchanged — the mixin JSON pins `com.breadmoirai.garnet.mixin.client`, and
+`WindowViewportExt` belongs with it.
 
 ### Test sourcesets
 
 `src/test`, `src/gametest`, and `src/clientTest` mirror the feature layout:
-`test/project/*` → `test/editor/*`, `test/recorder/*` → `test/anchor/` (they exercise the
-marker tool and recording lifecycle through the blocks), `test/network/*` → `test/anchor/`,
-`test/persistence/*` splits between `test/testing/` and `test/structure/`.
+`test/project/*` → `test/editor/*`, `test/persistence/*` splits between `test/testing/` and
+`test/structure/`, `test/runner/*` splits between `test/playback/` and `test/testing/`.
+`test/recorder/` and `test/network/` are deleted with the code they cover.
 
 `GametestSentinel`'s explicit spec list and `ClientTestSentinel`'s must be updated in the same
-commit as any spec move — autoscan is disabled, so an unregistered spec silently does not run.
+commit as any spec move or deletion — autoscan is disabled, so an unregistered spec silently
+does not run.
 
 ---
 
@@ -339,16 +347,16 @@ Each phase is one commit on `main`, gated on the full build:
 
 | Phase | Content |
 | --- | --- |
-| 1 | Trim. No moves, no renames. |
+| 1 | Trim: the in-world entry surface, its assets and tests, and the independent dead code. No moves, no renames. |
 | 2 | `testSupport` sourceset + build wiring; move the Kotest-coupled classes out of `main`. |
 | 3 | `testing/core` + `testing/server` + `event/` → `garnet.mc`; `GarnetTestLifecycle` → `McLifecycle`. |
 | 4 | Base packages: `spec/`, `structure/`, `ui/`, `config/`. Includes the `StateRecordingViewLike` and `StructureRegionMath`/`PlacedBox` seam fixes. Update `RecordingDslEmitter`'s emitted import line and `SpecScript.defaultImports` to `garnet.spec.*`. |
-| 5 | `playback/`. |
-| 6 | `testing/`, then `anchor/` — the two are one commit only if `anchor/` cannot compile without `testing/` in place. |
-| 7 | `editor/`, including the `Project` → `Editor` rename and the `DockKeybinds` split. |
-| 8 | Docs sync. |
+| 5 | `playback/`, then `testing/`. |
+| 6 | `editor/`, including the `Project` → `Editor` rename and the `DockKeybinds` split. |
+| 7 | Docs sync. |
 
-Phases 5–7 run in dependency order so each lands on an already-moved base.
+Phase 1 is by far the largest diff and the only one with behavior change. Phases 3–6 run in
+dependency order so each lands on an already-moved base.
 
 Phase 4 is the only one with a user-visible artifact change: every `.spec.kts` file's first line
 becomes `import com.breadmoirai.garnet.spec.*`. No `.spec.kts` files are committed to the repo,
@@ -359,42 +367,53 @@ developer's local world save.
 
 Per phase:
 
-1. Compile all five (soon six) sourcesets.
+1. Compile all sourcesets (six after phase 2).
 2. `:26.2:test` unfiltered, then read the XML report — the `--tests` filter does not work with
    Kotest and reports a false "no tests found".
 3. `runGameTest` and `runClientTest` in the foreground with a 600 s timeout. `clientTest` XML
    reports are always empty; read the log for the sentinel's `LauncherResult.summary()`.
 4. `grep -rn "<OldName>" docs/ src/` returns zero hits referring to the old role.
 
-Phases 3 and 5–7 are mechanical: package/import rewrites with no logic edits. Any behavior diff
-in a mechanical phase is a bug in the move, not an intended change. Phase 4 carries the two
-seam fixes and phase 2 carries the build wiring, so those two need real review.
+Phase 1 additionally needs a manual check: launch the client, open a redstone project, and
+confirm the Explorer still lists, creates, renames, and places — that is the entire remaining
+product surface, and it must be unaffected.
+
+Phases 3 and 5–6 are mechanical: package/import rewrites with no logic edits. Any behavior diff
+in a mechanical phase is a bug in the move. Phase 4 carries two seam fixes and phase 2 carries
+build wiring, so those need real review.
 
 ## Docs impact
 
 `docs/architecture/module-map.md` is rewritten wholesale — it is a package-by-package tour and
-every entry changes. `docs/architecture/recording-pipeline.md`, `redstone-project.md`, the
-`docs/gametest/` articles (they name `GarnetTestSpec`, `launchKotest`, `FabricTestThreadPump`),
-and `docs/use-cases/gametest-harness.md` all cite moved names. `docs/persistence/` articles cite
-`Packets.kt` payloads that phase 1 deletes.
+every entry changes, including several that now describe deleted code (it already cites a
+`block/SpecBlockKind.kt` that does not exist).
 
-Full `grep -rn` sweep for every renamed symbol is part of phase 8, not deferred.
+Phase 1 invalidates whole articles rather than lines: anything documenting the recorder/runner
+blocks, the marker tool, or the C2S/S2C payload contract. `docs/persistence/network-payload-contract.md`
+loses its subject entirely — the `originPos` trust anchor it describes goes with the BE.
+`docs/architecture/recording-pipeline.md` needs its entry point rewritten to say the engine has
+none. `docs/use-cases/` entries covering record-from-block flows are no longer reachable
+journeys and should be marked as such rather than silently left.
+
+Phases 3–6 are name changes: `docs/gametest/` articles name `GarnetTestSpec`, `launchKotest`,
+`FabricTestThreadPump`; `docs/architecture/redstone-project.md` names the `Project*` classes.
+
+A full `grep -rn` sweep for every deleted and renamed symbol is part of phase 7, not deferred.
 
 ## Open risks
 
-- **Phase 2 is the riskiest phase.** A new sourceset that must be on the game's
+- **Phase 1 leaves the mod without a record/run entry point.** See Post-state. Everything else
+  in this spec is reversible refactoring; this is not.
+- **Phase 2 is the riskiest structural phase.** A new sourceset that must be on the game's
   runtime classpath for two different Loom run configs, excluded from Compose, and excluded
   from the shipped jar. If it resists, the fallback is to keep the harness in `main` behind a
   `garnet.harness` package and accept that Kotest ships — the layout benefit survives, only
   the jar-size/purity benefit is lost.
-- **Same-package-across-sourcesets `internal`.** Expect compile errors in phases 5–7 where
+- **Gametest coverage drops sharply in phase 1.** `MarkerToolSpec`, `RecordingLifecycleSpec`,
+  `RecorderRunnerNetworkRegistrySpec`, and `ClientNetworkSpec` are deleted, and they are the
+  only end-to-end exercise of the record→emit→run path through a real world. What remains is
+  `RunGarnetSpecSmokeTest` plus unit tests. Rebuilding that coverage against the editor-driven
+  path is a follow-up, not part of this spec.
+- **Same-package-across-sourcesets `internal`.** Expect compile errors in phases 5–6 where
   `src/client` code reaches `src/main` code that is now nominally in the same package. The fix
   is promoting to `public`, not restructuring further.
-- **Payload split.** `NetworkRegistry.kt` currently registers everything in one
-  `registerNetworking()` called from `Garnet.onInitialize`. Splitting it into `anchor` and
-  `editor` means two registration calls; registration order must stay stable or payload IDs
-  shift.
-- **`anchor/` is a compromise, not the destination.** It exists to contain `SpecBlockEntity`'s
-  reach without a behavior-affecting refactor. Splitting the BE per feature and dissolving
-  `anchor/` into `testing/block` and `playback/block` remains the better end state and should
-  get its own spec once the panels exist.
