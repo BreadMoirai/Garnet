@@ -21,18 +21,39 @@ import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.testing.GarnetTestSpec
 import com.breadmoirai.garnet.testing.server.onServer
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 class ProjectNetworkRegistrySpec : GarnetTestSpec({
+
+    // Every other test in this spec calls ProjectNetworkRegistry.handleX(...) directly, which
+    // never exercises whether register() was actually invoked at mod init. This test probes the
+    // global Fabric networking registries instead of the handler functions, so it fails if
+    // ProjectNetworkRegistry.register() is ever dropped from Garnet.onInitialize.
+    test("ProjectNetworkRegistry.register() was called at init: receiver and payload types are already claimed") {
+        // C2S: registerGlobalReceiver uses Map.putIfAbsent under the hood and returns false
+        // when a receiver for this type is already registered — proving init already claimed it.
+        // Because it's a no-op when already-present, this does not disturb the real handler.
+        val alreadyRegistered = ServerPlayNetworking.registerGlobalReceiver(LoadProjectFolderC2S.TYPE) { _, _ -> }
+        alreadyRegistered shouldBe false
+
+        // S2C: PayloadTypeRegistry.register() throws IllegalArgumentException if the type id is
+        // already present in its packetTypes map — proving init already registered the codec.
+        shouldThrow<IllegalArgumentException> {
+            PayloadTypeRegistry.clientboundPlay().register(ProjectErrorS2C.TYPE, ProjectErrorS2C.STREAM_CODEC)
+        }
+    }
 
     test("handleLoadFolder rejects path traversal with ProjectErrorS2C") {
         withTempRoot("project-net-traversal") { tmp ->
