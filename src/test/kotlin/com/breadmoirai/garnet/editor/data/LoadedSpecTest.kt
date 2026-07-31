@@ -1,6 +1,5 @@
-package com.breadmoirai.garnet.testing.data
+package com.breadmoirai.garnet.editor.data
 
-import com.breadmoirai.garnet.editor.data.EditorCell
 import com.breadmoirai.garnet.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

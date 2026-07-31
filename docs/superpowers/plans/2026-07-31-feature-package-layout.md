@@ -982,11 +982,11 @@ Splits `runner/` and `persistence/` into the two feature packages.
 
 **Files:**
 - Move: `runner/{StateRecorder,RecordingDslEmitter}.kt` → `playback/recorder/`; `runner/{StateRecording,StateRecordingStorage,StateRecordingView}.kt` + `persistence/RecordingSidecar.kt` → `playback/data/`
-- Move: `runner/{runGarnetSpec,SpecSnapshot}.kt` → `testing/runner/`; `persistence/{SpecPersistence,KtsSpecLoader,SpecScript,SpecDirectoryScan}.kt` + `project/LoadedSpec.kt` → `testing/data/`
+- Move: `runner/{runGarnetSpec,SpecSnapshot}.kt` → `testing/runner/`; `persistence/{SpecPersistence,KtsSpecLoader,SpecScript,SpecDirectoryScan}.kt` + `project/LoadedSpec.kt` → `editor/data/`
 
 **Interfaces:**
 - Consumes: Task 5's `spec/` and `structure/`.
-- Produces: `com.breadmoirai.garnet.playback.recorder.{StateRecorder, EntryMarker, RecordingDslEmitter}`, `com.breadmoirai.garnet.playback.data.{StateRecording, StateRecordingStorage, StateRecordingView, RecordingSidecar}`, `com.breadmoirai.garnet.testing.runner.{runGarnetSpec, SpecSnapshot}`, `com.breadmoirai.garnet.testing.data.{SpecPersistence, KtsSpecLoader, SpecScript, SpecDirectoryScan, LoadedSpec}`.
+- Produces: `com.breadmoirai.garnet.playback.recorder.{StateRecorder, EntryMarker, RecordingDslEmitter}`, `com.breadmoirai.garnet.playback.data.{StateRecording, StateRecordingStorage, StateRecordingView, RecordingSidecar}`, `com.breadmoirai.garnet.testing.runner.{runGarnetSpec, SpecSnapshot}`, `com.breadmoirai.garnet.testing.data.{SpecPersistence, KtsSpecLoader, SpecScript, SpecDirectoryScan}`.
 
 - [ ] **Step 1: Move into `playback/`**
 
@@ -1009,7 +1009,7 @@ G=src/main/kotlin/com/breadmoirai/garnet
 mkdir -p $G/testing/runner $G/testing/data
 git mv $G/runner/runGarnetSpec.kt $G/runner/SpecSnapshot.kt $G/testing/runner/
 git mv $G/persistence/SpecPersistence.kt $G/persistence/KtsSpecLoader.kt $G/persistence/SpecScript.kt $G/persistence/SpecDirectoryScan.kt $G/testing/data/
-git mv $G/project/LoadedSpec.kt $G/testing/data/
+git mv $G/project/LoadedSpec.kt $G/editor/data/
 sed -i 's/^package com\.breadmoirai\.garnet\.runner$/package com.breadmoirai.garnet.testing.runner/' $G/testing/runner/*.kt
 sed -i 's/^package com\.breadmoirai\.garnet\.\(persistence\|project\)$/package com.breadmoirai.garnet.testing.data/' $G/testing/data/*.kt
 rmdir $G/runner $G/persistence 2>/dev/null || true
@@ -1041,7 +1041,7 @@ for f in $FILES; do
     -e 's/com\.breadmoirai\.garnet\.persistence\.KtsSpecLoader/com.breadmoirai.garnet.testing.data.KtsSpecLoader/g' \
     -e 's/com\.breadmoirai\.garnet\.persistence\.SpecScript/com.breadmoirai.garnet.testing.data.SpecScript/g' \
     -e 's/com\.breadmoirai\.garnet\.persistence\.SpecDirectoryScan/com.breadmoirai.garnet.testing.data.SpecDirectoryScan/g' \
-    -e 's/com\.breadmoirai\.garnet\.project\.LoadedSpec/com.breadmoirai.garnet.testing.data.LoadedSpec/g' \
+    -e 's/com\.breadmoirai\.garnet\.project\.LoadedSpec/com.breadmoirai.garnet.editor.data.LoadedSpec/g' \
     "$f"
 done
 ```
@@ -1069,7 +1069,7 @@ git mv $T/runner/RecordingDslEmitterTest.kt $T/playback/recorder/
 git mv $T/runner/StateRecordingStorageTest.kt $T/runner/StateRecordingViewTest.kt $T/playback/data/
 git mv $T/persistence/RecordingSidecarTest.kt $T/playback/data/
 git mv $T/persistence/KtsSpecLoaderTest.kt $T/persistence/KtsSpecLoaderRoundtripTest.kt $T/persistence/SpecPersistenceTest.kt $T/persistence/SpecDirectoryScanTest.kt $T/testing/data/
-git mv $T/project/LoadedSpecTest.kt $T/testing/data/
+git mv $T/project/LoadedSpecTest.kt $T/editor/data/
 sed -i 's/^package com\.breadmoirai\.garnet\.runner$/package com.breadmoirai.garnet.playback.recorder/' $T/playback/recorder/*.kt
 sed -i 's/^package com\.breadmoirai\.garnet\.\(runner\|persistence\)$/package com.breadmoirai.garnet.playback.data/' $T/playback/data/*.kt
 sed -i 's/^package com\.breadmoirai\.garnet\.\(persistence\|project\)$/package com.breadmoirai.garnet.testing.data/' $T/testing/data/*.kt

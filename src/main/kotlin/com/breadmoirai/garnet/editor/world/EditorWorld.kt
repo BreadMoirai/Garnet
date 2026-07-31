@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.world
 
 import com.breadmoirai.garnet.editor.data.EditorRoot
-import com.breadmoirai.garnet.testing.data.LoadedSpec
+import com.breadmoirai.garnet.editor.data.LoadedSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.server.MinecraftServer
 import java.nio.file.Path
