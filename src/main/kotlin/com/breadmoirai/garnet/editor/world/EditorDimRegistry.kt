@@ -80,17 +80,23 @@ class EditorDimRegistry(private val server: MinecraftServer) {
 
     /**
      * The structure whose assigned region contains [pos], or null. Regions span the full world
-     * height, so only X/Z are tested. Linear in the number of placed structures — a handful in
-     * practice, and the overwhelmingly common answer is "none", reached in a couple of comparisons.
+     * height, so only X/Z are tested. Called on the hot `setBlock` path (via
+     * [StructureEditWatcher]), so the overwhelmingly common "not near any structure" answer must
+     * cost as little as possible: [isInStructureLaneZ] rejects on two integer comparisons before
+     * this method touches [structureBySubpath] at all, and the remaining (rare) lookup uses
+     * `ConcurrentHashMap.forEach(BiConsumer)` rather than a `for ((k, v) in map)` loop, which
+     * would allocate an `entries` iterator plus a boxed `Map.Entry` per step every single call.
      */
     fun structureSubpathAt(pos: BlockPos): String? {
+        if (!isInStructureLaneZ(pos)) return null
         val width = SharedSettings.structureRegionChunks * 16
-        for ((subpath, origin) in structureBySubpath) {
-            if (pos.x < origin.x || pos.x >= origin.x + width) continue
-            if (pos.z < origin.z || pos.z >= origin.z + width) continue
-            return subpath
+        var found: String? = null
+        structureBySubpath.forEach { subpath, origin ->
+            if (found == null && pos.x >= origin.x && pos.x < origin.x + width) {
+                found = subpath
+            }
         }
-        return null
+        return found
     }
 
     fun placedBoxOf(subpath: String): PlacedBox? = placedBoxes[subpath]
@@ -166,6 +172,22 @@ class EditorDimRegistry(private val server: MinecraftServer) {
          * and collide with the structure lane.
          */
         const val STRUCTURE_LANE_Z = 4096
+
+        /**
+         * Cheap, allocation-free, lock-free test for whether [pos] could possibly land inside ANY
+         * structure region — safe to call before touching a specific server's [EditorDimRegistry]
+         * instance at all (no [of] lookup, no map access). Every structure region's origin has
+         * `z == STRUCTURE_LANE_Z` — the only mutator, [getOrAssignStructureRegion], hardcodes it —
+         * and all regions share the same width, since [SharedSettings.structureRegionChunks] is a
+         * single global setting rather than per-structure. So every region occupies exactly the
+         * same Z band regardless of X index, server, or how many structures are placed: a position
+         * outside this band cannot be inside any region, full stop, and [structureSubpathAt] relies
+         * on that invariant to skip its per-region X check entirely once this passes.
+         */
+        fun isInStructureLaneZ(pos: BlockPos): Boolean {
+            val width = SharedSettings.structureRegionChunks * 16
+            return pos.z >= STRUCTURE_LANE_Z && pos.z < STRUCTURE_LANE_Z + width
+        }
 
         private val perServer = java.util.WeakHashMap<MinecraftServer, EditorDimRegistry>()
 

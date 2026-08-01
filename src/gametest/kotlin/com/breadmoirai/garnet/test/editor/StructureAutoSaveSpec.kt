@@ -142,4 +142,45 @@ class StructureAutoSaveSpec : GarnetTestSpec({
             autoSave.isDirty("watched.nbt") shouldBe false
         }
     }
+
+    // Fix round 1: StructureEditWatcher.onBlockChanged now rejects most positions with a cheap
+    // Z-band check (EditorDimRegistry.isInStructureLaneZ) before ever touching the per-server
+    // registry. This pins the true region boundary — on every edge, in both dimensions the cheap
+    // check and the fine-grained check jointly guard — so that optimization cannot introduce a
+    // false negative (a real edit silently dropped) or a false positive (an edit outside the
+    // region wrongly attributed).
+    test("the edit watcher's cheap lane rejection matches the true region boundary exactly") {
+        onServer {
+            val registry = EditorDimRegistry.of(this)
+            val origin = registry.getOrAssignStructureRegion("laneboundary.nbt")
+            val width = SharedSettings.structureRegionChunks * 16
+            val autoSave = StructureAutoSave.of(this)
+            val lvl = overworld()
+
+            fun editedAt(pos: BlockPos): Boolean {
+                autoSave.clear("laneboundary.nbt")
+                StructureEditWatcher.onBlockChanged(lvl, pos)
+                return autoSave.isDirty("laneboundary.nbt")
+            }
+
+            // Z lower boundary of the shared structure lane: in-band, and with x inside the
+            // region, the edit is attributed.
+            editedAt(BlockPos(origin.x, 500, EditorDimRegistry.STRUCTURE_LANE_Z)) shouldBe true
+            // One block below the lane: the cheap early-out must reject it exactly as the old
+            // per-region check did.
+            editedAt(BlockPos(origin.x, 500, EditorDimRegistry.STRUCTURE_LANE_Z - 1)) shouldBe false
+            // Z upper boundary: the last in-band row still attributes.
+            editedAt(BlockPos(origin.x, 500, EditorDimRegistry.STRUCTURE_LANE_Z + width - 1)) shouldBe true
+            // One block past the band (every region shares this same width): rejected.
+            editedAt(BlockPos(origin.x, 500, EditorDimRegistry.STRUCTURE_LANE_Z + width)) shouldBe false
+
+            // X boundaries of this specific region, at a Z that is safely inside the lane.
+            editedAt(BlockPos(origin.x, 500, origin.z)) shouldBe true
+            editedAt(BlockPos(origin.x + width - 1, 500, origin.z)) shouldBe true
+            editedAt(BlockPos(origin.x - 1, 500, origin.z)) shouldBe false
+            editedAt(BlockPos(origin.x + width, 500, origin.z)) shouldBe false
+
+            autoSave.clear("laneboundary.nbt")
+        }
+    }
 })
