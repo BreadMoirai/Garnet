@@ -99,7 +99,11 @@ object StructureCommit {
         /** The capture already matches the committed `.nbt` (or there was nothing to scan at all). */
         data object NoChange : CommitOutcome
 
-        /** [commit] was called for a subpath that isn't placed, or the root isn't resolvable. */
+        /**
+         * [commit] was called for a subpath that isn't placed, or whose root/file doesn't
+         * resolve. Unlike [Failed], the dirty state (if any) for that subpath IS cleared — see the
+         * judgement call recorded on [commit]'s KDoc.
+         */
         data object NotApplicable : CommitOutcome
 
         /** The history write or the `.nbt` write genuinely failed; the dirty state was NOT cleared. */
@@ -115,6 +119,20 @@ object StructureCommit {
      * [now] is the server tick used for failure-backoff bookkeeping; [writeNbt] is a test seam for
      * simulating a failing `.nbt` write (production callers get the real
      * [StructurePersistence.writeStructureAtomic]).
+     *
+     * **Judgement call (Task 7 fix round 2):** a subpath that resolves to [CommitOutcome.NotApplicable]
+     * — no root, no file, or not placed — has its dirty state cleared here, unlike
+     * [CommitOutcome.Failed]. The two are not the same kind of "didn't commit": [Failed] means a
+     * real attempt was made and a transient condition (a lock, a momentarily-full disk) stopped it,
+     * so retrying later is exactly the right behavior and the dirty flag must survive to drive that
+     * retry. [NotApplicable] means the subpath cannot be resolved AT ALL under the current
+     * root/registry state — there is nothing to retry, because nothing changed to make the next
+     * attempt any more likely to succeed than this one. Nothing in this codebase reintroduces a
+     * root, a file, or a placed-box for an existing dirty key without also going through a path
+     * that reseeds dirty tracking from scratch (a fresh edit after a re-place). Leaving the entry
+     * dirty here would therefore cost a `resolveSubpath` filesystem stat every tick, forever, for a
+     * subpath that will never successfully commit again — exactly the idle-fast-path defeat this
+     * whole commit/backoff design exists to avoid.
      */
     fun commit(
         server: MinecraftServer,
@@ -124,10 +142,15 @@ object StructureCommit {
         writeNbt: (CompoundTag, Path) -> Unit = StructurePersistence::writeStructureAtomic,
     ): CommitOutcome {
         val autoSave = StructureAutoSave.of(server)
-        val root = EditorNetworking.rootFor(server) ?: return CommitOutcome.NotApplicable
-        val file = root.resolveSubpath(subpath) ?: return CommitOutcome.NotApplicable
+        fun notApplicable(): CommitOutcome {
+            autoSave.clear(subpath)
+            clearBackoff(server, subpath)
+            return CommitOutcome.NotApplicable
+        }
+        val root = EditorNetworking.rootFor(server) ?: return notApplicable()
+        val file = root.resolveSubpath(subpath) ?: return notApplicable()
         val registry = EditorDimRegistry.of(server)
-        val placed = registry.placedBoxOf(subpath) ?: return CommitOutcome.NotApplicable
+        val placed = registry.placedBoxOf(subpath) ?: return notApplicable()
 
         val scan = union(placed, autoSave.dirtyBox(subpath)) ?: run {
             autoSave.clear(subpath)

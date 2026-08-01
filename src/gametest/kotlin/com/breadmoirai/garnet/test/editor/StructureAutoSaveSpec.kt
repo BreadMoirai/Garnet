@@ -568,7 +568,16 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // missed. A region-wide capture would include it; captureAutoFitIn must not,
                     // since the scan volume is union(placedBox, dirtyBox), not the whole region.
                     val untracked = region.offset(width - 3, 0, width - 3)
-                    lvl.setBlock(untracked, Blocks.IRON_BLOCK.defaultBlockState(), 2)
+                    // Deliberately use the 4-arg setBlock(pos, state, flags, recursionLeft) overload,
+                    // NOT the 3-arg one used everywhere else in this file: ServerLevelSetBlockMixin
+                    // only injects into the exact 3-arg setBlock(BlockPos, BlockState, int) method
+                    // body, so calling this overload directly never runs through that mixin and never
+                    // reaches StructureEditWatcher.onBlockChanged. That's the point -- this write must
+                    // be genuinely invisible to the watcher, standing in for an edit the mixin missed.
+                    // (The setBlock mixin is known to be flaky under the gametest harness; do NOT
+                    // "simplify" this back to the 3-arg call, or this test will intermittently see the
+                    // untracked block get watcher-marked and start failing with blockCount == 2.)
+                    lvl.setBlock(untracked, Blocks.IRON_BLOCK.defaultBlockState(), 2, 512)
 
                     val outcome = StructureCommit.commit(this, "bounded.nbt", LocalHistoryStore.REASON_AUTOSAVE)
                         .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()

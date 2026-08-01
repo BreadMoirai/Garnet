@@ -394,8 +394,20 @@ object EditorNetworking {
         }
 
         if (wasPlaced != null) {
-            StructurePersistence.clearBounds(registry.projectLevel(), wasPlaced.origin, wasPlaced.size)
+            // Drop the registry entry BEFORE clearing blocks, not after (Task 7 fix round 2 /
+            // residual on Finding 1). clearBounds writes AIR through the 3-arg level.setBlock,
+            // which the setBlock mixin hooks unconditionally for any successful server write; if
+            // the OLD subpath were still registered at that instant, EditorDimRegistry.structureSubpathAt
+            // would still attribute those positions to it, and the watcher would re-mark the OLD
+            // subpath dirty immediately after the commit loop above just cleared it. Since
+            // `wasPlaced.origin`/`wasPlaced.size` were already captured into a local before any
+            // registry mutation, clearBounds needs nothing further from the registry, so dropping
+            // the entry first is safe: with structureBySubpath no longer mapping the old subpath at
+            // all (and its freed region never recycled — nextStructureIndex is monotonic), those
+            // positions attribute to no subpath, and clearBounds's own writes cannot re-dirty
+            // anything.
             registry.unplaceStructure(payload.subpath)
+            StructurePersistence.clearBounds(registry.projectLevel(), wasPlaced.origin, wasPlaced.size)
         }
 
         if (wasPlaced != null) {

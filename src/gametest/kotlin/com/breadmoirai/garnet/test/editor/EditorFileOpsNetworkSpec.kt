@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.test.editor
 
+import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
@@ -16,6 +17,7 @@ import com.breadmoirai.garnet.editor.world.StructureCommit
 import com.breadmoirai.garnet.editor.world.StructureEditWatcher
 import com.breadmoirai.garnet.editor.data.EditorSession
 import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
@@ -33,6 +35,7 @@ import net.minecraft.world.level.block.Blocks
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
@@ -40,16 +43,31 @@ import kotlin.io.path.isDirectory
 /**
  * Model of `EditorStructureNetworkSpec`'s harness: temp project root + a mock server player,
  * wired through `EditorServerContext` so `EditorNetworking` resolves the temp root.
+ *
+ * Also redirects [SharedSettings.localHistoryDir] to a per-call temp directory for every test in
+ * this file (Task 7 fix round 2, minor): several of these tests place and/or commit structures,
+ * which writes real `LocalHistoryStore` revisions, and without this every one of them would litter
+ * the real `<gameDir>/.garnet/local-history` instead of a disposable temp dir. No test's assertions
+ * depend on the exact path (keys hash from each test's own unique temp root), so this is purely
+ * about not leaving blobs behind on the machine actually running the suite.
  */
 private suspend fun withServer(block: suspend (server: MinecraftServer, player: ServerPlayer, root: Path) -> Unit) {
-    withTempRoot("fileops-net") { tmp ->
-        onServer {
-            EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
-            val player = makeMockServerPlayer(this)
-            drainPayloads(player)
-            block(this, player, tmp)
-            EditorSession.clear(player.uuid)
+    val prevHistDir = SharedSettings.localHistoryDir
+    val histDir = createTempDirectory("fileops-net-hist")
+    SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+    try {
+        withTempRoot("fileops-net") { tmp ->
+            onServer {
+                EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+                block(this, player, tmp)
+                EditorSession.clear(player.uuid)
+            }
         }
+    } finally {
+        SharedSettings.localHistoryDir = prevHistDir
+        histDir.toFile().deleteRecursively()
     }
 }
 
@@ -148,6 +166,52 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             registry.placedBoxOf("clock.nbt").shouldBeNull()
             registry.placedBoxOf("ring.nbt").shouldNotBeNull()
             registry.structureRegionOriginOf("clock.nbt").shouldBeNull()
+        }
+    }
+
+    test("unplaceStructure before clearBounds keeps a live setBlock mixin from re-dirtying the old subpath") {
+        // REGRESSION (Task 7 fix round 2, residual on Finding 1): handleRename's rename-teardown
+        // used to call StructurePersistence.clearBounds (which writes AIR through the 3-arg
+        // level.setBlock, hooked unconditionally by the setBlock mixin) BEFORE
+        // registry.unplaceStructure. A live mixin firing during those writes would still see the
+        // OLD subpath registered (EditorDimRegistry.structureSubpathAt still mapped those
+        // positions to it) and re-mark it dirty immediately after the commit-before-move loop had
+        // just cleared it -- from then on StructureCommit.commit(oldSubpath) can never resolve the
+        // (now-moved) file again, so the old key stays dirty forever and defeats tick()'s idle fast
+        // path for the rest of the session. handleRename now calls unplaceStructure FIRST.
+        //
+        // The gametest harness's setBlock mixin is inert (a plain level.setBlock call never
+        // triggers StructureEditWatcher here), so an end-to-end call to handleRename cannot
+        // exercise this: unplaceStructure has already run, in EITHER order, by the time
+        // handleRename returns, so a post-hoc onBlockChanged call can't tell which order production
+        // code used. This test instead replicates the exact two-call sequence
+        // EditorNetworking.handleRename's teardown now uses, and simulates what a live mixin would
+        // report at the moment clearBounds writes -- with a NEGATIVE CONTROL proving the test can
+        // actually detect the bug (the old order) before trusting it to prove the fix (the new
+        // order).
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val level = registry.projectLevel()
+            val placed = registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+            val probePos = placed.origin
+
+            // Negative control: the OLD (buggy) order. clearBounds runs while "clock.nbt" is still
+            // registered, so a simulated mixin report at a cleared position still attributes to it.
+            StructurePersistence.clearBounds(level, placed.origin, placed.size)
+            StructureEditWatcher.onBlockChanged(level, probePos)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+            StructureAutoSave.of(server).clear("clock.nbt") // reset before exercising the real fix
+
+            // The fixed order, exactly as handleRename's teardown now runs it: unplaceStructure
+            // FIRST, so clearBounds's writes land in a region nothing maps to any more.
+            registry.unplaceStructure("clock.nbt")
+            StructurePersistence.clearBounds(level, placed.origin, placed.size)
+            StructureEditWatcher.onBlockChanged(level, probePos)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeFalse()
         }
     }
 
