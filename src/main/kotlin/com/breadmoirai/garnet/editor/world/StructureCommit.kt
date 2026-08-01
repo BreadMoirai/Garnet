@@ -10,12 +10,15 @@ import com.breadmoirai.garnet.structure.structuresDiffer
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
@@ -26,16 +29,67 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
  * This replaces the old `.nbt.unsaved` sidecar flush: there is no dirty buffer any more, so a
  * commit writes the real file every time and the local-history store is what makes an edit
  * reversible.
+ *
+ * **Ordering invariant (fix round 1 / Finding 2):** the live `.nbt` is never overwritten unless the
+ * new content is already durably recorded in local history, or history is deliberately disabled.
+ * [commit] therefore writes the revision *before* the `.nbt` rewrite and aborts — touching nothing
+ * on disk — if that revision write fails for a reason other than history being off. If the
+ * subsequent `.nbt` write itself then fails, the just-written revision is rolled back
+ * ([LocalHistoryStore.discardRevision]) so a structure that can never actually commit does not
+ * accumulate one indistinguishable revision per retry (fix round 1 / Finding 1b) and eventually
+ * prune away its own genuine history.
  */
 object StructureCommit {
 
     /**
-     * Capture, diff, and write [subpath] if its content actually changed. Returns the packet
-     * describing what was written, or null when nothing needed writing (or the structure is not
-     * placed / not resolvable). Always clears the dirty state — a structure that captured identical
-     * to disk is clean by definition.
+     * Minimum ticks between retrying a structure whose last commit attempt failed to write its
+     * `.nbt` or its history revision. ~5s at 20 tps — far above the previous every-tick retry, low
+     * enough that a transient lock (antivirus scan, a momentarily-open file handle) still recovers
+     * quickly. Gates the automatic [tick] pass only; an explicit [commit] call always attempts.
      */
-    fun commit(server: MinecraftServer, subpath: String, reason: String): StructureAutoSavedS2C? {
+    private const val FAILURE_BACKOFF_TICKS = 100L
+
+    private val retryAfter = java.util.WeakHashMap<MinecraftServer, ConcurrentHashMap<String, Long>>()
+
+    @Synchronized
+    private fun backoffMap(server: MinecraftServer): ConcurrentHashMap<String, Long> =
+        retryAfter.getOrPut(server) { ConcurrentHashMap() }
+
+    private fun clearBackoff(server: MinecraftServer, subpath: String) {
+        backoffMap(server).remove(subpath)
+    }
+
+    /**
+     * Records a failed commit attempt so [tick] backs off retrying [subpath] for
+     * [FAILURE_BACKOFF_TICKS], and logs once per backoff window rather than once per attempt (an
+     * explicit [commit] call bypasses [tick]'s skip and can retry sooner; this keeps repeated
+     * explicit retries from spamming the log too).
+     */
+    private fun onCommitFailure(server: MinecraftServer, subpath: String, now: Long, message: String) {
+        val previous = backoffMap(server).put(subpath, now + FAILURE_BACKOFF_TICKS)
+        if (previous == null || previous <= now) {
+            LOGGER.error("[StructureCommit] {}", message)
+        }
+    }
+
+    /**
+     * Capture, diff, and write [subpath] if its content actually changed. Returns the packet
+     * describing what was written, or null when nothing needed writing, the structure is not
+     * placed / not resolvable, or the write failed. Clears the dirty state on every path that
+     * leaves the `.nbt` correct (no-op, or a successful write) — deliberately NOT on a failed
+     * write, so the structure stays dirty and is retried rather than silently abandoned.
+     *
+     * [now] is the server tick used for failure-backoff bookkeeping; [writeNbt] is a test seam for
+     * simulating a failing `.nbt` write (production callers get the real
+     * [StructurePersistence.writeStructureAtomic]).
+     */
+    fun commit(
+        server: MinecraftServer,
+        subpath: String,
+        reason: String,
+        now: Long = server.overworld().gameTime,
+        writeNbt: (CompoundTag, Path) -> Unit = StructurePersistence::writeStructureAtomic,
+    ): StructureAutoSavedS2C? {
         val autoSave = StructureAutoSave.of(server)
         val root = EditorNetworking.rootFor(server) ?: return null
         val file = root.resolveSubpath(subpath) ?: return null
@@ -44,6 +98,7 @@ object StructureCommit {
 
         val scan = union(placed, autoSave.dirtyBox(subpath)) ?: run {
             autoSave.clear(subpath)
+            clearBackoff(server, subpath)
             return null
         }
         val captured = StructurePersistence.captureAutoFitIn(registry.projectLevel(), scan)
@@ -51,43 +106,71 @@ object StructureCommit {
         val committed = readTag(file)
         if (committed != null && !structuresDiffer(committed, captured.tag)) {
             autoSave.clear(subpath)
+            clearBackoff(server, subpath)
             return null
         }
 
         val size = captured.box?.size ?: Vec3i(0, 0, 0)
-        LocalHistoryStore.writeRevision(
+
+        // Bank the new content in history BEFORE it becomes the live .nbt. A failure here (history
+        // enabled but the write genuinely failed — NOT the same as history being disabled) means we
+        // cannot recover this content if the rewrite below goes wrong, so we abort without touching
+        // the .nbt at all.
+        val historyEnabled = SharedSettings.localHistoryEnabled
+        val revision = LocalHistoryStore.writeRevision(
             file, captured.tag, size.x, size.y, size.z, captured.blockCount, reason,
         )
-        try {
-            file.parent?.let { java.nio.file.Files.createDirectories(it) }
-            NbtIo.writeCompressed(captured.tag, file)
-        } catch (e: IOException) {
-            LOGGER.error("[StructureCommit] write '{}': {}", file, e.message)
+        if (historyEnabled && revision == null) {
+            onCommitFailure(server, subpath, now, "history write failed for '$subpath' ($file) — .nbt left untouched")
             return null
         }
+
+        try {
+            writeNbt(captured.tag, file)
+        } catch (e: IOException) {
+            // The .nbt write itself failed (locked file, read-only checkout, AV scan mid-write,
+            // ...). The revision above described content that never actually landed live — discard
+            // it so a stuck structure doesn't bank one orphan revision per retry.
+            if (revision != null) LocalHistoryStore.discardRevision(file, revision)
+            onCommitFailure(server, subpath, now, "write '$file' failed: ${e.message}")
+            return null
+        }
+
         captured.box?.let { registry.setPlacedBox(subpath, it) }
+        // A stale .nbt.unsaved sidecar must not silently win on the next place — see fix round 1 /
+        // Finding 5. The committed .nbt now already reflects everything the sidecar could offer.
+        StructurePersistence.unsavedSidecarOf(file).deleteIfExists()
         autoSave.clear(subpath)
+        clearBackoff(server, subpath)
 
         return StructureAutoSavedS2C(
             subpath, size.x, size.y, size.z, captured.blockCount, System.currentTimeMillis(),
         )
     }
 
-    /** Commit every dirty structure that has come due, and tell the clients. */
-    fun tick(server: MinecraftServer) {
+    /** Commit every dirty structure that has come due and isn't in a failure backoff, and tell the clients. */
+    fun tick(
+        server: MinecraftServer,
+        now: Long = server.overworld().gameTime,
+        writeNbt: (CompoundTag, Path) -> Unit = StructurePersistence::writeStructureAtomic,
+    ) {
         if (!SharedSettings.autoSaveEnabled) return
         val autoSave = StructureAutoSave.of(server)
         if (autoSave.dirtySubpaths().isEmpty()) return
-        val now = server.overworld().gameTime
+        val backoff = backoffMap(server)
         for (subpath in autoSave.dirtySubpaths()) {
             if (!autoSave.dueForCommit(subpath, now)) continue
-            commit(server, subpath, LocalHistoryStore.REASON_AUTOSAVE)?.let { broadcast(server, it) }
+            val retryAt = backoff[subpath]
+            if (retryAt != null && now < retryAt) continue
+            commit(server, subpath, LocalHistoryStore.REASON_AUTOSAVE, now, writeNbt)?.let { broadcast(server, it) }
         }
     }
 
     /**
-     * Backstop flush: commit every dirty structure regardless of timing. Used on world-save, server
-     * stop, and before operations that would strand dirty state (rename, unplace).
+     * Backstop flush: commit every dirty structure regardless of debounce/backoff timing. Used on
+     * world-save and server stop. (Rename/unplace are NOT wired to this yet — that is Task 7's job;
+     * today `handleRename`/`handleDiscardStructure` call nothing here, so a structure renamed while
+     * dirty currently strands its old-subpath dirty entry rather than committing it first.)
      */
     fun commitAll(server: MinecraftServer, reason: String) {
         val autoSave = StructureAutoSave.of(server)
@@ -100,6 +183,12 @@ object StructureCommit {
         for (player in server.playerList.players) {
             ServerPlayNetworking.send(player, payload)
         }
+    }
+
+    /** Drop this server's failure-backoff bookkeeping. Pair with [StructureAutoSave.dispose]. */
+    @Synchronized
+    fun dispose(server: MinecraftServer) {
+        retryAfter.remove(server)
     }
 
     /**

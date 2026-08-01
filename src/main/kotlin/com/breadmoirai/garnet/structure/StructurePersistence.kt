@@ -14,7 +14,10 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlac
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.io.path.*
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
@@ -109,6 +112,33 @@ object StructurePersistence {
     fun unsavedSidecarOf(file: Path): Path = file.resolveSibling("${file.fileName}.unsaved")
 
     /**
+     * Writes [tag] to [file] crash-safely: to a same-directory temp file first, then an atomic (or
+     * best-effort) move over the target. A plain `NbtIo.writeCompressed(tag, file)` truncates
+     * in place, so a crash or power loss mid-write leaves a corrupt structure; [file] here either
+     * keeps its old content or gets the fully-written new content, never a partial write.
+     *
+     * Throws [IOException] on failure (temp-write or move) — callers decide how to react. The temp
+     * file is always cleaned up, success or failure, so a failed attempt doesn't leave litter next
+     * to the structure.
+     */
+    fun writeStructureAtomic(tag: CompoundTag, file: Path) {
+        file.parent?.let { Files.createDirectories(it) }
+        val tmp = file.resolveSibling(".${file.fileName}.tmp-${System.nanoTime()}")
+        try {
+            NbtIo.writeCompressed(tag, tmp)
+            try {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (e: AtomicMoveNotSupportedException) {
+                // Some filesystems (certain network mounts, cross-device moves) reject ATOMIC_MOVE;
+                // a plain replace is still far safer than truncating the live file in place.
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(tmp)
+        }
+    }
+
+    /**
      * Auto-fit within an arbitrary absolute [scan] volume, rather than a whole structure region.
      *
      * This is the auto-save path's capture: scanning `union(placedBox, dirtyBox)` reads a few
@@ -190,8 +220,7 @@ object StructurePersistence {
         regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int,
     ): PlacedBox? {
         val (tag, box) = captureAutoFit(level, regionOrigin, regionSizeXZ, regionMinY, regionMaxY)
-        file.parent?.createDirectories()
-        try { NbtIo.writeCompressed(tag, file) }
+        try { writeStructureAtomic(tag, file) }
         catch (e: IOException) { LOGGER.error("[StructurePersistence#saveAutoFit] write '{}': {}", file, e.message) }
         LOGGER.debug("[StructurePersistence#saveAutoFit] captured {} at {} -> {}", box?.size, box?.origin, file)
         return box

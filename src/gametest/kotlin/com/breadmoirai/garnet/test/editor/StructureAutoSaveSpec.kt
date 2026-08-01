@@ -22,8 +22,15 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.level.block.Blocks
+import java.io.IOException
+import java.nio.file.Path
+import kotlin.io.path.createDirectory
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
 import kotlin.io.path.readBytes
+import kotlin.io.path.writeBytes
 
 /**
  * Dirty-state bookkeeping only — the commit itself is covered by the network-level tests once
@@ -379,6 +386,237 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 SharedSettings.localHistoryDir = prevHistDir
                 SharedSettings.autoSaveEnabled = prevEnabled
                 SharedSettings.autoSaveDebounceTicks = prevDebounce
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    // --- Fix round 1: failure-path coverage (Critical/Important findings) -----------------------
+
+    test("a commit whose .nbt write fails does not clear dirty state, does not bank an orphan revision, and backs off instead of retrying every tick") {
+        withTempRoot("autosave-writefail") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            val prevDebounce = SharedSettings.autoSaveDebounceTicks
+            SharedSettings.structureRegionChunks = 1
+            SharedSettings.autoSaveDebounceTicks = 0
+            val histDir = kotlin.io.path.createTempDirectory("autosave-writefail-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "broken")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("broken.nbt"))
+                    drainPayloads(player)
+
+                    val file = tmp.resolve("broken.nbt")
+                    LocalHistoryStore.revisions(file) shouldHaveSize 1 // the placed baseline
+
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("broken.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+                    val edited = region.offset(1, 0, 1)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+                    StructureAutoSave.of(this).isDirty("broken.nbt") shouldBe true
+
+                    val editTick = lvl.gameTime
+                    var attempts = 0
+                    val failingWrite: (CompoundTag, Path) -> Unit = { _, _ ->
+                        attempts++
+                        throw IOException("simulated write failure")
+                    }
+
+                    // First attempt: the .nbt write fails. Dirty state must survive, and the
+                    // revision speculatively written before the failing write must be rolled back
+                    // -- not left behind as an orphan that never corresponds to the live .nbt.
+                    StructureCommit.tick(this, now = editTick, writeNbt = failingWrite)
+                    attempts shouldBe 1
+                    StructureAutoSave.of(this).isDirty("broken.nbt") shouldBe true
+                    LocalHistoryStore.revisions(file) shouldHaveSize 1
+
+                    // One tick later, still well inside the failure backoff window: tick() must
+                    // skip the retry entirely rather than hammering the write every tick.
+                    StructureCommit.tick(this, now = editTick + 1, writeNbt = failingWrite)
+                    attempts shouldBe 1
+                    LocalHistoryStore.revisions(file) shouldHaveSize 1
+
+                    // Comfortably past the backoff window: tick() retries, and (still failing)
+                    // still leaves no orphan revision behind.
+                    StructureCommit.tick(this, now = editTick + 150, writeNbt = failingWrite)
+                    attempts shouldBe 2
+                    StructureAutoSave.of(this).isDirty("broken.nbt") shouldBe true
+                    LocalHistoryStore.revisions(file) shouldHaveSize 1
+
+                    // Once the write actually succeeds (real writer, backoff long since irrelevant
+                    // since this call is due and past any backoff window), the structure recovers
+                    // normally: dirty clears and a genuine revision is banked.
+                    StructureCommit.tick(this, now = editTick + 300)
+                    StructureAutoSave.of(this).isDirty("broken.nbt") shouldBe false
+                    LocalHistoryStore.revisions(file) shouldHaveSize 2
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                SharedSettings.autoSaveDebounceTicks = prevDebounce
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("a commit whose history write fails leaves the .nbt untouched") {
+        withTempRoot("autosave-histfail") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("autosave-histfail-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "brokenhist")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("brokenhist.nbt"))
+                    drainPayloads(player)
+
+                    val file = tmp.resolve("brokenhist.nbt")
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("brokenhist.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+                    val edited = region.offset(1, 0, 1)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+
+                    // Occupy index.json's path with a directory so the next writeRevision call
+                    // fails deterministically and portably (same trick LocalHistoryStoreSpec uses
+                    // for "writeRevision returns null ... when the index write fails").
+                    val dir = LocalHistoryStore.dirFor(file)
+                    dir.resolve("index.json").deleteIfExists()
+                    dir.resolve("index.json").createDirectory()
+
+                    val before = file.readBytes().toList()
+
+                    val result = StructureCommit.commit(this, "brokenhist.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+
+                    result shouldBe null
+                    // The .nbt write must never have been attempted: the history write that was
+                    // supposed to back up this content failed first.
+                    file.readBytes().toList() shouldBe before
+                    StructureAutoSave.of(this).isDirty("brokenhist.nbt") shouldBe true
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("a successful commit deletes the .nbt.unsaved sidecar") {
+        withTempRoot("autosave-sidecar") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("autosave-sidecar-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "sidecar")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("sidecar.nbt"))
+                    drainPayloads(player)
+
+                    val file = tmp.resolve("sidecar.nbt")
+                    val sidecar = StructurePersistence.unsavedSidecarOf(file)
+                    // A stale sidecar left over from the old dirty-buffer path (e.g. from before
+                    // this world upgraded to auto-save). Content doesn't matter for this test --
+                    // only that a successful commit must not leave it behind to silently win on a
+                    // future place.
+                    sidecar.writeBytes(byteArrayOf(1, 2, 3))
+                    sidecar.exists() shouldBe true
+
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("sidecar.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+                    val edited = region.offset(1, 0, 1)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+
+                    StructureCommit.commit(this, "sidecar.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldNotBeNull()
+
+                    sidecar.exists() shouldBe false
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("a commit's capture is bounded to union(placedBox, dirtyBox), not the whole region") {
+        withTempRoot("autosave-bounded") { tmp ->
+            val prevHistDir = SharedSettings.localHistoryDir
+            // Deliberately leave SharedSettings.structureRegionChunks at its real default (a
+            // 144-wide region): if StructureCommit's capture were ever swapped back to the
+            // region-wide StructurePersistence.captureAutoFit, this test would see the untracked
+            // block below and fail. Every other test in this spec forces structureRegionChunks = 1,
+            // which is too small to distinguish bounded from region-wide capture.
+            val histDir = kotlin.io.path.createTempDirectory("autosave-bounded-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "bounded")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("bounded.nbt"))
+                    drainPayloads(player)
+
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("bounded.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+
+                    // The tracked edit: watcher-marked, near one corner of the region. The dirty
+                    // box this produces is exactly this one block -- nothing else needs clearing.
+                    val tracked = region.offset(2, 0, 2)
+                    lvl.setBlock(tracked, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, tracked)
+
+                    // A real, non-air block far across the SAME region, well inside its bounds, but
+                    // never reported to the watcher -- standing in for an edit the setBlock mixin
+                    // missed. A region-wide capture would include it; captureAutoFitIn must not,
+                    // since the scan volume is union(placedBox, dirtyBox), not the whole region.
+                    val untracked = region.offset(width - 3, 0, width - 3)
+                    lvl.setBlock(untracked, Blocks.IRON_BLOCK.defaultBlockState(), 2)
+
+                    val result = StructureCommit.commit(this, "bounded.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldNotBeNull()
+                    result.blockCount shouldBe 1
+                    result.sizeX shouldBe 1
+                    result.sizeY shouldBe 1
+                    result.sizeZ shouldBe 1
+                }
+            } finally {
+                SharedSettings.localHistoryDir = prevHistDir
                 histDir.toFile().deleteRecursively()
             }
         }

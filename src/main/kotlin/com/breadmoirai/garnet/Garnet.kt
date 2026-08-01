@@ -51,6 +51,7 @@ class Garnet : ModInitializer {
         ServerLifecycleEvents.SERVER_STOPPED.register { server ->
             StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
             StructureAutoSave.dispose(server)
+            StructureCommit.dispose(server)
             EditorDimLifecycle.releaseServerState(server)
         }
         ServerTickEvents.END_SERVER_TICK.register { server ->
@@ -58,6 +59,14 @@ class Garnet : ModInitializer {
         }
         ServerLifecycleEvents.BEFORE_SAVE.register { server, _, _ ->
             StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+            // Transitional backstop (fix round 1 / Finding 4): StructureCommit only ever commits
+            // subpaths the setBlock-mixin watcher marked dirty. The mixin only injects into the
+            // 3-arg Level.setBlock, so a 4-arg setBlock or a direct LevelChunk.setBlockState write
+            // is invisible to it -- never marked dirty, and silently excluded from the next commit's
+            // tight scan box. flushDirtyStructures is watcher-independent (it re-captures each
+            // placed structure's whole region and compares by content), so it still catches those.
+            // Remove this call in Task 7, once the .nbt.unsaved sidecar itself is retired.
+            EditorNetworking.flushDirtyStructures(server)
         }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             EditorCommand.register(dispatcher)

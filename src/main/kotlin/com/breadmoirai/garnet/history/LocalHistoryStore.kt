@@ -149,6 +149,31 @@ object LocalHistoryStore {
     }
 
     /**
+     * Removes [revision] from [structureFile]'s index and deletes its blob.
+     *
+     * A seam for callers that must speculatively write a revision before attempting a dependent,
+     * possibly-failing operation (`StructureCommit`'s atomic `.nbt` rewrite: the revision has to be
+     * durable *before* the rewrite per the "never overwrite unless the prior state is recoverable"
+     * invariant, but if the rewrite itself then fails, that revision must not linger — a structure
+     * that can never actually commit would otherwise accumulate one indistinguishable revision per
+     * retry and eventually prune away its own genuine history). Best-effort: logs and leaves the
+     * index as-is if the rewrite fails, rather than throwing — the caller is already deep in its
+     * own failure handling and has nothing further to undo.
+     */
+    fun discardRevision(structureFile: Path, revision: Revision) {
+        val dir = dirFor(structureFile)
+        runCatching { dir.resolve(revision.file).deleteIfExists() }
+        val index = readIndex(structureFile)
+        val remaining = index.revisions.filterNot { it.file == revision.file }
+        if (remaining.size == index.revisions.size) return
+        runCatching {
+            writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), remaining))
+        }.onFailure { e ->
+            LOGGER.error("[LocalHistoryStore] discardRevision index rewrite for '{}': {}", structureFile, e.message)
+        }
+    }
+
+    /**
      * Move a structure's history to the key for [to] — called after a rename, since the absolute
      * path (and therefore the hash) changes. Merging rather than replacing keeps any history the
      * destination path already accumulated under a previous structure of the same name.
