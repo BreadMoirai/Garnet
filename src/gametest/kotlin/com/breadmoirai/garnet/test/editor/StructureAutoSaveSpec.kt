@@ -32,6 +32,7 @@ import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
+import kotlin.io.path.writeBytes
 
 /**
  * Dirty-state bookkeeping only — the commit itself is covered by the network-level tests once
@@ -481,8 +482,10 @@ class StructureAutoSaveSpec : GarnetTestSpec({
             val histDir = kotlin.io.path.createTempDirectory("autosave-histfail-hist")
             SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
             EditorNewStructure.create(tmp, "brokenhist")
+            var server: MinecraftServer? = null
             try {
                 onServer {
+                    server = this
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
                     EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("brokenhist.nbt"))
@@ -517,17 +520,19 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // supposed to back up this content failed first.
                     file.readBytes().toList() shouldBe before
                     StructureAutoSave.of(this).isDirty("brokenhist.nbt") shouldBe true
-
-                    // This test deliberately leaves "brokenhist.nbt" dirty (that's the point being
-                    // tested). StructureAutoSave and StructureCommit's backoff map are both
-                    // per-server, and the gametest server keeps ticking after this block returns --
-                    // production END_SERVER_TICK would otherwise keep retrying this subpath forever
-                    // against whatever temp root a LATER test happens to have live at the time.
-                    // Forget both so no state leaks past this test.
-                    StructureAutoSave.of(this).clear("brokenhist.nbt")
-                    StructureCommit.clearBackoff(this, "brokenhist.nbt")
                 }
             } finally {
+                // This test deliberately leaves "brokenhist.nbt" dirty (that's the point being
+                // tested). StructureAutoSave and StructureCommit's backoff map are both per-server,
+                // and the gametest server keeps ticking after this block returns -- production
+                // END_SERVER_TICK would otherwise keep retrying this subpath forever against
+                // whatever temp root a LATER test happens to have live at the time. Forget both so
+                // no state leaks past this test, in `finally` so it still runs if the body above
+                // throws before reaching this point (same pattern as the fix-round-3 test below).
+                server?.let {
+                    StructureAutoSave.of(it).clear("brokenhist.nbt")
+                    StructureCommit.clearBackoff(it, "brokenhist.nbt")
+                }
                 SharedSettings.structureRegionChunks = prevChunks
                 SharedSettings.localHistoryDir = prevHistDir
                 histDir.toFile().deleteRecursively()
@@ -753,6 +758,148 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 SharedSettings.structureRegionChunks = prevChunks
                 SharedSettings.localHistoryDir = prevHistDir
                 SharedSettings.localHistoryMaxRevisions = prevMaxRev
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    // --- Final review, Finding B3: history must be untouched when deliberately disabled ------------
+
+    test("a successful commit with localHistoryEnabled = false leaves an existing history directory untouched") {
+        withTempRoot("autosave-histdisabled") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            val prevHistEnabled = SharedSettings.localHistoryEnabled
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("autosave-histdisabled-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "frozen")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    // Placed WHILE history is still enabled, so the placed baseline + one genuine
+                    // autosave revision exist beforehand -- this is what a "disable history to
+                    // freeze the archive" user actually has: a pre-existing directory they want left
+                    // alone, not an empty one.
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("frozen.nbt"))
+                    drainPayloads(player)
+
+                    val file = tmp.resolve("frozen.nbt")
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("frozen.nbt")!!
+                    val lvl = overworld()
+                    val firstEdit = region.offset(1, 0, 1)
+                    lvl.setBlock(firstEdit, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, firstEdit)
+                    StructureCommit.commit(this, "frozen.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+
+                    val beforeDisabling = LocalHistoryStore.revisions(file)
+                    beforeDisabling shouldHaveSize 2 // placed baseline + the autosave above
+                    val dir = LocalHistoryStore.dirFor(file)
+                    val blobsBefore = dir.toFile().listFiles()?.map { it.name }?.sorted().orEmpty()
+
+                    // Now disable history and commit again -- SharedSettings.localHistoryDays
+                    // defaults to 5, but even an age cutoff of 0 (or any cutoff) must not apply while
+                    // history is deliberately disabled: disabling it means "hands off the archive",
+                    // not "prune it on the next write."
+                    SharedSettings.localHistoryEnabled = false
+                    val secondEdit = region.offset(2, 0, 2)
+                    lvl.setBlock(secondEdit, Blocks.IRON_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, secondEdit)
+                    StructureCommit.commit(this, "frozen.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+
+                    // writeRevision itself is a no-op when disabled, so the count is unchanged --
+                    // but the real point of this test is that prune() was never called on the
+                    // pre-existing directory either: every blob that existed before still exists.
+                    LocalHistoryStore.revisions(file) shouldBe beforeDisabling
+                    val blobsAfter = dir.toFile().listFiles()?.map { it.name }?.sorted().orEmpty()
+                    blobsAfter shouldBe blobsBefore
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                SharedSettings.localHistoryEnabled = prevHistEnabled
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    // --- Final review, Finding F4: out-of-band .nbt content must not be destroyed with no recovery -
+
+    test("an out-of-band .nbt edit is banked as a REASON_EXTERNAL revision before the next commit overwrites it") {
+        withTempRoot("autosave-external") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("autosave-external-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "external")
+            EditorNewStructure.create(tmp, "donor")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+
+                    // Produce genuinely different, valid structure content by committing an edit to
+                    // an unrelated "donor" structure through the real path.
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("donor.nbt"))
+                    drainPayloads(player)
+                    val donorFile = tmp.resolve("donor.nbt")
+                    val donorRegistry = EditorDimRegistry.of(this)
+                    val donorRegion = donorRegistry.structureRegionOriginOf("donor.nbt")!!
+                    val lvl = overworld()
+                    val donorEdit = donorRegion.offset(1, 0, 1)
+                    lvl.setBlock(donorEdit, Blocks.EMERALD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, donorEdit)
+                    StructureCommit.commit(this, "donor.nbt", LocalHistoryStore.REASON_MANUAL)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                    val donorBytes = donorFile.readBytes()
+
+                    // Place "external.nbt" -- this seeds its own placed baseline revision, matching
+                    // its (empty) on-disk content at this point.
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("external.nbt"))
+                    drainPayloads(player)
+                    val externalFile = tmp.resolve("external.nbt")
+                    LocalHistoryStore.revisions(externalFile) shouldHaveSize 1
+                    LocalHistoryStore.revisions(externalFile).single().reason shouldBe LocalHistoryStore.REASON_PLACED
+
+                    // Simulate content changed OUTSIDE the editor between sessions (an external NBT
+                    // tool, a git checkout, a restore-from-backup): overwrite external.nbt's bytes
+                    // directly, bypassing StructureCommit entirely. No revision anywhere describes
+                    // this content yet.
+                    externalFile.writeBytes(donorBytes)
+
+                    // A real, tracked edit to "external.nbt" that will trigger the next commit.
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("external.nbt")!!
+                    val trackedEdit = region.offset(2, 0, 2)
+                    lvl.setBlock(trackedEdit, Blocks.DIAMOND_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, trackedEdit)
+
+                    StructureCommit.commit(this, "external.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+
+                    // Three revisions now: the original placed baseline, the out-of-band content
+                    // banked before it was overwritten, and the new tracked-edit commit.
+                    val revisions = LocalHistoryStore.revisions(externalFile)
+                    revisions shouldHaveSize 3
+                    revisions[0].reason shouldBe LocalHistoryStore.REASON_PLACED
+                    revisions[1].reason shouldBe LocalHistoryStore.REASON_EXTERNAL
+                    revisions[2].reason shouldBe LocalHistoryStore.REASON_AUTOSAVE
+
+                    // The out-of-band content is genuinely recoverable, byte-for-byte identical to
+                    // what was on disk right before the commit overwrote it.
+                    val bankedTag = LocalHistoryStore.readTag(externalFile, revisions[1]).shouldNotBeNull()
+                    val donorTag = LocalHistoryStore.readTag(donorFile, LocalHistoryStore.revisions(donorFile).last())
+                        .shouldNotBeNull()
+                    com.breadmoirai.garnet.structure.structuresDiffer(bankedTag, donorTag) shouldBe false
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
                 histDir.toFile().deleteRecursively()
             }
         }

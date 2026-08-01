@@ -27,8 +27,13 @@ data class EditorRoot(val path: Path) {
         if (isAbs) return null
         val candidate = path.resolve(subpath).normalize()
         if (!candidate.exists()) return null
-        val real = candidate.toRealPath()
-        val rootReal = path.toRealPath()
+        // toRealPath can throw IOException (disconnected network root, a transient lock racing the
+        // exists() check above, ...). This is now reachable from the END_SERVER_TICK path via
+        // StructureCommit.commit -> resolveSubpath, so an uncaught exception here is a hard server
+        // crash (B4). Treat an unresolvable path the same as a missing one: null, which routes
+        // callers into their existing "not found" handling (NotApplicable for StructureCommit).
+        val real = runCatching { candidate.toRealPath() }.getOrNull() ?: return null
+        val rootReal = runCatching { path.toRealPath() }.getOrNull() ?: return null
         return if (real.startsWith(rootReal)) real else null
     }
 

@@ -165,8 +165,14 @@ object StructurePersistence {
     }
 
     /**
-     * Auto-fit across a whole structure region. Kept for the explicit-save path; the auto-save path
-     * uses [captureAutoFitIn] with a far smaller volume.
+     * Auto-fit across a whole structure region. There is no "explicit-save path" any more — the
+     * old sidecar model that used this for a full-region flush on save was replaced by the
+     * `.nbt`-per-commit model, and every commit (`StructureCommit.commit`) goes through
+     * [captureAutoFitIn] with the tiny `union(placedBox, dirtyBox)` volume instead (F10). This
+     * remains test-only: [StructureRegionPersistenceSpec] and [StructureAutoSaveSpec] exercise it
+     * directly to assert the tight-fit scan itself. **Do not call this from any commit path** — a
+     * full ~144-wide-region scan (~8M block reads) on every debounce is exactly the cost
+     * [captureAutoFitIn] exists to avoid.
      */
     fun captureAutoFit(
         level: ServerLevel, regionOrigin: BlockPos,
@@ -185,6 +191,10 @@ object StructurePersistence {
      * non-air, computes the tight box, and writes exactly that box into [file] as a compressed
      * structure. Returns the captured [PlacedBox] (absolute origin + size), or null when the
      * region is empty (an empty structure is still written).
+     *
+     * Test-only (F10): built on [captureAutoFit]'s full-region scan, which no commit path uses —
+     * see that function's KDoc. [StructureRegionPersistenceSpec] uses this to assert the
+     * region-wide auto-fit-and-write behavior directly.
      */
     fun saveAutoFitToFile(
         file: Path, level: ServerLevel, regionOrigin: BlockPos,

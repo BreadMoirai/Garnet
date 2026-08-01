@@ -180,11 +180,13 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         // (now-moved) file again, so the old key stays dirty forever and defeats tick()'s idle fast
         // path for the rest of the session. handleRename now calls unplaceStructure FIRST.
         //
-        // The gametest harness's setBlock mixin is inert (a plain level.setBlock call never
-        // triggers StructureEditWatcher here), so an end-to-end call to handleRename cannot
-        // exercise this: unplaceStructure has already run, in EITHER order, by the time
-        // handleRename returns, so a post-hoc onBlockChanged call can't tell which order production
-        // code used. This test instead replicates the exact two-call sequence
+        // The gametest harness's setBlock mixin is FLAKY (a plain level.setBlock call sometimes
+        // fails to trigger StructureEditWatcher here, not reliably never — see
+        // feedback_setblock_mixin_flaky_in_gametest), so an end-to-end call to handleRename can't
+        // be trusted to exercise this: unplaceStructure has already run, in EITHER order, by the
+        // time handleRename returns, so a post-hoc onBlockChanged call can't tell which order
+        // production code used, and a flaky mixin would make the test itself flaky besides. This
+        // test instead replicates the exact two-call sequence
         // EditorNetworking.handleRename's teardown now uses, and simulates what a live mixin would
         // report at the moment clearBounds writes -- with a NEGATIVE CONTROL proving the test can
         // actually detect the bug (the old order) before trusting it to prove the fix (the new

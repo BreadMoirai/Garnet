@@ -15,7 +15,13 @@ import com.breadmoirai.garnet.editor.network.EditorNetworking
 import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
+import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
+import com.breadmoirai.garnet.editor.data.EditorNewStructure
+import com.breadmoirai.garnet.editor.world.StructureAutoSave
+import com.breadmoirai.garnet.editor.world.StructureCommit
+import com.breadmoirai.garnet.editor.world.StructureEditWatcher
+import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
@@ -27,12 +33,17 @@ import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.minecraft.server.MinecraftServer
+import net.minecraft.world.level.block.Blocks
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
+import kotlin.io.path.readBytes
+import kotlin.io.path.writeBytes
 import kotlin.io.path.writeText
 
 class EditorNetworkRegistrySpec : GarnetTestSpec({
@@ -266,6 +277,86 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 val err = drainPayloads(player).filterIsInstance<EditorErrorS2C>().single()
                 err.reason shouldContain "not a folder"
                 SharedSettings.projectRootPath shouldBe originalRootPath
+            }
+        }
+    }
+
+    // --- Final review, Finding B1: root swap must not cross-contaminate structures --------------
+
+    test("handleSetRoot commits the OLD root's dirty structure and never touches the NEW root's same-named file") {
+        withTempRoot("project-net-setroot-crosscontam") { tmp ->
+            val rootA = tmp.resolve("rootA").also { it.createDirectories() }
+            val rootB = tmp.resolve("rootB").also { it.createDirectories() }
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("project-net-setroot-crosscontam-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+
+            // A's clock.nbt: a real, placeable structure -- this is the one that gets edited and
+            // must receive the commit.
+            EditorNewStructure.create(rootA, "clock")
+            val fileA = rootA.resolve("clock.nbt")
+
+            // B's clock.nbt: a DIFFERENT file that happens to share the exact same name. It is never
+            // opened or placed by this test -- if handleSetRoot's reset is missing, a leftover
+            // placedBox/region assignment for "clock.nbt" would let the next commit capture A's
+            // leftover world blocks and silently overwrite THIS file with them.
+            val fileB = rootB.resolve("clock.nbt")
+            fileB.writeBytes(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9))
+            val bBefore = fileB.readBytes()
+
+            var server: MinecraftServer? = null
+            try {
+                onServer {
+                    server = this
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(rootA)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
+                    drainPayloads(player)
+
+                    val fileABeforeEdit = fileA.readBytes()
+
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("clock.nbt")!!
+                    val lvl = overworld()
+                    val edited = region.offset(1, 0, 1)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    // Drive the watcher directly: the setBlock mixin is flaky under this harness.
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+                    StructureAutoSave.of(this).isDirty("clock.nbt") shouldBe true
+
+                    // The swap itself must flush A's dirty structure BEFORE touching any state, and
+                    // reset all per-structure state so nothing carries over onto B.
+                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+                    drainPayloads(player)
+
+                    // A received the edit: its file changed from the pre-edit baseline.
+                    fileA.readBytes() shouldNotBe fileABeforeEdit
+                    // B was never touched -- not one byte.
+                    fileB.readBytes() shouldBe bBefore
+
+                    // The reset actually happened: no leftover placed/dirty/region state survives
+                    // under the old root's key.
+                    StructureAutoSave.of(this).isDirty("clock.nbt") shouldBe false
+                    EditorDimRegistry.of(this).placedBoxOf("clock.nbt") shouldBe null
+
+                    // A tick pass after the swap must not resurrect the cross-contamination either.
+                    StructureCommit.tick(this, now = overworld().gameTime + 1000)
+                    fileB.readBytes() shouldBe bBefore
+
+                    SharedSettings.projectRootPath = ""
+                    EditorWorld.clear(this)
+                    EditorServerContext.clear(this)
+                }
+            } finally {
+                server?.let {
+                    StructureAutoSave.of(it).clear("clock.nbt")
+                    StructureCommit.clearBackoff(it, "clock.nbt")
+                }
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
             }
         }
     }

@@ -176,9 +176,30 @@ object EditorNetworking {
         if (!abs.isDirectory()) {
             ServerPlayNetworking.send(player, EditorErrorS2C("not a folder: $abs")); return
         }
+        // Flush every dirty structure against the OLD root BEFORE touching any state (B1). Once the
+        // root swaps, StructureCommit.commit resolves subpaths against the NEW root, so a dirty
+        // structure committed after the swap would capture the OLD root's world blocks and write
+        // them over the NEW root's same-named file — silently destroying content that belongs to a
+        // different project the player never touched.
+        StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+
         val root = EditorRoot(abs)
         SharedSettings.projectRootPath = abs.toString()
         EditorServerContext.set(server, EditorServerContext(root))
+
+        // Fully reset per-structure state so nothing from the old root carries across: a leftover
+        // placedBox would let a later commit for the same subpath under the NEW root capture the
+        // OLD root's leftover world blocks, and a leftover region assignment would place the NEW
+        // root's file on top of the OLD root's blocks (B1). Snapshot the subpath list first —
+        // unplaceStructure mutates the registry's backing maps.
+        val registry = EditorDimRegistry.of(server)
+        val autoSave = StructureAutoSave.of(server)
+        for (subpath in registry.placedStructureSubpaths()) {
+            autoSave.clear(subpath)
+            StructureCommit.clearBackoff(server, subpath)
+            registry.unplaceStructure(subpath)
+        }
+
         EditorDimLifecycle.placeAll(server, root)
         sendTree(server, player)
     }
@@ -254,7 +275,18 @@ object EditorNetworking {
             return
         }
         when (val outcome = StructureCommit.commit(server, payload.subpath, LocalHistoryStore.REASON_MANUAL)) {
-            is StructureCommit.CommitOutcome.Committed -> StructureCommit.broadcast(server, outcome.payload)
+            is StructureCommit.CommitOutcome.Committed -> {
+                // This is a REPLY to the SaveStructureC2S `player` just sent — they provably have
+                // the mod (they just used one of its channels), so send to them directly and
+                // unconditionally, the same way every other S2C in this file replies. The `canSend`
+                // guard on StructureCommit.broadcast exists for the genuinely UNSOLICITED fan-out
+                // (StructureCommit.tick's debounce, commitAll's backstop) where the recipient never
+                // asked for anything and isn't provably running the mod at all (F6) — it does not
+                // apply to a reply. Still broadcast to every OTHER player (guarded) so their
+                // Explorer status lines pick up the change too.
+                ServerPlayNetworking.send(player, outcome.payload)
+                StructureCommit.broadcast(server, outcome.payload, exclude = player)
+            }
             is StructureCommit.CommitOutcome.NoChange -> {
                 // Nothing to write: the region already matches the committed file.
                 ServerPlayNetworking.send(player, StructureResultS2C(
@@ -362,9 +394,21 @@ object EditorNetworking {
         }
         for (dirtySubpath in dirtyUnderRename) {
             val outcome = StructureCommit.commit(server, dirtySubpath, LocalHistoryStore.REASON_AUTOSAVE)
+            // NotApplicable here (F5) means the subpath was dirty but its root/file was momentarily
+            // unresolvable — commit correctly leaves the dirty flag SET rather than clearing it (see
+            // StructureCommit.commit's KDoc, case 2). But proceeding with the rename anyway would
+            // rekey the registry to a NEW subpath while that dirty entry stays keyed under the OLD
+            // one, and nothing ever resolves the old key again — the edit is stranded exactly like
+            // the Failed case this already guards against. Abort the same way.
             if (outcome is StructureCommit.CommitOutcome.Failed) {
                 ServerPlayNetworking.send(player, EditorErrorS2C(
                     "rename failed: could not save pending edits for '$dirtySubpath': ${outcome.reason}",
+                ))
+                return
+            }
+            if (outcome is StructureCommit.CommitOutcome.NotApplicable && autoSave.dirtySubpaths().contains(dirtySubpath)) {
+                ServerPlayNetworking.send(player, EditorErrorS2C(
+                    "rename failed: pending edits for '$dirtySubpath' are not resolvable right now",
                 ))
                 return
             }

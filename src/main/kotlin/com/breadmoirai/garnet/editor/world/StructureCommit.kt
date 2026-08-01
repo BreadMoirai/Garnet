@@ -14,6 +14,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
+import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Path
@@ -196,6 +197,23 @@ object StructureCommit {
         val captured = StructurePersistence.captureAutoFitIn(registry.projectLevel(), scan)
 
         val committed = readTag(file)
+
+        // F4: bank on-disk content that was written OUTSIDE the editor (external NBT tool, git
+        // checkout, restore-from-backup) between sessions — if it doesn't match the newest revision
+        // already banked, no revision anywhere holds it, and it's about to be overwritten below with
+        // no recovery point. Cheap: `committed` is already read for the diff just below; this only
+        // adds a comparison against the newest revision's blob.
+        if (committed != null) {
+            val existing = LocalHistoryStore.revisions(file)
+            val newestTag = existing.lastOrNull()?.let { LocalHistoryStore.readTag(file, it) }
+            if (newestTag == null || structuresDiffer(committed, newestTag)) {
+                val (sx, sy, sz) = sizeOf(committed)
+                LocalHistoryStore.writeRevision(
+                    file, committed, sx, sy, sz, blockCount = 0, reason = LocalHistoryStore.REASON_EXTERNAL,
+                )
+            }
+        }
+
         if (committed != null && !structuresDiffer(committed, captured.tag)) {
             autoSave.clear(subpath)
             clearBackoff(server, subpath)
@@ -235,7 +253,9 @@ object StructureCommit {
         // The write landed: this revision is now confirmed worth keeping, so it's safe to apply
         // the age/count cap (which may delete OLDER blobs) without risking data a failed attempt
         // would have had no business touching. See the pruning invariant on this object's KDoc.
-        LocalHistoryStore.prune(file)
+        // But ONLY when history is deliberately enabled (B3): a user who disables history means to
+        // FREEZE the existing archive, not have it silently age-pruned on the next commit.
+        if (historyEnabled) LocalHistoryStore.prune(file)
 
         captured.box?.let { registry.setPlacedBox(subpath, it) }
         autoSave.clear(subpath)
@@ -284,9 +304,26 @@ object StructureCommit {
         }
     }
 
-    fun broadcast(server: MinecraftServer, payload: StructureAutoSavedS2C) {
+    /**
+     * Unsolicited fan-out: tells every OTHER connected player (`exclude`, if given, is typically
+     * the player who just triggered the commit and was already replied to directly — see
+     * [EditorNetworking.handleSaveStructure]) that a structure changed, so their Explorer status
+     * lines can update. Nothing here is a reply to anything these players sent, so — unlike every
+     * other S2C in this mod — the receiver isn't provably running the mod at all: a vanilla/unmodded
+     * client on a dedicated server can be disconnected for an unknown play-phase payload (F6). Guard
+     * every send with `canSend`. [tick] and [commitAll] are the two genuinely unsolicited callers
+     * (a debounced auto-save and the periodic/shutdown backstop, neither triggered by a specific
+     * player's packet) and both go through this function unfiltered (`exclude = null`).
+     */
+    fun broadcast(server: MinecraftServer, payload: StructureAutoSavedS2C, exclude: ServerPlayer? = null) {
         for (player in server.playerList.players) {
-            ServerPlayNetworking.send(player, payload)
+            if (player === exclude) continue
+            // Unlike every other S2C here, this one is unsolicited — it isn't a reply to a C2S, so
+            // the receiver isn't provably running the mod. On a dedicated server, sending an unknown
+            // play-phase payload to a vanilla/unmodded client can get it disconnected (F6).
+            if (ServerPlayNetworking.canSend(player, StructureAutoSavedS2C.TYPE)) {
+                ServerPlayNetworking.send(player, payload)
+            }
         }
     }
 
@@ -320,4 +357,11 @@ object StructureCommit {
     private fun readTag(file: Path) =
         if (!file.exists()) null
         else runCatching { NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()) }.getOrNull()
+
+    /** The `(x, y, z)` size stored in a structure tag's "size" list — registry-free, unlike
+     *  loading through [net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate]. */
+    private fun sizeOf(tag: CompoundTag): Triple<Int, Int, Int> {
+        val sizeTag = tag.getListOrEmpty("size")
+        return Triple(sizeTag.getIntOr(0, 0), sizeTag.getIntOr(1, 0), sizeTag.getIntOr(2, 0))
+    }
 }

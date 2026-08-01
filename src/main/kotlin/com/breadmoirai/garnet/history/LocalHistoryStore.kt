@@ -46,6 +46,10 @@ object LocalHistoryStore {
     const val REASON_PLACED = "placed"
     const val REASON_AUTOSAVE = "autosave"
     const val REASON_MANUAL = "manual"
+    /** Content found on disk that doesn't match the newest banked revision — edited outside the
+     *  editor (external NBT tool, git checkout, restore-from-backup) between sessions. Banked so a
+     *  commit that's about to overwrite it doesn't destroy the only copy (F4). */
+    const val REASON_EXTERNAL = "external"
 
     /** `<instance>/.garnet/local-history`, or [SharedSettings.localHistoryDir] when set. */
     fun historyRoot(): Path {

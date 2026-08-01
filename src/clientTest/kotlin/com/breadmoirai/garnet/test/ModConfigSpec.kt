@@ -6,12 +6,45 @@ import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.shouldBe
 import kotlin.io.path.createTempDirectory
 
+/**
+ * Snapshot of every [SharedSettings] field this spec mutates (F8) — this spec deliberately
+ * clobbers global mutable state to exercise the save/load round trip, so each test must restore
+ * it in `finally`, the same way the gametest specs do. Without this, a test that only fails
+ * partway through (or a later spec sharing the same JVM) inherits whatever this spec last left
+ * behind: `autoSaveEnabled=false`, `projectRootPath="/only/this"`, `localHistoryDir="/tmp/hist"`,
+ * `structureRegionChunks=2`, etc.
+ */
+private data class SettingsSnapshot(
+    val projectRootPath: String = SharedSettings.projectRootPath,
+    val autoSaveEnabled: Boolean = SharedSettings.autoSaveEnabled,
+    val autoSaveDebounceTicks: Int = SharedSettings.autoSaveDebounceTicks,
+    val autoSaveMaxDirtyTicks: Int = SharedSettings.autoSaveMaxDirtyTicks,
+    val localHistoryEnabled: Boolean = SharedSettings.localHistoryEnabled,
+    val localHistoryDays: Int = SharedSettings.localHistoryDays,
+    val localHistoryMaxRevisions: Int = SharedSettings.localHistoryMaxRevisions,
+    val localHistoryDir: String = SharedSettings.localHistoryDir,
+    val structureRegionChunks: Int = SharedSettings.structureRegionChunks,
+) {
+    fun restore() {
+        SharedSettings.projectRootPath = projectRootPath
+        SharedSettings.autoSaveEnabled = autoSaveEnabled
+        SharedSettings.autoSaveDebounceTicks = autoSaveDebounceTicks
+        SharedSettings.autoSaveMaxDirtyTicks = autoSaveMaxDirtyTicks
+        SharedSettings.localHistoryEnabled = localHistoryEnabled
+        SharedSettings.localHistoryDays = localHistoryDays
+        SharedSettings.localHistoryMaxRevisions = localHistoryMaxRevisions
+        SharedSettings.localHistoryDir = localHistoryDir
+        SharedSettings.structureRegionChunks = structureRegionChunks
+    }
+}
+
 class ModConfigSpec : ClientSpec({
 
     test("every setting round-trips through garnet.json") {
         val dir = createTempDirectory("garnet-config")
         val file = dir.resolve("garnet.json").toFile()
         ModConfig.configFileForTest(file)
+        val snapshot = SettingsSnapshot()
         try {
             SharedSettings.projectRootPath = "/tmp/proj"
             SharedSettings.autoSaveEnabled = false
@@ -48,12 +81,14 @@ class ModConfigSpec : ClientSpec({
         } finally {
             ModConfig.resetConfigFileForTest()
             dir.toFile().deleteRecursively()
+            snapshot.restore()
         }
     }
 
     test("a missing config file leaves defaults untouched") {
         val dir = createTempDirectory("garnet-config-missing")
         ModConfig.configFileForTest(dir.resolve("absent.json").toFile())
+        val snapshot = SettingsSnapshot()
         try {
             SharedSettings.autoSaveDebounceTicks = 20
             ModConfig.load()
@@ -61,6 +96,7 @@ class ModConfigSpec : ClientSpec({
         } finally {
             ModConfig.resetConfigFileForTest()
             dir.toFile().deleteRecursively()
+            snapshot.restore()
         }
     }
 
@@ -69,6 +105,7 @@ class ModConfigSpec : ClientSpec({
         val file = dir.resolve("garnet.json").toFile()
         file.writeText("""{"projectRootPath":"/only/this"}""")
         ModConfig.configFileForTest(file)
+        val snapshot = SettingsSnapshot()
         try {
             SharedSettings.localHistoryDays = 42
             ModConfig.load()
@@ -77,6 +114,7 @@ class ModConfigSpec : ClientSpec({
         } finally {
             ModConfig.resetConfigFileForTest()
             dir.toFile().deleteRecursively()
+            snapshot.restore()
         }
     }
 })

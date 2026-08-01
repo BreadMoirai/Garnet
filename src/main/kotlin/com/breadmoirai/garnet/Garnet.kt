@@ -48,8 +48,13 @@ class Garnet : ModInitializer {
             val ctx = EditorServerContext.get(server) ?: return@register
             EditorDimLifecycle.placeAll(server, ctx.root)
         }
-        ServerLifecycleEvents.SERVER_STOPPED.register { server ->
+        ServerLifecycleEvents.SERVER_STOPPING.register { server ->
+            // stopServer HEAD: levels are still fully live here. SERVER_STOPPED fires at TAIL, after
+            // saveAllChunks and after every level is closed — retrying a failed commit there would
+            // call getBlockState on a closed ServerLevel (B2).
             StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+        }
+        ServerLifecycleEvents.SERVER_STOPPED.register { server ->
             StructureAutoSave.dispose(server)
             StructureCommit.dispose(server)
             EditorDimLifecycle.releaseServerState(server)
