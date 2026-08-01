@@ -2,8 +2,6 @@ package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.editor.ui.ExplorerEdit
 import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.ui.ProjectTreeState
-import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FileTreeNode
 import com.breadmoirai.garnet.editor.data.FolderNode
@@ -24,8 +22,8 @@ class ExplorerTreeStateSpec : ClientSpec({
         FolderNode("adders", listOf(
             FolderNode("full-adder", listOf(FileNode("full.spec.kts", "kts"))),
         )),
-        FileNode("dirty.nbt", "nbt", hasUnsaved = true),
-        FileNode("clean.nbt", "nbt", hasUnsaved = false),
+        FileNode("dirty.nbt", "nbt"),
+        FileNode("clean.nbt", "nbt"),
     ))
 
     test("selection is stored in Jewel's TreeState, keyed by path") {
@@ -40,19 +38,6 @@ class ExplorerTreeStateSpec : ClientSpec({
         ExplorerTreeState.expandedPaths shouldContain "adders"
         runOnClient { ExplorerTreeState.toggleExpanded("adders") }
         ExplorerTreeState.treeState.openNodes shouldNotContain "adders"
-    }
-
-    test("selectedHasUnsaved is derived from the snapshot, not stored") {
-        runOnClient {
-            ProjectTreeState.reset(); ExplorerTreeState.reset()
-            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, currentSubpath = null))
-            ExplorerTreeState.select("dirty.nbt")
-        }
-        ExplorerTreeState.selectedHasUnsaved() shouldBe true
-        runOnClient { ExplorerTreeState.select("clean.nbt") }
-        ExplorerTreeState.selectedHasUnsaved() shouldBe false
-        runOnClient { ExplorerTreeState.select("adders") }
-        ExplorerTreeState.selectedHasUnsaved() shouldBe false
     }
 
     test("buildTreeFrom emits the project root as the single top-level node") {
@@ -95,16 +80,6 @@ class ExplorerTreeStateSpec : ClientSpec({
         fullAdder.open(false)
         val fullAdderChildren = fullAdder.children ?: emptyList()
         fullAdderChildren.map { it.id } shouldContainExactly listOf("adders/full-adder/full.spec.kts")
-    }
-
-    test("selectedHasUnsaved is false with no snapshot, and with a selection absent from the snapshot") {
-        runOnClient { ProjectTreeState.reset(); ExplorerTreeState.reset(); ExplorerTreeState.select("dirty.nbt") }
-        ExplorerTreeState.selectedHasUnsaved() shouldBe false
-        runOnClient {
-            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, currentSubpath = null))
-            ExplorerTreeState.select("does/not/exist")
-        }
-        ExplorerTreeState.selectedHasUnsaved() shouldBe false
     }
 
     test("collapseAll clears every open node") {

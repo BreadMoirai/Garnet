@@ -73,7 +73,7 @@ class JewelExplorerSpec : ClientSpec({
         FolderNode("clocks", listOf(
             FolderNode("ring", listOf(FileNode("ring.spec.kts", "kts"))),
         )),
-        FileNode("box.nbt", "nbt", hasUnsaved = true),
+        FileNode("box.nbt", "nbt"),
         FileNode("README.md", "md"),
     ))
 

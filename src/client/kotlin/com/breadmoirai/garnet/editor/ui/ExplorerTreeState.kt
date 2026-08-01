@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FileTreeNode
 import com.breadmoirai.garnet.editor.data.FolderNode
-import com.breadmoirai.garnet.editor.data.resolve
 import org.jetbrains.jewel.foundation.lazy.SelectableLazyListState
 import org.jetbrains.jewel.foundation.lazy.SelectionMode
 import org.jetbrains.jewel.foundation.lazy.tree.Tree
@@ -51,13 +50,6 @@ object ExplorerTreeState {
     /** Collapse every expanded node. Selection is left alone — IntelliJ's Collapse All does the same. */
     fun collapseAll() {
         treeState.openNodes = emptySet()
-    }
-
-    /** True when [selectedPath] resolves to a `.nbt` file flagged dirty in the current snapshot. */
-    fun selectedHasUnsaved(): Boolean {
-        val path = selectedPath ?: return false
-        val node = ProjectTreeState.snapshot?.root?.resolve(path)
-        return node is FileNode && node.hasUnsaved
     }
 
     /** The tree id of the project root itself. `FolderNode.resolve("")` and

@@ -63,10 +63,8 @@ Pure data:
   whichever folder is the root, so re-rooting is free. This is the tree carried by
   `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` and rendered recursively by
   `ProjectExplorerPanel` (below) — the old flat `leaves`/`intermediates`/`ProjectLeafEntry` payload
-  fields are gone. `FileNode.hasUnsaved: Boolean = false` flags a `<name>.nbt` node that has a
-  sibling `<name>.nbt.unsaved` dirty-buffer sidecar; `scanFolder` sets it and omits the sidecar
-  file itself from the tree. `FILE_TREE_STREAM_CODEC` (in `EditorPackets.kt`) serializes it as a
-  trailing boolean on the file-node tag.
+  fields are gone. `FileNode` is just `(name, extension)` — there is no per-node dirty flag; a
+  `.nbt`'s auto-save state lives server-side in `StructureAutoSave` (see below), not in the tree.
 - `GridLayout` — `(specs, cellSize, gap, rowMax, yBase) → cells`.
 - `EditorCell` — pure cell record (origin + size).
 - `EditorSaveNaming` — `rootPath → project-<tail>-<8-hex-sha1>` save-name derivation (pure
@@ -106,7 +104,7 @@ Client:
   click-to-toggle behavior). Clicking a file calls `ExplorerTreeState.select(path)` (highlight
   only, no packet) — except a `.nbt` `FileNode` (`node.extension == "nbt"`), which selects **and**
   sends `PlaceStructureC2S(path)` (rendered with a Jewel `AllIconsKeys.FileTypes.Archive` icon, plus
-  a leading `● ` dirty dot when `node.hasUnsaved` is true, or when the row is `currentSubpath`).
+  a leading `● ` marker when the row is `currentSubpath`).
   Paths are `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
   `currentSubpath`. `ExplorerToolbar()` is the panel's single top row: a kebab `IconButton` opening
   a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Refresh
@@ -114,9 +112,11 @@ Client:
   This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
   row. `New`/`Rename` now have a client UI trigger again — the right-click `ExplorerContextMenu` (see
   [ui/explorer-toolbar-and-context-menu.md](../ui/explorer-toolbar-and-context-menu.md)) — while
-  `Save`/`Discard` still have none: `SaveStructureC2S`/`DiscardStructureC2S` remain fully wired
-  server-side and covered by `EditorStructureNetworkSpec`, with no tree-row action sending them yet.
-  `NewStructureC2S` was reshaped to
+  `Save` (`SaveStructureC2S`, now a force-commit through `StructureCommit`) still has none: it
+  remains fully wired server-side and covered by `EditorStructureNetworkSpec`, with no tree-row
+  action sending it yet. There is no `Discard` any more — placed structures auto-save continuously,
+  so there is nothing to discard back to; see [Standalone structure files](#standalone-structure-files)
+  below. `NewStructureC2S` was reshaped to
   `NewStructureC2S(parentSubpath, name)` so the context-menu "New Structure" action targets the
   folder that was right-clicked instead of the session's active folder; `handleNewStructure` now
   resolves `folder` strictly via `EditorRoot.resolveSubpath(payload.parentSubpath)` and no longer
@@ -127,13 +127,13 @@ Client:
   `handleCreateFolder`, and `handleRename` all re-validate the final name server-side through
   `EditorNames.validate` against the destination folder's real directory listing, since the
   client's tree snapshot can be stale. `handleRename` additionally: refuses `subpath == ""` (the
-  client already disables the menu item for the root, but the server does not trust that), moves
-  the `<name>.nbt.unsaved` sidecar with a renamed structure (`StructurePersistence.unsavedSidecarOf`)
-  so unsaved edits stay attached, unloads and re-places a currently-placed structure under the new
+  client already disables the menu item for the root, but the server does not trust that), commits
+  a placed-and-dirty structure's pending edits through `StructureCommit.commit` BEFORE the file
+  move (so the dirty state, keyed by subpath, is never stranded under a name nothing will commit
+  again), then moves the file and carries its `LocalHistoryStore` revisions across via
+  `LocalHistoryStore.moveHistory`, unloads and re-places a currently-placed structure under the new
   subpath (`EditorDimRegistry.unplaceStructure` then `placeStructureFrom` — the structure lands in
-  a fresh region since `nextStructureIndex` is never recycled — and, like `handlePlaceStructure`,
-  prefers the moved `.nbt.unsaved` sidecar over the saved file when one exists, so a placed *and*
-  dirty structure re-places from its unsaved edits rather than reverting to the last save), rekeys
+  a fresh region since `nextStructureIndex` is never recycled), rekeys
   every OTHER registry entry nested under a renamed folder onto the new subpath
   (`EditorDimRegistry.rekeyForRename`, same `"$oldSubpath/"` boundary as below — a pure bookkeeping
   move that never touches the world, since only the file's path changed, not its placed position),
@@ -179,28 +179,27 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
   world height.
 - **Cheap re-clear:** the registry tracks the last-placed `PlacedBox` per structure subpath;
   re-placing clears only that footprint, not the whole region.
-- **Packets:** `PlaceStructureC2S` / `SaveStructureC2S` / `NewStructureC2S` / `DiscardStructureC2S`
-  → `StructureResultS2C`, handled by
-  `EditorNetworking.handlePlaceStructure/handleSaveStructure/handleNewStructure/handleDiscardStructure`.
-- **Dirty sidecar lifecycle:** placing a `.nbt` prefers its `.nbt.unsaved` sidecar when present
-  (`StructurePersistence.unsavedSidecarOf`) and reports `hasUnsaved = true`; "Save Structure"
-  writes the committed `.nbt` and deletes the sidecar; "Discard" deletes the sidecar and
-  re-places from the committed `.nbt`. `EditorNetworking.flushDirtyStructures` (writing the
-  sidecar via `StructurePersistence.flushUnsavedSidecar`) still exists and is callable directly,
-  but is no longer wired to `ServerLifecycleEvents.BEFORE_SAVE`.
-  `EditorDimRegistry.placedStructureSubpaths()` remains the set it iterates when called.
-- **Debounced auto-save + local history (superseding auto-persist):** `StructureCommit` is now
-  the auto-persist path. `ServerTickEvents.END_SERVER_TICK` calls `StructureCommit.tick`, which
-  commits any placed structure whose `StructureAutoSave` dirty state has gone quiet for
-  `SharedSettings.autoSaveDebounceTicks` (or has been continuously dirty for
+- **Packets:** `PlaceStructureC2S` / `SaveStructureC2S` / `NewStructureC2S` →
+  `StructureResultS2C`, handled by
+  `EditorNetworking.handlePlaceStructure/handleSaveStructure/handleNewStructure`. There is no
+  `DiscardStructureC2S` any more — see below.
+- **Debounced auto-save + local history (the only auto-persist path):** `StructureCommit` writes
+  the `.nbt` directly; there is no dirty-buffer sidecar. `ServerTickEvents.END_SERVER_TICK` calls
+  `StructureCommit.tick`, which commits any placed structure whose `StructureAutoSave` dirty state
+  has gone quiet for `SharedSettings.autoSaveDebounceTicks` (or has been continuously dirty for
   `autoSaveMaxDirtyTicks`); `ServerLifecycleEvents.BEFORE_SAVE` and `SERVER_STOPPED` both call
-  `StructureCommit.commitAll` as a backstop flush regardless of timing. A commit scans only
-  `union(placedBox, dirtyBox)` via `StructurePersistence.captureAutoFitIn` — never the full
-  144×full-height region — writes the `.nbt` directly, records a `LocalHistoryStore` revision,
+  `StructureCommit.commitAll` as a backstop flush regardless of timing. `SaveStructureC2S` →
+  `handleSaveStructure` is a force-commit through the same `StructureCommit.commit` (reason
+  `REASON_MANUAL`), so "Save Structure" and auto-save write through the identical path. A commit
+  scans only `union(placedBox, dirtyBox)` via `StructurePersistence.captureAutoFitIn` — never the
+  full 144×full-height region — writes the `.nbt` directly, records a `LocalHistoryStore` revision
+  BEFORE the rewrite (so the pre-edit content is never lost even if the `.nbt` write itself fails),
   and broadcasts `StructureAutoSavedS2C`. `SERVER_STOPPED` also calls `StructureAutoSave.dispose`
-  so per-server dirty state cannot leak across server lifecycles. The `.nbt.unsaved` sidecar
-  mechanism above still runs alongside this (removal is a later step in the same effort); see
-  `docs/superpowers/specs/2026-07-31-structure-autosave-local-history-design.md`.
+  so per-server dirty state cannot leak across server lifecycles. Since there is no dirty buffer to
+  revert to, there is no "Discard" action — an edit's only rollback path is `LocalHistoryStore`.
+  See `docs/persistence/local-history.md` for the on-disk layout and pruning policy, and
+  `docs/superpowers/specs/2026-07-31-structure-autosave-local-history-design.md` for the design
+  history.
 
 ## Where to start reading
 

@@ -28,7 +28,7 @@ val FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode> = object : Stream
                 repeat(count) { children.add(decode(buf)) }
                 FolderNode(name, children)
             }
-            TAG_FILE -> FileNode(name, ByteBufCodecs.STRING_UTF8.decode(buf), buf.readBoolean())
+            TAG_FILE -> FileNode(name, ByteBufCodecs.STRING_UTF8.decode(buf))
             else -> throw IllegalStateException("Unknown FileTreeNode tag: $tag")
         }
     }
@@ -45,7 +45,6 @@ val FILE_TREE_STREAM_CODEC: StreamCodec<ByteBuf, FileTreeNode> = object : Stream
                 buf.writeByte(TAG_FILE.toInt())
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.name)
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.extension)
-                buf.writeBoolean(value.hasUnsaved)
             }
         }
     }
@@ -244,17 +243,6 @@ data class RenamePathC2S(val subpath: String, val newName: String) : CustomPacke
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
-data class DiscardStructureC2S(val subpath: String) : CustomPacketPayload {
-    companion object {
-        val TYPE = CustomPacketPayload.Type<DiscardStructureC2S>(id("discard_structure"))
-        val STREAM_CODEC: StreamCodec<ByteBuf, DiscardStructureC2S> = StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8, DiscardStructureC2S::subpath,
-            ::DiscardStructureC2S,
-        )
-    }
-    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
-}
-
 // === Structure S2C ===
 
 /**
@@ -288,7 +276,6 @@ data class StructureAutoSavedS2C(
 data class StructureResultS2C(
     val subpath: String,
     val sizeX: Int, val sizeY: Int, val sizeZ: Int,
-    val hasUnsaved: Boolean,
     val message: String,
 ) : CustomPacketPayload {
     companion object {
@@ -298,7 +285,6 @@ data class StructureResultS2C(
             ByteBufCodecs.VAR_INT, StructureResultS2C::sizeX,
             ByteBufCodecs.VAR_INT, StructureResultS2C::sizeY,
             ByteBufCodecs.VAR_INT, StructureResultS2C::sizeZ,
-            ByteBufCodecs.BOOL, StructureResultS2C::hasUnsaved,
             ByteBufCodecs.STRING_UTF8, StructureResultS2C::message,
             ::StructureResultS2C,
         )

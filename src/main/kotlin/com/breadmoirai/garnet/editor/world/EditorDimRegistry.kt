@@ -103,7 +103,7 @@ class EditorDimRegistry(private val server: MinecraftServer) {
 
     fun setPlacedBox(subpath: String, box: PlacedBox) { placedBoxes[subpath] = box }
 
-    /** Subpaths with a recorded placed box this session (the set to flush on world-save). */
+    /** Subpaths with a recorded placed box this session. */
     fun placedStructureSubpaths(): Set<String> = placedBoxes.keys.toSet()
 
     /**
@@ -125,9 +125,9 @@ class EditorDimRegistry(private val server: MinecraftServer) {
      * called after a rename's file move succeeds. `EditorDimRegistry` keys every map by full
      * subpath string, so renaming a folder without this strands every structure beneath it: its
      * placed-box and region-assignment entries stay keyed by the OLD path forever, which orphans
-     * its in-world blocks from `flushDirtyStructures` (which does
-     * `resolveSubpath(oldSubpath) ?: continue` and silently skips it) and lets a click on the new
-     * path re-place a second copy in a fresh region.
+     * its in-world blocks from `StructureCommit` (whose `commit` resolves the subpath via
+     * `EditorNetworking.rootFor(server).resolveSubpath(subpath)` and returns null, silently
+     * skipping it) and lets a click on the new path re-place a second copy in a fresh region.
      *
      * The boundary is a full path segment, matching [repointSession]'s logic: renaming "redstone"
      * must rekey "redstone" and "redstone/clock.nbt", but never "redstoneworks/clocks" — a plain

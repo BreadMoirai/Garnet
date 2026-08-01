@@ -6,12 +6,14 @@ import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.EditorNetworking
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
-import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.data.EditorNewStructure
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.world.StructureAutoSave
+import com.breadmoirai.garnet.editor.world.StructureEditWatcher
 import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
@@ -29,7 +31,6 @@ import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
-import kotlin.io.path.writeBytes
 
 /**
  * Model of `EditorStructureNetworkSpec`'s harness: temp project root + a mock server player,
@@ -113,20 +114,6 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         }
     }
 
-    test("handleRename moves a structure's unsaved sidecar with it") {
-        withServer { server, player, root ->
-            val nbt = root.resolve("clock.nbt")
-            EditorNewStructure.create(root, "clock")
-            StructurePersistence.unsavedSidecarOf(nbt).writeBytes(byteArrayOf(1, 2, 3))
-
-            EditorNetworking.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
-
-            root.resolve("ring.nbt").exists().shouldBeTrue()
-            StructurePersistence.unsavedSidecarOf(root.resolve("ring.nbt")).exists().shouldBeTrue()
-            StructurePersistence.unsavedSidecarOf(nbt).exists().shouldBeFalse()
-        }
-    }
-
     test("handleRename rejects a new name that already exists") {
         withServer { server, player, root ->
             root.resolve("a").createDirectories()
@@ -159,34 +146,30 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         }
     }
 
-    test("renaming a placed AND dirty structure re-places from its sidecar, not the stale saved file") {
-        // REGRESSION: handlePlaceStructure already prefers the ".nbt.unsaved" sidecar over the saved
-        // file when one exists (see its own body). handleRename's re-place call used to hard-code
-        // hasUnsaved = false and pass the SAVED file unconditionally -- so renaming a structure with
-        // unsaved edits repainted the world from the stale save, and the next flushDirtyStructures
-        // would then capture that reverted region right back over the (still-present) sidecar,
-        // destroying the unsaved edits for good. This covers the intersection the suite otherwise
-        // misses: a structure that is BOTH placed AND dirty, then renamed.
+    test("renaming a placed AND dirty structure commits first, so no edits are lost") {
+        // REGRESSION (reframed): under the old sidecar model a rename could repaint the world from
+        // the stale saved file and lose unsaved edits. With auto-save there is no dirty buffer, so
+        // the invariant is now that handleRename commits BEFORE moving the file — otherwise the
+        // dirty box would be stranded against the old subpath and the edits would be dropped.
         withServer { server, player, root ->
             EditorNewStructure.create(root, "clock")
             EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
             drainPayloads(player)
 
-            // Make the placed region genuinely dirty via the REAL path (StructurePersistence's
-            // flush), not a hand-written garbage sidecar the re-place below could never actually load
-            // as a structure: place a block inside the region, then flush.
             val registry = EditorDimRegistry.of(server)
             val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
-            registry.projectLevel().setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
-            EditorNetworking.flushDirtyStructures(server)
-            StructurePersistence.unsavedSidecarOf(root.resolve("clock.nbt")).exists().shouldBeTrue()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
 
             EditorNetworking.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
 
+            // The edit was committed under the OLD name before the move, then carried across.
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeFalse()
             val result = drainPayloads(player).filterIsInstance<StructureResultS2C>().last()
             result.subpath shouldBe "ring.nbt"
-            result.hasUnsaved.shouldBeTrue()
-            StructurePersistence.unsavedSidecarOf(root.resolve("ring.nbt")).exists().shouldBeTrue()
+            LocalHistoryStore.revisions(root.resolve("ring.nbt")).size shouldBe 2
         }
     }
 
@@ -194,9 +177,9 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         // REGRESSION: EditorDimRegistry keys placedBoxes/structureBySubpath by full subpath.
         // handleRename only ever checked registry.placedBoxOf(payload.subpath) -- the EXACT renamed
         // path -- so a placed structure nested under a renamed FOLDER kept its old-path registry key
-        // forever: its blocks orphan in-world, flushDirtyStructures does
-        // `resolveSubpath(oldSubpath) ?: continue` and silently skips it, and clicking the new path
-        // re-places a second copy in a fresh region.
+        // forever: its blocks orphan in-world, StructureCommit.commit resolves the subpath via
+        // `rootFor(server).resolveSubpath(subpath) ?: return null` and silently skips it, and
+        // clicking the new path re-places a second copy in a fresh region.
         withServer { server, player, root ->
             root.resolve("redstone").createDirectories()
             EditorNewStructure.create(root.resolve("redstone"), "clock")

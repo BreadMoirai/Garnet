@@ -47,11 +47,4 @@ class FileTreeCodecTest : FunSpec({
         val decoded = SetEditorRootC2S.STREAM_CODEC.decode(buf)
         decoded shouldBe payload
     }
-
-    test("FileNode hasUnsaved survives round-trip") {
-        val node: com.breadmoirai.garnet.editor.data.FileTreeNode = FileNode("gadget.nbt", "nbt", hasUnsaved = true)
-        val buf = io.netty.buffer.Unpooled.buffer()
-        FILE_TREE_STREAM_CODEC.encode(buf, node)
-        (FILE_TREE_STREAM_CODEC.decode(buf) as FileNode).hasUnsaved shouldBe true
-    }
 })

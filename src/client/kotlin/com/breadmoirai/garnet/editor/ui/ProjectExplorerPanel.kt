@@ -263,9 +263,7 @@ private fun TreeRow(
                 if (node.extension == "nbt") Icon(AllIconsKeys.FileTypes.Archive, contentDescription = null)
                 else Icon(AllIconsKeys.FileTypes.Text, contentDescription = null)
         }
-        val dirty = node is FileNode && node.hasUnsaved
-        val current = path == currentSubpath
-        val marker = if (dirty || current) "● " else ""
+        val marker = if (path == currentSubpath) "● " else ""
         Text("  $marker${node.name}")
     }
 }

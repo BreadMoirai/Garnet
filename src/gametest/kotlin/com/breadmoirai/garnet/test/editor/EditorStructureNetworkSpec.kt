@@ -1,14 +1,16 @@
 package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.config.SharedSettings
-import com.breadmoirai.garnet.editor.network.DiscardStructureC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.SaveStructureC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorNetworking
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.world.StructureEditWatcher
+import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.data.EditorNewStructure
@@ -23,6 +25,7 @@ import com.breadmoirai.garnet.mc.onServer
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Blocks
@@ -58,9 +61,11 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                     BlockPos(region.x, lvl.minY, region.z),
                     Vec3i(width, lvl.maxY - lvl.minY + 1, width),
                 )
-                overworld().setBlock(region.offset(5, 0, 5), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                val edited = region.offset(5, 0, 5)
+                lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                StructureEditWatcher.onBlockChanged(lvl, edited)
                 EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("gadget.nbt"))
-                val saved = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
+                val saved = drainPayloads(player).filterIsInstance<StructureAutoSavedS2C>().single()
                 saved.sizeX shouldBe 1; saved.sizeY shouldBe 1; saved.sizeZ shouldBe 1
 
                 EditorSession.clear(player.uuid)
@@ -141,60 +146,52 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
         }
     }
 
-    test("dirty sidecar lifecycle: flush writes/deletes, place loads unsaved, save+discard clear") {
-        withTempRoot("struct-dirty") { tmp ->
+    test("editing a placed structure and force-saving commits straight to the .nbt") {
+        withTempRoot("struct-commit") { tmp ->
             val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
             SharedSettings.structureRegionChunks = 1
-            EditorNewStructure.create(tmp, "widget") // empty widget.nbt at root
+            val histDir = kotlin.io.path.createTempDirectory("struct-commit-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "widget")
             val committed = tmp.resolve("widget.nbt")
-            val sidecar = com.breadmoirai.garnet.structure.StructurePersistence.unsavedSidecarOf(committed)
-            onServer {
-                EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
-                val player = makeMockServerPlayer(this)
-                drainPayloads(player)
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    drainPayloads(player)
 
-                EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
-                val placed = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
-                placed.hasUnsaved shouldBe false
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
+                    drainPayloads(player)
 
-                val region = EditorDimRegistry.of(this).structureRegionOriginOf("widget.nbt")!!
-                val width = SharedSettings.structureRegionChunks * 16
-                val lvl = overworld()
-                StructurePersistence.clearBounds(
-                    lvl, BlockPos(region.x, lvl.minY, region.z),
-                    Vec3i(width, lvl.maxY - lvl.minY + 1, width),
-                )
-                // Snapshot the committed file's bytes so we can prove the flush never touches it.
-                val committedBefore = committed.readBytes()
-                // Edit the region, then flush (simulates a world-save): sidecar appears, committed untouched.
-                lvl.setBlock(region.offset(5, 0, 5), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
-                EditorNetworking.flushDirtyStructures(this)
-                sidecar.exists() shouldBe true
-                // Flush writes ONLY the sidecar — the committed .nbt is byte-for-byte unchanged.
-                committed.readBytes().toList() shouldBe committedBefore.toList()
+                    val region = EditorDimRegistry.of(this).structureRegionOriginOf("widget.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+                    val before = committed.readBytes().toList()
 
-                // Re-place: loads the unsaved sidecar (1x1x1 gold), reports hasUnsaved.
-                EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
-                val replaced = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
-                replaced.hasUnsaved shouldBe true
-                replaced.sizeX shouldBe 1
+                    val edited = region.offset(5, 0, 5)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
 
-                // Explicit Save: writes committed, deletes sidecar, reports clean.
-                EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("widget.nbt"))
-                val saved = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
-                saved.hasUnsaved shouldBe false
-                sidecar.exists() shouldBe false
+                    EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("widget.nbt"))
 
-                // Edit again + flush -> sidecar reappears; then Discard removes it and re-places committed.
-                lvl.setBlock(region.offset(6, 0, 6), Blocks.IRON_BLOCK.defaultBlockState(), 2)
-                EditorNetworking.flushDirtyStructures(this)
-                sidecar.exists() shouldBe true
-                EditorNetworking.handleDiscardStructure(this, player, DiscardStructureC2S("widget.nbt"))
-                val discarded = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
-                discarded.hasUnsaved shouldBe false
-                sidecar.exists() shouldBe false
+                    // The committed file itself changed — there is no dirty buffer any more.
+                    committed.readBytes().toList() shouldNotBe before
+                    val saved = drainPayloads(player).filterIsInstance<StructureAutoSavedS2C>().last()
+                    saved.subpath shouldBe "widget.nbt"
+                    saved.sizeX shouldBe 1
+                    // The pre-edit state is recoverable from history rather than from a sidecar.
+                    LocalHistoryStore.revisions(committed).size shouldBe 2
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
             }
-            SharedSettings.structureRegionChunks = prevChunks
         }
     }
 })

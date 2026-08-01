@@ -161,7 +161,7 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
 ### UC-MAN-10 — Place, save, and create standalone structure files *(moved)*
 
 The standalone `.nbt` structure journeys — clicking a `.nbt` to place it, "Save Structure",
-"+ Structure", "Discard", and the `.nbt.unsaved` dirty sidecar — now live in their own article,
+"+ Structure", and its debounced auto-save with local history — now live in their own article,
 alongside the spec-cell sidecar path:
 [structure-lifecycle.md](structure-lifecycle.md#standalone-nbt-structures-uc-man-10). The UC IDs
 (`UC-MAN-10.a`–`.g`) are unchanged; only the article that hosts them moved.
@@ -223,7 +223,7 @@ alongside the spec-cell sidecar path:
 | UC-MAN-09.b | Non-null pick persists + sends `SetEditorRootC2S`; cancel sends nothing | `RootPickerSpec."openFolder sends SetEditorRootC2S and persists the picked path"`, `RootPickerSpec."openFolder sends nothing when the picker is cancelled"` | covered |
 | UC-MAN-09.c | `handleSetRoot` validates dir, swaps root, re-places, re-snapshots; non-dir → `EditorErrorS2C` | `EditorNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `EditorNetworkRegistrySpec."handleSetRoot rejects a non-directory path with EditorErrorS2C"` | covered |
 | UC-MAN-09.d | *(Plan B)* old grid persists; region assignments accumulate; Attach not implemented | — | n/a |
-| UC-MAN-10 | Place, save, create, discard standalone `.nbt` structures + `.nbt.unsaved` dirty sidecar *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |
+| UC-MAN-10 | Place, save, create standalone `.nbt` structures; debounced auto-save + local history *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |
 
 **UI-caller gap (not a test gap):** UC-MAN-01/02/06/07/08's `.a` rows above are marked historical
 because their only client trigger (`ProjectScreen`/`ProjectRootListScreen`) was deleted in the

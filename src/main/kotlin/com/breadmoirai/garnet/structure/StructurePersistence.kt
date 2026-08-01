@@ -108,9 +108,6 @@ object StructurePersistence {
         return saveDir.listDirectoryEntries("*.nbt").map { it.nameWithoutExtension }
     }
 
-    /** `<name>.nbt` → adjacent `<name>.nbt.unsaved` dirty buffer (same directory). */
-    fun unsavedSidecarOf(file: Path): Path = file.resolveSibling("${file.fileName}.unsaved")
-
     /**
      * Writes [tag] to [file] crash-safely: to a same-directory temp file first, then an atomic (or
      * best-effort) move over the target. A plain `NbtIo.writeCompressed(tag, file)` truncates
@@ -181,32 +178,6 @@ object StructurePersistence {
         )
         val captured = captureAutoFitIn(level, scan)
         return captured.tag to captured.box
-    }
-
-    /**
-     * Captures the region and compares to the committed [file]; writes `<file>.unsaved` when they
-     * differ (or the committed file is missing), deletes the sidecar when they match. Returns true
-     * when the structure is now dirty (sidecar present).
-     */
-    fun flushUnsavedSidecar(
-        file: Path, level: ServerLevel, regionOrigin: BlockPos,
-        regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int,
-    ): Boolean {
-        val (capturedTag, _) = captureAutoFit(level, regionOrigin, regionSizeXZ, regionMinY, regionMaxY)
-        val committedTag = if (file.exists()) {
-            try { NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()) }
-            catch (e: IOException) { LOGGER.error("[StructurePersistence#flush] read '{}': {}", file, e.message); null }
-        } else null
-        val sidecar = unsavedSidecarOf(file)
-        val dirty = committedTag == null || structuresDiffer(committedTag, capturedTag)
-        if (dirty) {
-            sidecar.parent?.createDirectories()
-            try { NbtIo.writeCompressed(capturedTag, sidecar) }
-            catch (e: IOException) { LOGGER.error("[StructurePersistence#flush] write '{}': {}", sidecar, e.message) }
-        } else {
-            sidecar.deleteIfExists()
-        }
-        return dirty
     }
 
     /**

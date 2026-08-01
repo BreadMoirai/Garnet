@@ -59,11 +59,4 @@ class StructureDiffTest : FunSpec({
         val b = structureTag(Triple(2, 1, 1), listOf("minecraft:stone"), listOf(intArrayOf(0, 0, 0, 0)))
         structuresDiffer(a, b) shouldBe true
     }
-    test("unsavedSidecarOf appends .unsaved adjacent to the file") {
-        val f = java.nio.file.Path.of("/proj", "sub", "gadget.nbt")
-        val sc = com.breadmoirai.garnet.structure.StructurePersistence.unsavedSidecarOf(f)
-        sc.fileName.toString() shouldBe "gadget.nbt.unsaved"
-        sc.parent shouldBe f.parent
-        sc.fileName.toString().endsWith(".nbt") shouldBe false
-    }
 })

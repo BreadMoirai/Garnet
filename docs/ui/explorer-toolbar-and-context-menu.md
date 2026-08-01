@@ -73,22 +73,21 @@ loaded folder's own region), `structureBySubpath` (a standalone structure's assi
 `placedBoxes` (the last-placed footprint, used for cheap re-clearing). All three are keyed by
 subpath, so a rename that only moves the file on disk without touching the registry strands every
 entry under the OLD subpath: the structure's placed blocks become unreachable by the new name
-(`flushDirtyStructures` does `resolveSubpath(oldSubpath) ?: continue` and silently skips it
-forever), and a fresh `PlaceStructureC2S(newSubpath)` finds no registry entry and re-places a
-second copy in a brand-new region, orphaning the first in the world.
+(`StructureCommit.commit` resolves the subpath via `rootFor(server).resolveSubpath(subpath) ?:
+return null` and silently skips it forever), and a fresh `PlaceStructureC2S(newSubpath)` finds no
+registry entry and re-places a second copy in a brand-new region, orphaning the first in the world.
 
 `handleRename` handles two distinct shapes of this problem differently:
 
 - **The renamed node itself is a placed structure** (`registry.placedBoxOf(payload.subpath) !=
-  null`): an unload/reload, not a rekey. `handleRename` calls
-  `EditorDimRegistry.unplaceStructure(oldSubpath)` (clearing `structureBySubpath` and
-  `placedBoxes`), then re-places it under the new subpath via `placeStructureFrom` — which prefers
-  the `.nbt.unsaved` sidecar over the saved file when one exists (mirroring
-  `handlePlaceStructure`'s own preference), so a structure that is both placed *and* dirty
-  re-places from its unsaved edits rather than reverting to the last save. This lands the
-  structure in a freshly-assigned region (`nextStructureIndex` is monotonic and never recycled)
-  rather than reusing the old one — intended, matching how every other region assignment in the
-  registry behaves.
+  null`): an unload/reload, not a rekey. `handleRename` first commits any pending auto-save edits
+  for the OLD subpath through `StructureCommit.commit` — BEFORE the file move, since the dirty
+  state is keyed by subpath and moving first would strand it under a name nothing will ever commit
+  again — then calls `EditorDimRegistry.unplaceStructure(oldSubpath)` (clearing
+  `structureBySubpath` and `placedBoxes`), then re-places it under the new subpath via
+  `placeStructureFrom`. This lands the structure in a freshly-assigned region
+  (`nextStructureIndex` is monotonic and never recycled) rather than reusing the old one —
+  intended, matching how every other region assignment in the registry behaves.
 - **Descendants of a renamed folder** (a structure or sub-folder nested *under* the renamed path,
   not the renamed path itself): `EditorDimRegistry.rekeyForRename(oldSubpath, newSubpath)`
   rewrites every entry across all three maps whose subpath is `oldSubpath` or begins with
@@ -101,7 +100,8 @@ second copy in a brand-new region, orphaning the first in the world.
   runs, that case's exact-match key is already gone and only descendants remain to rekey.
 
 **The teardown must run only after the file move succeeds, never before.** `handleRename` moves the
-`.nbt` (and its `.nbt.unsaved` sidecar, if present) first, inside a `try`, and only calls
+`.nbt` first, inside a `try` — carrying its `LocalHistoryStore` revisions across via
+`LocalHistoryStore.moveHistory` — and only calls
 `EditorDimRegistry.unplaceStructure`/`rekeyForRename` in the success path afterward. A file move is
 an IO operation that can fail (a lock, a permission problem, a full disk) for reasons the server
 can't always predict up front. If the registry teardown ran first — clearing the placed blocks and

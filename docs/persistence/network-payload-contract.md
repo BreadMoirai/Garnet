@@ -21,14 +21,17 @@ block-entity handle at all: the client addresses everything by **path** and by *
 
 Unchanged in spirit from the old protocol. The client never writes to disk directly — every
 mutating action (`CreateFolderC2S`, `RenamePathC2S`, `NewStructureC2S`, `NewEditorSpecC2S`,
-`SaveStructureC2S`, `DiscardStructureC2S`, `SaveNowC2S`) is a request the server validates and
+`SaveStructureC2S`, `SaveNowC2S`) is a request the server validates and
 performs, replying with either the new state (`EditorTreeSnapshotS2C`, `StructureResultS2C`,
-`EditorFolderLoadedS2C`, `EditorSaveReportS2C`) or `EditorErrorS2C(reason)`.
+`EditorFolderLoadedS2C`, `EditorSaveReportS2C`) or `EditorErrorS2C(reason)`. `SaveStructureC2S` is
+a force-commit through `StructureCommit`, the same engine that drives auto-save — there is no
+`DiscardStructureC2S`; a placed structure auto-saves continuously, so there is nothing to discard
+back to (recovery goes through `LocalHistoryStore` instead, see `docs/persistence/local-history.md`).
 
 `StructureAutoSavedS2C(subpath, sizeX, sizeY, sizeZ, blockCount, savedAtMillis)` is the one
-clientbound payload here that is **not** a reply to a specific request: the auto-save commit path
-(structure edit debounce, not yet wired as of this writing) broadcasts it to every player, since a
-structure region is server-global and any player looking at it wants the update. The client
+clientbound payload here that is **not** a reply to a specific request: `StructureCommit` broadcasts
+it to every player on every successful commit (debounced auto-save or a forced `SaveStructureC2S`),
+since a structure region is server-global and any player looking at it wants the update. The client
 handler (`ProjectTreeState.onAutoSaved`) only renders `subpath`/`sizeX`/`sizeY`/`sizeZ`/`blockCount`
 into the Explorer status line today; `blockCount` and `savedAtMillis` are carried for a structure
 info panel that consumes this same packet later.
@@ -51,7 +54,7 @@ fun resolveSubpath(subpath: String): Path? {
 ```
 
 Every handler in `EditorNetworking` that takes a client-supplied subpath (`LoadEditorFolderC2S`,
-`PlaceStructureC2S`, `SaveStructureC2S`, `DiscardStructureC2S`, `RenamePathC2S`,
+`PlaceStructureC2S`, `SaveStructureC2S`, `RenamePathC2S`,
 `NewStructureC2S.parentSubpath`, `CreateFolderC2S.parentSubpath`) calls this before touching the
 filesystem, and replies with `EditorErrorS2C("... not found or escapes root: ...")` on a `null`.
 Three things this rejects: an absolute path, a `..`-relative escape, and a symlink that resolves

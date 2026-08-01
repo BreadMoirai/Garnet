@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
@@ -158,29 +157,6 @@ object StructureCommit {
         LocalHistoryStore.prune(file)
 
         captured.box?.let { registry.setPlacedBox(subpath, it) }
-        // A stale .nbt.unsaved sidecar must not silently win on the next place — see fix round 1 /
-        // Finding 5. The committed .nbt now already reflects everything the sidecar could offer.
-        //
-        // Interaction note (fix round 2): if an edit the setBlock-mixin watcher never saw (e.g. a
-        // 4-arg setBlock or a direct LevelChunk.setBlockState write) landed OUTSIDE this commit's
-        // bounded scan box, it is currently visible only via the transitional flushDirtyStructures
-        // sidecar (see Finding 4 / BEFORE_SAVE). This bounded capture excludes that block and then
-        // deletes the sidecar describing it. That edit is not permanently lost — the block itself
-        // is still standing in the region, and the next BEFORE_SAVE's flushDirtyStructures re-diffs
-        // the whole region against the now-updated .nbt and recreates the sidecar — but it is
-        // momentarily unrepresented until that next world-save, and would be dropped for good if a
-        // place/discard intervened first. Task 7 removes this whole interaction along with the
-        // sidecar itself.
-        try {
-            StructurePersistence.unsavedSidecarOf(file).deleteIfExists()
-        } catch (e: IOException) {
-            // Never let an undeletable sidecar (locked file, read-only dir) escape uncaught here:
-            // tick() runs this inside the END_SERVER_TICK handler, which Fabric does not guard, so
-            // an uncaught IOException at this point would crash the server rather than just leaving
-            // a harmless stale sidecar behind. The .nbt write itself already succeeded and is not
-            // affected either way.
-            LOGGER.error("[StructureCommit] delete stale sidecar for '{}': {}", file, e.message)
-        }
         autoSave.clear(subpath)
         clearBackoff(server, subpath)
 
@@ -209,9 +185,12 @@ object StructureCommit {
 
     /**
      * Backstop flush: commit every dirty structure regardless of debounce/backoff timing. Used on
-     * world-save and server stop. (Rename/unplace are NOT wired to this yet — that is Task 7's job;
-     * today `handleRename`/`handleDiscardStructure` call nothing here, so a structure renamed while
-     * dirty currently strands its old-subpath dirty entry rather than committing it first.)
+     * world-save and server stop. `EditorNetworking.handleRename` also calls [commit] directly
+     * (not this batch form) for the single structure being renamed, BEFORE moving its file — this
+     * is what keeps a rename from stranding a dirty entry under a subpath nothing will ever commit
+     * again. There is no separate unplace path any more: `handleDiscardStructure` was removed along
+     * with the sidecar model, and `handleRename` is the only caller of
+     * [EditorDimRegistry.unplaceStructure], already covered above.
      */
     fun commitAll(server: MinecraftServer, reason: String) {
         val autoSave = StructureAutoSave.of(server)

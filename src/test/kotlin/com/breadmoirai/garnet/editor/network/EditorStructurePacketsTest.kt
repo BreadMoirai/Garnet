@@ -1,7 +1,6 @@
 package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
-import com.breadmoirai.garnet.editor.network.DiscardStructureC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
@@ -53,14 +52,8 @@ class EditorStructurePacketsTest : FunSpec({
     }
     test("StructureResultS2C codec round-trips") {
         val buf = Unpooled.buffer()
-        val orig = StructureResultS2C("a/b.nbt", 2, 1, 3, hasUnsaved = true, message = "placed a/b.nbt — unsaved changes")
+        val orig = StructureResultS2C("a/b.nbt", 2, 1, 3, message = "placed a/b.nbt")
         StructureResultS2C.STREAM_CODEC.encode(buf, orig)
         StructureResultS2C.STREAM_CODEC.decode(buf) shouldBe orig
-    }
-    test("DiscardStructureC2S codec round-trips") {
-        val buf = Unpooled.buffer()
-        val orig = DiscardStructureC2S("a/b.nbt")
-        DiscardStructureC2S.STREAM_CODEC.encode(buf, orig)
-        DiscardStructureC2S.STREAM_CODEC.decode(buf) shouldBe orig
     }
 })

@@ -13,7 +13,7 @@ The prefix list is closed: `PER` (persistence), `NET` (networking), `MAN` (redst
 ## Articles
 
 - [Persistence](persistence.md) — `.spec.kts` save/load, directory scan, script-host errors. (Structure `.nbt` sidecar UCs moved to structure-lifecycle.md.) Tags: storage, kts, scripting.
-- [Structure lifecycle](structure-lifecycle.md) — `.nbt` save/load on both paths, `.nbt.unsaved` dirty tracking, save-vs-discard (UC-MAN-10, UC-PER-06/07). Tags: structure, dirty-state, save, revert, sidecar.
+- [Structure lifecycle](structure-lifecycle.md) — `.nbt` save/load on both paths, standalone-`.nbt` debounced auto-save with local history (UC-MAN-10, UC-PER-06/07). Tags: structure, autosave, save, history.
 - [Networking](networking.md) — UNREACHABLE: documents the deleted recorder/runner C2S/S2C protocol, kept as a design spec for a future dock panel. Tags: payloads, sync, authority, unreachable.
 - [Redstone project](redstone-project.md) — Void-dim workspace, grid placement, folder-tree, per-spec save-back. (Standalone `.nbt` structures moved to structure-lifecycle.md.) Tags: redstone-project, dimensions, grid.
 - [Command surface](command.md) — `/garnet project` dispatcher. Tags: command, dispatch.

@@ -30,7 +30,6 @@ import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
-import kotlin.io.path.writeBytes
 
 /**
  * Dirty-state bookkeeping only — the commit itself is covered by the network-level tests once
@@ -523,55 +522,6 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // Forget both so no state leaks past this test.
                     StructureAutoSave.of(this).clear("brokenhist.nbt")
                     StructureCommit.clearBackoff(this, "brokenhist.nbt")
-                }
-            } finally {
-                SharedSettings.structureRegionChunks = prevChunks
-                SharedSettings.localHistoryDir = prevHistDir
-                histDir.toFile().deleteRecursively()
-            }
-        }
-    }
-
-    test("a successful commit deletes the .nbt.unsaved sidecar") {
-        withTempRoot("autosave-sidecar") { tmp ->
-            val prevChunks = SharedSettings.structureRegionChunks
-            val prevHistDir = SharedSettings.localHistoryDir
-            SharedSettings.structureRegionChunks = 1
-            val histDir = kotlin.io.path.createTempDirectory("autosave-sidecar-hist")
-            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
-            EditorNewStructure.create(tmp, "sidecar")
-            try {
-                onServer {
-                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
-                    val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("sidecar.nbt"))
-                    drainPayloads(player)
-
-                    val file = tmp.resolve("sidecar.nbt")
-                    val sidecar = StructurePersistence.unsavedSidecarOf(file)
-                    // A stale sidecar left over from the old dirty-buffer path (e.g. from before
-                    // this world upgraded to auto-save). Content doesn't matter for this test --
-                    // only that a successful commit must not leave it behind to silently win on a
-                    // future place.
-                    sidecar.writeBytes(byteArrayOf(1, 2, 3))
-                    sidecar.exists() shouldBe true
-
-                    val registry = EditorDimRegistry.of(this)
-                    val region = registry.structureRegionOriginOf("sidecar.nbt")!!
-                    val lvl = overworld()
-                    val width = SharedSettings.structureRegionChunks * 16
-                    StructurePersistence.clearBounds(
-                        lvl, BlockPos(region.x, lvl.minY, region.z),
-                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
-                    )
-                    val edited = region.offset(1, 0, 1)
-                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
-                    StructureEditWatcher.onBlockChanged(lvl, edited)
-
-                    StructureCommit.commit(this, "sidecar.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldNotBeNull()
-
-                    sidecar.exists() shouldBe false
                 }
             } finally {
                 SharedSettings.structureRegionChunks = prevChunks

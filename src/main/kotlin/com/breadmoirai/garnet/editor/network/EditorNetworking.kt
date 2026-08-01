@@ -18,7 +18,6 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
-import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
@@ -56,7 +55,6 @@ object EditorNetworking {
         PayloadTypeRegistry.serverboundPlay().register(NewStructureC2S.TYPE, NewStructureC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(CreateFolderC2S.TYPE, CreateFolderC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(RenamePathC2S.TYPE, RenamePathC2S.STREAM_CODEC)
-        PayloadTypeRegistry.serverboundPlay().register(DiscardStructureC2S.TYPE, DiscardStructureC2S.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorTreeSnapshotS2C.TYPE, EditorTreeSnapshotS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorFolderLoadedS2C.TYPE, EditorFolderLoadedS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorSaveReportS2C.TYPE, EditorSaveReportS2C.STREAM_CODEC)
@@ -96,9 +94,6 @@ object EditorNetworking {
         }
         ServerPlayNetworking.registerGlobalReceiver(RenamePathC2S.TYPE) { payload, ctx ->
             ctx.server().execute { handleRename(ctx.server(), ctx.player(), payload) }
-        }
-        ServerPlayNetworking.registerGlobalReceiver(DiscardStructureC2S.TYPE) { payload, ctx ->
-            ctx.server().execute { handleDiscardStructure(ctx.server(), ctx.player(), payload) }
         }
     }
 
@@ -188,7 +183,7 @@ object EditorNetworking {
 
     private fun placeStructureFrom(
         server: MinecraftServer, player: ServerPlayer, subpath: String,
-        source: Path, hasUnsaved: Boolean, message: String,
+        source: Path, message: String,
     ) {
         val registry = EditorDimRegistry.of(server)
         val level = registry.projectLevel()
@@ -211,7 +206,7 @@ object EditorNetworking {
             emptySet<Relative>(), player.yRot, player.xRot, true,
         )
         ServerPlayNetworking.send(player, StructureResultS2C(
-            subpath, placed.size.x, placed.size.y, placed.size.z, hasUnsaved, message,
+            subpath, placed.size.x, placed.size.y, placed.size.z, message,
         ))
     }
 
@@ -239,64 +234,31 @@ object EditorNetworking {
                 )
             }
         }
-        val sidecar = StructurePersistence.unsavedSidecarOf(file)
-        val hasUnsaved = sidecar.exists()
-        val source = if (hasUnsaved) sidecar else file
-        val message = if (hasUnsaved) "placed ${payload.subpath} — unsaved changes" else "placed ${payload.subpath}"
-        placeStructureFrom(server, player, payload.subpath, source, hasUnsaved, message)
+        placeStructureFrom(server, player, payload.subpath, file, "placed ${payload.subpath}")
     }
 
     fun handleSaveStructure(server: MinecraftServer, player: ServerPlayer, payload: SaveStructureC2S) {
         val root = rootFor(server) ?: run {
             ServerPlayNetworking.send(player, EditorErrorS2C("project-root not configured")); return
         }
-        val file = root.resolveSubpath(payload.subpath) ?: run {
+        if (root.resolveSubpath(payload.subpath) == null) {
             ServerPlayNetworking.send(player, EditorErrorS2C("subpath not found or escapes root: ${payload.subpath}")); return
         }
         if (!payload.subpath.endsWith(".nbt")) {
             ServerPlayNetworking.send(player, EditorErrorS2C("not a structure file: ${payload.subpath}")); return
         }
-        val registry = EditorDimRegistry.of(server)
-        if (registry.placedBoxOf(payload.subpath) == null) {
+        if (EditorDimRegistry.of(server).placedBoxOf(payload.subpath) == null) {
             ServerPlayNetworking.send(player, EditorErrorS2C("place the structure before saving: ${payload.subpath}"))
             return
         }
-        val level = registry.projectLevel()
-        val origin = registry.getOrAssignStructureRegion(payload.subpath)
-        val width = SharedSettings.structureRegionChunks * 16
-        val box = StructurePersistence.saveAutoFitToFile(file, level, origin, width, level.minY, level.maxY)
-        val size = box?.size ?: Vec3i(0, 0, 0)
-        if (box != null) registry.setPlacedBox(payload.subpath, box)
-        StructurePersistence.unsavedSidecarOf(file).deleteIfExists()
-        val msg = if (box == null) "saved ${payload.subpath} (empty)"
-                  else "saved ${payload.subpath} (${size.x}×${size.y}×${size.z})"
-        ServerPlayNetworking.send(player, StructureResultS2C(payload.subpath, size.x, size.y, size.z, false, msg))
-    }
-
-    fun handleDiscardStructure(server: MinecraftServer, player: ServerPlayer, payload: DiscardStructureC2S) {
-        val root = rootFor(server) ?: run {
-            ServerPlayNetworking.send(player, EditorErrorS2C("project-root not configured")); return
-        }
-        val file = root.resolveSubpath(payload.subpath) ?: run {
-            ServerPlayNetworking.send(player, EditorErrorS2C("subpath not found or escapes root: ${payload.subpath}")); return
-        }
-        if (!payload.subpath.endsWith(".nbt")) {
-            ServerPlayNetworking.send(player, EditorErrorS2C("not a structure file: ${payload.subpath}")); return
-        }
-        StructurePersistence.unsavedSidecarOf(file).deleteIfExists()
-        placeStructureFrom(server, player, payload.subpath, file, false, "discarded ${payload.subpath}")
-    }
-
-    /** Capture each placed structure's region on world-save, writing/deleting its `.nbt.unsaved`. */
-    fun flushDirtyStructures(server: MinecraftServer) {
-        val root = rootFor(server) ?: return
-        val registry = EditorDimRegistry.of(server)
-        val level = registry.projectLevel()
-        val width = SharedSettings.structureRegionChunks * 16
-        for (subpath in registry.placedStructureSubpaths()) {
-            val file = root.resolveSubpath(subpath) ?: continue
-            val origin = registry.structureRegionOriginOf(subpath) ?: continue
-            StructurePersistence.flushUnsavedSidecar(file, level, origin, width, level.minY, level.maxY)
+        val result = StructureCommit.commit(server, payload.subpath, LocalHistoryStore.REASON_MANUAL)
+        if (result == null) {
+            // Nothing to write: the region already matches the committed file.
+            ServerPlayNetworking.send(player, StructureResultS2C(
+                payload.subpath, 0, 0, 0, "no changes to save: ${payload.subpath}",
+            ))
+        } else {
+            StructureCommit.broadcast(server, result)
         }
     }
 
@@ -364,18 +326,21 @@ object EditorNetworking {
         // down the placed-structure state (clearing its blocks, dropping its registry keys) before
         // the move is confirmed would leave the structure's blocks erased and its registry entry gone
         // while the player is told the rename failed and the (untouched, still-old-named) file sits
-        // there unrecoverably out of sync with the world. Only touch that state once the file (and
-        // its sidecar) have actually moved.
+        // there unrecoverably out of sync with the world. Only touch that state once the move is
+        // confirmed.
         val registry = EditorDimRegistry.of(server)
         val wasPlaced = registry.placedBoxOf(payload.subpath)
+
+        // Commit before the move: the dirty box is keyed by subpath, so moving first would strand
+        // the edits under a name nothing will ever commit again.
+        if (wasPlaced != null) StructureCommit.commit(server, payload.subpath, LocalHistoryStore.REASON_AUTOSAVE)
 
         val target = parent.resolve(newName)
         try {
             source.moveTo(target)
-            // The dirty buffer lives beside the .nbt as "<name>.nbt.unsaved"; leaving it behind
-            // would silently detach a structure's unsaved edits from the structure.
-            val sidecar = StructurePersistence.unsavedSidecarOf(source)
-            if (sidecar.exists()) sidecar.moveTo(StructurePersistence.unsavedSidecarOf(target))
+            // History is keyed by the file's absolute path, so a rename must carry it across or the
+            // structure silently loses every revision it has accumulated.
+            LocalHistoryStore.moveHistory(source, target)
         } catch (e: Exception) {
             LOGGER.error("[project/rename] {} -> {}: {}", payload.subpath, newSubpath, e.message, e)
             ServerPlayNetworking.send(player, EditorErrorS2C("rename failed: ${e.message}")); return
@@ -387,16 +352,7 @@ object EditorNetworking {
         }
 
         if (wasPlaced != null) {
-            // Mirror handlePlaceStructure: prefer the just-moved ".nbt.unsaved" sidecar over the saved
-            // file. The move above already relocated the sidecar alongside the renamed file, so a
-            // dirty structure must re-place FROM that sidecar and report hasUnsaved = true — otherwise
-            // the world repaints from the stale saved .nbt, and the next flushDirtyStructures captures
-            // that reverted region right back over the sidecar, permanently losing the unsaved edits.
-            val sidecar = StructurePersistence.unsavedSidecarOf(target)
-            val hasUnsaved = sidecar.exists()
-            val source = if (hasUnsaved) sidecar else target
-            val message = if (hasUnsaved) "renamed to $newSubpath — unsaved changes" else "renamed to $newSubpath"
-            placeStructureFrom(server, player, newSubpath, source, hasUnsaved, message)
+            placeStructureFrom(server, player, newSubpath, target, "renamed to $newSubpath")
         }
 
         // Rekey every OTHER registry entry nested under the renamed path (e.g. structures placed

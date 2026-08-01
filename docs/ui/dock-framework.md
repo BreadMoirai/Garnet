@@ -214,9 +214,10 @@ rows. The pattern:
   `PlaceStructureC2S(path)` to place the standalone structure centered in its auto-assigned region.
   The Refresh `IconButton` sends `ListEditorTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh
   unit payload — see `EditorPackets`). `TreeRow` prefixes a row's label with `●` when the row's
-  path equals `snapshot.currentSubpath` or (for a `.nbt` file) `node.hasUnsaved` is true, and shows
+  path equals `snapshot.currentSubpath`, and shows
   a Jewel `AllIconsKeys` icon per node kind (`Nodes.Folder`, `FileTypes.Archive` for `.nbt`,
-  `FileTypes.Text` otherwise).
+  `FileTypes.Text` otherwise). There is no per-node dirty flag any more — a `.nbt`'s auto-save
+  state lives server-side (`StructureAutoSave`), not in the tree.
 - **`ExplorerToolbar()`** is the panel's single top row (replacing the earlier root-name `Dropdown`
   header plus a separate `StructureActions()` "+ New"/"Save"/"Discard" row): a kebab `IconButton`
   (`AllIconsKeys.Actions.More` — the *vertical* three-dot kebab; `Actions.MoreHorizontal` is a
@@ -231,9 +232,11 @@ rows. The pattern:
   full `ExplorerContextMenu`/inline-field write-up. `NewStructureC2S` was reshaped to
   `NewStructureC2S(parentSubpath, name)` (folder-targeted, not session-active-folder-targeted) and
   `CreateFolderC2S`/`RenamePathC2S` are new alongside it; all three are handled in
-  `EditorNetworking` and covered by client and gametest specs. **`Save`/`Discard` still have no
-  client UI trigger** — `SaveStructureC2S`/`DiscardStructureC2S` remain fully wired server-side and
-  covered by `EditorStructureNetworkSpec`, with no tree-row action that sends them yet.
+  `EditorNetworking` and covered by client and gametest specs. **`Save` still has no
+  client UI trigger** — `SaveStructureC2S` (a force-commit through `StructureCommit`) remains fully
+  wired server-side and covered by `EditorStructureNetworkSpec`, with no tree-row action that sends
+  it yet. There is no `Discard` any more: a placed structure auto-saves continuously, so there is
+  nothing to discard back to — see `docs/persistence/local-history.md` for the rollback path.
   `StructureResultS2C` still surfaces through `ProjectTreeState.onStructureResult` into the same
   status line as folder load/save results whenever those packets fire (e.g. from gametest
   coverage). See

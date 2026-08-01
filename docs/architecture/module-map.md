@@ -64,14 +64,28 @@ Construction is via `garnetSpec(id) { … }`.
 ## `structure/` — structure NBT + region math
 
 - `StructurePersistence.kt` — compressed-NBT structure template save/load (`save`/`load`,
-  origin-fixed 1:1) and the standalone-file path (`saveAutoFitToFile`/`placeStructureCentered`,
-  auto-fit + re-center), plus the `.nbt.unsaved` dirty-sidecar helpers
-  (`unsavedSidecarOf`/`flushUnsavedSidecar`) used only by the Explorer's standalone-`.nbt` flow.
+  origin-fixed 1:1), the standalone-file path (`saveAutoFitToFile`/`placeStructureCentered`,
+  auto-fit + re-center), the crash-safe `writeStructureAtomic`, and `captureAutoFitIn` (the
+  bounded-volume capture `StructureCommit` uses for auto-save).
 - `StructureDiff.kt` — palette-order-insensitive NBT comparison (`structuresDiffer`) used to
-  decide whether a placed structure is actually dirty.
+  decide whether a commit's captured content actually changed vs. the committed `.nbt`.
 - `StructureRegionMath.kt` — `centeredStart`/`anchorY`/`autoFit`: pure geometry for centering and
   tight-boxing a structure inside an assigned region.
 - `PlacedBox.kt` — `(origin, size)` record for a structure's last-placed footprint.
+
+## `editor/world/` — auto-save
+
+- `StructureAutoSave.kt` — per-server dirty-state tracking (fed by the setBlock-mixin watcher):
+  which subpaths are dirty, their touched-box, and debounce due-time.
+- `StructureEditWatcher.kt` — records an in-world edit against the placed structure it lands in.
+- `StructureCommit.kt` — turns a structure's dirty state into a committed `.nbt` plus a
+  `LocalHistoryStore` revision; see [redstone-project.md](redstone-project.md#standalone-structure-files).
+
+## `history/` — local history for standalone structures
+
+- `LocalHistoryStore.kt` — writes/prunes/lists per-structure revisions under
+  `<instance>/.garnet/local-history`, keyed by the structure file's own absolute path. See
+  `docs/persistence/local-history.md`.
 
 ## `config/`
 
