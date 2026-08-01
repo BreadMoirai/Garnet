@@ -120,14 +120,17 @@ had rather than overwriting it, and if any individual revision fails to move, th
 only that one) is left behind at the source rather than the whole move being treated as
 all-or-nothing.
 
-## `blockCount` is `0` on a `placed` baseline revision
+## `blockCount` is `0` on `placed` and `external` revisions
 
 When a structure is placed into the world, `EditorNetworking` writes an initial revision tagged
 `REASON_PLACED` with `blockCount = 0`. This isn't a bug: block count is only knowable by scanning
 the placed volume, and at the moment of placement nothing has been scanned yet — the structure is
-being written *into* the world from its `.nbt`, not captured *out of* it. Every subsequent revision
-(`REASON_AUTOSAVE` or `REASON_MANUAL`, written by `StructureCommit`) carries a real `blockCount`
-because those are written from a `CapturedStructure` produced by scanning the world.
+being written *into* the world from its `.nbt`, not captured *out of* it. `StructureCommit` writes
+`blockCount = 0` for the same reason on a `REASON_EXTERNAL` revision (see "Out-of-band edits are
+banked too" above): that content comes from reading the on-disk `.nbt` tag directly, not from
+scanning a placed volume, so no block count is available either. Only `REASON_AUTOSAVE` and
+`REASON_MANUAL` revisions — also written by `StructureCommit` — carry a real `blockCount`, because
+those are written from a `CapturedStructure` produced by scanning the world.
 
 ## The only writer
 

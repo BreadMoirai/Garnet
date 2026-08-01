@@ -127,9 +127,11 @@ object StructureCommit {
      * the dirty flag:
      * 1. not placed (`registry.placedBoxOf(subpath) == null`) — genuinely nothing left to commit.
      *    There is no world content standing by; the dirty flag is cleared unconditionally. This is
-     *    safe because `handleRename` is the only caller of [EditorDimRegistry.unplaceStructure]
-     *    repo-wide, and it commits every dirty subpath under the rename (aborting the whole rename
-     *    on [Failed]) BEFORE unplacing — so a dirty key never survives into an unplace.
+     *    safe because both repo-wide callers of [EditorDimRegistry.unplaceStructure] —
+     *    `EditorNetworking.handleRename` (per-subpath, aborting the whole rename on [Failed]) and
+     *    `EditorNetworking.handleSetRoot` (a [commitAll] flush of the OLD root before the swap) —
+     *    commit every dirty subpath first and only unplace afterward — so a dirty key never survives
+     *    into an unplace.
      * 2. no root (`EditorNetworking.rootFor(server) == null`) or no file
      *    (`root.resolveSubpath(subpath) == null`, which fails whenever the candidate file doesn't
      *    currently exist on disk) — while the structure IS still placed. Root/file resolution
@@ -293,8 +295,10 @@ object StructureCommit {
      * under a subpath nothing will ever commit again (Task 7 fix round 1 / Finding 1), and aborts
      * the whole rename without touching the filesystem if any of those commits genuinely fails
      * (Finding 2). There is no separate unplace path any more: `handleDiscardStructure` was removed
-     * along with the sidecar model, and `handleRename` is the only caller of
-     * [EditorDimRegistry.unplaceStructure], already covered above.
+     * along with the sidecar model. [EditorDimRegistry.unplaceStructure] has two callers repo-wide —
+     * `handleRename`, above, and `handleSetRoot`, which calls this very method ([commitAll]) to flush
+     * the OLD root before unplacing every previously-placed subpath during a root swap — and both
+     * commit dirty state before unplacing, already covered above.
      */
     fun commitAll(server: MinecraftServer, reason: String) {
         val autoSave = StructureAutoSave.of(server)
