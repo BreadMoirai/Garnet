@@ -18,9 +18,14 @@ capture, place, dirty-state tracking, explicit save, and revert. Two code paths 
 
 **Dirty-state** is a first-class concept only on the standalone path: an in-progress edit is buffered
 to a `<name>.nbt.unsaved` sidecar next to the committed `<name>.nbt`. "Save Structure" commits and
-deletes the sidecar; "Discard" deletes the sidecar and re-places from the committed file; a world-save
-(`BEFORE_SAVE`) flushes the live region to (or deletes) the sidecar. The committed `.nbt` is never
-touched except by an explicit save. See
+deletes the sidecar; "Discard" deletes the sidecar and re-places from the committed file.
+`EditorNetworking.flushDirtyStructures` (the sidecar flush) still exists but is no longer wired to
+`ServerLifecycleEvents.BEFORE_SAVE` as of the debounced auto-save work: `BEFORE_SAVE`,
+`ServerTickEvents.END_SERVER_TICK`, and `SERVER_STOPPED` now drive `StructureCommit`, which commits
+a placed structure's `<name>.nbt` directly (with a `LocalHistoryStore` revision) once its edits go
+quiet — see `docs/superpowers/specs/2026-07-31-structure-autosave-local-history-design.md` for the
+design. The `.nbt.unsaved` sidecar path is slated for removal once that migration completes; until
+then both mechanisms coexist. See
 [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
 and [persistence/spec-on-disk-format.md](../persistence/spec-on-disk-format.md).
 

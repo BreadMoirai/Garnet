@@ -1,15 +1,20 @@
 package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.data.*
 import com.breadmoirai.garnet.editor.world.*
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.Vec3i
+import net.minecraft.core.registries.Registries
+import net.minecraft.nbt.NbtAccounter
+import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Relative
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
@@ -24,7 +29,12 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 object EditorNetworking {
 
-    private fun rootFor(server: MinecraftServer): EditorRoot? {
+    /**
+     * The active managed root: the loaded world's, else a pinned server context's, else the
+     * configured path. Public because [com.breadmoirai.garnet.editor.world.StructureCommit] resolves
+     * subpaths through the same rule.
+     */
+    fun rootFor(server: MinecraftServer): EditorRoot? {
         val world = EditorWorld.get(server)
         if (world != null) return world.root
         val ctx = EditorServerContext.get(server)
@@ -214,6 +224,20 @@ object EditorNetworking {
         }
         if (!payload.subpath.endsWith(".nbt")) {
             ServerPlayNetworking.send(player, EditorErrorS2C("not a structure file: ${payload.subpath}")); return
+        }
+        // Seed the pre-edit baseline so a rollback target exists from the moment the structure is
+        // opened, not only after the first auto-save.
+        if (file.exists()) {
+            val tag = runCatching { NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()) }.getOrNull()
+            if (tag != null && LocalHistoryStore.revisions(file).isEmpty()) {
+                val template = StructureTemplate()
+                template.load(server.registryAccess().lookupOrThrow(Registries.BLOCK), tag)
+                val size = template.size
+                LocalHistoryStore.writeRevision(
+                    file, tag, size.x, size.y, size.z,
+                    blockCount = 0, reason = LocalHistoryStore.REASON_PLACED,
+                )
+            }
         }
         val sidecar = StructurePersistence.unsavedSidecarOf(file)
         val hasUnsaved = sidecar.exists()

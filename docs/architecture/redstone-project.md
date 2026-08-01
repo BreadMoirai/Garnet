@@ -185,11 +185,22 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
 - **Dirty sidecar lifecycle:** placing a `.nbt` prefers its `.nbt.unsaved` sidecar when present
   (`StructurePersistence.unsavedSidecarOf`) and reports `hasUnsaved = true`; "Save Structure"
   writes the committed `.nbt` and deletes the sidecar; "Discard" deletes the sidecar and
-  re-places from the committed `.nbt`. On `ServerLifecycleEvents.BEFORE_SAVE`,
-  `EditorNetworking.flushDirtyStructures` captures every placed structure's region into its
-  sidecar via `StructurePersistence.flushUnsavedSidecar` (world-save is the only auto-persist
-  point for in-progress structure edits — there is no autosave on disconnect, matching UC-MAN-07).
-  `EditorDimRegistry.placedStructureSubpaths()` is the set flushed each world-save.
+  re-places from the committed `.nbt`. `EditorNetworking.flushDirtyStructures` (writing the
+  sidecar via `StructurePersistence.flushUnsavedSidecar`) still exists and is callable directly,
+  but is no longer wired to `ServerLifecycleEvents.BEFORE_SAVE`.
+  `EditorDimRegistry.placedStructureSubpaths()` remains the set it iterates when called.
+- **Debounced auto-save + local history (superseding auto-persist):** `StructureCommit` is now
+  the auto-persist path. `ServerTickEvents.END_SERVER_TICK` calls `StructureCommit.tick`, which
+  commits any placed structure whose `StructureAutoSave` dirty state has gone quiet for
+  `SharedSettings.autoSaveDebounceTicks` (or has been continuously dirty for
+  `autoSaveMaxDirtyTicks`); `ServerLifecycleEvents.BEFORE_SAVE` and `SERVER_STOPPED` both call
+  `StructureCommit.commitAll` as a backstop flush regardless of timing. A commit scans only
+  `union(placedBox, dirtyBox)` via `StructurePersistence.captureAutoFitIn` — never the full
+  144×full-height region — writes the `.nbt` directly, records a `LocalHistoryStore` revision,
+  and broadcasts `StructureAutoSavedS2C`. `SERVER_STOPPED` also calls `StructureAutoSave.dispose`
+  so per-server dirty state cannot leak across server lifecycles. The `.nbt.unsaved` sidecar
+  mechanism above still runs alongside this (removal is a later step in the same effort); see
+  `docs/superpowers/specs/2026-07-31-structure-autosave-local-history-design.md`.
 
 ## Where to start reading
 

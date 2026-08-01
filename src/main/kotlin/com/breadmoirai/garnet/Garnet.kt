@@ -7,11 +7,15 @@ import com.breadmoirai.garnet.editor.command.EditorCommand
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.world.StructureAutoSave
+import com.breadmoirai.garnet.editor.world.StructureCommit
+import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.mc.McLifecycle
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import com.breadmoirai.garnet.editor.data.EditorSession
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -45,10 +49,15 @@ class Garnet : ModInitializer {
             EditorDimLifecycle.placeAll(server, ctx.root)
         }
         ServerLifecycleEvents.SERVER_STOPPED.register { server ->
+            StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+            StructureAutoSave.dispose(server)
             EditorDimLifecycle.releaseServerState(server)
         }
+        ServerTickEvents.END_SERVER_TICK.register { server ->
+            StructureCommit.tick(server)
+        }
         ServerLifecycleEvents.BEFORE_SAVE.register { server, _, _ ->
-            EditorNetworking.flushDirtyStructures(server)
+            StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
         }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             EditorCommand.register(dispatcher)
