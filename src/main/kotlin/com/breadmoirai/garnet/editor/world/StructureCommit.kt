@@ -36,8 +36,16 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
  * on disk — if that revision write fails for a reason other than history being off. If the
  * subsequent `.nbt` write itself then fails, the just-written revision is rolled back
  * ([LocalHistoryStore.discardRevision]) so a structure that can never actually commit does not
- * accumulate one indistinguishable revision per retry (fix round 1 / Finding 1b) and eventually
- * prune away its own genuine history.
+ * accumulate one indistinguishable revision per retry.
+ *
+ * **Pruning invariant (fix round 2 / Finding 1b):** a failed attempt must cause NO net loss of
+ * genuine history, at any revision count — including at/above
+ * [com.breadmoirai.garnet.config.SharedSettings.localHistoryMaxRevisions]. The speculative revision
+ * write above therefore passes `prune = false`: it appends without ever deleting an older blob.
+ * Only once the `.nbt` rewrite has actually succeeded does [commit] call
+ * [LocalHistoryStore.prune] to apply the age/count cap — so a real, kept write still prunes
+ * normally, but a rolled-back failed attempt never triggers a prune at all and is a complete no-op
+ * against the rest of the structure's history.
  */
 object StructureCommit {
 
@@ -55,7 +63,13 @@ object StructureCommit {
     private fun backoffMap(server: MinecraftServer): ConcurrentHashMap<String, Long> =
         retryAfter.getOrPut(server) { ConcurrentHashMap() }
 
-    private fun clearBackoff(server: MinecraftServer, subpath: String) {
+    /**
+     * Drop [subpath]'s failure-backoff entry. Called internally on a no-op or successful commit;
+     * also public as a test/administrative seam for forgetting a failure without a real commit
+     * (e.g. a test that deliberately leaves a structure dirty must also forget any backoff it
+     * triggered, or a later, unrelated test sharing the same server would inherit it).
+     */
+    fun clearBackoff(server: MinecraftServer, subpath: String) {
         backoffMap(server).remove(subpath)
     }
 
@@ -117,8 +131,10 @@ object StructureCommit {
         // cannot recover this content if the rewrite below goes wrong, so we abort without touching
         // the .nbt at all.
         val historyEnabled = SharedSettings.localHistoryEnabled
+        // prune = false: see the pruning invariant on this object's KDoc. A failed attempt must
+        // not touch older revisions; only a write that actually lands (below) prunes.
         val revision = LocalHistoryStore.writeRevision(
-            file, captured.tag, size.x, size.y, size.z, captured.blockCount, reason,
+            file, captured.tag, size.x, size.y, size.z, captured.blockCount, reason, prune = false,
         )
         if (historyEnabled && revision == null) {
             onCommitFailure(server, subpath, now, "history write failed for '$subpath' ($file) — .nbt left untouched")
@@ -136,10 +152,35 @@ object StructureCommit {
             return null
         }
 
+        // The write landed: this revision is now confirmed worth keeping, so it's safe to apply
+        // the age/count cap (which may delete OLDER blobs) without risking data a failed attempt
+        // would have had no business touching. See the pruning invariant on this object's KDoc.
+        LocalHistoryStore.prune(file)
+
         captured.box?.let { registry.setPlacedBox(subpath, it) }
         // A stale .nbt.unsaved sidecar must not silently win on the next place — see fix round 1 /
         // Finding 5. The committed .nbt now already reflects everything the sidecar could offer.
-        StructurePersistence.unsavedSidecarOf(file).deleteIfExists()
+        //
+        // Interaction note (fix round 2): if an edit the setBlock-mixin watcher never saw (e.g. a
+        // 4-arg setBlock or a direct LevelChunk.setBlockState write) landed OUTSIDE this commit's
+        // bounded scan box, it is currently visible only via the transitional flushDirtyStructures
+        // sidecar (see Finding 4 / BEFORE_SAVE). This bounded capture excludes that block and then
+        // deletes the sidecar describing it. That edit is not permanently lost — the block itself
+        // is still standing in the region, and the next BEFORE_SAVE's flushDirtyStructures re-diffs
+        // the whole region against the now-updated .nbt and recreates the sidecar — but it is
+        // momentarily unrepresented until that next world-save, and would be dropped for good if a
+        // place/discard intervened first. Task 7 removes this whole interaction along with the
+        // sidecar itself.
+        try {
+            StructurePersistence.unsavedSidecarOf(file).deleteIfExists()
+        } catch (e: IOException) {
+            // Never let an undeletable sidecar (locked file, read-only dir) escape uncaught here:
+            // tick() runs this inside the END_SERVER_TICK handler, which Fabric does not guard, so
+            // an uncaught IOException at this point would crash the server rather than just leaving
+            // a harmless stale sidecar behind. The .nbt write itself already succeeded and is not
+            // affected either way.
+            LOGGER.error("[StructureCommit] delete stale sidecar for '{}': {}", file, e.message)
+        }
         autoSave.clear(subpath)
         clearBackoff(server, subpath)
 

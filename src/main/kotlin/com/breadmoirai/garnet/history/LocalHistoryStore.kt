@@ -98,8 +98,19 @@ object LocalHistoryStore {
     }
 
     /**
-     * Appends [tag] as a new revision and prunes. Returns the written [Revision], or null when
-     * history is disabled or the write failed.
+     * Appends [tag] as a new revision, optionally pruning. Returns the written [Revision], or null
+     * when history is disabled or the write failed.
+     *
+     * [prune] defaults to `true` — today's behavior for every pre-existing caller: the write is
+     * immediately followed by an age/count-capped prune that **permanently deletes** the blobs it
+     * drops. Pass `prune = false` when the caller cannot yet promise this revision is worth keeping
+     * — e.g. `StructureCommit` writes speculatively, before attempting a possibly-failing `.nbt`
+     * rewrite, and rolls the write back via [discardRevision] if that rewrite then fails. If every
+     * write pruned unconditionally, a stuck structure retried on a backoff would still permanently
+     * delete one genuine OLDER revision per failed attempt once the count is at the cap — the
+     * revision that failed doesn't survive either way, but a real one that had nothing to do with
+     * this attempt would be destroyed for no reason. Callers that pass `prune = false` are
+     * responsible for calling [prune] themselves once the write is confirmed worth keeping.
      */
     fun writeRevision(
         structureFile: Path,
@@ -110,6 +121,7 @@ object LocalHistoryStore {
         blockCount: Int,
         reason: String,
         nowMillis: Long = System.currentTimeMillis(),
+        prune: Boolean = true,
     ): Revision? {
         if (!SharedSettings.localHistoryEnabled) return null
         val dir = dirFor(structureFile)
@@ -128,8 +140,9 @@ object LocalHistoryStore {
             dir.createDirectories()
             NbtIo.writeCompressed(tag, dir.resolve(name))
             val merged = (index.revisions + revision).sortedBy { it.timestampMillis }
+            val toWrite = if (prune) prune(dir, merged, nowMillis) else merged
             try {
-                writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), prune(dir, merged, nowMillis)))
+                writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), toWrite))
             } catch (e: IOException) {
                 // The blob landed on disk but the index write failed, so revisions() would never
                 // see it — an invisible orphan. Delete it so disk state matches what revisions()
@@ -149,16 +162,42 @@ object LocalHistoryStore {
     }
 
     /**
+     * Applies the age cutoff then the count cap to [structureFile]'s history right now,
+     * **permanently deleting** the blobs it drops. Call this once a [writeRevision]`(prune = false)`
+     * write is confirmed worth keeping (`StructureCommit` calls it only after the `.nbt` rewrite it
+     * gates has actually succeeded) — deferring the prune out of `writeRevision` itself is what
+     * keeps a failed, rolled-back attempt ([discardRevision]) from destroying old history it never
+     * should have touched, at any revision count including at/above the cap.
+     */
+    fun prune(structureFile: Path, nowMillis: Long = System.currentTimeMillis()) {
+        val dir = dirFor(structureFile)
+        val index = readIndex(structureFile)
+        if (index.revisions.isEmpty()) return
+        val pruned = prune(dir, index.revisions, nowMillis)
+        if (pruned.size == index.revisions.size) return
+        runCatching {
+            writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), pruned))
+        }.onFailure { e ->
+            LOGGER.error("[LocalHistoryStore] prune index rewrite for '{}': {}", structureFile, e.message)
+        }
+    }
+
+    /**
      * Removes [revision] from [structureFile]'s index and deletes its blob.
      *
-     * A seam for callers that must speculatively write a revision before attempting a dependent,
-     * possibly-failing operation (`StructureCommit`'s atomic `.nbt` rewrite: the revision has to be
-     * durable *before* the rewrite per the "never overwrite unless the prior state is recoverable"
-     * invariant, but if the rewrite itself then fails, that revision must not linger — a structure
-     * that can never actually commit would otherwise accumulate one indistinguishable revision per
-     * retry and eventually prune away its own genuine history). Best-effort: logs and leaves the
-     * index as-is if the rewrite fails, rather than throwing — the caller is already deep in its
-     * own failure handling and has nothing further to undo.
+     * A seam for callers that must speculatively write a revision (typically via
+     * `writeRevision(prune = false)`, so this rollback is a complete no-op against the rest of the
+     * structure's history — nothing else was touched or pruned by that write) before attempting a
+     * dependent, possibly-failing operation (`StructureCommit`'s atomic `.nbt` rewrite: the revision
+     * has to be durable *before* the rewrite per the "never overwrite unless the prior state is
+     * recoverable" invariant, but if the rewrite itself then fails, that revision must not linger —
+     * a structure that can never actually commit would otherwise accumulate one indistinguishable
+     * revision per retry). Best-effort: if the blob delete succeeds but the index rewrite then fails,
+     * this logs and leaves the index as-is — the index would then reference a blob that no longer
+     * exists, which [readTag] already handles gracefully (returns null for a missing blob) rather
+     * than throwing, so that failure mode degrades to "one revision unrecoverable," not corruption.
+     * The caller is already deep in its own failure handling at this point and has nothing further
+     * to undo.
      */
     fun discardRevision(structureFile: Path, revision: Revision) {
         val dir = dirFor(structureFile)

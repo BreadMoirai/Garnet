@@ -514,6 +514,15 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // supposed to back up this content failed first.
                     file.readBytes().toList() shouldBe before
                     StructureAutoSave.of(this).isDirty("brokenhist.nbt") shouldBe true
+
+                    // This test deliberately leaves "brokenhist.nbt" dirty (that's the point being
+                    // tested). StructureAutoSave and StructureCommit's backoff map are both
+                    // per-server, and the gametest server keeps ticking after this block returns --
+                    // production END_SERVER_TICK would otherwise keep retrying this subpath forever
+                    // against whatever temp root a LATER test happens to have live at the time.
+                    // Forget both so no state leaks past this test.
+                    StructureAutoSave.of(this).clear("brokenhist.nbt")
+                    StructureCommit.clearBackoff(this, "brokenhist.nbt")
                 }
             } finally {
                 SharedSettings.structureRegionChunks = prevChunks
@@ -617,6 +626,90 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 }
             } finally {
                 SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    // --- Fix round 2: pruning must never be coupled to a failed attempt (Item A) ------------------
+
+    test("a failed commit at the local-history cap causes no net loss of genuine history") {
+        withTempRoot("autosave-cap") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            val prevMaxRev = SharedSettings.localHistoryMaxRevisions
+            SharedSettings.structureRegionChunks = 1
+            SharedSettings.localHistoryMaxRevisions = 3
+            val histDir = kotlin.io.path.createTempDirectory("autosave-cap-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "capped")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("capped.nbt"))
+                    drainPayloads(player)
+
+                    val file = tmp.resolve("capped.nbt")
+                    LocalHistoryStore.revisions(file) shouldHaveSize 1 // the placed baseline
+
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("capped.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+                    val pos = region.offset(1, 0, 1)
+
+                    // Fill history to the cap (3): the placed baseline plus two successful autosave
+                    // commits, each changing the same block to a different type so the diff check
+                    // sees real content changes.
+                    lvl.setBlock(pos, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, pos)
+                    StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldNotBeNull()
+                    LocalHistoryStore.revisions(file) shouldHaveSize 2
+
+                    lvl.setBlock(pos, Blocks.IRON_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, pos)
+                    StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldNotBeNull()
+                    val atCap = LocalHistoryStore.revisions(file)
+                    atCap shouldHaveSize 3
+
+                    // One more edit, but every subsequent .nbt write will fail. Repeated retries AT
+                    // the cap must cause NO net change to the already-recorded genuine history --
+                    // not the count, not the identity of any entry.
+                    lvl.setBlock(pos, Blocks.DIAMOND_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, pos)
+
+                    val failingWrite: (CompoundTag, Path) -> Unit = { _, _ ->
+                        throw IOException("simulated write failure")
+                    }
+                    var now = lvl.gameTime
+                    repeat(3) {
+                        StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE, now, failingWrite)
+                        LocalHistoryStore.revisions(file) shouldBe atCap
+                        now += 150
+                    }
+                    StructureAutoSave.of(this).isDirty("capped.nbt") shouldBe true
+
+                    // A genuine, successful write still prunes normally: the oldest survivor (the
+                    // "placed" baseline) is finally dropped once a real 4th revision needs to fit
+                    // in the cap of 3. This confirms the fix didn't just disable pruning outright --
+                    // it only decoupled it from failed attempts.
+                    StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldNotBeNull()
+                    val afterSuccess = LocalHistoryStore.revisions(file)
+                    afterSuccess shouldHaveSize 3
+                    afterSuccess.none { it.reason == LocalHistoryStore.REASON_PLACED } shouldBe true
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                SharedSettings.localHistoryMaxRevisions = prevMaxRev
                 histDir.toFile().deleteRecursively()
             }
         }
