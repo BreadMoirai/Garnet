@@ -152,9 +152,9 @@ Client:
   opened in response. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
   `r.message` (place/save/new-structure outcomes all surface through the same status line as
   folder load/save results). `StructureAutoSavedS2C` → `ProjectTreeState.onAutoSaved` sets
-  `status` to `"auto-saved $subpath ($sizeX×$sizeY×$sizeZ, $blockCount blocks)"` — as of this
-  writing nothing broadcasts the packet yet (the auto-save commit path lands in a later change);
-  the receiver and status-line wiring exist ahead of the sender.
+  `status` to `"auto-saved $subpath ($sizeX×$sizeY×$sizeZ, $blockCount blocks)"`. The packet is
+  broadcast by `StructureCommit` (see the "Standalone structure files" section below), from both
+  the end-of-tick debounce pass and the `commitAll` backstop.
 - `editor/world/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
   the UI via `TitleScreenMixin`) opens/creates the single shared `garnet-workspace` save
   with no root pinned. The dormant `pendingRoot`/`EditorServerContext` pinning machinery is
