@@ -25,6 +25,14 @@ mutating action (`CreateFolderC2S`, `RenamePathC2S`, `NewStructureC2S`, `NewEdit
 performs, replying with either the new state (`EditorTreeSnapshotS2C`, `StructureResultS2C`,
 `EditorFolderLoadedS2C`, `EditorSaveReportS2C`) or `EditorErrorS2C(reason)`.
 
+`StructureAutoSavedS2C(subpath, sizeX, sizeY, sizeZ, blockCount, savedAtMillis)` is the one
+clientbound payload here that is **not** a reply to a specific request: the auto-save commit path
+(structure edit debounce, not yet wired as of this writing) broadcasts it to every player, since a
+structure region is server-global and any player looking at it wants the update. The client
+handler (`ProjectTreeState.onAutoSaved`) only renders `subpath`/`sizeX`/`sizeY`/`sizeZ`/`blockCount`
+into the Explorer status line today; `blockCount` and `savedAtMillis` are carried for a structure
+info panel that consumes this same packet later.
+
 ## Invariant 2: every client-supplied path goes through `EditorRoot.resolveSubpath`
 
 There is no `originPos` lookup anymore — the trust anchor is **path containment**, not a

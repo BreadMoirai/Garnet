@@ -8,6 +8,7 @@ import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 
 /**
  * Client-side, Compose-observable state for the Project Explorer: the server's tree snapshot and the
@@ -34,6 +35,10 @@ object ProjectTreeState {
     fun onSaveReport(r: EditorSaveReportS2C) { status = "saved ${r.perSpec.size} spec(s)" }
     fun onError(e: EditorErrorS2C) { status = "error: ${e.reason}" }
     fun onStructureResult(r: StructureResultS2C) { status = r.message }
+
+    fun onAutoSaved(p: StructureAutoSavedS2C) {
+        status = "auto-saved ${p.subpath} (${p.sizeX}×${p.sizeY}×${p.sizeZ}, ${p.blockCount} blocks)"
+    }
 
     /** Test/reset hook: clears the snapshot and status back to initial values. */
     fun reset() {

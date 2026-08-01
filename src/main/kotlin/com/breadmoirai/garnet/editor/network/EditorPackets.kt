@@ -257,6 +257,34 @@ data class DiscardStructureC2S(val subpath: String) : CustomPacketPayload {
 
 // === Structure S2C ===
 
+/**
+ * Sent on every committed auto-save. Broadcast rather than addressed: structure regions are
+ * server-global, so any player looking at one wants the update.
+ *
+ * Carries more than the status line needs — [blockCount] and [savedAtMillis] exist for the
+ * structure info panel, which consumes this same packet.
+ */
+data class StructureAutoSavedS2C(
+    val subpath: String,
+    val sizeX: Int, val sizeY: Int, val sizeZ: Int,
+    val blockCount: Int,
+    val savedAtMillis: Long,
+) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<StructureAutoSavedS2C>(id("structure_autosaved"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, StructureAutoSavedS2C> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, StructureAutoSavedS2C::subpath,
+            ByteBufCodecs.VAR_INT, StructureAutoSavedS2C::sizeX,
+            ByteBufCodecs.VAR_INT, StructureAutoSavedS2C::sizeY,
+            ByteBufCodecs.VAR_INT, StructureAutoSavedS2C::sizeZ,
+            ByteBufCodecs.VAR_INT, StructureAutoSavedS2C::blockCount,
+            ByteBufCodecs.VAR_LONG, StructureAutoSavedS2C::savedAtMillis,
+            ::StructureAutoSavedS2C,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 data class StructureResultS2C(
     val subpath: String,
     val sizeX: Int, val sizeY: Int, val sizeZ: Int,

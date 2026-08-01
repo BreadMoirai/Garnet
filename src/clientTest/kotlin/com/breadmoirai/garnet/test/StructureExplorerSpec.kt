@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.ui.ProjectTreeState
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.harness.ClientSpec
@@ -35,5 +36,15 @@ class StructureExplorerSpec : ClientSpec({
         ExplorerTreeState.selectedHasUnsaved() shouldBe true
         runOnClient { ExplorerTreeState.select("clean.nbt") }
         ExplorerTreeState.selectedHasUnsaved() shouldBe false
+    }
+
+    test("an auto-save result lands in the Explorer status line") {
+        runOnClient {
+            ProjectTreeState.reset()
+            ProjectTreeState.onAutoSaved(
+                StructureAutoSavedS2C("redstone/clock.nbt", 5, 3, 7, 42, savedAtMillis = 1_700_000_000_000L),
+            )
+        }
+        ProjectTreeState.status shouldBe "auto-saved redstone/clock.nbt (5×3×7, 42 blocks)"
     }
 })

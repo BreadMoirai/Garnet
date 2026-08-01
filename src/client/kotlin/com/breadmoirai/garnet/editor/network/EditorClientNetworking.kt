@@ -6,6 +6,7 @@ import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 
 object EditorClientNetworking {
@@ -24,6 +25,9 @@ object EditorClientNetworking {
         }
         ClientPlayNetworking.registerGlobalReceiver(StructureResultS2C.TYPE) { payload, ctx ->
             ctx.client().execute { ProjectTreeState.onStructureResult(payload) }
+        }
+        ClientPlayNetworking.registerGlobalReceiver(StructureAutoSavedS2C.TYPE) { payload, ctx ->
+            ctx.client().execute { ProjectTreeState.onAutoSaved(payload) }
         }
     }
 }

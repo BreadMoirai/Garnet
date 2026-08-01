@@ -148,10 +148,13 @@ Client:
   [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the
   `ExplorerTreeState`/`ProjectTreeState` split.
 - `editor/network/EditorClientNetworking` — S2C receivers. They feed `ProjectTreeState`
-  (snapshot/folder-loaded/save-report/error/structure-result); no client screen is opened in
-  response. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
+  (snapshot/folder-loaded/save-report/error/structure-result/auto-saved); no client screen is
+  opened in response. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
   `r.message` (place/save/new-structure outcomes all surface through the same status line as
-  folder load/save results).
+  folder load/save results). `StructureAutoSavedS2C` → `ProjectTreeState.onAutoSaved` sets
+  `status` to `"auto-saved $subpath ($sizeX×$sizeY×$sizeZ, $blockCount blocks)"` — as of this
+  writing nothing broadcasts the packet yet (the auto-save commit path lands in a later change);
+  the receiver and status-line wiring exist ahead of the sender.
 - `editor/world/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
   the UI via `TitleScreenMixin`) opens/creates the single shared `garnet-workspace` save
   with no root pinned. The dormant `pendingRoot`/`EditorServerContext` pinning machinery is

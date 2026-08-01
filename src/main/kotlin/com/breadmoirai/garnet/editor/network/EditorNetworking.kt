@@ -52,6 +52,7 @@ object EditorNetworking {
         PayloadTypeRegistry.clientboundPlay().register(EditorSaveReportS2C.TYPE, EditorSaveReportS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorErrorS2C.TYPE, EditorErrorS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(StructureResultS2C.TYPE, StructureResultS2C.STREAM_CODEC)
+        PayloadTypeRegistry.clientboundPlay().register(StructureAutoSavedS2C.TYPE, StructureAutoSavedS2C.STREAM_CODEC)
 
         ServerPlayNetworking.registerGlobalReceiver(ListEditorTreeC2S.TYPE) { _, ctx ->
             ctx.server().execute { handleListTree(ctx.server(), ctx.player()) }
