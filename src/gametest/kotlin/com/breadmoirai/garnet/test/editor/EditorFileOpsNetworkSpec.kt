@@ -3,6 +3,7 @@ package com.breadmoirai.garnet.test.editor
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
+import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorNetworking
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
@@ -11,6 +12,7 @@ import com.breadmoirai.garnet.editor.data.EditorNewStructure
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.world.StructureAutoSave
+import com.breadmoirai.garnet.editor.world.StructureCommit
 import com.breadmoirai.garnet.editor.world.StructureEditWatcher
 import com.breadmoirai.garnet.editor.data.EditorSession
 import com.breadmoirai.garnet.history.LocalHistoryStore
@@ -21,6 +23,7 @@ import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.mc.onServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -29,6 +32,8 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.level.block.Blocks
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
+import kotlin.io.path.createDirectory
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 
@@ -194,6 +199,122 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             registry.structureRegionOriginOf("redstone/clock.nbt").shouldBeNull()
             registry.placedBoxOf("logic/clock.nbt").shouldNotBeNull()
             registry.structureRegionOriginOf("logic/clock.nbt").shouldNotBeNull()
+        }
+    }
+
+    test("renaming a folder commits a dirty structure placed directly inside it") {
+        // REGRESSION (Task 7 fix round 1 / Finding 1): handleRename's commit-before-move guard used
+        // to be gated on placedBoxOf(payload.subpath) -- the EXACT renamed path. A folder is never
+        // itself a placed structure, so renaming a folder committed nothing; rekeyForRename moved
+        // the descendant's registry entries onto the new subpath, but StructureAutoSave has no such
+        // rekey, so the descendant's dirty entry was stranded under its OLD, now-unresolvable
+        // subpath forever -- and its pending edits would never reach the .nbt.
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone"), "clock")
+            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("redstone/clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeTrue()
+
+            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+
+            // Committed under the OLD subpath before the move -- neither the old (gone) nor the new
+            // key is left dirty; the edit made it into the .nbt via a real commit, not a rekey.
+            StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeFalse()
+            StructureAutoSave.of(server).isDirty("logic/clock.nbt").shouldBeFalse()
+            LocalHistoryStore.revisions(root.resolve("logic/clock.nbt")).size shouldBe 2
+        }
+    }
+
+    test("renaming a folder commits a dirty structure nested two levels deep") {
+        withServer { server, player, root ->
+            root.resolve("redstone/gates").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone/gates"), "and")
+            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/gates/and.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("redstone/gates/and.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("redstone/gates/and.nbt").shouldBeTrue()
+
+            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+
+            StructureAutoSave.of(server).isDirty("redstone/gates/and.nbt").shouldBeFalse()
+            StructureAutoSave.of(server).isDirty("logic/gates/and.nbt").shouldBeFalse()
+            LocalHistoryStore.revisions(root.resolve("logic/gates/and.nbt")).size shouldBe 2
+        }
+    }
+
+    test("renaming a folder moves local history for every structure placed inside it, not just the renamed path itself") {
+        // Isolates Finding 3 from Findings 1/2: the structure is placed but NOT dirty, so the
+        // commit-before-move loop has nothing to do for it, and any history movement observed here
+        // is purely due to the folder-level moveDescendantHistories walk.
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone"), "clock")
+            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            drainPayloads(player)
+            LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")).size shouldBe 1 // placed baseline
+            StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeFalse()
+
+            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+
+            LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")) shouldHaveSize 0
+            LocalHistoryStore.revisions(root.resolve("logic/clock.nbt")) shouldHaveSize 1
+        }
+    }
+
+    test("a failed commit during rename aborts the rename entirely and reports an error") {
+        // REGRESSION (Task 7 fix round 1 / Finding 2): handleRename used to ignore commit's return
+        // value entirely. A genuine commit failure (history write or .nbt write) must abort the
+        // whole rename -- proceeding to move the file anyway would invalidate the old subpath and
+        // strand those edits permanently, since nothing can ever resolve/commit them again.
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+
+            // Force the commit's history write to fail deterministically and portably: occupy
+            // index.json's path with a directory (same trick as StructureAutoSaveSpec's
+            // "a commit whose history write fails leaves the .nbt untouched").
+            val file = root.resolve("clock.nbt")
+            val historyDir = LocalHistoryStore.dirFor(file)
+            historyDir.resolve("index.json").deleteIfExists()
+            historyDir.resolve("index.json").createDirectory()
+
+            try {
+                EditorNetworking.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+
+                // Aborted before touching the filesystem at all.
+                root.resolve("clock.nbt").exists().shouldBeTrue()
+                root.resolve("ring.nbt").exists().shouldBeFalse()
+                // The dirty entry survives under the OLD subpath -- it was never stranded, because
+                // the rename that would have stranded it never happened.
+                StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+                drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+            } finally {
+                // This test deliberately leaves "clock.nbt" dirty and its history dir booby-trapped;
+                // clean both up so no state leaks into a later test sharing this server.
+                StructureAutoSave.of(server).clear("clock.nbt")
+                StructureCommit.clearBackoff(server, "clock.nbt")
+                historyDir.resolve("index.json").toFile().delete()
+            }
         }
     }
 

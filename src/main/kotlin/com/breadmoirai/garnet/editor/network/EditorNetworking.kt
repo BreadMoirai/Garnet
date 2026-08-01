@@ -16,10 +16,12 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import org.slf4j.LoggerFactory
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
@@ -251,14 +253,24 @@ object EditorNetworking {
             ServerPlayNetworking.send(player, EditorErrorS2C("place the structure before saving: ${payload.subpath}"))
             return
         }
-        val result = StructureCommit.commit(server, payload.subpath, LocalHistoryStore.REASON_MANUAL)
-        if (result == null) {
-            // Nothing to write: the region already matches the committed file.
-            ServerPlayNetworking.send(player, StructureResultS2C(
-                payload.subpath, 0, 0, 0, "no changes to save: ${payload.subpath}",
-            ))
-        } else {
-            StructureCommit.broadcast(server, result)
+        when (val outcome = StructureCommit.commit(server, payload.subpath, LocalHistoryStore.REASON_MANUAL)) {
+            is StructureCommit.CommitOutcome.Committed -> StructureCommit.broadcast(server, outcome.payload)
+            is StructureCommit.CommitOutcome.NoChange -> {
+                // Nothing to write: the region already matches the committed file.
+                ServerPlayNetworking.send(player, StructureResultS2C(
+                    payload.subpath, 0, 0, 0, "no changes to save: ${payload.subpath}",
+                ))
+            }
+            is StructureCommit.CommitOutcome.NotApplicable -> {
+                // Shouldn't happen — placedBoxOf(subpath) was already confirmed non-null above —
+                // but report it honestly rather than silently claiming success.
+                ServerPlayNetworking.send(player, EditorErrorS2C("place the structure before saving: ${payload.subpath}"))
+            }
+            is StructureCommit.CommitOutcome.Failed -> {
+                // The edits exist only in the world; a bare "no changes to save" here would tell the
+                // player their work is safe when it is not (Task 7 fix round 1 / Finding 4).
+                ServerPlayNetworking.send(player, EditorErrorS2C("save failed: ${outcome.reason}"))
+            }
         }
     }
 
@@ -331,19 +343,54 @@ object EditorNetworking {
         val registry = EditorDimRegistry.of(server)
         val wasPlaced = registry.placedBoxOf(payload.subpath)
 
-        // Commit before the move: the dirty box is keyed by subpath, so moving first would strand
-        // the edits under a name nothing will ever commit again.
-        if (wasPlaced != null) StructureCommit.commit(server, payload.subpath, LocalHistoryStore.REASON_AUTOSAVE)
+        // Commit every dirty structure under the renamed path BEFORE the move — the renamed node
+        // itself (subpath == payload.subpath) AND every descendant placed inside a renamed folder
+        // (subpath starting with "payload.subpath/"). Dirty state is keyed by subpath, so moving
+        // first would strand it under a name StructureCommit will never resolve again: a folder
+        // rename rekeys EditorDimRegistry's entries (see rekeyForRename below) but StructureAutoSave
+        // has no such rekey, so a descendant's dirty entry would otherwise sit under its OLD subpath
+        // forever — dirtySubpaths() never empties, defeating tick()'s idle fast path permanently,
+        // and worse, commitAll (BEFORE_SAVE/SERVER_STOPPED) can't resolve the old subpath either
+        // once the folder has moved, so the edits would never reach the .nbt at all
+        // (Task 7 fix round 1 / Finding 1). If any of these commits genuinely fails — not "nothing
+        // to write", but a real history/.nbt write failure — abort the whole rename without moving
+        // anything: proceeding anyway would let the move invalidate the old subpath and permanently
+        // strand those edits (Finding 2).
+        val autoSave = StructureAutoSave.of(server)
+        val dirtyUnderRename = autoSave.dirtySubpaths().filter {
+            it == payload.subpath || it.startsWith("${payload.subpath}/")
+        }
+        for (dirtySubpath in dirtyUnderRename) {
+            val outcome = StructureCommit.commit(server, dirtySubpath, LocalHistoryStore.REASON_AUTOSAVE)
+            if (outcome is StructureCommit.CommitOutcome.Failed) {
+                ServerPlayNetworking.send(player, EditorErrorS2C(
+                    "rename failed: could not save pending edits for '$dirtySubpath': ${outcome.reason}",
+                ))
+                return
+            }
+        }
 
         val target = parent.resolve(newName)
         try {
             source.moveTo(target)
-            // History is keyed by the file's absolute path, so a rename must carry it across or the
-            // structure silently loses every revision it has accumulated.
-            LocalHistoryStore.moveHistory(source, target)
         } catch (e: Exception) {
             LOGGER.error("[project/rename] {} -> {}: {}", payload.subpath, newSubpath, e.message, e)
             ServerPlayNetworking.send(player, EditorErrorS2C("rename failed: ${e.message}")); return
+        }
+
+        // History is keyed by each file's own absolute path, so every moved .nbt (the renamed file
+        // itself, or every descendant .nbt when a whole FOLDER was renamed) must carry its history
+        // across, or it silently loses every revision it has accumulated (Finding 3). This cannot
+        // itself fail the rename from the player's perspective — the file(s) already moved — so a
+        // problem here is logged, not reported as a rename failure (Finding 6): sharing one `try`
+        // with the file move above would have let a hypothetical history-move exception report
+        // "rename failed" after the file had already relocated.
+        try {
+            moveDescendantHistories(source, target)
+        } catch (e: Exception) {
+            LOGGER.error(
+                "[project/rename] history move for {} -> {}: {}", payload.subpath, newSubpath, e.message, e,
+            )
         }
 
         if (wasPlaced != null) {
@@ -364,6 +411,34 @@ object EditorNetworking {
         repointSession(player, payload.subpath, newSubpath)
 
         sendTree(server, player)
+    }
+
+    /**
+     * Move local history for every `.nbt` under a renamed path, not just [oldRoot] itself
+     * (Task 7 fix round 1 / Finding 3). `LocalHistoryStore` keys history by each structure file's
+     * own absolute path — a plain `moveHistory(oldRoot, newRoot)` only relocates history for a
+     * single renamed `.nbt`, so renaming a whole FOLDER would silently orphan every contained
+     * structure's history at its old, now-nonexistent path.
+     *
+     * [newRoot] (not [oldRoot]) is walked, since by the time this runs the caller has already moved
+     * the file(s) on disk and [oldRoot] no longer exists; each `.nbt`'s pre-move path is
+     * reconstructed by relativizing against [newRoot] and resolving against [oldRoot], which is
+     * safe because a plain file move preserves the subtree's internal structure.
+     * [LocalHistoryStore.moveHistory] is a no-op for a path with no history directory, so this is
+     * safe to call for every `.nbt` found under [newRoot], not just ones known to have history.
+     */
+    private fun moveDescendantHistories(oldRoot: Path, newRoot: Path) {
+        if (!newRoot.isDirectory()) {
+            LocalHistoryStore.moveHistory(oldRoot, newRoot)
+            return
+        }
+        Files.walk(newRoot).use { stream ->
+            stream.filter { it.isRegularFile() && it.name.endsWith(".nbt") }
+                .forEach { newFile ->
+                    val rel = newRoot.relativize(newFile)
+                    LocalHistoryStore.moveHistory(oldRoot.resolve(rel), newFile)
+                }
+        }
     }
 
     /**

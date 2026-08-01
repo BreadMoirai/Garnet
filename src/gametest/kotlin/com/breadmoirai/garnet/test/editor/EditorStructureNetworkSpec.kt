@@ -29,6 +29,8 @@ import io.kotest.matchers.shouldNotBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Blocks
+import kotlin.io.path.createDirectory
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
 
@@ -186,6 +188,66 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                     saved.sizeX shouldBe 1
                     // The pre-edit state is recoverable from history rather than from a sidecar.
                     LocalHistoryStore.revisions(committed).size shouldBe 2
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("a genuinely failed force-save reports an error, not 'no changes to save'") {
+        // REGRESSION (Task 7 fix round 1 / Finding 4): handleSaveStructure used to treat
+        // commit(...) == null as a no-op unconditionally, but commit also returns null on a genuine
+        // history/.nbt write failure. A player pressing Save on a locked/read-only .nbt must be told
+        // the save failed -- not "no changes to save", which implies the (never-persisted) edits are
+        // safe when they exist only in the world.
+        withTempRoot("struct-savefail") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("struct-savefail-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "locked")
+            val file = tmp.resolve("locked.nbt")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    drainPayloads(player)
+
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("locked.nbt"))
+                    drainPayloads(player)
+
+                    val region = EditorDimRegistry.of(this).structureRegionOriginOf("locked.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+                    val edited = region.offset(1, 0, 1)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+
+                    // Force the commit's history write to fail deterministically and portably:
+                    // occupy index.json's path with a directory (same trick as
+                    // StructureAutoSaveSpec's "a commit whose history write fails...").
+                    val historyDir = LocalHistoryStore.dirFor(file)
+                    historyDir.resolve("index.json").deleteIfExists()
+                    historyDir.resolve("index.json").createDirectory()
+
+                    val before = file.readBytes().toList()
+
+                    EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("locked.nbt"))
+
+                    val payloads = drainPayloads(player)
+                    payloads.filterIsInstance<StructureAutoSavedS2C>() shouldHaveSize 0
+                    payloads.filterIsInstance<StructureResultS2C>() shouldHaveSize 0
+                    val error = payloads.filterIsInstance<EditorErrorS2C>().single()
+                    error.reason shouldNotBe "no changes to save: locked.nbt"
+                    file.readBytes().toList() shouldBe before
                 }
             } finally {
                 SharedSettings.structureRegionChunks = prevChunks

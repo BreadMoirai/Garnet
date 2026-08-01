@@ -86,11 +86,31 @@ object StructureCommit {
     }
 
     /**
-     * Capture, diff, and write [subpath] if its content actually changed. Returns the packet
-     * describing what was written, or null when nothing needed writing, the structure is not
-     * placed / not resolvable, or the write failed. Clears the dirty state on every path that
-     * leaves the `.nbt` correct (no-op, or a successful write) — deliberately NOT on a failed
-     * write, so the structure stays dirty and is retried rather than silently abandoned.
+     * The result of a single [commit] attempt. Deliberately distinguishes "there was nothing to do"
+     * from "an attempt was made and it failed" (Task 7 fix round 1 / Finding 4) — a caller that
+     * collapses both into a bare `null` cannot tell a genuinely clean structure apart from one whose
+     * edits are still only in the world and never made it to disk, which is exactly the distinction
+     * a user pressing "Save Structure" needs reported honestly.
+     */
+    sealed interface CommitOutcome {
+        /** A real write landed; [payload] is what changed, for broadcasting. */
+        data class Committed(val payload: StructureAutoSavedS2C) : CommitOutcome
+
+        /** The capture already matches the committed `.nbt` (or there was nothing to scan at all). */
+        data object NoChange : CommitOutcome
+
+        /** [commit] was called for a subpath that isn't placed, or the root isn't resolvable. */
+        data object NotApplicable : CommitOutcome
+
+        /** The history write or the `.nbt` write genuinely failed; the dirty state was NOT cleared. */
+        data class Failed(val reason: String) : CommitOutcome
+    }
+
+    /**
+     * Capture, diff, and write [subpath] if its content actually changed. Clears the dirty state on
+     * every path that leaves the `.nbt` correct ([CommitOutcome.Committed] or
+     * [CommitOutcome.NoChange]) — deliberately NOT on [CommitOutcome.Failed], so the structure stays
+     * dirty and is retried rather than silently abandoned.
      *
      * [now] is the server tick used for failure-backoff bookkeeping; [writeNbt] is a test seam for
      * simulating a failing `.nbt` write (production callers get the real
@@ -102,17 +122,17 @@ object StructureCommit {
         reason: String,
         now: Long = server.overworld().gameTime,
         writeNbt: (CompoundTag, Path) -> Unit = StructurePersistence::writeStructureAtomic,
-    ): StructureAutoSavedS2C? {
+    ): CommitOutcome {
         val autoSave = StructureAutoSave.of(server)
-        val root = EditorNetworking.rootFor(server) ?: return null
-        val file = root.resolveSubpath(subpath) ?: return null
+        val root = EditorNetworking.rootFor(server) ?: return CommitOutcome.NotApplicable
+        val file = root.resolveSubpath(subpath) ?: return CommitOutcome.NotApplicable
         val registry = EditorDimRegistry.of(server)
-        val placed = registry.placedBoxOf(subpath) ?: return null
+        val placed = registry.placedBoxOf(subpath) ?: return CommitOutcome.NotApplicable
 
         val scan = union(placed, autoSave.dirtyBox(subpath)) ?: run {
             autoSave.clear(subpath)
             clearBackoff(server, subpath)
-            return null
+            return CommitOutcome.NoChange
         }
         val captured = StructurePersistence.captureAutoFitIn(registry.projectLevel(), scan)
 
@@ -120,7 +140,7 @@ object StructureCommit {
         if (committed != null && !structuresDiffer(committed, captured.tag)) {
             autoSave.clear(subpath)
             clearBackoff(server, subpath)
-            return null
+            return CommitOutcome.NoChange
         }
 
         val size = captured.box?.size ?: Vec3i(0, 0, 0)
@@ -136,8 +156,9 @@ object StructureCommit {
             file, captured.tag, size.x, size.y, size.z, captured.blockCount, reason, prune = false,
         )
         if (historyEnabled && revision == null) {
-            onCommitFailure(server, subpath, now, "history write failed for '$subpath' ($file) — .nbt left untouched")
-            return null
+            val message = "history write failed for '$subpath' ($file) — .nbt left untouched"
+            onCommitFailure(server, subpath, now, message)
+            return CommitOutcome.Failed(message)
         }
 
         try {
@@ -147,8 +168,9 @@ object StructureCommit {
             // ...). The revision above described content that never actually landed live — discard
             // it so a stuck structure doesn't bank one orphan revision per retry.
             if (revision != null) LocalHistoryStore.discardRevision(file, revision)
-            onCommitFailure(server, subpath, now, "write '$file' failed: ${e.message}")
-            return null
+            val message = "write '$file' failed: ${e.message}"
+            onCommitFailure(server, subpath, now, message)
+            return CommitOutcome.Failed(message)
         }
 
         // The write landed: this revision is now confirmed worth keeping, so it's safe to apply
@@ -160,9 +182,9 @@ object StructureCommit {
         autoSave.clear(subpath)
         clearBackoff(server, subpath)
 
-        return StructureAutoSavedS2C(
+        return CommitOutcome.Committed(StructureAutoSavedS2C(
             subpath, size.x, size.y, size.z, captured.blockCount, System.currentTimeMillis(),
-        )
+        ))
     }
 
     /** Commit every dirty structure that has come due and isn't in a failure backoff, and tell the clients. */
@@ -179,23 +201,27 @@ object StructureCommit {
             if (!autoSave.dueForCommit(subpath, now)) continue
             val retryAt = backoff[subpath]
             if (retryAt != null && now < retryAt) continue
-            commit(server, subpath, LocalHistoryStore.REASON_AUTOSAVE, now, writeNbt)?.let { broadcast(server, it) }
+            val outcome = commit(server, subpath, LocalHistoryStore.REASON_AUTOSAVE, now, writeNbt)
+            if (outcome is CommitOutcome.Committed) broadcast(server, outcome.payload)
         }
     }
 
     /**
      * Backstop flush: commit every dirty structure regardless of debounce/backoff timing. Used on
      * world-save and server stop. `EditorNetworking.handleRename` also calls [commit] directly
-     * (not this batch form) for the single structure being renamed, BEFORE moving its file — this
-     * is what keeps a rename from stranding a dirty entry under a subpath nothing will ever commit
-     * again. There is no separate unplace path any more: `handleDiscardStructure` was removed along
-     * with the sidecar model, and `handleRename` is the only caller of
+     * (not this batch form) for the renamed structure AND every dirty descendant of a renamed
+     * folder, BEFORE moving any files — this is what keeps a rename from stranding a dirty entry
+     * under a subpath nothing will ever commit again (Task 7 fix round 1 / Finding 1), and aborts
+     * the whole rename without touching the filesystem if any of those commits genuinely fails
+     * (Finding 2). There is no separate unplace path any more: `handleDiscardStructure` was removed
+     * along with the sidecar model, and `handleRename` is the only caller of
      * [EditorDimRegistry.unplaceStructure], already covered above.
      */
     fun commitAll(server: MinecraftServer, reason: String) {
         val autoSave = StructureAutoSave.of(server)
         for (subpath in autoSave.dirtySubpaths()) {
-            commit(server, subpath, reason)?.let { broadcast(server, it) }
+            val outcome = commit(server, subpath, reason)
+            if (outcome is CommitOutcome.Committed) broadcast(server, outcome.payload)
         }
     }
 

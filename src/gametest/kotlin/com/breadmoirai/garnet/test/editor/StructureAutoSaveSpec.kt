@@ -20,6 +20,7 @@ import com.breadmoirai.garnet.test.withTempRoot
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
@@ -242,11 +243,11 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     StructureEditWatcher.onBlockChanged(lvl, edited)
                     StructureAutoSave.of(this).isDirty("widget.nbt") shouldBe true
 
-                    val result = StructureCommit.commit(this, "widget.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldNotBeNull()
-                    result.subpath shouldBe "widget.nbt"
-                    result.sizeX shouldBe 1
-                    result.blockCount shouldBe 1
+                    val outcome = StructureCommit.commit(this, "widget.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                    outcome.payload.subpath shouldBe "widget.nbt"
+                    outcome.payload.sizeX shouldBe 1
+                    outcome.payload.blockCount shouldBe 1
 
                     StructureAutoSave.of(this).isDirty("widget.nbt") shouldBe false
                     LocalHistoryStore.revisions(file) shouldHaveSize 2
@@ -280,7 +281,8 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     val revisionsBefore = LocalHistoryStore.revisions(file).size
 
                     // No edits at all -> the capture matches the committed file exactly.
-                    StructureCommit.commit(this, "still.nbt", LocalHistoryStore.REASON_AUTOSAVE) shouldBe null
+                    StructureCommit.commit(this, "still.nbt", LocalHistoryStore.REASON_AUTOSAVE) shouldBe
+                        StructureCommit.CommitOutcome.NoChange
 
                     file.readBytes().toList() shouldBe before
                     LocalHistoryStore.revisions(file) shouldHaveSize revisionsBefore
@@ -377,7 +379,8 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     StructureCommit.tick(this)
                     StructureAutoSave.of(this).isDirty("manual.nbt") shouldBe true
 
-                    StructureCommit.commit(this, "manual.nbt", LocalHistoryStore.REASON_MANUAL).shouldNotBeNull()
+                    StructureCommit.commit(this, "manual.nbt", LocalHistoryStore.REASON_MANUAL)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
                     StructureAutoSave.of(this).isDirty("manual.nbt") shouldBe false
                 }
             } finally {
@@ -506,9 +509,9 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     val before = file.readBytes().toList()
 
-                    val result = StructureCommit.commit(this, "brokenhist.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                    val outcome = StructureCommit.commit(this, "brokenhist.nbt", LocalHistoryStore.REASON_AUTOSAVE)
 
-                    result shouldBe null
+                    outcome.shouldBeInstanceOf<StructureCommit.CommitOutcome.Failed>()
                     // The .nbt write must never have been attempted: the history write that was
                     // supposed to back up this content failed first.
                     file.readBytes().toList() shouldBe before
@@ -567,12 +570,12 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     val untracked = region.offset(width - 3, 0, width - 3)
                     lvl.setBlock(untracked, Blocks.IRON_BLOCK.defaultBlockState(), 2)
 
-                    val result = StructureCommit.commit(this, "bounded.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldNotBeNull()
-                    result.blockCount shouldBe 1
-                    result.sizeX shouldBe 1
-                    result.sizeY shouldBe 1
-                    result.sizeZ shouldBe 1
+                    val outcome = StructureCommit.commit(this, "bounded.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                    outcome.payload.blockCount shouldBe 1
+                    outcome.payload.sizeX shouldBe 1
+                    outcome.payload.sizeY shouldBe 1
+                    outcome.payload.sizeZ shouldBe 1
                 }
             } finally {
                 SharedSettings.localHistoryDir = prevHistDir
@@ -619,13 +622,13 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(pos, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, pos)
                     StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldNotBeNull()
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
                     LocalHistoryStore.revisions(file) shouldHaveSize 2
 
                     lvl.setBlock(pos, Blocks.IRON_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, pos)
                     StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldNotBeNull()
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
                     val atCap = LocalHistoryStore.revisions(file)
                     atCap shouldHaveSize 3
 
@@ -651,7 +654,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // in the cap of 3. This confirms the fix didn't just disable pruning outright --
                     // it only decoupled it from failed attempts.
                     StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldNotBeNull()
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
                     val afterSuccess = LocalHistoryStore.revisions(file)
                     afterSuccess shouldHaveSize 3
                     afterSuccess.none { it.reason == LocalHistoryStore.REASON_PLACED } shouldBe true
