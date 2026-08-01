@@ -593,6 +593,74 @@ class StructureAutoSaveSpec : GarnetTestSpec({
         }
     }
 
+    // --- Fix round 3: NotApplicable must not discard recoverable, still-placed edits ---------------
+
+    test("a still-placed structure whose file becomes unresolvable keeps its dirty flag, and commits once the file is restored") {
+        withTempRoot("autosave-unresolvable") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("autosave-unresolvable-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "recoverable")
+            val displaced = kotlin.io.path.createTempDirectory("autosave-unresolvable-displaced")
+                .resolve("recoverable.nbt")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("recoverable.nbt"))
+                    drainPayloads(player)
+
+                    val file = tmp.resolve("recoverable.nbt")
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("recoverable.nbt")!!
+                    val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+
+                    val edited = region.offset(5, 0, 5)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    // Drive the watcher directly: the setBlock mixin is flaky under this harness.
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+                    StructureAutoSave.of(this).isDirty("recoverable.nbt") shouldBe true
+
+                    // Simulate the file becoming unresolvable while the structure is still placed --
+                    // an external delete-then-restore, a git checkout, cloud sync, a root swap, etc.
+                    // The world blocks (the actual unsaved edit) are untouched; only resolveSubpath
+                    // now fails because the candidate file doesn't exist.
+                    java.nio.file.Files.move(file, displaced)
+
+                    StructureCommit.commit(this, "recoverable.nbt", LocalHistoryStore.REASON_AUTOSAVE) shouldBe
+                        StructureCommit.CommitOutcome.NotApplicable
+
+                    // The dirty flag MUST survive: the structure is still placed, its edited blocks
+                    // are still live in the world, and nothing else will ever re-mark it dirty if the
+                    // flag is discarded here. Losing it now means losing the edit permanently once the
+                    // file becomes resolvable again.
+                    StructureAutoSave.of(this).isDirty("recoverable.nbt") shouldBe true
+
+                    // Restore the file (the root/file condition that was blocking the commit clears)
+                    // and confirm the surviving dirty flag lets it actually commit.
+                    java.nio.file.Files.move(displaced, file)
+
+                    val outcome = StructureCommit.commit(this, "recoverable.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                    outcome.payload.blockCount shouldBe 1
+                    StructureAutoSave.of(this).isDirty("recoverable.nbt") shouldBe false
+                }
+            } finally {
+                displaced.parent.toFile().deleteRecursively()
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
     // --- Fix round 2: pruning must never be coupled to a failed attempt (Item A) ------------------
 
     test("a failed commit at the local-history cap causes no net loss of genuine history") {

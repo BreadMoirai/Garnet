@@ -101,8 +101,9 @@ object StructureCommit {
 
         /**
          * [commit] was called for a subpath that isn't placed, or whose root/file doesn't
-         * resolve. Unlike [Failed], the dirty state (if any) for that subpath IS cleared — see the
-         * judgement call recorded on [commit]'s KDoc.
+         * resolve. Unlike [Failed], the dirty state is cleared here ONLY when the structure isn't
+         * placed — see the judgement call recorded on [commit]'s KDoc for why an unresolvable
+         * root/file must NOT clear the flag while the structure is still placed.
          */
         data object NotApplicable : CommitOutcome
 
@@ -120,19 +121,32 @@ object StructureCommit {
      * simulating a failing `.nbt` write (production callers get the real
      * [StructurePersistence.writeStructureAtomic]).
      *
-     * **Judgement call (Task 7 fix round 2):** a subpath that resolves to [CommitOutcome.NotApplicable]
-     * — no root, no file, or not placed — has its dirty state cleared here, unlike
-     * [CommitOutcome.Failed]. The two are not the same kind of "didn't commit": [Failed] means a
-     * real attempt was made and a transient condition (a lock, a momentarily-full disk) stopped it,
-     * so retrying later is exactly the right behavior and the dirty flag must survive to drive that
-     * retry. [NotApplicable] means the subpath cannot be resolved AT ALL under the current
-     * root/registry state — there is nothing to retry, because nothing changed to make the next
-     * attempt any more likely to succeed than this one. Nothing in this codebase reintroduces a
-     * root, a file, or a placed-box for an existing dirty key without also going through a path
-     * that reseeds dirty tracking from scratch (a fresh edit after a re-place). Leaving the entry
-     * dirty here would therefore cost a `resolveSubpath` filesystem stat every tick, forever, for a
-     * subpath that will never successfully commit again — exactly the idle-fast-path defeat this
-     * whole commit/backoff design exists to avoid.
+     * **Judgement call (Task 7 fix round 2, narrowed in fix round 3):** [CommitOutcome.NotApplicable]
+     * covers three distinct conditions, and they are NOT equivalent for whether it's safe to clear
+     * the dirty flag:
+     * 1. not placed (`registry.placedBoxOf(subpath) == null`) — genuinely nothing left to commit.
+     *    There is no world content standing by; the dirty flag is cleared unconditionally. This is
+     *    safe because `handleRename` is the only caller of [EditorDimRegistry.unplaceStructure]
+     *    repo-wide, and it commits every dirty subpath under the rename (aborting the whole rename
+     *    on [Failed]) BEFORE unplacing — so a dirty key never survives into an unplace.
+     * 2. no root (`EditorNetworking.rootFor(server) == null`) or no file
+     *    (`root.resolveSubpath(subpath) == null`, which fails whenever the candidate file doesn't
+     *    currently exist on disk) — while the structure IS still placed. Root/file resolution
+     *    depends on state this object does not own: an external delete-then-restore, a git
+     *    checkout, cloud sync, AV quarantine, or the player swapping project roots
+     *    (`handleSetRoot`) mid-edit. A still-placed structure's world blocks are the only copy of
+     *    its unsaved edits, and they remain live in the level the whole time root/file are
+     *    unresolvable. Clearing the dirty flag here would discard the *only* signal that those
+     *    blocks still need to be written, with no path back: neither `tick` nor `commitAll` scan a
+     *    non-dirty subpath, so if the root/file becomes resolvable again later (root swapped back,
+     *    file restored) nothing ever re-commits it. So for (2) the dirty flag is left untouched
+     *    while placed, and cleared only if the structure also isn't placed (falls through to case
+     *    1's reasoning instead).
+     *
+     * The remaining backoff-map entry for a genuinely-broken, still-placed root/file costs one
+     * `resolveSubpath` filesystem stat per due `tick`, bounded by [FAILURE_BACKOFF_TICKS]-like
+     * debounce spacing — an acceptable, narrow cost for not losing edits, versus the old
+     * unconditional clear which was cheaper but could silently drop live content.
      */
     fun commit(
         server: MinecraftServer,
@@ -142,15 +156,25 @@ object StructureCommit {
         writeNbt: (CompoundTag, Path) -> Unit = StructurePersistence::writeStructureAtomic,
     ): CommitOutcome {
         val autoSave = StructureAutoSave.of(server)
-        fun notApplicable(): CommitOutcome {
+        val registry = EditorDimRegistry.of(server)
+        val placedBeforeResolve = registry.placedBoxOf(subpath)
+        // Root/file unresolvable while still placed: leave the dirty flag alone (case 2 above) so
+        // the edits still live in the world can be recommitted once root/file resolve again.
+        fun notApplicableUnresolved(): CommitOutcome {
+            if (placedBeforeResolve == null) {
+                autoSave.clear(subpath)
+                clearBackoff(server, subpath)
+            }
+            return CommitOutcome.NotApplicable
+        }
+        val root = EditorNetworking.rootFor(server) ?: return notApplicableUnresolved()
+        val file = root.resolveSubpath(subpath) ?: return notApplicableUnresolved()
+        // Not placed (case 1 above): genuinely nothing left to commit, clear unconditionally.
+        val placed = registry.placedBoxOf(subpath) ?: run {
             autoSave.clear(subpath)
             clearBackoff(server, subpath)
             return CommitOutcome.NotApplicable
         }
-        val root = EditorNetworking.rootFor(server) ?: return notApplicable()
-        val file = root.resolveSubpath(subpath) ?: return notApplicable()
-        val registry = EditorDimRegistry.of(server)
-        val placed = registry.placedBoxOf(subpath) ?: return notApplicable()
 
         val scan = union(placed, autoSave.dirtyBox(subpath)) ?: run {
             autoSave.clear(subpath)
