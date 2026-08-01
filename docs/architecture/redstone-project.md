@@ -187,14 +187,19 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
   the `.nbt` directly; there is no dirty-buffer sidecar. `ServerTickEvents.END_SERVER_TICK` calls
   `StructureCommit.tick`, which commits any placed structure whose `StructureAutoSave` dirty state
   has gone quiet for `SharedSettings.autoSaveDebounceTicks` (or has been continuously dirty for
-  `autoSaveMaxDirtyTicks`); `ServerLifecycleEvents.BEFORE_SAVE` and `SERVER_STOPPED` both call
-  `StructureCommit.commitAll` as a backstop flush regardless of timing. `SaveStructureC2S` →
+  `autoSaveMaxDirtyTicks`); `ServerLifecycleEvents.BEFORE_SAVE` and `SERVER_STOPPING` both call
+  `StructureCommit.commitAll` as a backstop flush regardless of timing — both fire while every
+  level is still live (`SERVER_STOPPED`, by contrast, fires at `stopServer` TAIL after every level
+  has closed, so retrying a failed commit there against a closed `ServerLevel` is unsafe; it's used
+  only for the disposal calls below, not for `commitAll`). `SaveStructureC2S` →
   `handleSaveStructure` is a force-commit through the same `StructureCommit.commit` (reason
   `REASON_MANUAL`), so "Save Structure" and auto-save write through the identical path. A commit
   scans only `union(placedBox, dirtyBox)` via `StructurePersistence.captureAutoFitIn` — never the
-  full 144×full-height region — writes the `.nbt` directly, records a `LocalHistoryStore` revision
-  BEFORE the rewrite (so the pre-edit content is never lost even if the `.nbt` write itself fails),
-  and broadcasts `StructureAutoSavedS2C`. `SERVER_STOPPED` also calls `StructureAutoSave.dispose`
+  full 144×full-height region — records a `LocalHistoryStore` revision capturing the NEWLY CAPTURED
+  content BEFORE overwriting the `.nbt` with it (so that content is durably banked before it
+  becomes the live file; the pre-edit content itself lives in the *previous* revision, banked by an
+  earlier commit — see `docs/persistence/local-history.md` for the rollback implication), and
+  broadcasts `StructureAutoSavedS2C`. `SERVER_STOPPED` calls `StructureAutoSave.dispose`
   so per-server dirty state cannot leak across server lifecycles. Since there is no dirty buffer to
   revert to, there is no "Discard" action — an edit's only rollback path is `LocalHistoryStore`.
   See `docs/persistence/local-history.md` for the on-disk layout and pruning policy, and

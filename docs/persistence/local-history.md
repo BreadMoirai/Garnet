@@ -8,11 +8,18 @@ summary: How auto-saved .nbt structures record revisions under <instance>/.garne
 
 `com.breadmoirai.garnet.history.LocalHistoryStore` is a JetBrains-style local history for
 standalone `.nbt` structures: every time `StructureCommit` is about to rewrite a structure's
-`.nbt` file, it first writes a **revision** — a snapshot of the structure as it was immediately
-before that rewrite — so an edit can be rolled back even though there is no "Discard" action and
-no in-memory undo buffer. See [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
+`.nbt` file, it first writes a **revision** — a snapshot of the NEWLY CAPTURED content that is
+about to become the live `.nbt`, not the content being replaced — so an edit can be rolled back
+even though there is no "Discard" action and no in-memory undo buffer. See
+[architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
 for how commits are triggered, and [spec-on-disk-format.md](spec-on-disk-format.md) for where the
 history directory sits relative to the rest of a world's on-disk layout.
+
+**Rollback implication (read this before trusting `revisions.last()`):** the model is a `placed`
+baseline plus one POST-commit revision per commit — each revision is what the `.nbt` became, not
+what it was before. So to undo the most recent edit, restore `revisions[size - 2]` (the revision
+*before* the latest one), not `revisions.last()` — the last revision already matches what's
+currently on disk.
 
 ## Layout
 
@@ -32,8 +39,10 @@ differ.
 Inside a structure's directory, each revision is one compressed-NBT blob named
 `<epochMillis>-<seq>.nbt` (the `-<seq>` suffix only appears when two writes land in the same
 millisecond) plus one shared `index.json` listing every revision's filename, timestamp, size
-(`sizeX`/`sizeY`/`sizeZ`), `blockCount`, and a `reason` tag (`"placed"`, `"autosave"`, or
-`"manual"`). `index.json` also records the absolute path it was keyed from, so a hand-inspection of
+(`sizeX`/`sizeY`/`sizeZ`), `blockCount`, and a `reason` tag (`"placed"`, `"autosave"`, `"manual"`,
+or `"external"` — content found on disk that didn't match the newest banked revision, i.e. edited
+outside the editor between sessions; see "Out-of-band edits are banked too" below). `index.json`
+also records the absolute path it was keyed from, so a hand-inspection of
 an opaque hash directory can identify which structure it belongs to and a hash collision would be
 noticeable rather than silently interleaving two structures' revisions. `LocalHistoryStore` is the
 sole reader/writer of this layout; nothing else touches these files directly.
@@ -74,9 +83,22 @@ recording as a whole is gated by `localHistoryEnabled` (default true); when disa
 
 ## Revision-before-rewrite ordering, and why `prune` is deferred
 
-`StructureCommit` always writes a revision capturing the structure's *current* on-disk state before
-it overwrites the `.nbt` file with the newly captured world state. This guarantees the pre-edit
-content is recoverable even if the `.nbt` write itself then fails partway through.
+`StructureCommit` always writes a revision capturing the NEWLY CAPTURED world state before it
+overwrites the `.nbt` file with that same content. This guarantees the new content is durably
+recorded before it becomes the live file, so a `.nbt` write that fails partway through can't lose
+it — the pre-edit content itself lives in the *previous* revision (or the `placed` baseline),
+already banked by an earlier commit.
+
+## Out-of-band edits are banked too
+
+If a structure's `.nbt` was changed *outside* the editor between commits — an external NBT tool, a
+`git checkout`, a restore-from-backup — the revision-before-rewrite ordering above alone would lose
+that content with no recovery point: the next commit would capture the world's content, overwrite
+the `.nbt`, and the out-of-band content would never have been banked anywhere. `StructureCommit`
+guards against this: before writing the new revision, it reads what's currently on disk and, if it
+doesn't match the newest existing revision's content (`structuresDiffer`), banks it first as a
+`REASON_EXTERNAL` revision. This only fires when there's a genuine mismatch — the common case
+(disk already matches the newest revision, because the previous commit wrote both) is a no-op.
 
 Because that revision is written speculatively — before the outcome of the rewrite it's guarding is
 known — it must not be pruned yet. If the `.nbt` write then fails, `LocalHistoryStore.discardRevision`
@@ -109,12 +131,12 @@ because those are written from a `CapturedStructure` produced by scanning the wo
 
 ## The only writer
 
-`com.breadmoirai.garnet.editor.world.StructureCommit` is the only caller that writes autosave or
-manual revisions; `EditorNetworking` writes the one `placed` baseline revision at place time. No
-other code path calls `LocalHistoryStore.writeRevision` — there is no separate "manual snapshot"
-feature. See `docs/architecture/redstone-project.md#standalone-structure-files` for how
-`StructureCommit` decides *when* to commit (debounce ticks, max-dirty cap, and the
-`BEFORE_SAVE`/`SERVER_STOPPED` backstops).
+`com.breadmoirai.garnet.editor.world.StructureCommit` is the only caller that writes autosave,
+manual, or external revisions; `EditorNetworking` writes the one `placed` baseline revision at
+place time. No other code path calls `LocalHistoryStore.writeRevision` — there is no separate
+"manual snapshot" feature. See `docs/architecture/redstone-project.md#standalone-structure-files`
+for how `StructureCommit` decides *when* to commit (debounce ticks, max-dirty cap, and the
+`BEFORE_SAVE`/`SERVER_STOPPING` backstops).
 
 ## Test coverage
 

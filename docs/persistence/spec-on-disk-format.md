@@ -42,9 +42,11 @@ garnetSpec("door_latch") {
   Saved/loaded by `StructurePersistence`. Independent of the `.spec.kts`
   file; the spec references it by `structure = "<id>"`.
 - **`<instance>/.garnet/local-history/`** — per-structure revision history written by
-  `StructureCommit` before every `.nbt` rewrite, keyed by the structure file's own absolute path.
-  There is no dirty-buffer sidecar: a standalone `.nbt` auto-saves directly, on a debounce, and the
-  pre-edit content is recovered from history rather than from an unsaved buffer. See
+  `StructureCommit` before every `.nbt` rewrite (each revision holds what the `.nbt` is ABOUT TO
+  become, not what it was before — see `docs/persistence/local-history.md` for the rollback
+  implication), keyed by the structure file's own absolute path. There is no dirty-buffer sidecar:
+  a standalone `.nbt` auto-saves directly, on a debounce, and a discarded edit is recovered from
+  an earlier history revision rather than from an unsaved buffer. See
   `docs/persistence/local-history.md`.
 
 `.nbt` files are also standalone Explorer citizens, not just spec sidecars: they can be
