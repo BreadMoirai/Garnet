@@ -122,7 +122,7 @@ object StructureCommit {
      * [StructurePersistence.writeStructureAtomic]).
      *
      * **Judgement call (Task 7 fix round 2, narrowed in fix round 3):** [CommitOutcome.NotApplicable]
-     * covers three distinct conditions, and they are NOT equivalent for whether it's safe to clear
+     * covers two distinct conditions, and they are NOT equivalent for whether it's safe to clear
      * the dirty flag:
      * 1. not placed (`registry.placedBoxOf(subpath) == null`) — genuinely nothing left to commit.
      *    There is no world content standing by; the dirty flag is cleared unconditionally. This is
@@ -143,10 +143,14 @@ object StructureCommit {
      *    while placed, and cleared only if the structure also isn't placed (falls through to case
      *    1's reasoning instead).
      *
-     * The remaining backoff-map entry for a genuinely-broken, still-placed root/file costs one
-     * `resolveSubpath` filesystem stat per due `tick`, bounded by [FAILURE_BACKOFF_TICKS]-like
-     * debounce spacing — an acceptable, narrow cost for not losing edits, versus the old
-     * unconditional clear which was cheaper but could silently drop live content.
+     * A still-placed, unresolved subpath is given a [FAILURE_BACKOFF_TICKS] backoff entry directly
+     * (not via [onCommitFailure], which would log every window — an unresolved path isn't a write
+     * failure and shouldn't spam the log), so [tick]'s automatic pass retries it at most once per
+     * backoff window instead of every tick — a `resolveSubpath` filesystem stat roughly every 5s
+     * instead of 20x/second — while an explicit [commit] call always attempts regardless. That
+     * backoff entry is cleared the same way any other is, on the first [Committed]/[NoChange]
+     * outcome, so a structure whose root/file resolves again commits promptly rather than waiting
+     * out a stale window.
      */
     fun commit(
         server: MinecraftServer,
@@ -159,11 +163,19 @@ object StructureCommit {
         val registry = EditorDimRegistry.of(server)
         val placedBeforeResolve = registry.placedBoxOf(subpath)
         // Root/file unresolvable while still placed: leave the dirty flag alone (case 2 above) so
-        // the edits still live in the world can be recommitted once root/file resolve again.
+        // the edits still live in the world can be recommitted once root/file resolve again. Still
+        // set a backoff entry directly (not via onCommitFailure, which would log once per window —
+        // this isn't a write failure, just an unresolved path, and shouldn't spam the log) so
+        // tick's per-tick dueForCommit check doesn't retry (and stat the filesystem) 20x/second for
+        // as long as the root/file stays broken; once it resolves again, the paths below that
+        // already clearBackoff on success clear this entry too, so a restored structure commits
+        // promptly rather than waiting out a stale window.
         fun notApplicableUnresolved(): CommitOutcome {
             if (placedBeforeResolve == null) {
                 autoSave.clear(subpath)
                 clearBackoff(server, subpath)
+            } else {
+                backoffMap(server)[subpath] = now + FAILURE_BACKOFF_TICKS
             }
             return CommitOutcome.NotApplicable
         }

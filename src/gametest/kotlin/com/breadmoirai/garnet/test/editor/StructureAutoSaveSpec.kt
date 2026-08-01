@@ -24,6 +24,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.server.MinecraftServer
 import net.minecraft.world.level.block.Blocks
 import java.io.IOException
 import java.nio.file.Path
@@ -605,8 +606,10 @@ class StructureAutoSaveSpec : GarnetTestSpec({
             EditorNewStructure.create(tmp, "recoverable")
             val displaced = kotlin.io.path.createTempDirectory("autosave-unresolvable-displaced")
                 .resolve("recoverable.nbt")
+            var server: MinecraftServer? = null
             try {
                 onServer {
+                    server = this
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
                     EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("recoverable.nbt"))
@@ -653,6 +656,16 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     StructureAutoSave.of(this).isDirty("recoverable.nbt") shouldBe false
                 }
             } finally {
+                // If the body threw between the two Files.move calls (or anywhere after the edit),
+                // "recoverable.nbt" could be left placed + dirty on the shared gametest server, whose
+                // root (tmp) is about to be deleted. Under this round's semantics a still-placed
+                // dirty entry with an unresolvable root now SURVIVES (that's the point of the fix),
+                // so without this it would stat the filesystem every backoff window for the rest of
+                // the suite. Forget it explicitly, same as the round-2 tests do.
+                server?.let {
+                    StructureAutoSave.of(it).clear("recoverable.nbt")
+                    StructureCommit.clearBackoff(it, "recoverable.nbt")
+                }
                 displaced.parent.toFile().deleteRecursively()
                 SharedSettings.structureRegionChunks = prevChunks
                 SharedSettings.localHistoryDir = prevHistDir
