@@ -9,7 +9,10 @@ import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
@@ -144,7 +147,7 @@ object LocalHistoryStore {
             dir.createDirectories()
             NbtIo.writeCompressed(tag, dir.resolve(name))
             val merged = (index.revisions + revision).sortedBy { it.timestampMillis }
-            val toWrite = if (prune) prune(dir, merged, nowMillis) else merged
+            val toWrite = if (prune) survivingRevisions(merged, nowMillis) else merged
             try {
                 writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), toWrite))
             } catch (e: IOException) {
@@ -158,6 +161,10 @@ object LocalHistoryStore {
                 )
                 return null
             }
+            // Only now that the index no longer references them is it safe to delete the pruned
+            // blobs. Deleting first would leave the index pointing at blobs that are already gone
+            // for as long as the index write took — and permanently, if that write then failed.
+            if (prune) deleteDroppedBlobs(dir, merged, toWrite)
             revision
         } catch (e: IOException) {
             LOGGER.error("[LocalHistoryStore] write revision for '{}': {}", structureFile, e.message)
@@ -177,10 +184,13 @@ object LocalHistoryStore {
         val dir = dirFor(structureFile)
         val index = readIndex(structureFile)
         if (index.revisions.isEmpty()) return
-        val pruned = prune(dir, index.revisions, nowMillis)
+        val pruned = survivingRevisions(index.revisions, nowMillis)
         if (pruned.size == index.revisions.size) return
         runCatching {
             writeIndex(structureFile, HistoryIndex(normalizePath(structureFile, onWindows()), pruned))
+            // Blobs are deleted only after the index that stopped referencing them is durable —
+            // never the other way round. See [writeRevision].
+            deleteDroppedBlobs(dir, index.revisions, pruned)
         }.onFailure { e ->
             LOGGER.error("[LocalHistoryStore] prune index rewrite for '{}': {}", structureFile, e.message)
         }
@@ -293,19 +303,29 @@ object LocalHistoryStore {
     }
 
     /**
-     * Applies the age cutoff then the count cap to [revisions], deleting the blobs it drops.
-     * Returns what survives, chronological.
+     * Applies the age cutoff then the count cap to [revisions] and returns what survives,
+     * chronological. **Pure** — it touches no files. Deleting the blobs it drops is a separate step
+     * ([deleteDroppedBlobs]) precisely so a caller can order the two correctly: the index must stop
+     * referencing a blob *before* that blob is deleted, never after.
      */
-    private fun prune(dir: Path, revisions: List<Revision>, nowMillis: Long): List<Revision> {
+    private fun survivingRevisions(revisions: List<Revision>, nowMillis: Long): List<Revision> {
         val cutoff = nowMillis - SharedSettings.localHistoryDays.toLong() * MILLIS_PER_DAY
         val byAge = revisions.filter { it.timestampMillis >= cutoff }
-        val capped = byAge.takeLast(SharedSettings.localHistoryMaxRevisions.coerceAtLeast(1))
-        val keptFiles = capped.mapTo(HashSet()) { it.file }
-        for (dropped in revisions) {
+        return byAge.takeLast(SharedSettings.localHistoryMaxRevisions.coerceAtLeast(1))
+    }
+
+    /**
+     * Deletes every blob in [all] that [kept] no longer references. Call this only once the index
+     * recording [kept] is durable: an index that references a deleted blob degrades a revision to
+     * unreadable, whereas a blob nothing references is merely wasted disk that the next prune
+     * cleans up.
+     */
+    private fun deleteDroppedBlobs(dir: Path, all: List<Revision>, kept: List<Revision>) {
+        val keptFiles = kept.mapTo(HashSet()) { it.file }
+        for (dropped in all) {
             if (dropped.file in keptFiles) continue
             runCatching { dir.resolve(dropped.file).deleteIfExists() }
         }
-        return capped
     }
 
     private fun readIndex(structureFile: Path): HistoryIndex {
@@ -320,13 +340,33 @@ object LocalHistoryStore {
     }
 
     /**
-     * Writes `index.json`. Throws [IOException] on failure rather than swallowing it — callers
-     * must decide how to react (undo a just-written blob, abort a move, etc.); this function has
-     * no way to know what "recover" means for each caller, so it must not silently report success.
+     * Writes `index.json` crash-safely: to a same-directory temp file first, then an atomic (or
+     * best-effort) move over the target — the same pattern
+     * [com.breadmoirai.garnet.structure.StructurePersistence.writeStructureAtomic] uses for the
+     * `.nbt` itself. A plain `writeText` truncates in place, so a crash, power loss, or full disk
+     * mid-write would leave a half-written `index.json`; [readIndex] can only degrade that to "no
+     * history", silently hiding every revision whose blob is still sitting right there on disk.
+     *
+     * Throws [IOException] on failure rather than swallowing it — callers must decide how to react
+     * (undo a just-written blob, abort a move, etc.); this function has no way to know what
+     * "recover" means for each caller, so it must not silently report success.
      */
     private fun writeIndex(structureFile: Path, index: HistoryIndex) {
         val dir = dirFor(structureFile)
         dir.createDirectories()
-        dir.resolve(INDEX_FILE).writeText(GSON.toJson(index))
+        val target = dir.resolve(INDEX_FILE)
+        val tmp = dir.resolve(".$INDEX_FILE.tmp-${System.nanoTime()}")
+        try {
+            tmp.writeText(GSON.toJson(index))
+            try {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (e: AtomicMoveNotSupportedException) {
+                // Some filesystems (certain network mounts, cross-device moves) reject ATOMIC_MOVE;
+                // a plain replace is still far safer than truncating the live index in place.
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(tmp)
+        }
     }
 }

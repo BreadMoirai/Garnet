@@ -42,6 +42,11 @@ millisecond) plus one shared `index.json` listing every revision's filename, tim
 (`sizeX`/`sizeY`/`sizeZ`), `blockCount`, and a `reason` tag (`"placed"`, `"autosave"`, `"manual"`,
 or `"external"` — content found on disk that didn't match the newest banked revision, i.e. edited
 outside the editor between sessions; see "Out-of-band edits are banked too" below). `index.json`
+`index.json` is rewritten crash-safely — to a same-directory temp file, then an atomic move over
+the target, the same pattern `StructurePersistence.writeStructureAtomic` uses for the `.nbt` itself.
+A plain truncate-in-place write would let a crash, power loss, or full disk leave a half-written
+index, and `readIndex` can only degrade that to "no history" — silently hiding every revision whose
+blob is still sitting right there on disk. `index.json`
 also records the absolute path it was keyed from, so a hand-inspection of
 an opaque hash directory can identify which structure it belongs to and a hash collision would be
 noticeable rather than silently interleaving two structures' revisions. `LocalHistoryStore` is the
@@ -74,7 +79,11 @@ Pruning applies two policies, age first then count, both driven by `SharedSettin
   kept.
 
 Dropped revisions have their blobs deleted from disk — pruning is destructive, not a soft
-tombstone. `writeRevision(..., prune = true)` (the default) prunes immediately after a successful
+tombstone. Those deletions happen **after** the rewritten `index.json` has landed, never before:
+an index that still names a blob which is already gone degrades that revision to unreadable,
+whereas a blob nothing references is merely wasted disk the next prune cleans up. Of the two ways
+to be inconsistent mid-prune, only one loses data, so the ordering is chosen to fail into the
+other. `writeRevision(..., prune = true)` (the default) prunes immediately after a successful
 write. `StructureCommit` instead passes `prune = false` and calls the standalone `prune(file)`
 entry point itself, but only *after* the `.nbt` rewrite that revision was guarding has actually
 succeeded — see "Revision-before-rewrite ordering" below for why that separation matters. History

@@ -148,6 +148,39 @@ class LocalHistoryStoreSpec : GarnetTestSpec({
         }
     }
 
+    test("a pruning write leaves every indexed revision readable and no temp litter behind") {
+        withStore { _ ->
+            // The index must never reference a blob that has already been deleted, and index.json
+            // must never be left half-written. writeIndex writes via a temp file + ATOMIC_MOVE, and
+            // pruned blobs are deleted only AFTER that index write lands — so at every observable
+            // point the directory is self-consistent.
+            SharedSettings.localHistoryDays = 3650
+            SharedSettings.localHistoryMaxRevisions = 3
+            val proj = createTempDirectory("proj-consistent")
+            val file = proj.resolve("clock.nbt")
+            repeat(6) { i ->
+                LocalHistoryStore.writeRevision(
+                    file, tagWith("r$i"), 1, 1, 1, 1, LocalHistoryStore.REASON_AUTOSAVE,
+                    nowMillis = 2_000L + i,
+                )
+            }
+
+            val kept = LocalHistoryStore.revisions(file)
+            kept shouldHaveSize 3
+            // Every revision the index still names resolves to a real, readable blob.
+            for (revision in kept) {
+                LocalHistoryStore.readTag(file, revision).shouldNotBeNull()
+                    .getStringOr("garnetTestMarker", "") shouldNotBe ""
+            }
+            val dir = LocalHistoryStore.dirFor(file)
+            // No orphan blobs, and no abandoned index temp file.
+            dir.listDirectoryEntries("*.nbt") shouldHaveSize 3
+            dir.listDirectoryEntries("*.tmp-*") shouldHaveSize 0
+
+            proj.toFile().deleteRecursively()
+        }
+    }
+
     test("localHistoryEnabled=false writes nothing") {
         withStore { _ ->
             SharedSettings.localHistoryEnabled = false
