@@ -21,7 +21,7 @@ import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -29,6 +29,7 @@ import io.kotest.matchers.shouldNotBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Blocks
+import java.nio.file.Files
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
@@ -104,7 +105,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 payloads.filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
                 payloads.filterIsInstance<StructureResultS2C>() shouldHaveSize 0
 
-                val after = java.nio.file.Files.readAllBytes(tmp.resolve("unplaced.nbt"))
+                val after = Files.readAllBytes(tmp.resolve("unplaced.nbt"))
                 after shouldBe before
 
                 EditorDimRegistry.of(this).structureRegionOriginOf("unplaced.nbt").shouldBeNull()

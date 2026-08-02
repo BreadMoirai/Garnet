@@ -5,8 +5,8 @@ import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.test.GametestSentinel
-import com.breadmoirai.garnet.mc.awaitTicks
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.awaitTicks
+import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos

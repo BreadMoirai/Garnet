@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.mc
+package com.breadmoirai.garnet.core.events
 
 import com.breadmoirai.garnet.spec.Phase
 import net.fabricmc.fabric.api.event.Event

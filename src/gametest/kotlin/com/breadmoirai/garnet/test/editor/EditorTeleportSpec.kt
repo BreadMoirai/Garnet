@@ -10,7 +10,7 @@ import com.breadmoirai.garnet.editor.world.EditorWorld
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe

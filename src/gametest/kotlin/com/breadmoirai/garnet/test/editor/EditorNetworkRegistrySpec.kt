@@ -28,7 +28,7 @@ import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
@@ -132,7 +132,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 val bounds = world.perFolder["set"]!!["a"]!!.spec.bounds
                 clearCellVolume(level, abs, bounds)
                 EditorDimLifecycle.placeFolder(this, root, "set")
-                level.setBlock(abs.offset(1, 1, 1), net.minecraft.world.level.block.Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                level.setBlock(abs.offset(1, 1, 1), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                 drainPayloads(player)
 
                 EditorNetworking.handleSaveNow(this, player)

@@ -19,7 +19,7 @@ object EditorCommand {
     fun register(dispatcher: CommandDispatcher<CommandSourceStack>) {
         dispatcher.register(
             Commands.literal("garnet")
-                .then(Commands.literal("project").executes(::open))
+                .then(Commands.literal("editor").executes(::open))
         )
     }
 
@@ -33,7 +33,7 @@ object EditorCommand {
             ?: if (rootCfg.isNotBlank()) EditorRoot(Path.of(rootCfg).toAbsolutePath()) else null
 
         if (root == null) {
-            src.sendSystemMessage(Component.literal("§cRedstone Project root not configured. Use the world-list 'Redstone Projects…' button (singleplayer) or set 'projectRootPath' in config (dedicated server)."))
+            src.sendSystemMessage(Component.literal("§cProject root not configured. Use the world-list 'Redstone Projects…' button (singleplayer) or set 'projectRootPath' in config (dedicated server)."))
             return 0
         }
 

@@ -8,11 +8,12 @@ import com.breadmoirai.garnet.editor.world.EditorWorld
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
@@ -76,10 +77,10 @@ class EditorDimSpec : GarnetTestSpec({
                 val absB = world.absoluteCellOrigin(this, "set-b", "b").shouldNotBeNull()
                 val level = EditorDimRegistry.of(this).projectLevel().shouldNotBeNull()
                 val air = Blocks.AIR.defaultBlockState()
-                for (pos in net.minecraft.core.BlockPos.betweenClosed(absA, absA.offset(2, 2, 2))) {
+                for (pos in BlockPos.betweenClosed(absA, absA.offset(2, 2, 2))) {
                     level.setBlock(pos, air, 2)
                 }
-                for (pos in net.minecraft.core.BlockPos.betweenClosed(absB, absB.offset(1, 1, 1))) {
+                for (pos in BlockPos.betweenClosed(absB, absB.offset(1, 1, 1))) {
                     level.setBlock(pos, air, 2)
                 }
                 EditorDimLifecycle.placeFolder(this, root, "set-b")
@@ -231,7 +232,7 @@ class EditorDimSpec : GarnetTestSpec({
                 for (sub in listOf("set-a", "set-b")) {
                     val id = world.perFolder[sub]!!.keys.single()
                     val abs = world.absoluteCellOrigin(this, sub, id).shouldNotBeNull()
-                    level.setBlock(abs.offset(1, 1, 1), net.minecraft.world.level.block.Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    level.setBlock(abs.offset(1, 1, 1), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                 }
                 val r = EditorDimLifecycle.saveAll(this)
                 EditorWorld.clear(this)

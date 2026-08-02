@@ -11,7 +11,7 @@ import com.breadmoirai.garnet.test.editor.StructureAutoSaveSpec
 import com.breadmoirai.garnet.test.history.LocalHistoryStoreSpec
 import com.breadmoirai.garnet.test.structure.StructureRegionPersistenceSpec
 import com.breadmoirai.garnet.test.structure.StructureSidecarPersistenceSpec
-import com.breadmoirai.garnet.mc.McLifecycle
+import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import com.breadmoirai.garnet.harness.launcher.launchKotest
 import net.fabricmc.fabric.api.gametest.v1.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
@@ -54,7 +54,7 @@ class GametestSentinel {
         testOrigin = helper.absolutePos(net.minecraft.core.BlockPos.ZERO)
         // SERVER_STARTED has already fired by the time a GameTest method runs.
         // Register tick events and install the dispatcher directly from the live server.
-        McLifecycle.registerWithServer(server)
+        AsyncEventHandler.registerWithServer(server)
         val worker = Thread.ofPlatform()
             .name("kotest-gametest")
             .uncaughtExceptionHandler { _, t ->

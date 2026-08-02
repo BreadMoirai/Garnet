@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.mc
 
+import com.breadmoirai.garnet.core.async.awaitTicks
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.async

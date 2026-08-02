@@ -22,7 +22,7 @@ import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldHaveSize

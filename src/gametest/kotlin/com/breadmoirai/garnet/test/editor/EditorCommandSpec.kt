@@ -11,7 +11,7 @@ import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.onServer
 import com.mojang.brigadier.CommandDispatcher
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe

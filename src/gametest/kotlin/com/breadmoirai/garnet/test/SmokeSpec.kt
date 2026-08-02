@@ -1,9 +1,9 @@
 package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.mc.McDispatchers
-import com.breadmoirai.garnet.mc.awaitTickEnd
-import com.breadmoirai.garnet.mc.awaitTicks
+import com.breadmoirai.garnet.core.async.AsyncDispatchers
+import com.breadmoirai.garnet.core.async.awaitTickEnd
+import com.breadmoirai.garnet.core.async.awaitTicks
 import io.kotest.matchers.shouldBe
 
 class SmokeSpec : GarnetTestSpec({
@@ -14,13 +14,13 @@ class SmokeSpec : GarnetTestSpec({
         // tickServer (MinecraftServer:1003), so reading tickCount before vs after that
         // increment racy-ily produces delta=2 or delta=3 from the same awaitTicks(3) call.
         awaitTickEnd()
-        val before = McDispatchers.currentServer.tickCount
+        val before = AsyncDispatchers.currentServer.tickCount
         awaitTicks(3)
-        val after = McDispatchers.currentServer.tickCount
+        val after = AsyncDispatchers.currentServer.tickCount
         (after - before) shouldBe 3
     }
 
     test("test body runs on the server thread") {
-        McDispatchers.currentServer.isSameThread shouldBe true
+        AsyncDispatchers.currentServer.isSameThread shouldBe true
     }
 })

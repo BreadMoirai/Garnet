@@ -8,8 +8,8 @@ import com.breadmoirai.garnet.spec.GarnetSpec
 import com.breadmoirai.garnet.spec.SimTime
 import com.breadmoirai.garnet.spec.SpecRun
 import com.breadmoirai.garnet.spec.StateRecordingViewLike
-import com.breadmoirai.garnet.mc.McDispatchers
-import com.breadmoirai.garnet.mc.awaitTickEnd
+import com.breadmoirai.garnet.core.async.AsyncDispatchers
+import com.breadmoirai.garnet.core.async.awaitTickEnd
 import kotlinx.coroutines.withContext
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -36,7 +36,7 @@ suspend fun runGarnetSpec(
     level: ServerLevel,
     origin: BlockPos,
     spec: GarnetSpec,
-): StateRecording = withContext(McDispatchers.Server) {
+): StateRecording = withContext(AsyncDispatchers.Server) {
     val snapshot = SpecSnapshot.capture(level, origin, spec.bounds)
     val recorderId = UUID.randomUUID()
     val recorder = StateRecorder.forSpec(recorderId, origin, spec.bounds)

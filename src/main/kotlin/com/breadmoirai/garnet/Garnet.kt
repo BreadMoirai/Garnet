@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet
 
 import com.breadmoirai.garnet.config.SharedSettings
-import com.breadmoirai.garnet.mc.SubTickPhaseEvents
+import com.breadmoirai.garnet.core.events.SubTickPhaseEvents
 import com.breadmoirai.garnet.editor.network.EditorNetworking
 import com.breadmoirai.garnet.editor.command.EditorCommand
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
@@ -10,10 +10,11 @@ import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.world.StructureAutoSave
 import com.breadmoirai.garnet.editor.world.StructureCommit
 import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.mc.McLifecycle
+import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.playback.recorder.StateRecorder
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
@@ -27,9 +28,9 @@ class Garnet : ModInitializer {
     override fun onInitialize() {
         LOGGER.debug("[Garnet#onInitialize] initializing mod")
         EditorNetworking.register()
-        McLifecycle.register()
+        AsyncEventHandler.register()
         SubTickPhaseEvents.PHASE.register { level, phase ->
-            com.breadmoirai.garnet.playback.recorder.StateRecorder.onPhaseForActiveRecorders(level, phase)
+            StateRecorder.onPhaseForActiveRecorders(level, phase)
         }
         ServerLifecycleEvents.SERVER_STARTING.register { server ->
             val cfg = SharedSettings.projectRootPath

@@ -12,8 +12,9 @@ import com.breadmoirai.garnet.editor.world.StructureCommit
 import com.breadmoirai.garnet.editor.world.StructureEditWatcher
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.mc.onServer
+import com.breadmoirai.garnet.core.async.onServer
 import com.breadmoirai.garnet.structure.StructurePersistence
+import com.breadmoirai.garnet.structure.structuresDiffer
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
@@ -27,10 +28,10 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.level.block.Blocks
 import java.io.IOException
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
 import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 
@@ -651,7 +652,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // an external delete-then-restore, a git checkout, cloud sync, a root swap, etc.
                     // The world blocks (the actual unsaved edit) are untouched; only resolveSubpath
                     // now fails because the candidate file doesn't exist.
-                    java.nio.file.Files.move(file, displaced)
+                    Files.move(file, displaced)
 
                     StructureCommit.commit(this, "recoverable.nbt", LocalHistoryStore.REASON_AUTOSAVE) shouldBe
                         StructureCommit.CommitOutcome.NotApplicable
@@ -664,7 +665,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     // Restore the file (the root/file condition that was blocking the commit clears)
                     // and confirm the surviving dirty flag lets it actually commit.
-                    java.nio.file.Files.move(displaced, file)
+                    Files.move(displaced, file)
 
                     val outcome = StructureCommit.commit(this, "recoverable.nbt", LocalHistoryStore.REASON_AUTOSAVE)
                         .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
@@ -946,7 +947,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                         tmp.resolve("extdonor.nbt"),
                         LocalHistoryStore.revisions(tmp.resolve("extdonor.nbt")).last(),
                     ).shouldNotBeNull()
-                    com.breadmoirai.garnet.structure.structuresDiffer(bankedTag, donorTag) shouldBe false
+                    structuresDiffer(bankedTag, donorTag) shouldBe false
                 }
             } finally {
                 SharedSettings.structureRegionChunks = prevChunks
@@ -1022,7 +1023,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     val bankedTag = LocalHistoryStore.readTag(externalFile, revisions[1]).shouldNotBeNull()
                     val donorTag = LocalHistoryStore.readTag(donorFile, LocalHistoryStore.revisions(donorFile).last())
                         .shouldNotBeNull()
-                    com.breadmoirai.garnet.structure.structuresDiffer(bankedTag, donorTag) shouldBe false
+                    structuresDiffer(bankedTag, donorTag) shouldBe false
                 }
             } finally {
                 SharedSettings.structureRegionChunks = prevChunks
