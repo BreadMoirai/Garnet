@@ -22,6 +22,8 @@ import com.breadmoirai.garnet.editor.world.StructureAutoSave
 import com.breadmoirai.garnet.editor.world.StructureCommit
 import com.breadmoirai.garnet.editor.world.StructureEditWatcher
 import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.structure.PlacedBox
+import net.minecraft.core.Vec3i
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
@@ -430,6 +432,55 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 SharedSettings.structureRegionChunks = prevChunks
                 SharedSettings.localHistoryDir = prevHistDir
                 histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("a root swap still proceeds when a dirty structure is merely unresolvable, not write-failed") {
+        // The refuse-on-failure guard above must NOT extend to an unresolvable root/file. Nothing
+        // could be written for such a structure however long we wait, and "Open Folder" is the very
+        // action that repairs an unresolvable root -- refusing would leave a player holding a stale
+        // placed-and-dirty structure with no way out. (Found by this suite: three pre-existing
+        // root-swap tests started failing when the guard covered both cases.)
+        withTempRoot("project-net-setroot-unresolvable") { tmp ->
+            val rootB = tmp.resolve("rootB").also { it.createDirectories() }
+            val prevChunks = SharedSettings.structureRegionChunks
+            SharedSettings.structureRegionChunks = 1
+
+            var server: MinecraftServer? = null
+            try {
+                onServer {
+                    server = this
+                    val player = makeMockServerPlayer(this)
+                    drainPayloads(player)
+
+                    // A structure that is placed and dirty, but whose root cannot be resolved at
+                    // all -- no EditorServerContext is set. commit() reports NotApplicable and
+                    // deliberately KEEPS the dirty flag, which is what used to block the swap.
+                    val registry = EditorDimRegistry.of(this)
+                    val origin = registry.getOrAssignStructureRegion("ghost.nbt")
+                    registry.setPlacedBox("ghost.nbt", PlacedBox(origin, Vec3i(1, 1, 1)))
+                    EditorServerContext.clear(this)
+                    EditorWorld.clear(this)
+                    StructureAutoSave.of(this).onEdit("ghost.nbt", origin, overworld().gameTime)
+                    StructureAutoSave.of(this).isDirty("ghost.nbt") shouldBe true
+
+                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+
+                    // The swap went through: the root actually changed, and no error was sent.
+                    SharedSettings.projectRootPath shouldBe rootB.toAbsolutePath().toString()
+                    drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 0
+
+                    SharedSettings.projectRootPath = ""
+                    EditorWorld.clear(this)
+                    EditorServerContext.clear(this)
+                }
+            } finally {
+                server?.let {
+                    StructureAutoSave.of(it).clear("ghost.nbt")
+                    StructureCommit.clearBackoff(it, "ghost.nbt")
+                }
+                SharedSettings.structureRegionChunks = prevChunks
             }
         }
     }

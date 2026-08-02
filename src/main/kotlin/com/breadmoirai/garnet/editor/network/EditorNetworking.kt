@@ -182,18 +182,31 @@ object EditorNetworking {
         // them over the NEW root's same-named file — silently destroying content that belongs to a
         // different project the player never touched.
         //
-        // If any of those commits genuinely fails (locked file, read-only checkout, AV scan), the
-        // swap is REFUSED rather than pushed through. The reset loop below unplaces every structure
-        // and clears its blocks out of the world, so proceeding would destroy the only remaining
-        // copy of those edits — the world blocks themselves — with nothing on disk and no message
-        // to the player. Same rule `handleRename` already applies before its file move.
+        // If any of those commits genuinely FAILS TO WRITE (locked file, read-only checkout, AV
+        // scan), the swap is REFUSED rather than pushed through. The reset loop below unplaces
+        // every structure and clears its blocks out of the world, so proceeding would destroy the
+        // only remaining copy of those edits — the world blocks themselves — with nothing on disk
+        // and no message to the player. Same rule `handleRename` applies before its file move.
+        //
+        // A structure that is merely UNRESOLVABLE (no root configured, file missing) is NOT grounds
+        // to refuse, unlike in handleRename: nothing could be written for it however long we wait,
+        // and "Open Folder" is the very action that fixes an unresolvable root — refusing here
+        // would leave a player with a stale placed-and-dirty structure no way out at all. Log it
+        // and proceed.
         val uncommitted = StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
-        if (uncommitted.isNotEmpty()) {
+        val writeFailures = uncommitted.filter { it.writeFailed }
+        if (writeFailures.isNotEmpty()) {
             ServerPlayNetworking.send(player, EditorErrorS2C(
                 "open folder cancelled: unsaved edits could not be committed for " +
-                    uncommitted.joinToString(", ") { "'${it.subpath}' (${it.reason})" },
+                    writeFailures.joinToString(", ") { "'${it.subpath}' (${it.reason})" },
             ))
             return
+        }
+        for (stale in uncommitted) {
+            LOGGER.warn(
+                "[project/setRoot] '{}' is dirty but unresolvable ({}); swapping root anyway",
+                stale.subpath, stale.reason,
+            )
         }
 
         val root = EditorRoot(abs)

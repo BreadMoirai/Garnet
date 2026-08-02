@@ -290,8 +290,18 @@ object StructureCommit {
     /**
      * A structure [commitAll] could not get onto disk: its edits still exist only as world blocks.
      * [reason] is human-readable, for reporting to the player.
+     *
+     * [writeFailed] separates the two very different ways this happens, because callers must treat
+     * them differently:
+     * - `true` — a genuine [CommitOutcome.Failed]: the file resolved and the write itself failed
+     *   (locked file, read-only checkout, AV scan). Retrying later can succeed, and the user can
+     *   fix the cause, so a caller about to destroy the world blocks should refuse and say so.
+     * - `false` — a [CommitOutcome.NotApplicable] whose subpath is still dirty: the root or file
+     *   isn't resolvable at all right now. Nothing could be written no matter how long we wait, and
+     *   refusing to proceed on this would trap the user — "Open Folder" is precisely the action
+     *   that fixes an unresolvable root, so blocking it leaves no way out.
      */
-    data class UncommittedStructure(val subpath: String, val reason: String)
+    data class UncommittedStructure(val subpath: String, val reason: String, val writeFailed: Boolean)
 
     /**
      * Backstop flush: commit every dirty structure regardless of debounce/backoff timing. Used on
@@ -310,9 +320,9 @@ object StructureCommit {
      * world-save and server-stop backstops ignore this (there is nobody to tell and nothing to
      * abort), but `handleSetRoot` must not: it unplaces every structure right after calling this,
      * so a structure left uncommitted here has its only copy — world blocks — destroyed moments
-     * later. It refuses the root swap instead. The same two conditions `handleRename` aborts on
-     * are reported: [CommitOutcome.Failed], and a [CommitOutcome.NotApplicable] whose subpath is
-     * still dirty afterward (an unresolvable root/file, which deliberately leaves the flag set).
+     * later. It refuses the root swap on any entry with [UncommittedStructure.writeFailed] set, and
+     * merely logs the rest — see that property's KDoc for why the two cases cannot be treated
+     * alike.
      */
     fun commitAll(server: MinecraftServer, reason: String): List<UncommittedStructure> {
         val autoSave = StructureAutoSave.of(server)
@@ -320,10 +330,13 @@ object StructureCommit {
         for (subpath in autoSave.dirtySubpaths()) {
             when (val outcome = commit(server, subpath, reason)) {
                 is CommitOutcome.Committed -> broadcast(server, outcome.payload)
-                is CommitOutcome.Failed -> uncommitted += UncommittedStructure(subpath, outcome.reason)
+                is CommitOutcome.Failed ->
+                    uncommitted += UncommittedStructure(subpath, outcome.reason, writeFailed = true)
                 is CommitOutcome.NotApplicable ->
                     if (autoSave.dirtySubpaths().contains(subpath)) {
-                        uncommitted += UncommittedStructure(subpath, "root or file is not resolvable right now")
+                        uncommitted += UncommittedStructure(
+                            subpath, "root or file is not resolvable right now", writeFailed = false,
+                        )
                     }
                 is CommitOutcome.NoChange -> Unit
             }

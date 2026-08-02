@@ -152,12 +152,19 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   with `EditorErrorS2C`. Otherwise it first flushes every dirty standalone structure against the
   **old** root via `StructureCommit.commitAll` — once the root swaps, `commit` resolves subpaths
   against the NEW root, so a late commit would write the old root's world blocks over a same-named
-  file in a different project. If `commitAll` reports any structure it could not commit (a
-  `CommitOutcome.Failed`, or a `NotApplicable` whose subpath is still dirty afterward), **the swap
-  is refused** with `EditorErrorS2C` and nothing is touched: the reset below unplaces every
-  structure and clears its blocks, so proceeding would destroy the only surviving copy of those
-  edits — the world blocks themselves. This is the same rule `handleRename` applies before its file
-  move. Only once every dirty structure has committed cleanly does it set
+  file in a different project. If `commitAll` reports any structure whose **write genuinely failed**
+  (`UncommittedStructure.writeFailed` — a `CommitOutcome.Failed`: locked file, read-only checkout,
+  AV scan), **the swap is refused** with `EditorErrorS2C` and nothing is touched: the reset below
+  unplaces every structure and clears its blocks, so proceeding would destroy the only surviving
+  copy of those edits — the world blocks themselves. This is the same rule `handleRename` applies
+  before its file move.
+
+  A structure that is merely **unresolvable** (`CommitOutcome.NotApplicable` while still dirty — no
+  root configured, file missing) is deliberately *not* grounds to refuse, and here `handleSetRoot`
+  diverges from `handleRename` on purpose. Nothing could be written for such a structure however
+  long the swap waits, and "Open Folder" is the very action that repairs an unresolvable root — so
+  refusing would leave a player holding a stale placed-and-dirty structure with no way out at all.
+  It is logged and the swap proceeds. Only once no write has failed does it set
   `SharedSettings.projectRootPath`, pin a new `EditorServerContext`, drop all per-structure state
   via `EditorDimRegistry.resetAllStructures` (clearing each structure's tight `placedBox` out of
   the project level as it goes — regions are never recycled, so blocks left behind would be
