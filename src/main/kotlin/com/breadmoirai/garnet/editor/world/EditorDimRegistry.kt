@@ -107,6 +107,33 @@ class EditorDimRegistry(private val server: MinecraftServer) {
     fun placedStructureSubpaths(): Set<String> = placedBoxes.keys.toSet()
 
     /**
+     * Every subpath this registry knows anything about: those with a placed box AND those holding
+     * only a region assignment. The two sets are **not** the same — [getOrAssignStructureRegion]
+     * runs before [setPlacedBox], so a place that errors in between (an unreadable `.nbt`, say)
+     * leaves a region assignment with no placed box, invisible to [placedStructureSubpaths].
+     * Anything that means to forget *all* structure state must iterate this, not that.
+     */
+    fun structureSubpaths(): Set<String> = structureBySubpath.keys + placedBoxes.keys
+
+    /**
+     * Forget every structure: all placed boxes and all region assignments. Returns the removed
+     * [PlacedBox]es so the caller can clear those blocks out of the world — regions are never
+     * recycled ([nextStructureIndex] is monotonic), so blocks left behind here would sit in the
+     * project level untouched for the rest of the session.
+     *
+     * Used by the root swap, which must leave nothing from the old root behind: a surviving
+     * placed box would let a later commit for the same subpath under the NEW root capture the OLD
+     * root's leftover world blocks, and a surviving region assignment would place the NEW root's
+     * file on top of them.
+     */
+    fun resetAllStructures(): List<PlacedBox> {
+        val boxes = placedBoxes.values.toList()
+        structureBySubpath.clear()
+        placedBoxes.clear()
+        return boxes
+    }
+
+    /**
      * Forget everything about a placed structure: its footprint record and its region assignment.
      * Returns the removed [PlacedBox] so the caller can clear those blocks, or null if it was not
      * placed.

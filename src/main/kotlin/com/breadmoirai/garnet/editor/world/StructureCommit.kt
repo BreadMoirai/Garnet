@@ -288,6 +288,12 @@ object StructureCommit {
     }
 
     /**
+     * A structure [commitAll] could not get onto disk: its edits still exist only as world blocks.
+     * [reason] is human-readable, for reporting to the player.
+     */
+    data class UncommittedStructure(val subpath: String, val reason: String)
+
+    /**
      * Backstop flush: commit every dirty structure regardless of debounce/backoff timing. Used on
      * world-save and server stop. `EditorNetworking.handleRename` also calls [commit] directly
      * (not this batch form) for the renamed structure AND every dirty descendant of a renamed
@@ -299,13 +305,30 @@ object StructureCommit {
      * `handleRename`, above, and `handleSetRoot`, which calls this very method ([commitAll]) to flush
      * the OLD root before unplacing every previously-placed subpath during a root swap — and both
      * commit dirty state before unplacing, already covered above.
+     *
+     * Returns the structures whose edits did NOT reach disk — empty on the happy path. The
+     * world-save and server-stop backstops ignore this (there is nobody to tell and nothing to
+     * abort), but `handleSetRoot` must not: it unplaces every structure right after calling this,
+     * so a structure left uncommitted here has its only copy — world blocks — destroyed moments
+     * later. It refuses the root swap instead. The same two conditions `handleRename` aborts on
+     * are reported: [CommitOutcome.Failed], and a [CommitOutcome.NotApplicable] whose subpath is
+     * still dirty afterward (an unresolvable root/file, which deliberately leaves the flag set).
      */
-    fun commitAll(server: MinecraftServer, reason: String) {
+    fun commitAll(server: MinecraftServer, reason: String): List<UncommittedStructure> {
         val autoSave = StructureAutoSave.of(server)
+        val uncommitted = mutableListOf<UncommittedStructure>()
         for (subpath in autoSave.dirtySubpaths()) {
-            val outcome = commit(server, subpath, reason)
-            if (outcome is CommitOutcome.Committed) broadcast(server, outcome.payload)
+            when (val outcome = commit(server, subpath, reason)) {
+                is CommitOutcome.Committed -> broadcast(server, outcome.payload)
+                is CommitOutcome.Failed -> uncommitted += UncommittedStructure(subpath, outcome.reason)
+                is CommitOutcome.NotApplicable ->
+                    if (autoSave.dirtySubpaths().contains(subpath)) {
+                        uncommitted += UncommittedStructure(subpath, "root or file is not resolvable right now")
+                    }
+                is CommitOutcome.NoChange -> Unit
+            }
         }
+        return uncommitted
     }
 
     /**

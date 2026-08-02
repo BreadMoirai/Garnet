@@ -181,7 +181,20 @@ object EditorNetworking {
         // structure committed after the swap would capture the OLD root's world blocks and write
         // them over the NEW root's same-named file — silently destroying content that belongs to a
         // different project the player never touched.
-        StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+        //
+        // If any of those commits genuinely fails (locked file, read-only checkout, AV scan), the
+        // swap is REFUSED rather than pushed through. The reset loop below unplaces every structure
+        // and clears its blocks out of the world, so proceeding would destroy the only remaining
+        // copy of those edits — the world blocks themselves — with nothing on disk and no message
+        // to the player. Same rule `handleRename` already applies before its file move.
+        val uncommitted = StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+        if (uncommitted.isNotEmpty()) {
+            ServerPlayNetworking.send(player, EditorErrorS2C(
+                "open folder cancelled: unsaved edits could not be committed for " +
+                    uncommitted.joinToString(", ") { "'${it.subpath}' (${it.reason})" },
+            ))
+            return
+        }
 
         val root = EditorRoot(abs)
         SharedSettings.projectRootPath = abs.toString()
@@ -190,14 +203,26 @@ object EditorNetworking {
         // Fully reset per-structure state so nothing from the old root carries across: a leftover
         // placedBox would let a later commit for the same subpath under the NEW root capture the
         // OLD root's leftover world blocks, and a leftover region assignment would place the NEW
-        // root's file on top of the OLD root's blocks (B1). Snapshot the subpath list first —
-        // unplaceStructure mutates the registry's backing maps.
+        // root's file on top of the OLD root's blocks (B1).
+        //
+        // Iterate structureSubpaths(), not placedStructureSubpaths(): a subpath that got a region
+        // assignment but never a placed box — handlePlaceStructure erroring between
+        // getOrAssignStructureRegion and setPlacedBox — is absent from the latter, so its
+        // assignment would survive the reset and outlive the root it belonged to.
         val registry = EditorDimRegistry.of(server)
         val autoSave = StructureAutoSave.of(server)
-        for (subpath in registry.placedStructureSubpaths()) {
+        for (subpath in registry.structureSubpaths()) {
             autoSave.clear(subpath)
             StructureCommit.clearBackoff(server, subpath)
-            registry.unplaceStructure(subpath)
+        }
+        // Clear the old root's blocks out of the project level as the assignments are dropped.
+        // Regions are never recycled (nextStructureIndex is monotonic), so blocks left behind here
+        // are unreachable for the rest of the session — harmless once, unbounded over many swaps.
+        // Each box is the structure's own tight footprint, so this stays far away from a
+        // region-wide scan.
+        val level = registry.projectLevel()
+        for (box in registry.resetAllStructures()) {
+            StructurePersistence.clearBounds(level, box.origin, box.size)
         }
 
         EditorDimLifecycle.placeAll(server, root)

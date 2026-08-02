@@ -30,6 +30,7 @@ import com.breadmoirai.garnet.mc.onServer
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -354,6 +355,142 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     StructureAutoSave.of(it).clear("clock.nbt")
                     StructureCommit.clearBackoff(it, "clock.nbt")
                 }
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("a failed commit during a root swap aborts the swap and reports an error") {
+        // FOLLOW-UP (whole-branch review, item 2): handleSetRoot used to ignore commitAll's result,
+        // then unconditionally clear dirty state and unplace every structure. A structure whose
+        // commit FAILED had its edits -- which exist only as world blocks -- discarded silently.
+        // The swap must be refused instead, exactly as handleRename refuses its file move.
+        withTempRoot("project-net-setroot-commitfail") { tmp ->
+            val rootA = tmp.resolve("rootA").also { it.createDirectories() }
+            val rootB = tmp.resolve("rootB").also { it.createDirectories() }
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("project-net-setroot-commitfail-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+
+            EditorNewStructure.create(rootA, "clock")
+            val fileA = rootA.resolve("clock.nbt")
+
+            var server: MinecraftServer? = null
+            var historyDir: java.nio.file.Path? = null
+            try {
+                onServer {
+                    server = this
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(rootA)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
+                    drainPayloads(player)
+
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+                    val lvl = overworld()
+                    val edited = region.offset(1, 0, 1)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+                    StructureAutoSave.of(this).isDirty("clock.nbt") shouldBe true
+
+                    // Force the commit's history write to fail deterministically and portably by
+                    // occupying index.json's path with a directory -- the same trick
+                    // EditorFileOpsNetworkSpec's rename-abort test uses.
+                    historyDir = LocalHistoryStore.dirFor(fileA)
+                    historyDir!!.resolve("index.json").toFile().delete()
+                    historyDir!!.resolve("index.json").createDirectories()
+
+                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+
+                    // Refused, with an error the player actually sees.
+                    drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+                    // The root did NOT swap.
+                    EditorNetworking.rootFor(this)!!.path shouldBe rootA
+                    // The edits are still recoverable: the structure is still placed and still
+                    // dirty, so a later commit (once the failure clears) can still write them.
+                    StructureAutoSave.of(this).isDirty("clock.nbt") shouldBe true
+                    EditorDimRegistry.of(this).placedBoxOf("clock.nbt").shouldNotBeNull()
+                    // The world blocks -- the only copy of those edits -- were not cleared.
+                    lvl.getBlockState(edited).`is`(Blocks.GOLD_BLOCK) shouldBe true
+                }
+            } finally {
+                // This test deliberately leaves "clock.nbt" dirty and its history dir booby-trapped.
+                server?.let {
+                    StructureAutoSave.of(it).clear("clock.nbt")
+                    StructureCommit.clearBackoff(it, "clock.nbt")
+                    EditorWorld.clear(it)
+                    EditorServerContext.clear(it)
+                }
+                historyDir?.resolve("index.json")?.toFile()?.delete()
+                SharedSettings.projectRootPath = ""
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("a root swap clears the old root's blocks and drops region assignments that never got a placed box") {
+        // FOLLOW-UP (whole-branch review, item 3): regions are never recycled, so blocks left in the
+        // project level after a swap are unreachable for the rest of the session. And the old reset
+        // loop iterated placedStructureSubpaths(), which misses a subpath that got a region
+        // assignment but never a placed box -- that assignment used to survive the swap.
+        withTempRoot("project-net-setroot-leak") { tmp ->
+            val rootA = tmp.resolve("rootA").also { it.createDirectories() }
+            val rootB = tmp.resolve("rootB").also { it.createDirectories() }
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("project-net-setroot-leak-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+
+            EditorNewStructure.create(rootA, "clock")
+
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(rootA)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
+                    drainPayloads(player)
+
+                    val registry = EditorDimRegistry.of(this)
+                    val lvl = overworld()
+                    val region = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+
+                    // A block inside the structure's placed footprint, committed so placedBox grows
+                    // to enclose it -- this is what must be gone from the world after the swap.
+                    val edited = region.offset(1, 0, 1)
+                    lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+                    StructureCommit.commit(this, "clock.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                    lvl.getBlockState(edited).`is`(Blocks.GOLD_BLOCK) shouldBe true
+
+                    // A subpath that got a region assignment but never a placed box -- exactly the
+                    // state handlePlaceStructure leaves behind when it errors after assigning.
+                    registry.getOrAssignStructureRegion("orphan.nbt")
+                    registry.structureRegionOriginOf("orphan.nbt").shouldNotBeNull()
+                    registry.placedBoxOf("orphan.nbt").shouldBeNull()
+
+                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+                    drainPayloads(player)
+
+                    // The old root's blocks are gone from the project level, not orphaned in a
+                    // region nothing will ever address again.
+                    lvl.getBlockState(edited).`is`(Blocks.AIR) shouldBe true
+                    // Both kinds of registry state are gone -- including the placed-box-less one.
+                    registry.placedBoxOf("clock.nbt").shouldBeNull()
+                    registry.structureRegionOriginOf("clock.nbt").shouldBeNull()
+                    registry.structureRegionOriginOf("orphan.nbt").shouldBeNull()
+
+                    SharedSettings.projectRootPath = ""
+                    EditorWorld.clear(this)
+                    EditorServerContext.clear(this)
+                }
+            } finally {
                 SharedSettings.structureRegionChunks = prevChunks
                 SharedSettings.localHistoryDir = prevHistDir
                 histDir.toFile().deleteRecursively()

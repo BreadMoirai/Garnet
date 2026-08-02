@@ -149,12 +149,30 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   the JVM so the choice is restored via `ModConfig.load()`; a dedicated-server root swap is not
   durable across restart.
 - **UC-MAN-09.c** `EditorNetworking.handleSetRoot` rejects a non-directory / invalid path
-  with `EditorErrorS2C`; otherwise it sets `SharedSettings.projectRootPath`, pins a new
-  `EditorServerContext`, re-runs `EditorDimLifecycle.placeAll`, and re-sends the single-root
-  `EditorTreeSnapshotS2C`. The Explorer re-renders rooted at the new folder.
-- **UC-MAN-09.d** *(Plan-A rough edges, deferred to Plan B)* The previous root's already-placed
-  cells remain in the workspace overworld after a swap and `EditorDimRegistry` keeps
-  accumulating region assignments; **Attach Folder** (a second root) is not implemented.
+  with `EditorErrorS2C`. Otherwise it first flushes every dirty standalone structure against the
+  **old** root via `StructureCommit.commitAll` — once the root swaps, `commit` resolves subpaths
+  against the NEW root, so a late commit would write the old root's world blocks over a same-named
+  file in a different project. If `commitAll` reports any structure it could not commit (a
+  `CommitOutcome.Failed`, or a `NotApplicable` whose subpath is still dirty afterward), **the swap
+  is refused** with `EditorErrorS2C` and nothing is touched: the reset below unplaces every
+  structure and clears its blocks, so proceeding would destroy the only surviving copy of those
+  edits — the world blocks themselves. This is the same rule `handleRename` applies before its file
+  move. Only once every dirty structure has committed cleanly does it set
+  `SharedSettings.projectRootPath`, pin a new `EditorServerContext`, drop all per-structure state
+  via `EditorDimRegistry.resetAllStructures` (clearing each structure's tight `placedBox` out of
+  the project level as it goes — regions are never recycled, so blocks left behind would be
+  unreachable for the rest of the session), re-run `EditorDimLifecycle.placeAll`, and re-send the
+  single-root `EditorTreeSnapshotS2C`. The Explorer re-renders rooted at the new folder.
+
+  Note that the reset iterates `EditorDimRegistry.structureSubpaths()`, not
+  `placedStructureSubpaths()`: `getOrAssignStructureRegion` runs before `setPlacedBox`, so a place
+  that errored in between leaves a region assignment with no placed box, which the placed-box-keyed
+  set does not see and which would otherwise outlive the root it belonged to.
+- **UC-MAN-09.d** *(Plan-A rough edges, deferred to Plan B)* Standalone **structures** are now
+  fully cleaned up on a swap (see UC-MAN-09.c), but the previous root's already-placed spec-folder
+  **cells** still remain in the workspace overworld — those live in `EditorDimRegistry.bySubpath`,
+  which `resetAllStructures` deliberately does not touch. **Attach Folder** (a second root) is not
+  implemented.
 
 ---
 
@@ -221,7 +239,7 @@ alongside the spec-cell sidecar path:
 | UC-MAN-09 | Re-root the Explorer from a native folder picker | `RootPickerSpec`, `EditorNetworkRegistrySpec` | **GAP-PARTIAL** |
 | UC-MAN-09.a | Kebab menu toggles the menu; Open Folder runs the `FolderPicker` on a worker thread | `RootPickerSpec."openFolder sends SetEditorRootC2S and persists the picked path"`, `ProjectExplorerSpec."Explorer header renders the root name"`, `JewelExplorerSpec."the kebab menu opens in-scene over the Blaze3D FBO"` | covered |
 | UC-MAN-09.b | Non-null pick persists + sends `SetEditorRootC2S`; cancel sends nothing | `RootPickerSpec."openFolder sends SetEditorRootC2S and persists the picked path"`, `RootPickerSpec."openFolder sends nothing when the picker is cancelled"` | covered |
-| UC-MAN-09.c | `handleSetRoot` validates dir, swaps root, re-places, re-snapshots; non-dir → `EditorErrorS2C` | `EditorNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `EditorNetworkRegistrySpec."handleSetRoot rejects a non-directory path with EditorErrorS2C"` | covered |
+| UC-MAN-09.c | `handleSetRoot` validates dir, commits the old root's dirty structures (refusing the swap if any fails), swaps root, clears the old root's structure blocks and all region assignments, re-places, re-snapshots; non-dir → `EditorErrorS2C` | `EditorNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `EditorNetworkRegistrySpec."handleSetRoot rejects a non-directory path with EditorErrorS2C"`, `EditorNetworkRegistrySpec."handleSetRoot commits the OLD root's dirty structure and never touches the NEW root's same-named file"`, `EditorNetworkRegistrySpec."a failed commit during a root swap aborts the swap and reports an error"`, `EditorNetworkRegistrySpec."a root swap clears the old root's blocks and drops region assignments that never got a placed box"` | covered |
 | UC-MAN-09.d | *(Plan B)* old grid persists; region assignments accumulate; Attach not implemented | — | n/a |
 | UC-MAN-10 | Place, save, create standalone `.nbt` structures; debounced auto-save + local history *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |
 
