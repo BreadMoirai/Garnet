@@ -830,6 +830,122 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
     // --- Final review, Finding F4: out-of-band .nbt content must not be destroyed with no recovery -
 
+    test("repeated commits with no out-of-band edit never bank a spurious REASON_EXTERNAL revision") {
+        // The out-of-band check is short-circuited by a per-subpath fingerprint of what the last
+        // successful commit left on disk. This asserts the fast path is actually correct: several
+        // ordinary commits in a row must produce ONLY autosave revisions.
+        withTempRoot("autosave-nofingerprint-churn") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("autosave-churn-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "churn")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("churn.nbt"))
+                    drainPayloads(player)
+
+                    val file = tmp.resolve("churn.nbt")
+                    val registry = EditorDimRegistry.of(this)
+                    val region = registry.structureRegionOriginOf("churn.nbt")!!
+                    val lvl = overworld()
+
+                    repeat(3) { i ->
+                        val pos = region.offset(1 + i, 0, 1)
+                        lvl.setBlock(pos, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                        StructureEditWatcher.onBlockChanged(lvl, pos)
+                        StructureCommit.commit(this, "churn.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                            .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                    }
+
+                    val revisions = LocalHistoryStore.revisions(file)
+                    revisions.count { it.reason == LocalHistoryStore.REASON_EXTERNAL } shouldBe 0
+                    revisions.first().reason shouldBe LocalHistoryStore.REASON_PLACED
+                    revisions.drop(1).all { it.reason == LocalHistoryStore.REASON_AUTOSAVE } shouldBe true
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("an out-of-band edit AFTER a successful commit is still banked, despite the fingerprint fast path") {
+        // The regression the fingerprint could plausibly introduce: once a commit has recorded what
+        // it left on disk, a later external rewrite must still invalidate that record. The
+        // pre-existing external-edit test below never commits before its out-of-band write, so it
+        // exercises the no-fingerprint path instead of this one.
+        withTempRoot("autosave-external-after-commit") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("autosave-extafter-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "extafter")
+            EditorNewStructure.create(tmp, "extdonor")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    val lvl = overworld()
+                    val registry = EditorDimRegistry.of(this)
+
+                    // Donor content: genuinely different, valid structure bytes.
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("extdonor.nbt"))
+                    drainPayloads(player)
+                    val donorRegion = registry.structureRegionOriginOf("extdonor.nbt")!!
+                    val donorEdit = donorRegion.offset(1, 0, 1)
+                    lvl.setBlock(donorEdit, Blocks.EMERALD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, donorEdit)
+                    StructureCommit.commit(this, "extdonor.nbt", LocalHistoryStore.REASON_MANUAL)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                    val donorBytes = tmp.resolve("extdonor.nbt").readBytes()
+
+                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("extafter.nbt"))
+                    drainPayloads(player)
+                    val file = tmp.resolve("extafter.nbt")
+                    val region = registry.structureRegionOriginOf("extafter.nbt")!!
+
+                    // FIRST commit -- this is what records the fingerprint.
+                    val first = region.offset(1, 0, 1)
+                    lvl.setBlock(first, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, first)
+                    StructureCommit.commit(this, "extafter.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                    LocalHistoryStore.revisions(file).count { it.reason == LocalHistoryStore.REASON_EXTERNAL } shouldBe 0
+
+                    // NOW clobber the file out of band, with the fingerprint already in place.
+                    file.writeBytes(donorBytes)
+
+                    val second = region.offset(2, 0, 1)
+                    lvl.setBlock(second, Blocks.DIAMOND_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, second)
+                    StructureCommit.commit(this, "extafter.nbt", LocalHistoryStore.REASON_AUTOSAVE)
+                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+
+                    // The out-of-band content was banked rather than silently overwritten.
+                    val external = LocalHistoryStore.revisions(file)
+                        .filter { it.reason == LocalHistoryStore.REASON_EXTERNAL }
+                    external shouldHaveSize 1
+                    val bankedTag = LocalHistoryStore.readTag(file, external.single()).shouldNotBeNull()
+                    val donorTag = LocalHistoryStore.readTag(
+                        tmp.resolve("extdonor.nbt"),
+                        LocalHistoryStore.revisions(tmp.resolve("extdonor.nbt")).last(),
+                    ).shouldNotBeNull()
+                    com.breadmoirai.garnet.structure.structuresDiffer(bankedTag, donorTag) shouldBe false
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
     test("an out-of-band .nbt edit is banked as a REASON_EXTERNAL revision before the next commit overwrites it") {
         withTempRoot("autosave-external") { tmp ->
             val prevChunks = SharedSettings.structureRegionChunks

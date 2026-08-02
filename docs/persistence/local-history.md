@@ -109,6 +109,20 @@ doesn't match the newest existing revision's content (`structuresDiffer`), banks
 `REASON_EXTERNAL` revision. This only fires when there's a genuine mismatch — the common case
 (disk already matches the newest revision, because the previous commit wrote both) is a no-op.
 
+**The common case doesn't pay for the check.** Proving disk matches the newest revision means
+gzip-decompressing that revision's blob and normalizing both tags — on a ~1s debounce over a large
+structure, real main-thread work on every single commit. So `StructureCommit` keeps a per-subpath
+fingerprint of what its last successful commit left behind: the `.nbt`'s size and mtime, plus which
+revision that content matches. If the file is still exactly as we left it and the newest revision is
+unchanged, disk *is* that revision and the comparison is skipped entirely; the steady state does no
+extra IO at all. Any genuine out-of-band write changes size or mtime and falls through to the full
+comparison, as does a file this process has not committed yet (no fingerprint). The fingerprint
+includes the file's **absolute path**, not just the subpath — subpaths are root-relative and the
+root is swappable, so this is what stops a stale entry from ever matching a different file after an
+"Open Folder…". The only way past the fast path is an external write within the same filesystem
+timestamp tick that also preserves the exact byte length, whose consequence is one un-banked
+external edit — the same outcome as for a file with no fingerprint yet.
+
 Because that revision is written speculatively — before the outcome of the rewrite it's guarding is
 known — it must not be pruned yet. If the `.nbt` write then fails, `LocalHistoryStore.discardRevision`
 rolls the speculative write back out of the index and deletes its blob, as if it had never happened.

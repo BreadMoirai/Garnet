@@ -64,6 +64,43 @@ object StructureCommit {
         retryAfter.getOrPut(server) { ConcurrentHashMap() }
 
     /**
+     * What the `.nbt` on disk looked like immediately after this process last committed it, and
+     * which revision that content matches. Used to skip the out-of-band-edit check (see [commit]):
+     * if the file is byte-identical in [size] and [modifiedMillis] to what we wrote, and the newest
+     * revision is still the same one, then disk *is* that revision and re-reading and normalizing
+     * the revision blob to prove it is pure waste.
+     *
+     * [path] is part of the identity, not just bookkeeping: subpaths are relative to the project
+     * root, and the root is swappable, so the same subpath can mean a completely different file
+     * after an "Open Folder…". Including the absolute path means a stale entry can never match the
+     * wrong file, which is why no cache invalidation is needed on a root swap, a rename, or between
+     * tests reusing a subpath under different temp directories.
+     */
+    private data class DiskFingerprint(
+        val path: String,
+        val revisionFile: String,
+        val size: Long,
+        val modifiedMillis: Long,
+    )
+
+    private val lastCommitted =
+        java.util.WeakHashMap<MinecraftServer, ConcurrentHashMap<String, DiskFingerprint>>()
+
+    @Synchronized
+    private fun fingerprintMap(server: MinecraftServer): ConcurrentHashMap<String, DiskFingerprint> =
+        lastCommitted.getOrPut(server) { ConcurrentHashMap() }
+
+    /** Current on-disk identity of [file], or null if it cannot be stat'd. */
+    private fun fingerprint(file: Path, revisionFile: String): DiskFingerprint? = runCatching {
+        val attrs = java.nio.file.Files.readAttributes(
+            file, java.nio.file.attribute.BasicFileAttributes::class.java,
+        )
+        DiskFingerprint(
+            file.toAbsolutePath().toString(), revisionFile, attrs.size(), attrs.lastModifiedTime().toMillis(),
+        )
+    }.getOrNull()
+
+    /**
      * Drop [subpath]'s failure-backoff entry. Called internally on a no-op or successful commit;
      * also public as a test/administrative seam for forgetting a failure without a real commit
      * (e.g. a test that deliberately leaves a structure dirty must also forget any backoff it
@@ -203,16 +240,36 @@ object StructureCommit {
         // F4: bank on-disk content that was written OUTSIDE the editor (external NBT tool, git
         // checkout, restore-from-backup) between sessions — if it doesn't match the newest revision
         // already banked, no revision anywhere holds it, and it's about to be overwritten below with
-        // no recovery point. Cheap: `committed` is already read for the diff just below; this only
-        // adds a comparison against the newest revision's blob.
+        // no recovery point.
+        //
+        // This is NOT cheap in the general case, which an earlier comment here understated: proving
+        // disk matches the newest revision means gzip-decompressing that revision's blob and
+        // normalizing both tags, on top of the `committed` read the no-op diff below already needs.
+        // On a ~1s debounce over a large structure that is real main-thread work every commit.
+        //
+        // So the steady state is short-circuited by a fingerprint: after a successful commit we know
+        // exactly what we wrote and which revision it matches, so if the file's size and mtime are
+        // still what we left them and the newest revision is unchanged, disk IS that revision and
+        // there is nothing to bank. Any genuine out-of-band write changes size or mtime (or lands
+        // before this process ever committed the file, in which case there's no fingerprint at all)
+        // and falls through to the full comparison. The only way past it is an external write in the
+        // same filesystem timestamp tick that also preserves the exact byte length — and the
+        // consequence is one un-banked external edit, the same as for a file this process has not
+        // committed yet.
         if (committed != null) {
             val existing = LocalHistoryStore.revisions(file)
-            val newestTag = existing.lastOrNull()?.let { LocalHistoryStore.readTag(file, it) }
-            if (newestTag == null || structuresDiffer(committed, newestTag)) {
-                val (sx, sy, sz) = sizeOf(committed)
-                LocalHistoryStore.writeRevision(
-                    file, committed, sx, sy, sz, blockCount = 0, reason = LocalHistoryStore.REASON_EXTERNAL,
-                )
+            val newest = existing.lastOrNull()
+            val current = fingerprint(file, newest?.file.orEmpty())
+            val diskIsNewestRevision =
+                current != null && fingerprintMap(server)[subpath] == current
+            if (!diskIsNewestRevision) {
+                val newestTag = newest?.let { LocalHistoryStore.readTag(file, it) }
+                if (newestTag == null || structuresDiffer(committed, newestTag)) {
+                    val (sx, sy, sz) = sizeOf(committed)
+                    LocalHistoryStore.writeRevision(
+                        file, committed, sx, sy, sz, blockCount = 0, reason = LocalHistoryStore.REASON_EXTERNAL,
+                    )
+                }
             }
         }
 
@@ -258,6 +315,13 @@ object StructureCommit {
         // But ONLY when history is deliberately enabled (B3): a user who disables history means to
         // FREEZE the existing archive, not have it silently age-pruned on the next commit.
         if (historyEnabled) LocalHistoryStore.prune(file)
+
+        // Remember what we just wrote, so the next commit can skip re-proving that disk still
+        // matches the newest revision. Stat AFTER the write and AFTER prune, so the recorded
+        // size/mtime and newest-revision filename describe the state actually left behind. If
+        // history is off, `revision` is null and the empty revision name is recorded — which still
+        // matches on the next commit, since revisions() stays empty too.
+        fingerprint(file, revision?.file.orEmpty())?.let { fingerprintMap(server)[subpath] = it }
 
         captured.box?.let { registry.setPlacedBox(subpath, it) }
         autoSave.clear(subpath)
@@ -367,10 +431,14 @@ object StructureCommit {
         }
     }
 
-    /** Drop this server's failure-backoff bookkeeping. Pair with [StructureAutoSave.dispose]. */
+    /**
+     * Drop this server's failure-backoff and last-committed-fingerprint bookkeeping. Pair with
+     * [StructureAutoSave.dispose].
+     */
     @Synchronized
     fun dispose(server: MinecraftServer) {
         retryAfter.remove(server)
+        lastCommitted.remove(server)
     }
 
     /**
