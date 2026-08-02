@@ -64,9 +64,11 @@ Construction is via `garnetSpec(id) { … }`.
 ## `structure/` — structure NBT + region math
 
 - `StructurePersistence.kt` — compressed-NBT structure template save/load (`save`/`load`,
-  origin-fixed 1:1), the standalone-file path (`saveAutoFitToFile`/`placeStructureCentered`,
-  auto-fit + re-center), the crash-safe `writeStructureAtomic`, and `captureAutoFitIn` (the
-  bounded-volume capture `StructureCommit` uses for auto-save).
+  origin-fixed 1:1), the standalone-file path (`captureAutoFitIn`/`placeStructureCentered`,
+  auto-fit + re-center), and the crash-safe `writeStructureAtomic`. `captureAutoFitIn` is the
+  bounded-volume capture `StructureCommit` uses for auto-save, and the only capture there is — the
+  region-wide `captureAutoFit`/`saveAutoFitToFile` pair was deleted once nothing in production
+  called it.
 - `StructureDiff.kt` — palette-order-insensitive NBT comparison (`structuresDiffer`) used to
   decide whether a commit's captured content actually changed vs. the committed `.nbt`.
 - `StructureRegionMath.kt` — `centeredStart`/`anchorY`/`autoFit`: pure geometry for centering and

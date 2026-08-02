@@ -170,8 +170,10 @@ Client:
 places it (`StructurePersistence.placeStructureCentered`) centered in an auto-assigned region
 (`EditorDimRegistry.getOrAssignStructureRegion`, a disjoint +X lane at
 `z = STRUCTURE_LANE_Z = 4096`), floored at `projectGridYBase` (64) — or vertically centered when
-the structure's height ≥ `TALL_THRESHOLD` (256). "Save Structure" auto-fits the tight non-air box
-in the region (`StructurePersistence.saveAutoFitToFile` → `project.autoFit`) and rewrites the file.
+the structure's height ≥ `TALL_THRESHOLD` (256). "Save Structure" is a force-commit through
+`StructureCommit.commit`, which auto-fits the tight non-air box over
+`union(placedBox, dirtyBox)` (`StructurePersistence.captureAutoFitIn` → `project.autoFit`) and
+rewrites the file.
 "New Structure" (`EditorNewStructure.create`) writes an empty `<name>.nbt` into the folder named
 by `NewStructureC2S.parentSubpath` (`""` = the project root).
 

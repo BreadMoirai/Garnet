@@ -544,9 +544,10 @@ class StructureAutoSaveSpec : GarnetTestSpec({
         withTempRoot("autosave-bounded") { tmp ->
             val prevHistDir = SharedSettings.localHistoryDir
             // Deliberately leave SharedSettings.structureRegionChunks at its real default (a
-            // 144-wide region): if StructureCommit's capture were ever swapped back to the
-            // region-wide StructurePersistence.captureAutoFit, this test would see the untracked
-            // block below and fail. Every other test in this spec forces structureRegionChunks = 1,
+            // 144-wide region): if StructureCommit's capture were ever widened to the whole region
+            // again (the old StructurePersistence.captureAutoFit, since deleted), this test would
+            // see the untracked block below and fail. Every other test in this spec forces
+            // structureRegionChunks = 1,
             // which is too small to distinguish bounded from region-wide capture.
             val histDir = kotlin.io.path.createTempDirectory("autosave-bounded-hist")
             SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
