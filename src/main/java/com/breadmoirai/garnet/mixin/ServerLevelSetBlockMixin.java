@@ -63,14 +63,6 @@ abstract class ServerLevelSetBlockMixin {
         Deque<Object> stack = BEFORE_STATE_STACK.get();
         Object fromObj = stack.isEmpty() ? SKIP_SENTINEL : stack.pop();
 
-        // Auto-save cares about every successful server-side change, not only positions some
-        // StateRecorder is watching -- so this must run BEFORE the sentinel return below, which
-        // fires for the common "no recorder interested" case. The watcher needs no before-state,
-        // only the position and the fact that the write actually landed.
-        if (cir.getReturnValue() && ((Object) this) instanceof ServerLevel) {
-            StructureEditWatcher.onBlockChanged((ServerLevel) (Object) this, pos);
-        }
-
         if (fromObj == SKIP_SENTINEL) return; // client level, out of bounds, or no recorder
         if (!cir.getReturnValue()) return; // block did not actually change
         BlockState before = (BlockState) fromObj;
@@ -78,6 +70,40 @@ abstract class ServerLevelSetBlockMixin {
             if (recorder.isInBounds(pos)) {
                 recorder.record(pos, before, newState);
             }
+        }
+    }
+
+    /**
+     * Feeds structure auto-save's dirty tracking, on the 4-arg overload rather than the 3-arg one
+     * the recorder hooks above use.
+     *
+     * <p>{@code setBlock(pos, state, flags)} delegates to {@code setBlock(pos, state, flags, 512)},
+     * and {@code ServerLevel} overrides neither, so hooking only the 4-arg covers BOTH overloads
+     * with exactly one watcher call per write — no double-counting, nothing added on the hot path.
+     * Hooking the 3-arg instead left every 4-arg write invisible to auto-save: vanilla's own
+     * shape-update machinery ({@code Block.updateOrDestroy}, neighbour-shape updates for fences,
+     * walls, stairs, redstone-wire reconnection) goes through the 4-arg form, as does any other mod
+     * calling it directly.
+     *
+     * <p>Unlike the recorder hooks, auto-save cares about every successful server-side change rather
+     * than only positions some {@link StateRecorder} is watching, and it needs no before-state —
+     * only the position and the fact that the write actually landed. So it takes no part in the
+     * {@code BEFORE_STATE_STACK} pairing and must not be folded into the RETURN hook above, which
+     * returns early for the common "no recorder interested" case.
+     *
+     * <p>A direct {@code LevelChunk.setBlockState} write still bypasses this, which is what
+     * {@code StructureAutoSaveSpec}'s bounded-capture test uses to stage a genuinely untracked edit.
+     */
+    @Inject(
+        method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z",
+        at = @At("RETURN")
+    )
+    private void garnet$notifyStructureWatcher(
+        BlockPos pos, BlockState newState, int flags, int updateLimit,
+        CallbackInfoReturnable<Boolean> cir
+    ) {
+        if (cir.getReturnValue() && ((Object) this) instanceof ServerLevel) {
+            StructureEditWatcher.onBlockChanged((ServerLevel) (Object) this, pos);
         }
     }
 }

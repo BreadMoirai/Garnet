@@ -575,16 +575,26 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // missed. A region-wide capture would include it; captureAutoFitIn must not,
                     // since the scan volume is union(placedBox, dirtyBox), not the whole region.
                     val untracked = region.offset(width - 3, 0, width - 3)
-                    // Deliberately use the 4-arg setBlock(pos, state, flags, recursionLeft) overload,
-                    // NOT the 3-arg one used everywhere else in this file: ServerLevelSetBlockMixin
-                    // only injects into the exact 3-arg setBlock(BlockPos, BlockState, int) method
-                    // body, so calling this overload directly never runs through that mixin and never
-                    // reaches StructureEditWatcher.onBlockChanged. That's the point -- this write must
-                    // be genuinely invisible to the watcher, standing in for an edit the mixin missed.
+                    // Write straight through the chunk, bypassing Level.setBlock entirely.
+                    // ServerLevelSetBlockMixin now hooks the 4-arg setBlock -- which the 3-arg form
+                    // delegates to -- so BOTH Level.setBlock overloads reach
+                    // StructureEditWatcher.onBlockChanged and neither can stage an untracked write
+                    // any more. LevelChunk.setBlockState is below that mixin and is genuinely
+                    // invisible to the watcher, which is exactly what this test needs: a real,
+                    // non-air block the auto-save path never heard about.
                     // (The setBlock mixin is known to be flaky under the gametest harness; do NOT
-                    // "simplify" this back to the 3-arg call, or this test will intermittently see the
+                    // "simplify" this back to a Level.setBlock call, or this test will see the
                     // untracked block get watcher-marked and start failing with blockCount == 2.)
-                    lvl.setBlock(untracked, Blocks.IRON_BLOCK.defaultBlockState(), 2, 512)
+                    lvl.getChunk(untracked).setBlockState(untracked, Blocks.IRON_BLOCK.defaultBlockState(), 2)
+                    // This test is only meaningful if that write actually landed -- a bypass that
+                    // silently placed nothing would make the assertions below pass for the wrong
+                    // reason. There must be a REAL non-air block here that the capture excludes.
+                    lvl.getBlockState(untracked).`is`(Blocks.IRON_BLOCK) shouldBe true
+                    StructureAutoSave.of(this).dirtyBox("bounded.nbt")!!.let { box ->
+                        // ...and the watcher must genuinely not have heard about it: the dirty box
+                        // still encloses only the tracked edit.
+                        (untracked.x >= box.origin.x && untracked.x < box.origin.x + box.size.x) shouldBe false
+                    }
 
                     val outcome = StructureCommit.commit(this, "bounded.nbt", LocalHistoryStore.REASON_AUTOSAVE)
                         .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()

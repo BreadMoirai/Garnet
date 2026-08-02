@@ -64,9 +64,15 @@ Windows path to the jar itself.
 ## Notes verified against current source
 
 - `Level.setBlock(BlockPos, BlockState, int)` is the 3-arg overload that
-  delegates to a 4-arg variant with `updateLimit=512`. The recorder mixin
-  hooks the 3-arg HEAD/RETURN; nested `setBlock` calls return inner-first, so
-  recorded `tickOrder=0` is the inner-most change.
+  delegates to a 4-arg variant with `updateLimit=512`, and `ServerLevel`
+  overrides neither. The recorder hooks in `ServerLevelSetBlockMixin` target the
+  3-arg HEAD/RETURN, so nested `setBlock` calls return inner-first and recorded
+  `tickOrder=0` is the inner-most change. Structure auto-save's watcher hook in
+  the same mixin instead targets the **4-arg** RETURN: because the 3-arg
+  delegates to it, one injection covers both overloads with exactly one call per
+  write. Anything that must observe *every* `Level.setBlock` write — rather than
+  pair with a HEAD capture — belongs on the 4-arg form. Only a direct
+  `LevelChunk.setBlockState` gets past both.
 - `ButtonBlock.press(state, level, pos, player?)` sets `POWERED=true`, fires
   neighbor updates, **and** calls `level.scheduleTick(pos, this, ticksToStayPressed)`.
   Replaying a press via raw `setBlock` skips the schedule and breaks
