@@ -4,11 +4,15 @@ import com.breadmoirai.garnet.structure.PlacedBox
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
+import com.breadmoirai.garnet.test.GametestSentinel
+import com.breadmoirai.garnet.mc.awaitTicks
 import com.breadmoirai.garnet.mc.onServer
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
+import net.minecraft.world.entity.EntitySpawnReason
+import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.level.block.Blocks
 import java.nio.file.Files
 
@@ -51,6 +55,54 @@ class StructureRegionPersistenceSpec : GarnetTestSpec({
 
             StructurePersistence.clearBounds(level, regionBox.origin, regionBox.size)
             Files.deleteIfExists(file)
+        }
+    }
+
+    test("captureAutoFitIn captures entities standing inside the structure, so place/save round-trips") {
+        // placeStructureCentered places with a default StructurePlaceSettings (ignoreEntities =
+        // false), so it spawns a structure's item frames / armour stands / paintings. Capturing
+        // without entities made the round-trip lossy in one direction only: the first unattended
+        // auto-save after a place silently deleted every entity the structure contained.
+        // Unlike every other test in this spec, this one runs inside the gametest structure's own
+        // area rather than far out in the structure lane. Out there -- and near spawn, and anywhere
+        // else -- a chunk loads on demand for block writes but its entity section is never tracked,
+        // so level.getEntitiesOfClass (exactly what fillFromWorld collects entities with) returns
+        // nothing however alive the entity is. The harness's own chunk ticket is what makes entities
+        // observable. See GametestSentinel.testOrigin.
+        val origin = GametestSentinel.testOrigin.shouldNotBeNull().offset(0, 4, 0)
+        val scan = PlacedBox(origin, Vec3i(6, 4, 6))
+
+        val stand = onServer {
+            val level = overworld()
+            // Precondition, stated explicitly so a failure here is unmistakable: entity capture is
+            // only observable where the chunk actually ticks entities.
+            level.isPositionEntityTicking(origin) shouldBe true
+            StructurePersistence.clearBounds(level, scan.origin, scan.size)
+            // Two blocks give the auto-fit a box; the armour stand sits between them, inside it.
+            level.setBlock(origin.offset(1, 0, 1), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+            level.setBlock(origin.offset(3, 0, 3), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
+            EntityTypes.ARMOR_STAND.spawn(level, origin.offset(2, 0, 2), EntitySpawnReason.COMMAND)
+                .shouldNotBeNull()
+        }
+        // A freshly added entity is not visible to level.getEntitiesOfClass -- which is what
+        // fillFromWorld uses to collect entities -- until the level's entity manager has processed
+        // the addition on the next tick. Capturing in the same tick as the spawn finds nothing and
+        // would make this test pass for the wrong reason.
+        awaitTicks(1)
+
+        try {
+            onServer {
+                val captured = StructurePersistence.captureAutoFitIn(overworld(), scan)
+
+                // The entity is in the saved tag, and the block count is unaffected by it.
+                captured.blockCount shouldBe 2
+                captured.tag.getListOrEmpty("entities").size shouldBe 1
+            }
+        } finally {
+            onServer {
+                stand.discard()
+                StructurePersistence.clearBounds(overworld(), scan.origin, scan.size)
+            }
         }
     }
 

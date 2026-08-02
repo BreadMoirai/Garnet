@@ -13,11 +13,22 @@ capture, place, dirty-state tracking, explicit save, and revert. Two code paths 
 | Path | Origin / bounds | Written by | Read by | Home UCs |
 |---|---|---|---|---|
 | **Spec-cell sidecar** | fixed origin + fixed `bounds` (`fillFromWorld`/`placeInWorld` 1:1) | `StructurePersistence.save` | `StructurePersistence.load` | UC-PER-06, UC-PER-07 |
-| **Standalone Explorer file** | tight box over `union(placedBox, dirtyBox)`, re-centered on place | `StructureCommit.commit` (via `StructurePersistence.captureAutoFitIn` + `writeStructureAtomic`) | `StructurePersistence.placeStructureCentered` | UC-MAN-10 |
+| **Standalone Explorer file** | tight box over `union(placedBox, dirtyBox)`, entities included, re-centered on place | `StructureCommit.commit` (via `StructurePersistence.captureAutoFitIn` + `writeStructureAtomic`) | `StructurePersistence.placeStructureCentered` | UC-MAN-10 |
 
 `StructurePersistence.captureAutoFitIn` is the only capture path. The region-wide
 `saveAutoFitToFile`/`captureAutoFit` pair (a full ~144-wide, full-world-height scan, ~8M block
-reads) was deleted: it had no production callers after the sidecar model went away, and leaving it
+**Standalone captures include entities** (`fillFromWorld(..., withEntities = true)`), because
+`placeStructureCentered` places them — a default `StructurePlaceSettings` has
+`ignoreEntities = false`, so placing a structure spawns its item frames, armour stands and
+paintings. Capturing without them made the round-trip lossy in one direction only: the first
+unattended auto-save after a place silently deleted every entity the structure contained. Two
+caveats: `fillFromWorld` filters out `Player`, so the person editing is never captured into their
+own structure; and the auto-fit box is derived from **blocks** only, so an entity sitting outside
+the tight non-air box is still dropped. (Spec-cell saves keep `withEntities = false` — their fixed
+`bounds` path is unchanged and out of scope here.)
+
+The region-wide `saveAutoFitToFile`/`captureAutoFit` pair (a full ~144-wide, full-world-height scan,
+~8M block reads) was deleted: it had no production callers after the sidecar model went away, and leaving it
 callable invited exactly the per-second region scan the bounded capture exists to avoid.
 
 **Dirty-state** is a first-class concept only on the standalone path, and there is no dirty-buffer

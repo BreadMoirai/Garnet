@@ -113,6 +113,25 @@ Use `spawnStructure` per test for isolation. With sequential mode (the default: 
 
 **The `runGameTest` world persists between invocations** (`versions/<v>/build/run/gameTest/world/`). Blocks and block entities a spec places at fixed coordinates survive to the *next* run. This bites any spec that places a block and then asserts on a *freshly-created* BE: `level.setBlock(pos, state)` is a no-op when `pos` already holds that exact `state`, so `getBlockEntity(pos)` returns the **stale** BE from the prior run with its old fields, not a new one. Force a fresh BE by clearing the position first — `level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2)` before placing — or by using a position no other run touches. (This is distinct from the flaky `setBlock`→recorder interaction; it is deterministic world carry-over.)
 
+**Entities are only observable inside the gametest structure's own area.** The gametest world tracks
+entities only where the harness holds a chunk ticket — around the running test structure. Everywhere
+else, including near spawn and the far-out coordinates most specs use, a chunk loads on demand for
+block reads and writes but its entity section is never tracked: `level.getEntitiesOfClass` returns
+**nothing**, however alive an entity you just spawned is, and it reports no error. Anything that
+reads entities (notably `StructureTemplate.fillFromWorld(..., withEntities = true)`) silently
+captures an empty list, so a test asserting on entity capture passes or fails for reasons that have
+nothing to do with the code under test.
+
+`GametestSentinel.testOrigin` publishes the running structure's absolute origin for exactly this
+case — work relative to it, and assert `level.isPositionEntityTicking(pos)` as an explicit
+precondition so a wrong position fails loudly instead of looking like a production bug.
+`ServerLevel.setChunkForced` does make a far chunk track entities, but it generates and then
+permanently ticks that chunk **and persists the ticket into the saved world**, which slowed the
+whole suite by an order of magnitude and survived into later runs — don't.
+
+Separately, a freshly spawned entity is not visible to `getEntitiesOfClass` until the level's entity
+manager processes the addition, so `awaitTicks(1)` between the spawn and the assertion is required.
+
 ## Spec style
 
 The project standard is Kotest's `FunSpec`. `GarnetTestSpec` extends `FunSpec`; unit tests in `src/test/` extend `FunSpec` directly. Use `context("group") { test("case") { ... } }` nesting when a logical group of cases shares setup or wants to be documented together. Other Kotest styles (`DescribeSpec`, `BehaviorSpec`, `StringSpec`) are not used to keep specs uniform across the codebase.

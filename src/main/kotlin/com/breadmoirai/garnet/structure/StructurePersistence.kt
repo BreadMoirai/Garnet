@@ -144,6 +144,26 @@ object StructurePersistence {
      * region (144 wide by full world height) reads ~8M, which is the difference between a viable
      * per-edit debounce and an unusable one. Nothing should reintroduce a region-wide scan on a
      * commit path. A zero-size [scan] is empty by definition.
+     *
+     * **Entities are captured** (`fillFromWorld(..., withEntities = true)`), because
+     * [placeStructureCentered] places them: a default [StructurePlaceSettings] has
+     * `ignoreEntities = false`, so placing a structure spawns its item frames, armour stands and
+     * paintings into the world. Capturing without them made the round-trip lossy in one direction
+     * only — the first unattended auto-save after a structure was placed silently deleted every
+     * entity it contained. `fillFromWorld` filters out `Player`, so the person doing the editing is
+     * never captured into their own structure.
+     *
+     * Two consequences worth knowing:
+     * - The auto-fit box is computed from **blocks** only, and `fillFromWorld` collects entities
+     *   from exactly that box. An entity floating outside the tight non-air box (past the last
+     *   block, or in an otherwise empty structure) is still dropped. Growing the box to enclose
+     *   entities would change what "the structure's extent" means for placement and re-centering,
+     *   so it deliberately does not.
+     * - [structuresDiffer] compares blocks only, so an entity that merely moved does not by itself
+     *   count as a change — nor could it trigger a commit anyway, since the dirty-tracking watcher
+     *   only ever sees `setBlock`. What this does guarantee is the reverse, and it is the important
+     *   direction: capturing entities cannot make an otherwise-unchanged structure look different,
+     *   so the no-op fast path still holds and a quiet structure still writes nothing.
      */
     fun captureAutoFitIn(level: ServerLevel, scan: PlacedBox): CapturedStructure {
         val template = StructureTemplate()
@@ -163,7 +183,7 @@ object StructurePersistence {
             scan.origin.x + fit.minX, scan.origin.y + fit.minY, scan.origin.z + fit.minZ,
         )
         val size = Vec3i(fit.sizeX, fit.sizeY, fit.sizeZ)
-        template.fillFromWorld(level, tightOrigin, size, false, emptyList())
+        template.fillFromWorld(level, tightOrigin, size, true, emptyList())
         return CapturedStructure(template.save(CompoundTag()), PlacedBox(tightOrigin, size), blockCount)
     }
 

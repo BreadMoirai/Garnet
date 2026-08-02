@@ -29,9 +29,29 @@ class GametestSentinel {
 
     private val logger = LoggerFactory.getLogger("Garnet")
 
+    companion object {
+        /**
+         * Absolute origin of the running gametest structure, published for specs that need a
+         * position the server actually **ticks entities** in.
+         *
+         * This matters more than it looks. The gametest world tracks entities only where the test
+         * harness holds a chunk ticket — its own structure area. Everywhere else, including near
+         * spawn and the far-out structure lane these specs normally use, a chunk loads on demand
+         * for block reads/writes but never tracks entities, so `level.getEntitiesOfClass` returns
+         * nothing however alive an entity is. Any spec asserting on entities must work relative to
+         * this origin. (Forcing a far chunk does work, but it generates and then permanently ticks
+         * a chunk thousands of chunks out and persists that ticket into the saved world.)
+         */
+        @Volatile
+        @JvmStatic
+        var testOrigin: net.minecraft.core.BlockPos? = null
+            private set
+    }
+
     @GameTest(structure = "garnet:empty_platform", maxTicks = 600000)
     fun runAll(helper: GameTestHelper) {
         val server = helper.level.server
+        testOrigin = helper.absolutePos(net.minecraft.core.BlockPos.ZERO)
         // SERVER_STARTED has already fired by the time a GameTest method runs.
         // Register tick events and install the dispatcher directly from the live server.
         McLifecycle.registerWithServer(server)
