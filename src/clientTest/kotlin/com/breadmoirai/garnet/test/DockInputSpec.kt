@@ -13,11 +13,8 @@ import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
-import io.kotest.matchers.nulls.shouldBeNull
-import io.kotest.matchers.nulls.shouldNotBeNull
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -35,7 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -47,63 +44,55 @@ import org.lwjgl.glfw.GLFW
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
+/**
+ * Consolidated dock-input routing story: one probe panel, mounted once, carrying a pointer-input
+ * collector, a clickable target region, and a focusable [BasicTextField] — exercised in sequence
+ * for every event path [DockInputRouter] forwards from raw GLFW callbacks into the Compose scene.
+ *
+ * The text field's `onPreviewKeyEvent` (tunneling, top-down) is used rather than `onKeyEvent`
+ * (bubbling) so the probe reliably observes a key press before `BasicTextField`'s own internal key
+ * handling (e.g. arrow-key cursor movement) has a chance to consume it — the same outcome the
+ * original plain-`Box` probe got "for free" by not being a text field at all.
+ */
 class DockInputSpec : ClientSpec({
-    test("a secondary press reaches the scene as Secondary") {
-        val seen = mutableListOf<PointerButton?>()
-        val panel = Panel("garnet.test.buttonprobe", "ButtonProbe") {
-            Box(
-                Modifier.fillMaxSize().pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val e = awaitPointerEvent()
-                            if (e.type == PointerEventType.Press) seen += e.button
-                        }
-                    }
-                },
-            )
-        }
-        runOnClient { mc ->
-            DockState.reset()
-            DockState.leftPanels.add(panel)
-            DockState.setVisible(DockRegion.LEFT, true)
-            DockState.setSize(DockRegion.LEFT, 300)
-            ViewportState.active = true
-            ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
-        }
-        waitClientTicks(12)
-        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
-        waitClientTicks(4)
-        runOnClient {
-            DockInputRouter.onGlfwMove(60.0, 200.0)
-            DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
-        }
-        waitClientTicks(4)
-        runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT) }
-        waitClientTicks(2)
-
-        seen shouldBe listOf(PointerButton.Secondary)
-        ComposeSurface.disabled.shouldBeFalse()
-
-        runOnClient { mc ->
-            ComposeOverlay.enabled = false; ViewportState.active = false
-            DockInputRouter.clearFocus()
-            DockState.reset()
-            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
-        }
-        waitClientTicks(2)
-    }
-
-    test("focused Left panel receives routed pointer clicks") {
+    test("pointer, key and char events route into a focused dock panel and back out") {
         closeClientScreen(); waitClientTicks(2)
+
+        val secondaryPresses = mutableListOf<PointerButton?>()
         val clicks = AtomicInteger(0)
+        val keySeen = AtomicReference<String?>(null)
+        val typedText = AtomicReference("")
+        val focusRequester = FocusRequester()
 
         runOnClient { mc ->
             DockState.reset()
-            DockState.leftPanels.add(Panel("demo.left", "Left") {
-                Box(Modifier.size(400.dp)) {
-                    Box(Modifier.offset(40.dp, 40.dp).size(80.dp).background(Color(0xFF2D6DA3))
-                        .clickable { clicks.incrementAndGet() })
+            DockState.leftPanels.add(Panel("garnet.test.dockinput", "DockInputProbe") {
+                var value by remember { mutableStateOf(TextFieldValue("")) }
+                Box(
+                    Modifier.fillMaxSize().pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val e = awaitPointerEvent()
+                                if (e.type == PointerEventType.Press) secondaryPresses += e.button
+                            }
+                        }
+                    },
+                ) {
+                    BasicTextField(
+                        value = value,
+                        onValueChange = { new -> value = new; typedText.set(new.text) },
+                        modifier = Modifier.fillMaxSize()
+                            .focusRequester(focusRequester)
+                            .onPreviewKeyEvent { e ->
+                                if (e.type == KeyEventType.KeyDown) keySeen.set(e.key.toString())
+                                false
+                            },
+                    )
+                    Box(
+                        Modifier.offset(40.dp, 40.dp).size(80.dp).background(Color(0xFF2D6DA3))
+                            .clickable { clicks.incrementAndGet() },
+                    )
+                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
                 }
             })
             DockState.setVisible(DockRegion.LEFT, true)
@@ -114,9 +103,23 @@ class DockInputSpec : ClientSpec({
         }
         waitClientTicks(12)
 
-        // Focus the left region, then route a click at the button centre (window coords == 80,80).
         runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        waitClientTicks(4)
+
+        // 1. a secondary press reaches the scene as PointerButton.Secondary.
+        // [orig: DockInputSpec "a secondary press reaches the scene as Secondary"]
+        runOnClient {
+            DockInputRouter.onGlfwMove(60.0, 200.0)
+            DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+        }
+        waitClientTicks(4)
+        runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT) }
         waitClientTicks(2)
+        secondaryPresses shouldBe listOf(PointerButton.Secondary)
+        ComposeSurface.disabled.shouldBeFalse()
+
+        // 2. a routed primary click reaches the focused LEFT panel.
+        // [orig: DockInputSpec "focused Left panel receives routed pointer clicks"]
         val before = clicks.get()
         runOnClient {
             DockInputRouter.onGlfwMove(80.0, 80.0)
@@ -125,90 +128,29 @@ class DockInputSpec : ClientSpec({
         waitClientTicks(3)
         runOnClient { DockInputRouter.onGlfwRelease(0) }
         waitClientTicks(3)
-
         if (!ComposeSurface.disabled) (clicks.get() > before).shouldBeTrue()
 
-        runOnClient { mc ->
-            ComposeOverlay.enabled = false; ViewportState.active = false
-            DockInputRouter.clearFocus(); DockState.reset()
-            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
-        }
-        waitClientTicks(6)
-    }
-
-    test("ESC drops dock focus; other keys and uncaptured ESC are left alone") {
-        runOnClient { DockState.reset() }
-        waitClientTicks(2)
-
-        // Uncaptured: ESC must be reported as not-consumed (vanilla untouched).
-        runOnClient {
-            DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS).shouldBeFalse()
-        }
-
-        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
-        waitClientTicks(2)
-        runOnClient { DockState.focusedRegion.shouldNotBeNull() }
-
-        // A non-ESC key while captured must not drop focus and must report not-consumed.
-        runOnClient {
-            DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_A, GLFW.GLFW_PRESS).shouldBeFalse()
-            DockState.focusedRegion.shouldNotBeNull()
-        }
-
-        // ESC-press while captured drops focus and reports consumed.
-        runOnClient {
-            DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS).shouldBeTrue()
-            DockState.focusedRegion.shouldBeNull()
-        }
-
-        runOnClient { DockInputRouter.clearFocus(); DockState.reset() }
-        waitClientTicks(2)
-    }
-
-    test("a non-ESC key press reaches a focused Compose widget in the scene") {
-        closeClientScreen(); waitClientTicks(2)
-        val seen = AtomicReference<String?>(null)
-        val focusRequester = FocusRequester()
-
-        runOnClient { mc ->
-            DockState.reset()
-            DockState.leftPanels.add(Panel("test.keys", "Keys") {
-                Box(
-                    Modifier.fillMaxSize()
-                        .focusRequester(focusRequester)
-                        .focusable()
-                        .onKeyEvent { e ->
-                            if (e.type == KeyEventType.KeyDown) seen.set(e.key.toString())
-                            true
-                        },
-                )
-                LaunchedEffect(Unit) { focusRequester.requestFocus() }
-            })
-            DockState.setVisible(DockRegion.LEFT, true)
-            DockState.setSize(DockRegion.LEFT, 300)
-            ViewportState.active = true
-            ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
-        }
-        waitClientTicks(8)
-
-        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
-        waitClientTicks(2)
+        // 3. a non-ESC key press reaches the focused widget.
+        // [orig: DockInputSpec "a non-ESC key press reaches a focused Compose widget in the scene"]
         runOnClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_DOWN, GLFW.GLFW_PRESS, 0) }
         waitClientTicks(4)
+        keySeen.get() shouldBe Key.DirectionDown.toString()
 
-        seen.get() shouldBe Key.DirectionDown.toString()
-
-        runOnClient { mc ->
-            ComposeOverlay.enabled = false; ViewportState.active = false
-            DockInputRouter.clearFocus(); DockState.reset()
-            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
-        }
+        // 4. a typed char lands in the text field via onGlfwChar.
+        // [orig: DockInputSpec "onGlfwChar delivers typed characters into a focused Compose text field"]
+        // Regression coverage for the Task-3 review finding: onGlfwChar must land on a real
+        // BasicTextField's committed text, not merely arrive at a key-event handler. Compose's own
+        // typed-character recognition (TextFieldKeyInput_desktopKt.isTypedEvent) requires unwrapping a
+        // real java.awt.event.KeyEvent off the Compose KeyEvent's nativeEvent field; a KeyEvent built
+        // without one (as onGlfwKey builds for non-typed keys) is invisible to it. See
+        // DockInputRouter.onGlfwChar's doc for how nativeEvent is populated and why.
+        runOnClient { "hi".forEach { c -> DockInputRouter.onGlfwChar(c.code) } }
         waitClientTicks(6)
-    }
+        typedText.get() shouldBe "hi"
 
-    test("onGlfwKey still reports only ESC-press as consumed, and drops nothing when uncaptured") {
-        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
+        // 5. ESC drops dock focus, and onGlfwKey reports only ESC-press as consumed.
+        // [orig: DockInputSpec "onGlfwKey still reports only ESC-press as consumed, and drops
+        // nothing when uncaptured"]
         // Forwarding is additive: a non-ESC key is delivered to the scene but NOT reported consumed,
         // so the mixin's existing cancel-everything-while-captured behavior is unchanged.
         // Note: runOnClient's action is `(Minecraft) -> Unit`, so it cannot round-trip a Boolean;
@@ -217,55 +159,19 @@ class DockInputSpec : ClientSpec({
         onClient { DockState.focusedRegion } shouldBe DockRegion.LEFT
         onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS, 0) } shouldBe true
         onClient { DockState.focusedRegion } shouldBe null
-        // Uncaptured: never consumed, so vanilla ESC still opens the pause menu.
+
+        // 6. an uncaptured ESC drops nothing.
+        // [orig: DockInputSpec "ESC drops dock focus; other keys and uncaptured ESC are left alone"
+        // and the tail of "onGlfwKey still reports..."] Uncaptured: never consumed, so vanilla ESC
+        // still opens the pause menu.
         onClient { DockInputRouter.onGlfwKey(GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_PRESS, 0) } shouldBe false
-    }
-
-    test("onGlfwChar delivers typed characters into a focused Compose text field") {
-        // Regression coverage for the Task-3 review finding: onGlfwChar must land on a real
-        // BasicTextField's committed text, not merely arrive at an onKeyEvent handler. A widget-level
-        // onKeyEvent assertion (as in the test above) would NOT catch this -- Compose's own
-        // typed-character recognition (TextFieldKeyInput_desktopKt.isTypedEvent) requires unwrapping a
-        // real java.awt.event.KeyEvent off the Compose KeyEvent's nativeEvent field; a KeyEvent built
-        // without one (as onGlfwKey builds for non-typed keys) is invisible to it. See
-        // DockInputRouter.onGlfwChar's doc for how nativeEvent is populated and why.
-        closeClientScreen(); waitClientTicks(2)
-        val text = AtomicReference("")
-        val focusRequester = FocusRequester()
-
-        runOnClient { mc ->
-            DockState.reset()
-            DockState.leftPanels.add(Panel("test.textfield", "Text") {
-                var value by remember { mutableStateOf(TextFieldValue("")) }
-                BasicTextField(
-                    value = value,
-                    onValueChange = { new -> value = new; text.set(new.text) },
-                    modifier = Modifier.fillMaxSize().focusRequester(focusRequester),
-                )
-                LaunchedEffect(Unit) { focusRequester.requestFocus() }
-            })
-            DockState.setVisible(DockRegion.LEFT, true)
-            DockState.setSize(DockRegion.LEFT, 300)
-            ViewportState.active = true
-            ComposeOverlay.enabled = true
-            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
-        }
-        waitClientTicks(8)
-
-        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
-        waitClientTicks(2)
-        runOnClient {
-            "hi".forEach { c -> DockInputRouter.onGlfwChar(c.code) }
-        }
-        waitClientTicks(6)
-
-        text.get() shouldBe "hi"
+        onClient { DockState.focusedRegion } shouldBe null
 
         runOnClient { mc ->
             ComposeOverlay.enabled = false; ViewportState.active = false
             DockInputRouter.clearFocus(); DockState.reset()
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
-        waitClientTicks(6)
+        waitClientTicks(2)
     }
 })
