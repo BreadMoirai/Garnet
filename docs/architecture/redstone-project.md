@@ -88,7 +88,8 @@ Server state and lifecycle:
 - `EditorCommand` — `/garnet project`.
 
 Network:
-- `editor/network/EditorPackets` + `EditorNetworking` — path-containment + per-player-session
+- `editor/network/EditorPackets` + `EditorNetworkRegistry` + `EditorTreeHandlers` /
+  `EditorStructureHandlers` / `EditorFileOpsHandlers` — path-containment + per-player-session
   authority; see [persistence/network-payload-contract.md](../persistence/network-payload-contract.md).
 
 Client:
@@ -132,7 +133,7 @@ Client:
   move (so the dirty state, keyed by subpath, is never stranded under a name nothing will commit
   again), then moves the file and carries its `LocalHistoryStore` revisions across via
   `LocalHistoryStore.moveHistory`, unloads and re-places a currently-placed structure under the new
-  subpath (`EditorDimRegistry.unplaceStructure` then `placeStructureFrom` — the structure lands in
+  subpath (`EditorDimRegistry.unplaceStructure` then `EditorStructureHandlers.placeStructureFrom` — the structure lands in
   a fresh region since `nextStructureIndex` is never recycled), rekeys
   every OTHER registry entry nested under a renamed folder onto the new subpath
   (`EditorDimRegistry.rekeyForRename`, same `"$oldSubpath/"` boundary as below — a pure bookkeeping
@@ -183,7 +184,7 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
   re-placing clears only that footprint, not the whole region.
 - **Packets:** `PlaceStructureC2S` / `SaveStructureC2S` / `NewStructureC2S` →
   `StructureResultS2C`, handled by
-  `EditorNetworking.handlePlaceStructure/handleSaveStructure/handleNewStructure`. There is no
+  `EditorStructureHandlers.handlePlaceStructure/handleSaveStructure/handleNewStructure`. There is no
   `DiscardStructureC2S` any more — see below.
 - **Debounced auto-save + local history (the only auto-persist path):** `StructureCommit` writes
   the `.nbt` directly; there is no dirty-buffer sidecar. `ServerTickEvents.END_SERVER_TICK` calls

@@ -17,6 +17,8 @@ import java.security.MessageDigest
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
 import kotlin.io.path.readText
@@ -325,6 +327,34 @@ object LocalHistoryStore {
         for (dropped in all) {
             if (dropped.file in keptFiles) continue
             runCatching { dir.resolve(dropped.file).deleteIfExists() }
+        }
+    }
+
+    /**
+     * Move local history for every `.nbt` under a renamed path, not just [oldRoot] itself
+     * (Task 7 fix round 1 / Finding 3). `LocalHistoryStore` keys history by each structure file's
+     * own absolute path — a plain `moveHistory(oldRoot, newRoot)` only relocates history for a
+     * single renamed `.nbt`, so renaming a whole FOLDER would silently orphan every contained
+     * structure's history at its old, now-nonexistent path.
+     *
+     * [newRoot] (not [oldRoot]) is walked, since by the time this runs the caller has already moved
+     * the file(s) on disk and [oldRoot] no longer exists; each `.nbt`'s pre-move path is
+     * reconstructed by relativizing against [newRoot] and resolving against [oldRoot], which is
+     * safe because a plain file move preserves the subtree's internal structure.
+     * [LocalHistoryStore.moveHistory] is a no-op for a path with no history directory, so this is
+     * safe to call for every `.nbt` found under [newRoot], not just ones known to have history.
+     */
+    fun moveDescendantHistories(oldRoot: Path, newRoot: Path) {
+        if (!newRoot.isDirectory()) {
+            moveHistory(oldRoot, newRoot)
+            return
+        }
+        Files.walk(newRoot).use { stream ->
+            stream.filter { it.isRegularFile() && it.name.endsWith(".nbt") }
+                .forEach { newFile ->
+                    val rel = newRoot.relativize(newFile)
+                    moveHistory(oldRoot.resolve(rel), newFile)
+                }
         }
     }
 

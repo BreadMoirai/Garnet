@@ -20,7 +20,7 @@ Compose dock panel is the intended replacement caller for `playback`/`testing`; 
 
 ## Top level (`src/main/kotlin/com/breadmoirai/garnet/`)
 
-- `Garnet.kt` — `ModInitializer`. Registers `EditorNetworking`, `McLifecycle`, the
+- `Garnet.kt` — `ModInitializer`. Registers `EditorNetworkRegistry`, `McLifecycle`, the
   `SubTickPhaseEvents.PHASE` listener that still drives any active `StateRecorder` (no *product*
   surface creates one today — the live caller is `testing/runner/runGarnetSpec.kt`, on the
   test-execution path), the project-root `SERVER_STARTING`/
@@ -146,8 +146,11 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   (place/save the grid), `EditorCellSaver` (dirty-diff a cell and rewrite its structure NBT),
   `EditorTeleport`, `EditorServerContext`, `GridLayout` (pure row-major slot math).
 - `command/EditorCommand.kt` — `/garnet project`.
-- `network/EditorPackets.kt` + `EditorNetworking.kt` (main) — the wire protocol and its server
-  handlers. See [persistence/network-payload-contract.md](../persistence/network-payload-contract.md)
+- `network/EditorPackets.kt` + `EditorNetworkRegistry.kt` + `EditorTreeHandlers.kt` +
+  `EditorStructureHandlers.kt` + `EditorFileOpsHandlers.kt` + `EditorHandlerSupport.kt` (main) —
+  the wire protocol and its server handlers, split by concern (registration; tree/root ops;
+  structure ops; file ops; shared helpers). See
+  [persistence/network-payload-contract.md](../persistence/network-payload-contract.md)
   for the authority model — a *different* one from the deleted block-entity trust anchor.
 - `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ProjectTreeState`.
 - `ui/` (client) — `ProjectExplorerPanel.kt`, `ExplorerToolbar.kt`, `ExplorerContextMenu.kt`,
@@ -221,7 +224,8 @@ dock shell). Nothing outside `editor/` depends on `editor/`.
   `block` lambda fires inputs and asserts outputs inline. Called from
   `testSupport/harness/GarnetTestSpec.kt` and gametest/unit specs today. See
   [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
-- *"How does the Explorer work?"* → `editor/network/EditorNetworking.kt` (server handlers) and
+- *"How does the Explorer work?"* → `editor/network/EditorTreeHandlers.kt` /
+  `EditorStructureHandlers.kt` / `EditorFileOpsHandlers.kt` (server handlers) and
   `editor/ui/ProjectExplorerPanel.kt` (client panel); see [redstone-project.md](redstone-project.md).
 - *"Why is the GUI structured this way?"* → the legacy `RecorderScreen`/`RunnerScreen`/
   `ProjectScreen` were hard-cut in favor of a full-window Compose dock; start at

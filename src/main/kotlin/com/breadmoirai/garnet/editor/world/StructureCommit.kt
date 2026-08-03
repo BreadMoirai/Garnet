@@ -1,7 +1,6 @@
 package com.breadmoirai.garnet.editor.world
 
 import com.breadmoirai.garnet.config.SharedSettings
-import com.breadmoirai.garnet.editor.network.EditorNetworking
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.PlacedBox
@@ -165,11 +164,11 @@ object StructureCommit {
      * 1. not placed (`registry.placedBoxOf(subpath) == null`) — genuinely nothing left to commit.
      *    There is no world content standing by; the dirty flag is cleared unconditionally. This is
      *    safe because both repo-wide callers of [EditorDimRegistry.unplaceStructure] —
-     *    `EditorNetworking.handleRename` (per-subpath, aborting the whole rename on [Failed]) and
-     *    `EditorNetworking.handleSetRoot` (a [commitAll] flush of the OLD root before the swap) —
+     *    `EditorFileOpsHandlers.handleRename` (per-subpath, aborting the whole rename on [Failed]) and
+     *    `EditorTreeHandlers.handleSetRoot` (a [commitAll] flush of the OLD root before the swap) —
      *    commit every dirty subpath first and only unplace afterward — so a dirty key never survives
      *    into an unplace.
-     * 2. no root (`EditorNetworking.rootFor(server) == null`) or no file
+     * 2. no root (`EditorRootResolver.rootFor(server) == null`) or no file
      *    (`root.resolveSubpath(subpath) == null`, which fails whenever the candidate file doesn't
      *    currently exist on disk) — while the structure IS still placed. Root/file resolution
      *    depends on state this object does not own: an external delete-then-restore, a git
@@ -219,7 +218,7 @@ object StructureCommit {
             }
             return CommitOutcome.NotApplicable
         }
-        val root = EditorNetworking.rootFor(server) ?: return notApplicableUnresolved()
+        val root = EditorRootResolver.rootFor(server) ?: return notApplicableUnresolved()
         val file = root.resolveSubpath(subpath) ?: return notApplicableUnresolved()
         // Not placed (case 1 above): genuinely nothing left to commit, clear unconditionally.
         val placed = registry.placedBoxOf(subpath) ?: run {
@@ -369,7 +368,7 @@ object StructureCommit {
 
     /**
      * Backstop flush: commit every dirty structure regardless of debounce/backoff timing. Used on
-     * world-save and server stop. `EditorNetworking.handleRename` also calls [commit] directly
+     * world-save and server stop. `EditorFileOpsHandlers.handleRename` also calls [commit] directly
      * (not this batch form) for the renamed structure AND every dirty descendant of a renamed
      * folder, BEFORE moving any files — this is what keeps a rename from stranding a dirty entry
      * under a subpath nothing will ever commit again (Task 7 fix round 1 / Finding 1), and aborts
@@ -411,7 +410,7 @@ object StructureCommit {
     /**
      * Unsolicited fan-out: tells every OTHER connected player (`exclude`, if given, is typically
      * the player who just triggered the commit and was already replied to directly — see
-     * [EditorNetworking.handleSaveStructure]) that a structure changed, so their Explorer status
+     * [EditorStructureHandlers.handleSaveStructure]) that a structure changed, so their Explorer status
      * lines can update. Nothing here is a reply to anything these players sent, so — unlike every
      * other S2C in this mod — the receiver isn't provably running the mod at all: a vanilla/unmodded
      * client on a dedicated server can be disconnected for an unknown play-phase payload (F6). Guard

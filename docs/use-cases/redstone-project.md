@@ -33,7 +33,7 @@ single shared workspace via `bootWorkspace()`; there is no per-root registration
 list. The only piece of this area that survives is the path-safety guard the live network handlers
 still rely on:
 
-- **UC-MAN-01.e** `EditorRoot` enforces that every path is absolute and rejects path-traversal attempts via `resolveSubpath`: a relative or escaping subpath returns `null` (symlink-defeat via `toRealPath` before `startsWith` check). This guard is exercised regardless of caller (still used by `resolveSubpath` calls from the live `EditorNetworking` handlers).
+- **UC-MAN-01.e** `EditorRoot` enforces that every path is absolute and rejects path-traversal attempts via `resolveSubpath`: a relative or escaping subpath returns `null` (symlink-defeat via `toRealPath` before `startsWith` check). This guard is exercised regardless of caller (still used by `resolveSubpath` calls from the live network handlers).
 
 ---
 
@@ -82,9 +82,9 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 
 A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
 
-- **UC-MAN-05.a** `/garnet project` immediately sends `ListEditorTreeC2S`. `EditorNetworking.handleListTree` (via private `sendTree`) calls `scanFolder(root.path)` on the server and replies with `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` carrying the full recursive folder tree (every file/folder, not just spec leaves) and the player's current `activeSubpath`.
+- **UC-MAN-05.a** `/garnet project` immediately sends `ListEditorTreeC2S`. `EditorTreeHandlers.handleListTree` (via `EditorHandlerSupport.sendTree`) calls `scanFolder(root.path)` on the server and replies with `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` carrying the full recursive folder tree (every file/folder, not just spec leaves) and the player's current `activeSubpath`.
 - **UC-MAN-05.b** `EditorClientNetworking` receives `EditorTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot`, converts it via `ExplorerTreeState.buildTreeFrom(snapshot.root)`, and renders it with Jewel's `LazyTree`, recomposing on change. This is the **only** client-side reaction to the snapshot — the legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the `ExplorerTreeState`/`ProjectTreeState` split (expand/select state vs. server data).
-- **UC-MAN-05.c** Clicking a "spec-folder" row (a folder directly containing a `*.spec.kts` file) sends `LoadEditorFolderC2S(path)`. `EditorNetworking.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `EditorTeleport.toFolder`, and sends `EditorFolderLoadedS2C` with the spec-id list and any errors. Clicking a non-spec folder or its expand triangle just toggles expand client-side (no packet); clicking a file row selects/highlights it client-side (no packet).
+- **UC-MAN-05.c** Clicking a "spec-folder" row (a folder directly containing a `*.spec.kts` file) sends `LoadEditorFolderC2S(path)`. `EditorTreeHandlers.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `EditorTeleport.toFolder`, and sends `EditorFolderLoadedS2C` with the spec-id list and any errors. Clicking a non-spec folder or its expand triangle just toggles expand client-side (no packet); clicking a file row selects/highlights it client-side (no packet).
 - **UC-MAN-05.d** `EditorTeleport.toFolder` looks up `EditorDimRegistry.regionOriginOf(subpath)`, teleports the player to `(region.x+0.5, yBase+2, region.z+0.5)` in `projectLevel()`, and calls `EditorSession.setActive(player.uuid, subpath)` so subsequent server actions (save, new-spec) scope to the right folder.
 - **UC-MAN-05.e** If the subpath's region has not been assigned (folder not yet placed), `toFolder` returns `false` and the server replies with `EditorErrorS2C`. `ProjectTreeState.onError(payload)` sets `status = "error: ${payload.reason}"`, which the Explorer panel renders as its status line — the same mechanism that used to update `ProjectScreen`'s status label.
 
@@ -95,7 +95,7 @@ A player selects a leaf folder from the in-game UI, which teleports them to that
 A player names a new spec from the in-game UI; the server writes a stub `.spec.kts`, re-places the folder, and the new cell appears in the world. **No live UI currently sends `NewEditorSpecC2S`** — the deleted `ProjectScreen` had the "New Spec" `EditBox`/button; `ProjectExplorerPanel` (the current LEFT-dock panel) does not yet have an equivalent control. The server handler and packet are otherwise unchanged and reachable by sending the payload directly (as the coverage tests below do).
 
 - **UC-MAN-06.a** *(historical UI path)* The player types a name into the `EditBox` in the deleted `ProjectScreen` (validated client-side for non-blank) and clicks "New Spec", sending `NewEditorSpecC2S(name)`.
-- **UC-MAN-06.b** `EditorNetworking.handleNewSpec` reads `EditorSession.get(player.uuid)?.activeSubpath`; if no folder is active it replies with `EditorErrorS2C("no folder selected")`.
+- **UC-MAN-06.b** `EditorTreeHandlers.handleNewSpec` reads `EditorSession.get(player.uuid)?.activeSubpath`; if no folder is active it replies with `EditorErrorS2C("no folder selected")`.
 - **UC-MAN-06.c** `EditorNewSpec.create(folder, name)` enforces that `name` matches `[a-zA-Z0-9_-]+`, that the target file does not already exist, then writes a minimal stub via `RecordingDslEmitter.emitStub(name)`. Throws on any violation so the caller can catch and report.
 - **UC-MAN-06.d** After creating the stub, `handleNewSpec` calls `EditorDimLifecycle.placeFolder(server, root, activeSubpath)` to re-scan and re-place the entire folder. The new file appears as an empty cell with a `GARNET_RECORDER_BLOCK` anchor.
 - **UC-MAN-06.e** `EditorFolderLoadedS2C` is sent back with the updated spec-id list and any parse/layout errors from the re-place.
@@ -106,7 +106,7 @@ A player names a new spec from the in-game UI; the server writes a stub `.spec.k
 
 When the player has modified blocks inside a spec's cell AABB, the server detects the diff and overwrites the source `.spec.kts` structure file. **No live UI currently sends `SaveNowC2S`** — the deleted `ProjectScreen` had the "Save Now" button; `ProjectExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged and reachable by sending the payload directly.
 
-- **UC-MAN-07.a** *(historical UI path)* The player clicks "Save Now" in the deleted `ProjectScreen`, sending `SaveNowC2S`. `EditorNetworking.handleSaveNow` calls `EditorDimLifecycle.saveAll(server)`, which iterates every subpath in `EditorWorld.perFolder` and calls `saveFolder`.
+- **UC-MAN-07.a** *(historical UI path)* The player clicks "Save Now" in the deleted `ProjectScreen`, sending `SaveNowC2S`. `EditorTreeHandlers.handleSaveNow` calls `EditorDimLifecycle.saveAll(server)`, which iterates every subpath in `EditorWorld.perFolder` and calls `saveFolder`.
 - **UC-MAN-07.b** `saveFolder` resolves each spec's absolute cell origin via `EditorWorld.absoluteCellOrigin` (adds `regionOrigin.x/z` to the region-relative `cell.origin.x/z`; Y from `cell.origin.y` is already absolute). It then passes `level`, `loaded`, and `absoluteCellOrigin` to `EditorCellSaver.captureAndSaveIfDirty`.
 - **UC-MAN-07.c** `EditorCellSaver` captures the live cell volume with `StructureTemplate.fillFromWorld`, serializes both live and baseline snapshots to `CompoundTag`, and returns `CellSaveResult(saved=false)` if the NBT is equal (no-op). Only a structural change in block data triggers the rewrite.
 - **UC-MAN-07.d** On a dirty diff, `NbtIo.writeCompressed(liveNbt, structureFile)` overwrites `<structureId>.nbt`. The `.spec.kts` source re-emission is deferred (noted in `EditorCellSaver`); `RecordingDslEmitter` will handle it in a later phase.
@@ -119,7 +119,7 @@ When the player has modified blocks inside a spec's cell AABB, the server detect
 
 A player explicitly unloads their active folder focus, or the session is cleared when the player disconnects or the server stops. **No live UI currently sends `UnloadEditorFolderC2S`** — the deleted `ProjectScreen` had the "Unload" button; `ProjectExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged.
 
-- **UC-MAN-08.a** *(historical UI path)* The player clicks "Unload" in the deleted `ProjectScreen`, sending `UnloadEditorFolderC2S`. `EditorNetworking.handleUnload` calls `EditorSession.clear(player.uuid)` and replies with `EditorSaveReportS2C(emptyList())`.
+- **UC-MAN-08.a** *(historical UI path)* The player clicks "Unload" in the deleted `ProjectScreen`, sending `UnloadEditorFolderC2S`. `EditorTreeHandlers.handleUnload` calls `EditorSession.clear(player.uuid)` and replies with `EditorSaveReportS2C(emptyList())`.
 - **UC-MAN-08.b** After unload, the player's `activeSubpath` is `null`; a subsequent `handleNewSpec` (which requires a folder focus) receives `EditorErrorS2C("no folder selected")`. `handleSaveNow` is deliberately session-independent — it calls `EditorDimLifecycle.saveAll(server)` over every loaded folder in `EditorWorld.perFolder`, so post-unload it still returns a `EditorSaveReportS2C` (empty when nothing is loaded), not an error.
 - **UC-MAN-08.c** If a player disconnects without clicking Unload (ungraceful exit), `EditorSession.clear(player.uuid)` must be called from the server-side player disconnect event. The `EditorSession` map is a `ConcurrentHashMap` keyed by `UUID`; the player's slot is released so it does not linger after reconnect.
 - **UC-MAN-08.d** On server stop, a `SERVER_STOPPED` listener (registered in `garnet.onInitialize`) calls `EditorDimLifecycle.releaseServerState(server)`, which invokes `EditorDimRegistry.dispose(server)`, `EditorWorld.clear(server)`, and `EditorServerContext.clear(server)` — removing each `WeakHashMap` entry for the server and releasing all server-scoped state promptly rather than waiting for GC.
@@ -148,7 +148,7 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   nothing. **Persistence is client-side only:** in singleplayer/LAN the integrated server shares
   the JVM so the choice is restored via `ModConfig.load()`; a dedicated-server root swap is not
   durable across restart.
-- **UC-MAN-09.c** `EditorNetworking.handleSetRoot` rejects a non-directory / invalid path
+- **UC-MAN-09.c** `EditorTreeHandlers.handleSetRoot` rejects a non-directory / invalid path
   with `EditorErrorS2C`. Otherwise it first flushes every dirty standalone structure against the
   **old** root via `StructureCommit.commitAll` — once the root swaps, `commit` resolves subpaths
   against the NEW root, so a late commit would write the old root's world blocks over a same-named

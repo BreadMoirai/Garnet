@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.test.editor
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.EditorNewStructure
 import com.breadmoirai.garnet.editor.data.EditorRoot
-import com.breadmoirai.garnet.editor.network.EditorNetworking
+import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorServerContext
@@ -222,7 +222,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     val player = makeMockServerPlayer(this)
                     drainPayloads(player)
 
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
                     drainPayloads(player)
 
                     // Placing seeds the pre-edit baseline, so rollback is possible from the start.
@@ -276,7 +276,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("still.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("still.nbt"))
                     drainPayloads(player)
 
                     val file = tmp.resolve("still.nbt")
@@ -314,7 +314,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("ticker.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("ticker.nbt"))
                     drainPayloads(player)
 
                     val registry = EditorDimRegistry.of(this)
@@ -364,7 +364,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("manual.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("manual.nbt"))
                     drainPayloads(player)
 
                     val registry = EditorDimRegistry.of(this)
@@ -412,7 +412,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("broken.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("broken.nbt"))
                     drainPayloads(player)
 
                     val file = tmp.resolve("broken.nbt")
@@ -489,7 +489,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     server = this
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("brokenhist.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("brokenhist.nbt"))
                     drainPayloads(player)
 
                     val file = tmp.resolve("brokenhist.nbt")
@@ -557,7 +557,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("bounded.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("bounded.nbt"))
                     drainPayloads(player)
 
                     val registry = EditorDimRegistry.of(this)
@@ -629,7 +629,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     server = this
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("recoverable.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("recoverable.nbt"))
                     drainPayloads(player)
 
                     val file = tmp.resolve("recoverable.nbt")
@@ -707,7 +707,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("capped.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("capped.nbt"))
                     drainPayloads(player)
 
                     val file = tmp.resolve("capped.nbt")
@@ -794,7 +794,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // autosave revision exist beforehand -- this is what a "disable history to
                     // freeze the archive" user actually has: a pre-existing directory they want left
                     // alone, not an empty one.
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("frozen.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("frozen.nbt"))
                     drainPayloads(player)
 
                     val file = tmp.resolve("frozen.nbt")
@@ -856,7 +856,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("churn.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("churn.nbt"))
                     drainPayloads(player)
 
                     val file = tmp.resolve("churn.nbt")
@@ -906,7 +906,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     val registry = EditorDimRegistry.of(this)
 
                     // Donor content: genuinely different, valid structure bytes.
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("extdonor.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("extdonor.nbt"))
                     drainPayloads(player)
                     val donorRegion = registry.structureRegionOriginOf("extdonor.nbt")!!
                     val donorEdit = donorRegion.offset(1, 0, 1)
@@ -916,7 +916,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                         .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
                     val donorBytes = tmp.resolve("extdonor.nbt").readBytes()
 
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("extafter.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("extafter.nbt"))
                     drainPayloads(player)
                     val file = tmp.resolve("extafter.nbt")
                     val region = registry.structureRegionOriginOf("extafter.nbt")!!
@@ -973,7 +973,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     // Produce genuinely different, valid structure content by committing an edit to
                     // an unrelated "donor" structure through the real path.
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("donor.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("donor.nbt"))
                     drainPayloads(player)
                     val donorFile = tmp.resolve("donor.nbt")
                     val donorRegistry = EditorDimRegistry.of(this)
@@ -988,7 +988,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     // Place "external.nbt" -- this seeds its own placed baseline revision, matching
                     // its (empty) on-disk content at this point.
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("external.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("external.nbt"))
                     drainPayloads(player)
                     val externalFile = tmp.resolve("external.nbt")
                     LocalHistoryStore.revisions(externalFile) shouldHaveSize 1

@@ -145,7 +145,7 @@ all-or-nothing.
 
 ## `blockCount` is `0` on `placed` and `external` revisions
 
-When a structure is placed into the world, `EditorNetworking` writes an initial revision tagged
+When a structure is placed into the world, `EditorStructureHandlers` writes an initial revision tagged
 `REASON_PLACED` with `blockCount = 0`. This isn't a bug: block count is only knowable by scanning
 the placed volume, and at the moment of placement nothing has been scanned yet — the structure is
 being written *into* the world from its `.nbt`, not captured *out of* it. `StructureCommit` writes
@@ -158,7 +158,7 @@ those are written from a `CapturedStructure` produced by scanning the world.
 ## The only writer
 
 `com.breadmoirai.garnet.editor.world.StructureCommit` is the only caller that writes autosave,
-manual, or external revisions; `EditorNetworking` writes the one `placed` baseline revision at
+manual, or external revisions; `EditorStructureHandlers` writes the one `placed` baseline revision at
 place time. No other code path calls `LocalHistoryStore.writeRevision` — there is no separate
 "manual snapshot" feature. See `docs/architecture/redstone-project.md#standalone-structure-files`
 for how `StructureCommit` decides *when* to commit (debounce ticks, max-dirty cap, and the

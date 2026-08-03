@@ -18,7 +18,7 @@ article covers the *why* behind five decisions that aren't visible just from rea
 
 `ExplorerActions.commitCreate`/`commitRename` re-run `EditorNames.validate` against the client's
 own tree snapshot before sending `CreateFolderC2S`/`NewStructureC2S`/`RenamePathC2S`. This looks
-redundant next to `EditorNetworking.handleCreateFolder`/`handleNewStructure`/`handleRename`,
+redundant next to `EditorFileOpsHandlers.handleCreateFolder`/`EditorStructureHandlers.handleNewStructure`/`EditorFileOpsHandlers.handleRename`,
 which validate the *same* name again server-side. It isn't: the two checks run against different
 data with different trust levels.
 
@@ -73,7 +73,7 @@ loaded folder's own region), `structureBySubpath` (a standalone structure's assi
 `placedBoxes` (the last-placed footprint, used for cheap re-clearing). All three are keyed by
 subpath, so a rename that only moves the file on disk without touching the registry strands every
 entry under the OLD subpath: the structure's placed blocks become unreachable by the new name
-(`StructureCommit.commit` resolves the subpath via `rootFor(server).resolveSubpath(subpath) ?:
+(`StructureCommit.commit` resolves the subpath via `EditorRootResolver.rootFor(server).resolveSubpath(subpath) ?:
 return null` and silently skips it forever), and a fresh `PlaceStructureC2S(newSubpath)` finds no
 registry entry and re-places a second copy in a brand-new region, orphaning the first in the world.
 
@@ -85,13 +85,13 @@ registry entry and re-places a second copy in a brand-new region, orphaning the 
   state is keyed by subpath and moving first would strand it under a name nothing will ever commit
   again — then calls `EditorDimRegistry.unplaceStructure(oldSubpath)` (clearing
   `structureBySubpath` and `placedBoxes`), then re-places it under the new subpath via
-  `placeStructureFrom`. This lands the structure in a freshly-assigned region
+  `EditorStructureHandlers.placeStructureFrom`. This lands the structure in a freshly-assigned region
   (`nextStructureIndex` is monotonic and never recycled) rather than reusing the old one —
   intended, matching how every other region assignment in the registry behaves.
 - **Descendants of a renamed folder** (a structure or sub-folder nested *under* the renamed path,
   not the renamed path itself): `EditorDimRegistry.rekeyForRename(oldSubpath, newSubpath)`
   rewrites every entry across all three maps whose subpath is `oldSubpath` or begins with
-  `"$oldSubpath/"` — the same path-segment boundary `repointSession` uses (a bare `startsWith`
+  `"$oldSubpath/"` — the same path-segment boundary `EditorSession.repointSession` uses (a bare `startsWith`
   would wrongly also rekey an unrelated sibling like `redstoneworks/clocks` when renaming
   `redstone`). This is a pure in-memory bookkeeping move: it does **not** touch the world. The
   structure's blocks stay exactly where they were placed — only the file's path changed, not its

@@ -13,7 +13,8 @@ all deleted — there is no in-game recorder/runner surface anymore (see
 [architecture/module-map.md](../architecture/module-map.md)).
 
 The Explorer/redstone-project wire protocol (`editor/network/EditorPackets.kt`,
-`editor/network/EditorNetworking.kt`) is a genuine replacement worth documenting on its own terms
+`editor/network/EditorNetworkRegistry.kt`, `EditorTreeHandlers.kt`, `EditorStructureHandlers.kt`,
+`EditorFileOpsHandlers.kt`) is a genuine replacement worth documenting on its own terms
 — it is a **different** authority model, not a renamed version of the old one. There is no
 block-entity handle at all: the client addresses everything by **path** and by **player identity**.
 
@@ -53,7 +54,8 @@ fun resolveSubpath(subpath: String): Path? {
 }
 ```
 
-Every handler in `EditorNetworking` that takes a client-supplied subpath (`LoadEditorFolderC2S`,
+Every handler across `EditorTreeHandlers`/`EditorStructureHandlers`/`EditorFileOpsHandlers` that
+takes a client-supplied subpath (`LoadEditorFolderC2S`,
 `PlaceStructureC2S`, `SaveStructureC2S`, `RenamePathC2S`,
 `NewStructureC2S.parentSubpath`, `CreateFolderC2S.parentSubpath`) calls this before touching the
 filesystem, and replies with `EditorErrorS2C("... not found or escapes root: ...")` on a `null`.
@@ -87,7 +89,7 @@ Consequences:
 
 ## Root resolution has a priority chain, not a single lookup
 
-`EditorNetworking.rootFor(server)`: `EditorWorld.get(server)?.root` → `EditorServerContext.get(server)?.root`
+`EditorRootResolver.rootFor(server)` (`editor/world/EditorRootResolver.kt`): `EditorWorld.get(server)?.root` → `EditorServerContext.get(server)?.root`
 → `SharedSettings.projectRootPath` (if non-blank). This is a fallback chain, not authority
 delegation — whichever resolves first is used for the entire request.
 
@@ -104,6 +106,6 @@ delegation — whichever resolves first is used for the entire request.
   children.
 - Optional string: a leading `Boolean` flag before the string, used by `EditorTreeSnapshotS2C.currentSubpath`.
 
-All payload types are registered in `EditorNetworking.register()`. If you add a payload, register
+All payload types are registered in `EditorNetworkRegistry.register()`. If you add a payload, register
 it in the right direction (`PayloadTypeRegistry.serverboundPlay()` vs `.clientboundPlay()`) —
 Fabric silently drops unregistered types.

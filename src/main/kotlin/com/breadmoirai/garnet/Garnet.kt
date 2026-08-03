@@ -2,7 +2,7 @@ package com.breadmoirai.garnet
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.core.events.SubTickPhaseEvents
-import com.breadmoirai.garnet.editor.network.EditorNetworking
+import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry
 import com.breadmoirai.garnet.editor.command.EditorCommand
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.data.EditorRoot
@@ -27,7 +27,7 @@ class Garnet : ModInitializer {
 
     override fun onInitialize() {
         LOGGER.debug("[Garnet#onInitialize] initializing mod")
-        EditorNetworking.register()
+        EditorNetworkRegistry.register()
         AsyncEventHandler.register()
         SubTickPhaseEvents.PHASE.register { level, phase ->
             StateRecorder.onPhaseForActiveRecorders(level, phase)

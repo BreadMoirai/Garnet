@@ -232,7 +232,7 @@ rows. The pattern:
   full `ExplorerContextMenu`/inline-field write-up. `NewStructureC2S` was reshaped to
   `NewStructureC2S(parentSubpath, name)` (folder-targeted, not session-active-folder-targeted) and
   `CreateFolderC2S`/`RenamePathC2S` are new alongside it; all three are handled in
-  `EditorNetworking` and covered by client and gametest specs. **`Save` still has no
+  `EditorFileOpsHandlers`/`EditorStructureHandlers` and covered by client and gametest specs. **`Save` still has no
   client UI trigger** — `SaveStructureC2S` (a force-commit through `StructureCommit`) remains fully
   wired server-side and covered by `EditorStructureNetworkSpec`, with no tree-row action that sends
   it yet. There is no `Discard` any more: a placed structure auto-saves continuously, so there is

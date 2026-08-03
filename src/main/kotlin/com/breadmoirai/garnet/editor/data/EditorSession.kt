@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.data
 
+import net.minecraft.server.level.ServerPlayer
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -21,5 +22,18 @@ data class EditorSession(
         }
         fun clear(playerId: UUID) { sessions.remove(playerId) }
         fun all(): Collection<EditorSession> = sessions.values
+
+        /**
+         * Keep a loaded project reachable after one of its ancestors is renamed: an activeSubpath
+         * equal to [oldSubpath], or nested under it, is rewritten onto [newSubpath].
+         */
+        fun repointSession(player: ServerPlayer, oldSubpath: String, newSubpath: String) {
+            val active = get(player.uuid)?.activeSubpath ?: return
+            when {
+                active == oldSubpath -> setActive(player.uuid, newSubpath)
+                active.startsWith("$oldSubpath/") ->
+                    setActive(player.uuid, newSubpath + active.removePrefix(oldSubpath))
+            }
+        }
     }
 }

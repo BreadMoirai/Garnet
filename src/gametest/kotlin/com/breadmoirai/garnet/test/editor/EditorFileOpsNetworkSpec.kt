@@ -5,7 +5,8 @@ import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
-import com.breadmoirai.garnet.editor.network.EditorNetworking
+import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
+import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
@@ -42,7 +43,7 @@ import kotlin.io.path.isDirectory
 
 /**
  * Model of `EditorStructureNetworkSpec`'s harness: temp project root + a mock server player,
- * wired through `EditorServerContext` so `EditorNetworking` resolves the temp root.
+ * wired through `EditorServerContext` so the handlers resolve the temp root.
  *
  * Also redirects [SharedSettings.localHistoryDir] to a per-call temp directory for every test in
  * this file (Task 7 fix round 2, minor): several of these tests place and/or commit structures,
@@ -75,7 +76,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
 
     test("handleCreateFolder creates a folder at the project root") {
         withServer { server, player, root ->
-            EditorNetworking.handleCreateFolder(server, player, CreateFolderC2S("", "toplevel"))
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("", "toplevel"))
             root.resolve("toplevel").isDirectory().shouldBeTrue()
         }
     }
@@ -83,7 +84,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
     test("handleCreateFolder creates a nested folder") {
         withServer { server, player, root ->
             root.resolve("redstone").createDirectories()
-            EditorNetworking.handleCreateFolder(server, player, CreateFolderC2S("redstone", "clocks"))
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("redstone", "clocks"))
             root.resolve("redstone/clocks").isDirectory().shouldBeTrue()
         }
     }
@@ -96,14 +97,14 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             // non-existent target passes even if the containment check were deleted outright. Create a
             // real directory outside the root so this only passes if containment itself rejects it.
             val evil = root.resolveSibling("evil").also { it.createDirectories() }
-            EditorNetworking.handleCreateFolder(server, player, CreateFolderC2S("../evil", "x"))
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("../evil", "x"))
             evil.resolve("x").exists().shouldBeFalse()
         }
     }
 
     test("handleCreateFolder rejects a name containing a separator") {
         withServer { server, player, root ->
-            EditorNetworking.handleCreateFolder(server, player, CreateFolderC2S("", "a/b"))
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("", "a/b"))
             root.resolve("a").exists().shouldBeFalse()
         }
     }
@@ -114,7 +115,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             root.resolve("other").createDirectories()
             EditorSession.setActive(player.uuid, "other")
 
-            EditorNetworking.handleNewStructure(server, player, NewStructureC2S("redstone", "gadget.nbt"))
+            EditorStructureHandlers.handleNewStructure(server, player, NewStructureC2S("redstone", "gadget.nbt"))
 
             root.resolve("redstone/gadget.nbt").exists().shouldBeTrue()
             root.resolve("other/gadget.nbt").exists().shouldBeFalse()
@@ -123,7 +124,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
 
     test("handleNewStructure creates at the project root for an empty parent") {
         withServer { server, player, root ->
-            EditorNetworking.handleNewStructure(server, player, NewStructureC2S("", "gadget.nbt"))
+            EditorStructureHandlers.handleNewStructure(server, player, NewStructureC2S("", "gadget.nbt"))
             root.resolve("gadget.nbt").exists().shouldBeTrue()
         }
     }
@@ -131,7 +132,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
     test("handleRename renames a folder") {
         withServer { server, player, root ->
             root.resolve("redstone").createDirectories()
-            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
             root.resolve("logic").isDirectory().shouldBeTrue()
             root.resolve("redstone").exists().shouldBeFalse()
         }
@@ -141,7 +142,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         withServer { server, player, root ->
             root.resolve("a").createDirectories()
             root.resolve("b").createDirectories()
-            EditorNetworking.handleRename(server, player, RenamePathC2S("a", "b"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("a", "b"))
             root.resolve("a").isDirectory().shouldBeTrue()   // untouched
         }
     }
@@ -149,7 +150,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
     test("handleRename rejects a new name containing a separator") {
         withServer { server, player, root ->
             root.resolve("a").createDirectories()
-            EditorNetworking.handleRename(server, player, RenamePathC2S("a", "x/y"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("a", "x/y"))
             root.resolve("a").isDirectory().shouldBeTrue()
         }
     }
@@ -157,11 +158,11 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
     test("renaming a placed structure unloads it and reloads it under the new name") {
         withServer { server, player, root ->
             EditorNewStructure.create(root, "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
             val registry = EditorDimRegistry.of(server)
             registry.placedBoxOf("clock.nbt").shouldNotBeNull()
 
-            EditorNetworking.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
 
             registry.placedBoxOf("clock.nbt").shouldBeNull()
             registry.placedBoxOf("ring.nbt").shouldNotBeNull()
@@ -187,13 +188,13 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         // time handleRename returns, so a post-hoc onBlockChanged call can't tell which order
         // production code used, and a flaky mixin would make the test itself flaky besides. This
         // test instead replicates the exact two-call sequence
-        // EditorNetworking.handleRename's teardown now uses, and simulates what a live mixin would
+        // EditorFileOpsHandlers.handleRename's teardown now uses, and simulates what a live mixin would
         // report at the moment clearBounds writes -- with a NEGATIVE CONTROL proving the test can
         // actually detect the bug (the old order) before trusting it to prove the fix (the new
         // order).
         withServer { server, player, root ->
             EditorNewStructure.create(root, "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
             drainPayloads(player)
 
             val registry = EditorDimRegistry.of(server)
@@ -224,7 +225,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         // dirty box would be stranded against the old subpath and the edits would be dropped.
         withServer { server, player, root ->
             EditorNewStructure.create(root, "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
             drainPayloads(player)
 
             val registry = EditorDimRegistry.of(server)
@@ -234,7 +235,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             StructureEditWatcher.onBlockChanged(level, origin)
             StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
 
-            EditorNetworking.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
 
             // The edit was committed under the OLD name before the move, then carried across.
             StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeFalse()
@@ -254,12 +255,12 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         withServer { server, player, root ->
             root.resolve("redstone").createDirectories()
             EditorNewStructure.create(root.resolve("redstone"), "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
             val registry = EditorDimRegistry.of(server)
             registry.placedBoxOf("redstone/clock.nbt").shouldNotBeNull()
             registry.structureRegionOriginOf("redstone/clock.nbt").shouldNotBeNull()
 
-            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
 
             registry.placedBoxOf("redstone/clock.nbt").shouldBeNull()
             registry.structureRegionOriginOf("redstone/clock.nbt").shouldBeNull()
@@ -278,7 +279,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         withServer { server, player, root ->
             root.resolve("redstone").createDirectories()
             EditorNewStructure.create(root.resolve("redstone"), "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
             drainPayloads(player)
 
             val registry = EditorDimRegistry.of(server)
@@ -288,7 +289,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             StructureEditWatcher.onBlockChanged(level, origin)
             StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeTrue()
 
-            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
 
             // Committed under the OLD subpath before the move -- neither the old (gone) nor the new
             // key is left dirty; the edit made it into the .nbt via a real commit, not a rekey.
@@ -302,7 +303,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         withServer { server, player, root ->
             root.resolve("redstone/gates").createDirectories()
             EditorNewStructure.create(root.resolve("redstone/gates"), "and")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/gates/and.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/gates/and.nbt"))
             drainPayloads(player)
 
             val registry = EditorDimRegistry.of(server)
@@ -312,7 +313,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             StructureEditWatcher.onBlockChanged(level, origin)
             StructureAutoSave.of(server).isDirty("redstone/gates/and.nbt").shouldBeTrue()
 
-            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
 
             StructureAutoSave.of(server).isDirty("redstone/gates/and.nbt").shouldBeFalse()
             StructureAutoSave.of(server).isDirty("logic/gates/and.nbt").shouldBeFalse()
@@ -327,12 +328,12 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         withServer { server, player, root ->
             root.resolve("redstone").createDirectories()
             EditorNewStructure.create(root.resolve("redstone"), "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
             drainPayloads(player)
             LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")).size shouldBe 1 // placed baseline
             StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeFalse()
 
-            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
 
             LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")) shouldHaveSize 0
             LocalHistoryStore.revisions(root.resolve("logic/clock.nbt")) shouldHaveSize 1
@@ -346,7 +347,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         // strand those edits permanently, since nothing can ever resolve/commit them again.
         withServer { server, player, root ->
             EditorNewStructure.create(root, "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
             drainPayloads(player)
 
             val registry = EditorDimRegistry.of(server)
@@ -365,7 +366,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             historyDir.resolve("index.json").createDirectory()
 
             try {
-                EditorNetworking.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+                EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
 
                 // Aborted before touching the filesystem at all.
                 root.resolve("clock.nbt").exists().shouldBeTrue()
@@ -387,7 +388,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
     test("a failed rename leaves a placed structure's registry state and blocks intact") {
         withServer { server, player, root ->
             EditorNewStructure.create(root, "clock")
-            EditorNetworking.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
             val registry = EditorDimRegistry.of(server)
             registry.placedBoxOf("clock.nbt").shouldNotBeNull()
             registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
@@ -398,7 +399,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             // path fails with a genuine FileSystemException while the handle is held.
             val lock = java.io.RandomAccessFile(root.resolve("clock.nbt").toFile(), "rw")
             try {
-                EditorNetworking.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
+                EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("clock.nbt", "ring.nbt"))
             } finally {
                 lock.close()
             }
@@ -415,7 +416,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             root.resolve("redstone/clocks").createDirectories()
             EditorSession.setActive(player.uuid, "redstone/clocks")
 
-            EditorNetworking.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
 
             EditorSession.get(player.uuid)!!.activeSubpath shouldBe "logic/clocks"
         }

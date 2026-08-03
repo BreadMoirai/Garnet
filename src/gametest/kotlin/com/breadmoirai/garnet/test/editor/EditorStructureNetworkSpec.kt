@@ -7,7 +7,7 @@ import com.breadmoirai.garnet.editor.network.SaveStructureC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
-import com.breadmoirai.garnet.editor.network.EditorNetworking
+import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.world.StructureEditWatcher
 import com.breadmoirai.garnet.history.LocalHistoryStore
@@ -49,7 +49,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 drainPayloads(player)
 
                 // Place: empty structure -> size 0,0,0, region assigned, player teleported.
-                EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("gadget.nbt"))
+                EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("gadget.nbt"))
                 val placed = drainPayloads(player).filterIsInstance<StructureResultS2C>().single()
                 placed.subpath shouldBe "gadget.nbt"
 
@@ -67,7 +67,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 val edited = region.offset(5, 0, 5)
                 lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                 StructureEditWatcher.onBlockChanged(lvl, edited)
-                EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("gadget.nbt"))
+                EditorStructureHandlers.handleSaveStructure(this, player, SaveStructureC2S("gadget.nbt"))
                 val saved = drainPayloads(player).filterIsInstance<StructureAutoSavedS2C>().single()
                 saved.sizeX shouldBe 1; saved.sizeY shouldBe 1; saved.sizeZ shouldBe 1
 
@@ -84,7 +84,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                 val player = makeMockServerPlayer(this)
                 drainPayloads(player)
-                EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("notes.txt"))
+                EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("notes.txt"))
                 drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
                 EditorSession.clear(player.uuid)
             }
@@ -100,7 +100,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 val player = makeMockServerPlayer(this)
                 drainPayloads(player)
 
-                EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("unplaced.nbt"))
+                EditorStructureHandlers.handleSaveStructure(this, player, SaveStructureC2S("unplaced.nbt"))
                 val payloads = drainPayloads(player)
                 payloads.filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
                 payloads.filterIsInstance<StructureResultS2C>() shouldHaveSize 0
@@ -123,7 +123,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 val player = makeMockServerPlayer(this)
                 drainPayloads(player)
 
-                EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("corrupt.nbt"))
+                EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("corrupt.nbt"))
                 val payloads = drainPayloads(player)
                 payloads.filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
                 payloads.filterIsInstance<StructureResultS2C>() shouldHaveSize 0
@@ -141,7 +141,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 // The session's active folder is deliberately NOT set: handleNewStructure resolves
                 // strictly from payload.parentSubpath now, so "" here must still land at the root.
                 drainPayloads(player)
-                EditorNetworking.handleNewStructure(this, player, NewStructureC2S("", "fresh"))
+                EditorStructureHandlers.handleNewStructure(this, player, NewStructureC2S("", "fresh"))
                 tmp.resolve("fresh.nbt").exists() shouldBe true
                 drainPayloads(player).filterIsInstance<EditorTreeSnapshotS2C>() shouldHaveSize 1
                 EditorSession.clear(player.uuid)
@@ -164,7 +164,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                     val player = makeMockServerPlayer(this)
                     drainPayloads(player)
 
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("widget.nbt"))
                     drainPayloads(player)
 
                     val region = EditorDimRegistry.of(this).structureRegionOriginOf("widget.nbt")!!
@@ -180,7 +180,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                     lvl.setBlock(edited, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, edited)
 
-                    EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("widget.nbt"))
+                    EditorStructureHandlers.handleSaveStructure(this, player, SaveStructureC2S("widget.nbt"))
 
                     // The committed file itself changed — there is no dirty buffer any more.
                     committed.readBytes().toList() shouldNotBe before
@@ -218,7 +218,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                     val player = makeMockServerPlayer(this)
                     drainPayloads(player)
 
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("locked.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("locked.nbt"))
                     drainPayloads(player)
 
                     val region = EditorDimRegistry.of(this).structureRegionOriginOf("locked.nbt")!!
@@ -241,7 +241,7 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
 
                     val before = file.readBytes().toList()
 
-                    EditorNetworking.handleSaveStructure(this, player, SaveStructureC2S("locked.nbt"))
+                    EditorStructureHandlers.handleSaveStructure(this, player, SaveStructureC2S("locked.nbt"))
 
                     val payloads = drainPayloads(player)
                     payloads.filterIsInstance<StructureAutoSavedS2C>() shouldHaveSize 0

@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.data.EditorRoot
+import com.breadmoirai.garnet.editor.world.EditorRootResolver
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.data.EditorSession
 import com.breadmoirai.garnet.editor.world.EditorWorld
@@ -11,7 +12,9 @@ import com.breadmoirai.garnet.editor.data.walk
 import com.breadmoirai.garnet.editor.network.LoadEditorFolderC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
-import com.breadmoirai.garnet.editor.network.EditorNetworking
+import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry
+import com.breadmoirai.garnet.editor.network.EditorTreeHandlers
+import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
@@ -51,11 +54,11 @@ import kotlin.io.path.writeText
 
 class EditorNetworkRegistrySpec : GarnetTestSpec({
 
-    // Every other test in this spec calls EditorNetworking.handleX(...) directly, which
+    // Every other test in this spec calls the handler objects' handleX(...) directly, which
     // never exercises whether register() was actually invoked at mod init. This test probes the
     // global Fabric networking registries instead of the handler functions, so it fails if
-    // EditorNetworking.register() is ever dropped from Garnet.onInitialize.
-    test("EditorNetworking.register() was called at init: receiver and payload types are already claimed") {
+    // EditorNetworkRegistry.register() is ever dropped from Garnet.onInitialize.
+    test("EditorNetworkRegistry.register() was called at init: receiver and payload types are already claimed") {
         // C2S: registerGlobalReceiver uses Map.putIfAbsent under the hood and returns false
         // when a receiver for this type is already registered — proving init already claimed it.
         // Because it's a no-op when already-present, this does not disturb the real handler.
@@ -79,7 +82,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 EditorDimLifecycle.placeAll(this, EditorRoot(tmp))
                 drainPayloads(player) // discard any pre-existing payloads
 
-                EditorNetworking.handleLoadFolder(this, player, LoadEditorFolderC2S("../escape"))
+                EditorTreeHandlers.handleLoadFolder(this, player, LoadEditorFolderC2S("../escape"))
 
                 val payloads = drainPayloads(player)
                 val err = payloads.filterIsInstance<EditorErrorS2C>().single()
@@ -103,7 +106,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 EditorDimLifecycle.placeAll(this, EditorRoot(tmp))
                 drainPayloads(player)
 
-                EditorNetworking.handleLoadFolder(this, player, LoadEditorFolderC2S("set"))
+                EditorTreeHandlers.handleLoadFolder(this, player, LoadEditorFolderC2S("set"))
 
                 val loaded = drainPayloads(player).filterIsInstance<EditorFolderLoadedS2C>().single()
                 loaded.subpath shouldBe "set"
@@ -135,7 +138,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 level.setBlock(abs.offset(1, 1, 1), Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                 drainPayloads(player)
 
-                EditorNetworking.handleSaveNow(this, player)
+                EditorTreeHandlers.handleSaveNow(this, player)
 
                 val report = drainPayloads(player).filterIsInstance<EditorSaveReportS2C>().single()
                 report.perSpec.any { it.startsWith("a|saved=true") } shouldBe true
@@ -155,7 +158,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 EditorSession.clear(player.uuid)
                 drainPayloads(player)
 
-                EditorNetworking.handleNewSpec(this, player, NewEditorSpecC2S("fresh"))
+                EditorTreeHandlers.handleNewSpec(this, player, NewEditorSpecC2S("fresh"))
 
                 val err = drainPayloads(player).filterIsInstance<EditorErrorS2C>().single()
                 err.reason shouldBe "no folder selected"
@@ -175,7 +178,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 EditorSession.setActive(player.uuid, "set")
                 drainPayloads(player)
 
-                EditorNetworking.handleNewSpec(this, player, NewEditorSpecC2S("fresh"))
+                EditorTreeHandlers.handleNewSpec(this, player, NewEditorSpecC2S("fresh"))
 
                 folder.resolve("fresh.spec.kts").exists() shouldBe true
                 val loaded = drainPayloads(player).filterIsInstance<EditorFolderLoadedS2C>().single()
@@ -196,7 +199,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 EditorSession.setActive(player.uuid, "set")
                 drainPayloads(player)
 
-                EditorNetworking.handleUnload(this, player)
+                EditorTreeHandlers.handleUnload(this, player)
 
                 EditorSession.get(player.uuid).let { it == null } shouldBe true
                 val report = drainPayloads(player).filterIsInstance<EditorSaveReportS2C>().single()
@@ -232,7 +235,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                 drainPayloads(player)
 
-                EditorNetworking.handleListTree(this, player)
+                EditorTreeHandlers.handleListTree(this, player)
 
                 val snap = drainPayloads(player).filterIsInstance<EditorTreeSnapshotS2C>().single()
                 val paths = snap.root.walk().map { it.first }.toList()
@@ -253,7 +256,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 val player = makeMockServerPlayer(this)
                 drainPayloads(player)
 
-                EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(newRoot.toString()))
+                EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(newRoot.toString()))
 
                 SharedSettings.projectRootPath shouldBe newRoot.toAbsolutePath().toString()
                 val snap = drainPayloads(player).filterIsInstance<EditorTreeSnapshotS2C>().single()
@@ -275,7 +278,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 val player = makeMockServerPlayer(this)
                 drainPayloads(player)
 
-                EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(notAFolder.toString()))
+                EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(notAFolder.toString()))
 
                 val err = drainPayloads(player).filterIsInstance<EditorErrorS2C>().single()
                 err.reason shouldContain "not a folder"
@@ -315,7 +318,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     server = this
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(rootA)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
                     drainPayloads(player)
 
                     val fileABeforeEdit = fileA.readBytes()
@@ -331,7 +334,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
 
                     // The swap itself must flush A's dirty structure BEFORE touching any state, and
                     // reset all per-structure state so nothing carries over onto B.
-                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+                    EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
                     drainPayloads(player)
 
                     // A received the edit: its file changed from the pre-edit baseline.
@@ -388,7 +391,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     server = this
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(rootA)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
                     drainPayloads(player)
 
                     val registry = EditorDimRegistry.of(this)
@@ -406,12 +409,12 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     historyDir!!.resolve("index.json").toFile().delete()
                     historyDir!!.resolve("index.json").createDirectories()
 
-                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+                    EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
 
                     // Refused, with an error the player actually sees.
                     drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
                     // The root did NOT swap.
-                    EditorNetworking.rootFor(this)!!.path shouldBe rootA
+                    EditorRootResolver.rootFor(this)!!.path shouldBe rootA
                     // The edits are still recoverable: the structure is still placed and still
                     // dirty, so a later commit (once the failure clears) can still write them.
                     StructureAutoSave.of(this).isDirty("clock.nbt") shouldBe true
@@ -465,7 +468,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     StructureAutoSave.of(this).onEdit("ghost.nbt", origin, overworld().gameTime)
                     StructureAutoSave.of(this).isDirty("ghost.nbt") shouldBe true
 
-                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+                    EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
 
                     // The swap went through: the root actually changed, and no error was sent.
                     SharedSettings.projectRootPath shouldBe rootB.toAbsolutePath().toString()
@@ -505,7 +508,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 onServer {
                     EditorServerContext.set(this, EditorServerContext(EditorRoot(rootA)))
                     val player = makeMockServerPlayer(this)
-                    EditorNetworking.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("clock.nbt"))
                     drainPayloads(player)
 
                     val registry = EditorDimRegistry.of(this)
@@ -526,7 +529,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     registry.structureRegionOriginOf("orphan.nbt").shouldNotBeNull()
                     registry.placedBoxOf("orphan.nbt").shouldBeNull()
 
-                    EditorNetworking.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
+                    EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
                     drainPayloads(player)
 
                     // The old root's blocks are gone from the project level, not orphaned in a

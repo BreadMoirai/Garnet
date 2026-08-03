@@ -153,7 +153,7 @@ class EditorDimRegistry(private val server: MinecraftServer) {
      * subpath string, so renaming a folder without this strands every structure beneath it: its
      * placed-box and region-assignment entries stay keyed by the OLD path forever, which orphans
      * its in-world blocks from `StructureCommit` (whose `commit` resolves the subpath via
-     * `EditorNetworking.rootFor(server).resolveSubpath(subpath)` and returns null, silently
+     * `EditorRootResolver.rootFor(server).resolveSubpath(subpath)` and returns null, silently
      * skipping it) and lets a click on the new path re-place a second copy in a fresh region.
      *
      * The boundary is a full path segment, matching [repointSession]'s logic: renaming "redstone"
