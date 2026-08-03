@@ -184,6 +184,16 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
 
 ---
 
+### UC-MAN-10 — Place, save, and create standalone structure files *(moved)*
+
+The standalone `.nbt` structure journeys — clicking a `.nbt` to place it, "Save Structure",
+"+ Structure", and its debounced auto-save with local history — now live in their own article,
+alongside the spec-cell sidecar path:
+[structure-lifecycle.md](structure-lifecycle.md#standalone-nbt-structures-uc-man-10). The UC IDs
+(`UC-MAN-10.a`–`.g`) are unchanged; only the article that hosts them moved.
+
+---
+
 ### UC-MAN-11 — Rejoin a world and find the tree already loaded
 
 A player who quit mid-session (or closed the game window outright) rejoins the same project and
@@ -215,16 +225,6 @@ save/restore mechanics; this use case is the player-visible behavior it produces
   latter covers closing the game window from inside a world, which does not always fire
   DISCONNECT. A session that never received a tree snapshot (joined a vanilla server, or quit
   before the first snapshot arrived) does not overwrite a good prior record with an empty one.
-
----
-
-### UC-MAN-10 — Place, save, and create standalone structure files *(moved)*
-
-The standalone `.nbt` structure journeys — clicking a `.nbt` to place it, "Save Structure",
-"+ Structure", and its debounced auto-save with local history — now live in their own article,
-alongside the spec-cell sidecar path:
-[structure-lifecycle.md](structure-lifecycle.md#standalone-nbt-structures-uc-man-10). The UC IDs
-(`UC-MAN-10.a`–`.g`) are unchanged; only the article that hosts them moved.
 
 ---
 

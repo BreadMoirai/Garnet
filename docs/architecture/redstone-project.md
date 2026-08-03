@@ -112,13 +112,7 @@ Client:
   `currentSubpath`. `ExplorerToolbar()` is the panel's single top row: a kebab `IconButton` opening
   a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Refresh
   (sends `ListEditorTreeC2S`) and Collapse All (`ExplorerTreeState.collapseAll()`) icon buttons.
-  The tree is not only reloaded on that explicit Refresh click: `ExplorerLifecycle`'s
-  `ClientPlayConnectionEvents.JOIN` handler also sends `ListEditorTreeC2S` automatically on every
-  world join, so the Explorer auto-populates without the player having to ask for it. That same
-  JOIN handler arms a one-shot restore of last session's expansion/selection, applied once the
-  resulting snapshot lands — see
-  [persistence/explorer-session-state.md](../persistence/explorer-session-state.md) for the
-  save/restore mechanics. This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
+  This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
   row. `New`/`Rename` now have a client UI trigger again — the right-click `ExplorerContextMenu` (see
   [ui/explorer-toolbar-and-context-menu.md](../ui/explorer-toolbar-and-context-menu.md)) — while
   `Save` (`SaveStructureC2S`, now a force-commit through `StructureCommit`) still has none: it
@@ -160,7 +154,13 @@ Client:
   `ExplorerTreeState`/`ProjectTreeState` split.
 - `editor/network/EditorClientNetworking` — S2C receivers. They feed `ProjectTreeState`
   (snapshot/folder-loaded/save-report/error/structure-result/auto-saved); no client screen is
-  opened in response. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
+  opened in response. The tree is not only reloaded on an explicit Refresh click: `ExplorerLifecycle`'s
+  `ClientPlayConnectionEvents.JOIN` handler also sends `ListEditorTreeC2S` automatically on every
+  world join, so the Explorer auto-populates without the player having to ask for it, and the
+  resulting `EditorTreeSnapshotS2C` receiver applies a one-shot restore of last session's
+  expansion/selection right after feeding `ProjectTreeState.onSnapshot` — see
+  [persistence/explorer-session-state.md](../persistence/explorer-session-state.md) for the
+  save/restore mechanics. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
   `r.message` (place/save/new-structure outcomes all surface through the same status line as
   folder load/save results). `StructureAutoSavedS2C` → `ProjectTreeState.onAutoSaved` sets
   `status` to `"auto-saved $subpath ($sizeX×$sizeY×$sizeZ, $blockCount blocks)"`. The packet is
