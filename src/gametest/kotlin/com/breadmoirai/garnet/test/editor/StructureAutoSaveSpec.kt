@@ -7,6 +7,7 @@ import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
@@ -247,7 +248,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     StructureAutoSave.of(this).isDirty("widget.nbt") shouldBe true
 
                     val outcome = StructureCommit.commit(this, "widget.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     outcome.payload.subpath shouldBe "widget.nbt"
                     outcome.payload.sizeX shouldBe 1
                     outcome.payload.blockCount shouldBe 1
@@ -285,7 +286,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     // No edits at all -> the capture matches the committed file exactly.
                     StructureCommit.commit(this, "still.nbt", LocalHistoryStore.REASON_AUTOSAVE) shouldBe
-                        StructureCommit.CommitOutcome.NoChange
+                        CommitOutcome.NoChange
 
                     file.readBytes().toList() shouldBe before
                     LocalHistoryStore.revisions(file) shouldHaveSize revisionsBefore
@@ -383,7 +384,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     StructureAutoSave.of(this).isDirty("manual.nbt") shouldBe true
 
                     StructureCommit.commit(this, "manual.nbt", LocalHistoryStore.REASON_MANUAL)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     StructureAutoSave.of(this).isDirty("manual.nbt") shouldBe false
                 }
             } finally {
@@ -516,7 +517,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     val outcome = StructureCommit.commit(this, "brokenhist.nbt", LocalHistoryStore.REASON_AUTOSAVE)
 
-                    outcome.shouldBeInstanceOf<StructureCommit.CommitOutcome.Failed>()
+                    outcome.shouldBeInstanceOf<CommitOutcome.Failed>()
                     // The .nbt write must never have been attempted: the history write that was
                     // supposed to back up this content failed first.
                     file.readBytes().toList() shouldBe before
@@ -598,7 +599,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     }
 
                     val outcome = StructureCommit.commit(this, "bounded.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     outcome.payload.blockCount shouldBe 1
                     outcome.payload.sizeX shouldBe 1
                     outcome.payload.sizeY shouldBe 1
@@ -655,7 +656,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     Files.move(file, displaced)
 
                     StructureCommit.commit(this, "recoverable.nbt", LocalHistoryStore.REASON_AUTOSAVE) shouldBe
-                        StructureCommit.CommitOutcome.NotApplicable
+                        CommitOutcome.NotApplicable
 
                     // The dirty flag MUST survive: the structure is still placed, its edited blocks
                     // are still live in the world, and nothing else will ever re-mark it dirty if the
@@ -668,7 +669,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     Files.move(displaced, file)
 
                     val outcome = StructureCommit.commit(this, "recoverable.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     outcome.payload.blockCount shouldBe 1
                     StructureAutoSave.of(this).isDirty("recoverable.nbt") shouldBe false
                 }
@@ -729,13 +730,13 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(pos, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, pos)
                     StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     LocalHistoryStore.revisions(file) shouldHaveSize 2
 
                     lvl.setBlock(pos, Blocks.IRON_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, pos)
                     StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     val atCap = LocalHistoryStore.revisions(file)
                     atCap shouldHaveSize 3
 
@@ -761,7 +762,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     // in the cap of 3. This confirms the fix didn't just disable pruning outright --
                     // it only decoupled it from failed attempts.
                     StructureCommit.commit(this, "capped.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     val afterSuccess = LocalHistoryStore.revisions(file)
                     afterSuccess shouldHaveSize 3
                     afterSuccess.none { it.reason == LocalHistoryStore.REASON_PLACED } shouldBe true
@@ -805,7 +806,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(firstEdit, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, firstEdit)
                     StructureCommit.commit(this, "frozen.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
 
                     val beforeDisabling = LocalHistoryStore.revisions(file)
                     beforeDisabling shouldHaveSize 2 // placed baseline + the autosave above
@@ -821,7 +822,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(secondEdit, Blocks.IRON_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, secondEdit)
                     StructureCommit.commit(this, "frozen.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
 
                     // writeRevision itself is a no-op when disabled, so the count is unchanged --
                     // but the real point of this test is that prune() was never called on the
@@ -869,7 +870,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                         lvl.setBlock(pos, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                         StructureEditWatcher.onBlockChanged(lvl, pos)
                         StructureCommit.commit(this, "churn.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                            .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                            .shouldBeInstanceOf<CommitOutcome.Committed>()
                     }
 
                     val revisions = LocalHistoryStore.revisions(file)
@@ -913,7 +914,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(donorEdit, Blocks.EMERALD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, donorEdit)
                     StructureCommit.commit(this, "extdonor.nbt", LocalHistoryStore.REASON_MANUAL)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     val donorBytes = tmp.resolve("extdonor.nbt").readBytes()
 
                     EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("extafter.nbt"))
@@ -926,7 +927,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(first, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, first)
                     StructureCommit.commit(this, "extafter.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     LocalHistoryStore.revisions(file).count { it.reason == LocalHistoryStore.REASON_EXTERNAL } shouldBe 0
 
                     // NOW clobber the file out of band, with the fingerprint already in place.
@@ -936,7 +937,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(second, Blocks.DIAMOND_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, second)
                     StructureCommit.commit(this, "extafter.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
 
                     // The out-of-band content was banked rather than silently overwritten.
                     val external = LocalHistoryStore.revisions(file)
@@ -983,7 +984,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     lvl.setBlock(donorEdit, Blocks.EMERALD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, donorEdit)
                     StructureCommit.commit(this, "donor.nbt", LocalHistoryStore.REASON_MANUAL)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
                     val donorBytes = donorFile.readBytes()
 
                     // Place "external.nbt" -- this seeds its own placed baseline revision, matching
@@ -1008,7 +1009,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     StructureEditWatcher.onBlockChanged(lvl, trackedEdit)
 
                     StructureCommit.commit(this, "external.nbt", LocalHistoryStore.REASON_AUTOSAVE)
-                        .shouldBeInstanceOf<StructureCommit.CommitOutcome.Committed>()
+                        .shouldBeInstanceOf<CommitOutcome.Committed>()
 
                     // Three revisions now: the original placed baseline, the out-of-band content
                     // banked before it was overwritten, and the new tracked-edit commit.

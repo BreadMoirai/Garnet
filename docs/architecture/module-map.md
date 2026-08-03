@@ -83,8 +83,14 @@ state): `editor/structure/` is dirty-track → debounce → commit → history, 
 - `StructureAutoSave.kt` — per-server dirty-state tracking (fed by the setBlock-mixin watcher):
   which subpaths are dirty, their touched-box, and debounce due-time.
 - `StructureEditWatcher.kt` — records an in-world edit against the placed structure it lands in.
-- `StructureCommit.kt` — turns a structure's dirty state into a committed `.nbt` plus a
-  `LocalHistoryStore` revision; see [redstone-project.md](redstone-project.md#standalone-structure-files).
+- `CommitOutcome.kt` — the `CommitOutcome` sealed interface (`Committed`/`NoChange`/
+  `NotApplicable`/`Failed`) returned by [StructureCommit.commit].
+- `CommitBackoff.kt` — per-server failure-backoff and last-committed-disk-fingerprint bookkeeping
+  used internally by `StructureCommit`; `clearBackoff` is also exposed as
+  `StructureCommit.clearBackoff` for tests.
+- `StructureCommit.kt` — orchestration only: turns a structure's dirty state into a committed
+  `.nbt` plus a `LocalHistoryStore` revision; see
+  [redstone-project.md](redstone-project.md#standalone-structure-files).
 
 ## `history/` — local history for standalone structures
 

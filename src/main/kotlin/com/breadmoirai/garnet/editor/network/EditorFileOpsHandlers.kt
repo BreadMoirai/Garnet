@@ -5,6 +5,7 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
+import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.world.*
@@ -93,11 +94,11 @@ object EditorFileOpsHandlers {
             // rekey the registry to a NEW subpath while that dirty entry stays keyed under the OLD
             // one, and nothing ever resolves the old key again — the edit is stranded exactly like
             // the Failed case this already guards against. Abort the same way.
-            if (outcome is StructureCommit.CommitOutcome.Failed) {
+            if (outcome is CommitOutcome.Failed) {
                 fail(player, "rename failed: could not save pending edits for '$dirtySubpath': ${outcome.reason}")
                 return
             }
-            if (outcome is StructureCommit.CommitOutcome.NotApplicable && autoSave.dirtySubpaths().contains(dirtySubpath)) {
+            if (outcome is CommitOutcome.NotApplicable && autoSave.dirtySubpaths().contains(dirtySubpath)) {
                 fail(player, "rename failed: pending edits for '$dirtySubpath' are not resolvable right now")
                 return
             }

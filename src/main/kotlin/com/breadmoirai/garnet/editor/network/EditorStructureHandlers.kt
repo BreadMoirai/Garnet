@@ -6,6 +6,7 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
+import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
@@ -97,7 +98,7 @@ object EditorStructureHandlers {
             return
         }
         when (val outcome = StructureCommit.commit(server, payload.subpath, LocalHistoryStore.REASON_MANUAL)) {
-            is StructureCommit.CommitOutcome.Committed -> {
+            is CommitOutcome.Committed -> {
                 // This is a REPLY to the SaveStructureC2S `player` just sent — they provably have
                 // the mod (they just used one of its channels), so send to them directly and
                 // unconditionally, the same way every other S2C in this file replies. The `canSend`
@@ -109,18 +110,18 @@ object EditorStructureHandlers {
                 ServerPlayNetworking.send(player, outcome.payload)
                 StructureCommit.broadcast(server, outcome.payload, exclude = player)
             }
-            is StructureCommit.CommitOutcome.NoChange -> {
+            is CommitOutcome.NoChange -> {
                 // Nothing to write: the region already matches the committed file.
                 ServerPlayNetworking.send(player, StructureResultS2C(
                     payload.subpath, 0, 0, 0, "no changes to save: ${payload.subpath}",
                 ))
             }
-            is StructureCommit.CommitOutcome.NotApplicable -> {
+            is CommitOutcome.NotApplicable -> {
                 // Shouldn't happen — placedBoxOf(subpath) was already confirmed non-null above —
                 // but report it honestly rather than silently claiming success.
                 fail(player, "place the structure before saving: ${payload.subpath}")
             }
-            is StructureCommit.CommitOutcome.Failed -> {
+            is CommitOutcome.Failed -> {
                 // The edits exist only in the world; a bare "no changes to save" here would tell the
                 // player their work is safe when it is not (Task 7 fix round 1 / Finding 4).
                 fail(player, "save failed: ${outcome.reason}")

@@ -16,13 +16,9 @@ import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
-import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Path
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
-
-private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 /**
  * Layer: `editor.structure` — the live editing pipeline (dirty-track → debounce → commit →
@@ -55,104 +51,12 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
 object StructureCommit {
 
     /**
-     * Minimum ticks between retrying a structure whose last commit attempt failed to write its
-     * `.nbt` or its history revision. ~5s at 20 tps — far above the previous every-tick retry, low
-     * enough that a transient lock (antivirus scan, a momentarily-open file handle) still recovers
-     * quickly. Gates the automatic [tick] pass only; an explicit [commit] call always attempts.
-     */
-    private const val FAILURE_BACKOFF_TICKS = 100L
-
-    private val retryAfter = java.util.WeakHashMap<MinecraftServer, ConcurrentHashMap<String, Long>>()
-
-    @Synchronized
-    private fun backoffMap(server: MinecraftServer): ConcurrentHashMap<String, Long> =
-        retryAfter.getOrPut(server) { ConcurrentHashMap() }
-
-    /**
-     * What the `.nbt` on disk looked like immediately after this process last committed it, and
-     * which revision that content matches. Used to skip the out-of-band-edit check (see [commit]):
-     * if the file is byte-identical in [size] and [modifiedMillis] to what we wrote, and the newest
-     * revision is still the same one, then disk *is* that revision and re-reading and normalizing
-     * the revision blob to prove it is pure waste.
-     *
-     * [path] is part of the identity, not just bookkeeping: subpaths are relative to the project
-     * root, and the root is swappable, so the same subpath can mean a completely different file
-     * after an "Open Folder…". Including the absolute path means a stale entry can never match the
-     * wrong file, which is why no cache invalidation is needed on a root swap, a rename, or between
-     * tests reusing a subpath under different temp directories.
-     */
-    private data class DiskFingerprint(
-        val path: String,
-        val revisionFile: String,
-        val size: Long,
-        val modifiedMillis: Long,
-    )
-
-    private val lastCommitted =
-        java.util.WeakHashMap<MinecraftServer, ConcurrentHashMap<String, DiskFingerprint>>()
-
-    @Synchronized
-    private fun fingerprintMap(server: MinecraftServer): ConcurrentHashMap<String, DiskFingerprint> =
-        lastCommitted.getOrPut(server) { ConcurrentHashMap() }
-
-    /** Current on-disk identity of [file], or null if it cannot be stat'd. */
-    private fun fingerprint(file: Path, revisionFile: String): DiskFingerprint? = runCatching {
-        val attrs = java.nio.file.Files.readAttributes(
-            file, java.nio.file.attribute.BasicFileAttributes::class.java,
-        )
-        DiskFingerprint(
-            file.toAbsolutePath().toString(), revisionFile, attrs.size(), attrs.lastModifiedTime().toMillis(),
-        )
-    }.getOrNull()
-
-    /**
      * Drop [subpath]'s failure-backoff entry. Called internally on a no-op or successful commit;
      * also public as a test/administrative seam for forgetting a failure without a real commit
      * (e.g. a test that deliberately leaves a structure dirty must also forget any backoff it
      * triggered, or a later, unrelated test sharing the same server would inherit it).
      */
-    fun clearBackoff(server: MinecraftServer, subpath: String) {
-        backoffMap(server).remove(subpath)
-    }
-
-    /**
-     * Records a failed commit attempt so [tick] backs off retrying [subpath] for
-     * [FAILURE_BACKOFF_TICKS], and logs once per backoff window rather than once per attempt (an
-     * explicit [commit] call bypasses [tick]'s skip and can retry sooner; this keeps repeated
-     * explicit retries from spamming the log too).
-     */
-    private fun onCommitFailure(server: MinecraftServer, subpath: String, now: Long, message: String) {
-        val previous = backoffMap(server).put(subpath, now + FAILURE_BACKOFF_TICKS)
-        if (previous == null || previous <= now) {
-            LOGGER.error("[StructureCommit] {}", message)
-        }
-    }
-
-    /**
-     * The result of a single [commit] attempt. Deliberately distinguishes "there was nothing to do"
-     * from "an attempt was made and it failed" (Task 7 fix round 1 / Finding 4) — a caller that
-     * collapses both into a bare `null` cannot tell a genuinely clean structure apart from one whose
-     * edits are still only in the world and never made it to disk, which is exactly the distinction
-     * a user pressing "Save Structure" needs reported honestly.
-     */
-    sealed interface CommitOutcome {
-        /** A real write landed; [payload] is what changed, for broadcasting. */
-        data class Committed(val payload: StructureAutoSavedS2C) : CommitOutcome
-
-        /** The capture already matches the committed `.nbt` (or there was nothing to scan at all). */
-        data object NoChange : CommitOutcome
-
-        /**
-         * [commit] was called for a subpath that isn't placed, or whose root/file doesn't
-         * resolve. Unlike [Failed], the dirty state is cleared here ONLY when the structure isn't
-         * placed — see the judgement call recorded on [commit]'s KDoc for why an unresolvable
-         * root/file must NOT clear the flag while the structure is still placed.
-         */
-        data object NotApplicable : CommitOutcome
-
-        /** The history write or the `.nbt` write genuinely failed; the dirty state was NOT cleared. */
-        data class Failed(val reason: String) : CommitOutcome
-    }
+    fun clearBackoff(server: MinecraftServer, subpath: String) = CommitBackoff.clearBackoff(server, subpath)
 
     /**
      * Capture, diff, and write [subpath] if its content actually changed. Clears the dirty state on
@@ -188,14 +92,15 @@ object StructureCommit {
      *    while placed, and cleared only if the structure also isn't placed (falls through to case
      *    1's reasoning instead).
      *
-     * A still-placed, unresolved subpath is given a [FAILURE_BACKOFF_TICKS] backoff entry directly
-     * (not via [onCommitFailure], which would log every window — an unresolved path isn't a write
-     * failure and shouldn't spam the log), so [tick]'s automatic pass retries it at most once per
-     * backoff window instead of every tick — a `resolveSubpath` filesystem stat roughly every 5s
-     * instead of 20x/second — while an explicit [commit] call always attempts regardless. That
-     * backoff entry is cleared the same way any other is, on the first [Committed]/[NoChange]
-     * outcome, so a structure whose root/file resolves again commits promptly rather than waiting
-     * out a stale window.
+     * A still-placed, unresolved subpath is given a [CommitBackoff.FAILURE_BACKOFF_TICKS] backoff
+     * entry directly (not via [CommitBackoff.onCommitFailure], which would log every window — an
+     * unresolved path isn't a write failure and shouldn't spam the log), so [tick]'s automatic pass
+     * retries it at most once per backoff window instead of every tick — a `resolveSubpath`
+     * filesystem stat roughly every 5s instead of 20x/second — while an explicit [commit] call
+     * always attempts regardless. That backoff entry is cleared the same way any other is, on the
+     * first [Committed][CommitOutcome.Committed]/[NoChange][CommitOutcome.NoChange] outcome, so a
+     * structure whose root/file resolves again commits promptly rather than waiting out a stale
+     * window.
      */
     fun commit(
         server: MinecraftServer,
@@ -220,7 +125,7 @@ object StructureCommit {
                 autoSave.clear(subpath)
                 clearBackoff(server, subpath)
             } else {
-                backoffMap(server)[subpath] = now + FAILURE_BACKOFF_TICKS
+                CommitBackoff.backoffMap(server)[subpath] = now + CommitBackoff.FAILURE_BACKOFF_TICKS
             }
             return CommitOutcome.NotApplicable
         }
@@ -264,9 +169,9 @@ object StructureCommit {
         if (committed != null) {
             val existing = LocalHistoryStore.revisions(file)
             val newest = existing.lastOrNull()
-            val current = fingerprint(file, newest?.file.orEmpty())
+            val current = CommitBackoff.fingerprint(file, newest?.file.orEmpty())
             val diskIsNewestRevision =
-                current != null && fingerprintMap(server)[subpath] == current
+                current != null && CommitBackoff.fingerprintMap(server)[subpath] == current
             if (!diskIsNewestRevision) {
                 val newestTag = newest?.let { LocalHistoryStore.readTag(file, it) }
                 if (newestTag == null || structuresDiffer(committed, newestTag)) {
@@ -298,7 +203,7 @@ object StructureCommit {
         )
         if (historyEnabled && revision == null) {
             val message = "history write failed for '$subpath' ($file) — .nbt left untouched"
-            onCommitFailure(server, subpath, now, message)
+            CommitBackoff.onCommitFailure(server, subpath, now, message)
             return CommitOutcome.Failed(message)
         }
 
@@ -310,7 +215,7 @@ object StructureCommit {
             // it so a stuck structure doesn't bank one orphan revision per retry.
             if (revision != null) LocalHistoryStore.discardRevision(file, revision)
             val message = "write '$file' failed: ${e.message}"
-            onCommitFailure(server, subpath, now, message)
+            CommitBackoff.onCommitFailure(server, subpath, now, message)
             return CommitOutcome.Failed(message)
         }
 
@@ -326,7 +231,9 @@ object StructureCommit {
         // size/mtime and newest-revision filename describe the state actually left behind. If
         // history is off, `revision` is null and the empty revision name is recorded — which still
         // matches on the next commit, since revisions() stays empty too.
-        fingerprint(file, revision?.file.orEmpty())?.let { fingerprintMap(server)[subpath] = it }
+        CommitBackoff.fingerprint(file, revision?.file.orEmpty())?.let {
+            CommitBackoff.fingerprintMap(server)[subpath] = it
+        }
 
         captured.box?.let { registry.setPlacedBox(subpath, it) }
         autoSave.clear(subpath)
@@ -346,7 +253,7 @@ object StructureCommit {
         if (!SharedSettings.autoSaveEnabled) return
         val autoSave = StructureAutoSave.of(server)
         if (autoSave.dirtySubpaths().isEmpty()) return
-        val backoff = backoffMap(server)
+        val backoff = CommitBackoff.backoffMap(server)
         for (subpath in autoSave.dirtySubpaths()) {
             if (!autoSave.dueForCommit(subpath, now)) continue
             val retryAt = backoff[subpath]
@@ -440,11 +347,7 @@ object StructureCommit {
      * Drop this server's failure-backoff and last-committed-fingerprint bookkeeping. Pair with
      * [StructureAutoSave.dispose].
      */
-    @Synchronized
-    fun dispose(server: MinecraftServer) {
-        retryAfter.remove(server)
-        lastCommitted.remove(server)
-    }
+    fun dispose(server: MinecraftServer) = CommitBackoff.dispose(server)
 
     /**
      * The volume to scan: the structure's own extent plus wherever the player touched. Zero-size

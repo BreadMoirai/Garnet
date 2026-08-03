@@ -81,7 +81,7 @@ class EditorDimRegistry(private val server: MinecraftServer) {
     /**
      * The structure whose assigned region contains [pos], or null. Regions span the full world
      * height, so only X/Z are tested. Called on the hot `setBlock` path (via
-     * [StructureEditWatcher]), so the overwhelmingly common "not near any structure" answer must
+     * `StructureEditWatcher`), so the overwhelmingly common "not near any structure" answer must
      * cost as little as possible: [isInStructureLaneZ] rejects on two integer comparisons before
      * this method touches [structureBySubpath] at all, and the remaining (rare) lookup uses
      * `ConcurrentHashMap.forEach(BiConsumer)` rather than a `for ((k, v) in map)` loop, which
