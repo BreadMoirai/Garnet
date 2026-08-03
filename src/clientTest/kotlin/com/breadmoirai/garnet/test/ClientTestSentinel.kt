@@ -73,6 +73,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         GlfwKeyMapSpec::class,
                         ExplorerTreeStateSpec::class,
                         ExplorerStateStoreSpec::class,
+                        ExplorerLifecycleSpec::class,
                         ModConfigSpec::class,
                         ProjectExplorerSpec::class,
                         RootPickerSpec::class,

@@ -1,9 +1,11 @@
 package com.breadmoirai.garnet.test
 
+import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.ui.FolderPicker
 import com.breadmoirai.garnet.editor.ui.RootPickerController
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
 import com.breadmoirai.garnet.harness.ClientSpec
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
@@ -46,5 +48,43 @@ class RootPickerSpec : ClientSpec({
 
         sent.shouldBeEmpty()
         RootPickerController.picking shouldBe false
+    }
+
+    test("openFolder seeds the picker's default from the configured project root") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = "/tmp/proj"
+            var capturedDefault: String? = "unset"
+            RootPickerController.picker = FolderPicker { _, default -> capturedDefault = default; null }
+            RootPickerController.runner = Runnable::run
+            RootPickerController.executor = Runnable::run
+            RootPickerController.sender = { }
+            RootPickerController.persist = { }
+
+            RootPickerController.openFolder()
+
+            capturedDefault shouldBe "/tmp/proj"
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
+    }
+
+    test("openFolder passes null as the picker's default when no root is configured") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = ""
+            var capturedDefault: String? = "unset"
+            RootPickerController.picker = FolderPicker { _, default -> capturedDefault = default; null }
+            RootPickerController.runner = Runnable::run
+            RootPickerController.executor = Runnable::run
+            RootPickerController.sender = { }
+            RootPickerController.persist = { }
+
+            RootPickerController.openFolder()
+
+            capturedDefault.shouldBeNull()
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
     }
 })

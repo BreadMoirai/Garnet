@@ -9,6 +9,32 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 
 /**
+ * Seam for the singleplayer check that gates Explorer session persistence.
+ *
+ * Extracted so clientTests can drive both branches: the gate is what stops a remote-server session
+ * from overwriting the local project's record, and it is not something to leave untested.
+ */
+object ExplorerSessionGate {
+    var isSingleplayer: () -> Boolean = { Minecraft.getInstance().hasSingleplayerServer() }
+
+    fun resetForTest() {
+        isSingleplayer = { Minecraft.getInstance().hasSingleplayerServer() }
+    }
+}
+
+/**
+ * Arm last session's restore — singleplayer only.
+ *
+ * `SharedSettings.projectRootPath` is client-local and is never updated from a remote server, so on
+ * a remote session the saved record's root would always compare equal to it and a foreign tree's
+ * expansion would be restored (and later saved) under the local project's key.
+ */
+fun armRestoreIfSingleplayer() {
+    if (!ExplorerSessionGate.isSingleplayer()) return
+    ExplorerTreeState.armRestore(ExplorerStateStore.load())
+}
+
+/**
  * Explorer session lifecycle: request the tree and restore last session's expansion on join,
  * persist it and reset on the way out.
  *
@@ -19,21 +45,14 @@ import net.minecraft.client.Minecraft
 fun registerExplorerLifecycle() {
     ClientPlayConnectionEvents.JOIN.register { _, _, mc ->
         mc.execute {
-            // Only arm on singleplayer: SharedSettings.projectRootPath is local config, and
-            // nothing on the client updates it from a remote server's root (EditorTreeSnapshotS2C
-            // carries a FolderNode *name*, never an absolute path). On a remote server the key
-            // ExplorerLifecycle/ExplorerTreeState compare against is therefore always this
-            // client's own local-project key, which would restore (and later overwrite) the local
-            // record against a tree that has nothing to do with it. hasSingleplayerServer() is the
-            // one case where the integrated server runs in this JVM and SharedSettings is
-            // genuinely describing the session we're in.
-            if (mc.hasSingleplayerServer()) {
-                // Arm before sending: the snapshot reply is what consumes the restore, and on a
-                // singleplayer join the reply can land in the very next tick.
-                ExplorerTreeState.armRestore(ExplorerStateStore.load())
-            }
+            // Arm before sending: the snapshot reply is what consumes the restore, and on a
+            // singleplayer join the reply can land in the very next tick. See
+            // ExplorerSessionGate/armRestoreIfSingleplayer for why this is gated.
+            armRestoreIfSingleplayer()
             // A vanilla server without the mod has no receiver registered for this payload, and
-            // sending it anyway throws. canSend is the standard Fabric guard.
+            // sending it anyway throws. canSend is the standard Fabric guard. Deliberately
+            // UNgated by singleplayer: a remote Garnet server must still populate the tree — only
+            // the local persisted record is protected.
             if (ClientPlayNetworking.canSend(ListEditorTreeC2S.TYPE)) {
                 ClientPlayNetworking.send(ListEditorTreeC2S.INSTANCE)
             }
@@ -73,8 +92,8 @@ fun registerExplorerLifecycle() {
  * player never saw a tree, and writing it would overwrite a good record with nothing. That is
  * exactly the case when the player joins a vanilla server, or quits before the snapshot arrives.
  */
-private fun saveExplorerSession() {
-    if (!Minecraft.getInstance().hasSingleplayerServer()) return
+fun saveExplorerSession() {
+    if (!ExplorerSessionGate.isSingleplayer()) return
     val root = SharedSettings.projectRootPath
     if (root.isBlank()) return
     if (ProjectTreeState.snapshot == null) return

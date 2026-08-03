@@ -205,11 +205,12 @@ when they left — no Refresh click required. See
 [persistence/explorer-session-state.md](../persistence/explorer-session-state.md) for the full
 save/restore mechanics; this use case is the player-visible behavior it produces.
 
-- **UC-MAN-11.a** `ExplorerLifecycle`'s `ClientPlayConnectionEvents.JOIN` handler arms a restore
-  from `ExplorerStateStore.load()` **only when `Minecraft.hasSingleplayerServer()`** — the
-  integrated server is the one case where `SharedSettings.projectRootPath` genuinely describes
-  this session, since nothing on the client updates it from a remote server's root. On any other
-  connection (multiplayer, including a friend's Garnet server) nothing is armed, and
+- **UC-MAN-11.a** `ExplorerLifecycle`'s `ClientPlayConnectionEvents.JOIN` handler calls
+  `armRestoreIfSingleplayer()`, which arms a restore from `ExplorerStateStore.load()` **only when
+  `ExplorerSessionGate.isSingleplayer()`** (default: `Minecraft.getInstance().hasSingleplayerServer()`)
+  — the integrated server is the one case where `SharedSettings.projectRootPath` genuinely
+  describes this session, since nothing on the client updates it from a remote server's root. On
+  any other connection (multiplayer, including a friend's Garnet server) nothing is armed, and
   `saveExplorerSession` mirrors the same guard on the way out, so a remote session never reads or
   writes `garnet-explorer.json` at all. The handler then unconditionally sends `ListEditorTreeC2S`
   (guarded by `ClientPlayNetworking.canSend`, so joining a vanilla server without the mod is a
@@ -293,8 +294,8 @@ save/restore mechanics; this use case is the player-visible behavior it produces
 | UC-MAN-09.c | `handleSetRoot` validates dir, commits the old root's dirty structures (refusing the swap if any fails), swaps root, clears the old root's structure blocks and all region assignments, re-places, re-snapshots; non-dir → `EditorErrorS2C` | `EditorNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `EditorNetworkRegistrySpec."handleSetRoot rejects a non-directory path with EditorErrorS2C"`, `EditorNetworkRegistrySpec."handleSetRoot commits the OLD root's dirty structure and never touches the NEW root's same-named file"`, `EditorNetworkRegistrySpec."a failed commit during a root swap aborts the swap and reports an error"`, `EditorNetworkRegistrySpec."a root swap clears the old root's blocks and drops region assignments that never got a placed box"` | covered |
 | UC-MAN-09.d | *(Plan B)* old grid persists; region assignments accumulate; Attach not implemented | — | n/a |
 | UC-MAN-10 | Place, save, create standalone `.nbt` structures; debounced auto-save + local history *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |
-| UC-MAN-11 | Rejoin a world and find the tree already loaded, with last session's expansion restored | `ExplorerStateStoreSpec`, `ExplorerTreeStateSpec` | **GAP-PARTIAL** |
-| UC-MAN-11.a | `JOIN` handler arms the restore and sends `ListEditorTreeC2S` (guarded by `canSend`) | — | **GAP** |
+| UC-MAN-11 | Rejoin a world and find the tree already loaded, with last session's expansion restored | `ExplorerStateStoreSpec`, `ExplorerTreeStateSpec`, `ExplorerLifecycleSpec` | covered |
+| UC-MAN-11.a | `JOIN` handler arms the restore and sends `ListEditorTreeC2S` (guarded by `canSend`); the singleplayer gate is two-sided on both save and arm | `ExplorerLifecycleSpec."singleplayer with a snapshot present writes the record"`, `ExplorerLifecycleSpec."not singleplayer writes nothing"`, `ExplorerLifecycleSpec."not singleplayer arms no restore"`, `ExplorerLifecycleSpec."singleplayer arms a restore"` | covered |
 | UC-MAN-11.b | Snapshot dispatch applies the pending restore; a root mismatch discards it | `ExplorerTreeStateSpec."an armed restore reopens the persisted folders when the snapshot lands"`, `ExplorerTreeStateSpec."a restore captured against a different root is discarded"` | covered |
 | UC-MAN-11.c | Stale/renamed paths dropped; only folders are restored to `openNodes` | `ExplorerTreeStateSpec."paths that no longer exist are dropped from the restore"`, `ExplorerTreeStateSpec."a file path is never restored as an expanded node"` | covered |
 | UC-MAN-11.d | Restore is one-shot; `reset()` disarms a pending restore | `ExplorerTreeStateSpec."the restore is one-shot: a second snapshot does not clobber live expansion"`, `ExplorerTreeStateSpec."reset disarms a pending restore"` | covered |

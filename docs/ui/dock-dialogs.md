@@ -57,3 +57,13 @@ thread via `Minecraft.getInstance().execute {}` before touching game/network sta
 `RootPickerController` is the reference for the seam layout: the dialog (`picker`), the thread
 (`runner`), the client-thread marshal (`executor`), the network send (`sender`), and disk
 persistence (`persist`) are each injectable seams so the flow is testable without a real dialog.
+
+## The picker opens at the current project root
+
+`RootPickerController.openFolder` reads `SharedSettings.projectRootPath` on the calling (client)
+thread — **before** dispatching to `runner`, since `runner` may hand off to a worker thread — and
+passes it as NFD's `defaultPath` so Open Folder starts where the player is already working instead
+of wherever the OS last remembered. A blank root (nothing configured yet) passes `null`, which
+lets NFD fall back to its own default; the same happens if the configured root has since been
+deleted — NFD tolerates an unresolvable `defaultPath` by falling back, so there is no separate
+staleness guard.

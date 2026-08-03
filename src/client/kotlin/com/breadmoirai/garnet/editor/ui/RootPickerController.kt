@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.breadmoirai.garnet.config.ModConfig
+import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
 import java.nio.file.Path
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -33,10 +34,15 @@ object RootPickerController {
     fun openFolder() {
         if (picking) return
         picking = true
+        // Seed the dialog at the current project root so Open Folder starts where the player is
+        // working. Blank (no root configured yet) passes null, which lets NFD pick its own
+        // default. Read here, before dispatching to runner: the runner may be a worker thread, and
+        // the read belongs on the calling (client) thread.
+        val start = SharedSettings.projectRootPath.takeIf { it.isNotBlank() }
         try {
             runner {
                 try {
-                    val path = picker.pick("Open Project Folder", null)
+                    val path = picker.pick("Open Project Folder", start)
                     if (path != null) {
                         // Normalize to absolute so the persisted + sent value matches the
                         // canonical form the server stores (handleSetRoot's toAbsolutePath()).

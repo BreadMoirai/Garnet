@@ -77,10 +77,10 @@ object ExplorerTreeState {
      * captured against a different root — the latter is the correct outcome after an Open Folder
      * swap, whose success handler resets this state (see [RootPickerController.openFolder]) before
      * a stale restore could ever land here. Note that nothing is armed at all on a non-singleplayer
-     * join in the first place — [ExplorerLifecycle]'s JOIN handler only calls [armRestore] when
-     * `Minecraft.hasSingleplayerServer()`, because `SharedSettings.projectRootPath` is local config
-     * that a remote server never overwrites, so it cannot be used to detect "this is a different
-     * server's tree".
+     * join in the first place — [armRestoreIfSingleplayer] only calls [armRestore] when
+     * `ExplorerSessionGate.isSingleplayer()` is true, because `SharedSettings.projectRootPath` is
+     * local config that a remote server never overwrites, so it cannot be used to detect "this is a
+     * different server's tree".
      *
      * Paths absent from [root] are dropped. Writing a stale id into `openNodes` would be inert
      * rather than harmful, but filtering stops the persisted set accumulating garbage across

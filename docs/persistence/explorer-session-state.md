@@ -38,8 +38,10 @@ opening the tree fresh, the same as a first run.
 
 ## Singleplayer-only: the key has no cross-session meaning otherwise
 
-Both save and restore are gated on `Minecraft.getInstance().hasSingleplayerServer()`. The record is
-keyed by `SharedSettings.projectRootPath`, which is local client config — nothing on the client ever
+Both save and restore are gated on `ExplorerSessionGate.isSingleplayer()`
+(`ExplorerLifecycle.kt`), a seam object whose default is
+`Minecraft.getInstance().hasSingleplayerServer()`. The record is keyed by
+`SharedSettings.projectRootPath`, which is local client config — nothing on the client ever
 overwrites it from a remote server's root (`EditorTreeSnapshotS2C` carries only a `FolderNode`
 *name*, never an absolute path). Without the gate, the comparison on a remote connection is always
 "this client's local key" against "this client's local key" — it always matches, regardless of
@@ -53,16 +55,25 @@ connection — a dedicated server, a friend's Garnet server, a vanilla server �
 JOIN and `saveExplorerSession` returns early on DISCONNECT/CLIENT_STOPPING, so
 `config/garnet-explorer.json` is neither read nor written for that session.
 
+The gate is a swappable `var` (`ExplorerSessionGate.isSingleplayer`, with `resetForTest()` to
+restore the default) precisely so `ExplorerLifecycleSpec` can drive both branches without a live
+client or a network connection — it is the one thing standing between a remote session and
+overwriting the local project's saved record, so it is not left untested. The arm step is its own
+top-level function, `armRestoreIfSingleplayer()`, so a test can call it directly without going
+through the JOIN event. `saveExplorerSession()` is public for the same reason.
+
 ## Arm at JOIN, apply at snapshot
 
 The restore is a two-step, one-shot handshake between `ExplorerLifecycle` and
 `ExplorerTreeState`, not a single "load and apply" call:
 
 1. **Arm** — `ExplorerLifecycle`'s `ClientPlayConnectionEvents.JOIN` handler calls
-   `ExplorerTreeState.armRestore(ExplorerStateStore.load())`, guarded by the singleplayer check
-   above, before sending `ListEditorTreeC2S` (itself guarded by `ClientPlayNetworking.canSend`, so
-   joining a vanilla server without the mod doesn't throw). This just stashes the loaded
-   `ExplorerSession?` in `pendingRestore`.
+   `armRestoreIfSingleplayer()`, which gates on `ExplorerSessionGate.isSingleplayer()` above and
+   then calls `ExplorerTreeState.armRestore(ExplorerStateStore.load())`, before sending
+   `ListEditorTreeC2S` (itself guarded by `ClientPlayNetworking.canSend`, so joining a vanilla
+   server without the mod doesn't throw, and deliberately **not** gated by singleplayer — a remote
+   Garnet server must still populate the tree, only the local persisted record is protected). This
+   just stashes the loaded `ExplorerSession?` in `pendingRestore`.
 2. **Apply** — `EditorClientNetworking`'s snapshot receiver calls
    `ExplorerTreeState.applyPendingRestore(payload.root)` immediately after feeding the same
    payload to `ProjectTreeState.onSnapshot`, then clears `pendingRestore`.
@@ -83,7 +94,7 @@ the wrong project's tree.
 
 ## Save skips when no snapshot was ever seen
 
-`ExplorerLifecycle`'s private `saveExplorerSession()` — the function both save trigger points call
+`ExplorerLifecycle`'s public `saveExplorerSession()` — the function both save trigger points call
 — returns early when `ProjectTreeState.snapshot == null`. Without a snapshot, `ExplorerTreeState`'s
 expansion/selection are empty because the player never actually saw a tree (joined a vanilla
 server, or disconnected before the snapshot arrived); persisting that emptiness would silently
