@@ -6,19 +6,12 @@ import com.mojang.blaze3d.opengl.GlTexture
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTextureView
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.PointerButton
 import org.jetbrains.skia.BackendRenderTarget
 import org.jetbrains.skia.ColorSpace
 import org.jetbrains.skia.DirectContext
 import org.jetbrains.skia.Surface
 import org.jetbrains.skia.SurfaceColorFormat
 import org.jetbrains.skia.SurfaceOrigin
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL13
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
 import org.slf4j.LoggerFactory
 
 /**
@@ -94,8 +87,8 @@ object ComposeSurface {
      * Marking instead of closing here is deliberate: [markSceneStale] is called from wherever the
      * overlay is switched off (a client tick, a test worker), while `ImageComposeScene.close()` must
      * happen on the render thread. The flag is honored at the top of [renderFrame] — which is on the
-     * render thread by construction — and by [guardedInput], so a stale scene accepts no input in the
-     * window between the two.
+     * render thread by construction — and by [ComposeInput]'s guard, so a stale scene accepts no input
+     * in the window between the two.
      */
     @Volatile
     private var sceneStale = false
@@ -119,7 +112,7 @@ object ComposeSurface {
     var lastHeight: Int = 0
         private set
 
-    private fun kill(reason: String, t: Throwable?) {
+    internal fun kill(reason: String, t: Throwable?) {
         disabled = true
         disabledReason = reason
         if (t != null) logger.error("[compose-spike] disabling Compose surface: {}", reason, t)
@@ -203,7 +196,7 @@ object ComposeSurface {
         if (width <= 0 || height <= 0) return null
         if (!ensureNativeLoaded()) return null
 
-        val saved = IntArray(SAVE_SLOTS)
+        val saved = IntArray(GlStateStash.SAVE_SLOTS)
         return try {
             val ctx = ensureDirectContext() ?: return null
             val s = ensureSurface(ctx, width, height) ?: return null
@@ -211,8 +204,8 @@ object ComposeSurface {
 
             // Compose the frame on Compose's own raster surface (no GL), then upload the one image.
             val image = h.render(System.nanoTime())
-            saveGlState(saved)
-            val unpack = saveAndResetUnpack()
+            GlStateStash.saveGlState(saved)
+            val unpack = GlStateStash.saveAndResetUnpack()
             try {
                 if (!loggedUpload) {
                     loggedUpload = true
@@ -229,8 +222,8 @@ object ComposeSurface {
                 image.close()
             }
             ctx.resetAll()
-            restoreUnpack(unpack)
-            restoreGlState(saved)
+            GlStateStash.restoreUnpack(unpack)
+            GlStateStash.restoreGlState(saved)
 
             lastWidth = width
             lastHeight = height
@@ -238,7 +231,7 @@ object ComposeSurface {
         } catch (t: Throwable) {
             // Best-effort restore even on failure so we don't leave Blaze3D wedged, then disable.
             try {
-                restoreGlState(saved)
+                GlStateStash.restoreGlState(saved)
             } catch (_: Throwable) {
             }
             kill("Compose/Skia render/coexistence failed", t)
@@ -263,108 +256,11 @@ object ComposeSurface {
         return h
     }
 
-    // --- Input (Task 4): forward GLFW-derived pointer/scroll/key events into the live dock scene ----
-    // Scene-local coords == window-local screen coords (Compose draws top-down; the BOTTOM_LEFT surface
-    // + flipV blit presents it upright, so no Y flip is needed for hit-testing).
+    /** Internal accessor so [ComposeInput] can reach the live scene without [host] itself going public. */
+    internal fun currentHost(): ComposeSceneHost? = host
 
-    fun sendPointerMove(pos: Offset) = guardedInput { host?.pointerMove(pos) }
-    fun sendPointerPress(pos: Offset, button: PointerButton? = null) =
-        guardedInput { host?.pointerPress(pos, button) }
-
-    fun sendPointerRelease(pos: Offset, button: PointerButton? = null) =
-        guardedInput { host?.pointerRelease(pos, button) }
-    fun sendScroll(pos: Offset, delta: Offset) = guardedInput { host?.scroll(pos, delta) }
-    /**
-     * Deliver a key event to the scene and report whether the scene **consumed** it. The return value
-     * is what lets [com.breadmoirai.garnet.ui.input.DockInputRouter] give an open
-     * in-scene popup (a Jewel `Dropdown` menu) first refusal on ESC before dropping dock focus.
-     * Returns `false` when Compose is disabled or no scene exists, so callers fall back to their
-     * pre-Compose behavior.
-     */
-    fun sendKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean =
-        guardedInput(false) { host?.sendKey(event) ?: false }
-
-    private inline fun guardedInput(block: () -> Unit) {
-        guardedInput(Unit) { block() }
-    }
-
-    private inline fun <T> guardedInput(fallback: T, block: () -> T): T {
-        // A scene awaiting teardown must not receive input: its composition is frozen at whatever was
-        // on screen when the dock was hidden, so a stale focused widget would happily consume keys
-        // (including the ESC that has to drop dock focus). See [sceneStale].
-        if (disabled || sceneStale) return fallback
-        return try {
-            block()
-        } catch (t: Throwable) {
-            kill("ComposeScene input dispatch failed", t)
-            fallback
-        }
-    }
-
-    // --- GL-state snapshot/restore ---------------------------------------------------------------
-    // Slots: 0 program, 1 VAO, 2 active-texture, 3 tex-binding-2D(unit0), 4 array-buffer,
-    //        5 draw-fbo, 6 read-fbo, 7 blend, 8 depth-test, 9 scissor, 10 cull.
-    private const val SAVE_SLOTS = 11
-
-    private fun saveGlState(o: IntArray) {
-        o[0] = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM)
-        o[1] = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING)
-        o[2] = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE)
-        o[3] = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D)
-        o[4] = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING)
-        o[5] = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING)
-        o[6] = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING)
-        o[7] = if (GL11.glIsEnabled(GL11.GL_BLEND)) 1 else 0
-        o[8] = if (GL11.glIsEnabled(GL11.GL_DEPTH_TEST)) 1 else 0
-        o[9] = if (GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)) 1 else 0
-        o[10] = if (GL11.glIsEnabled(GL11.GL_CULL_FACE)) 1 else 0
-    }
-
-    private fun restoreGlState(o: IntArray) {
-        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, o[5])
-        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, o[6])
-        GL30.glBindVertexArray(o[1])
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, o[4])
-        GL13.glActiveTexture(o[2])
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, o[3])
-        GL20.glUseProgram(o[0])
-        setEnabled(GL11.GL_BLEND, o[7])
-        setEnabled(GL11.GL_DEPTH_TEST, o[8])
-        setEnabled(GL11.GL_SCISSOR_TEST, o[9])
-        setEnabled(GL11.GL_CULL_FACE, o[10])
-    }
-
-    private fun setEnabled(cap: Int, on: Int) {
-        if (on == 1) GL11.glEnable(cap) else GL11.glDisable(cap)
-    }
-
-    // --- GL pixel-store (unpack) snapshot/reset --------------------------------------------------
-    // Skia's drawImage uploads a CPU raster via glTexSubImage2D, which reads the pixel buffer using
-    // the current GL_UNPACK_* state. Blaze3D leaves GL_UNPACK_ROW_LENGTH / SKIP_PIXELS set from its
-    // own texture writes; inherited, they roll/shear Skia's upload (the horizontal wraparound the
-    // asymmetric Compose panel exposed — the old symmetric plain-Skia panel didn't upload anything,
-    // so never hit it). We reset these to their GL defaults around the draw and restore MC's values
-    // after, keeping GlStateManager's belief intact. Slots: 0 align,1 row_len,2 skip_px,3 skip_rows.
-
-    private fun saveAndResetUnpack(): IntArray {
-        val o = IntArray(4)
-        o[0] = GL11.glGetInteger(GL11.GL_UNPACK_ALIGNMENT)
-        o[1] = GL11.glGetInteger(GL11.GL_UNPACK_ROW_LENGTH)
-        o[2] = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_PIXELS)
-        o[3] = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_ROWS)
-        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
-        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0)
-        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0)
-        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0)
-        return o
-    }
-
-    private fun restoreUnpack(o: IntArray) {
-        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, o[0])
-        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, o[1])
-        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, o[2])
-        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, o[3])
-    }
+    /** Internal accessor so [ComposeInput] can honor [sceneStale] without that field itself going public. */
+    internal fun isSceneStale(): Boolean = sceneStale
 
     private fun releaseSurfaceOnly() {
         surface?.close(); surface = null

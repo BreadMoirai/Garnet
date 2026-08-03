@@ -57,9 +57,10 @@ edge and the world content rect in lockstep with no cross-system round-trip.
 
 ## Guard and fallback
 
-Every Compose entry point (`ComposeSurface.ensureNativeLoaded`, `renderFrame`, the input dispatchers)
-is wrapped so any `Throwable` — a native-load failure, a GL state mismatch, a Skia error — sets
-`ComposeSurface.disabled = true` and logs once. `ComposeOverlay` and `DockInputRouter` no-op when
+Every Compose entry point (`ComposeSurface.ensureNativeLoaded`, `renderFrame`, `ComposeInput`'s
+pointer/scroll/key dispatchers) is wrapped so any `Throwable` — a native-load failure, a GL state
+mismatch, a Skia error — sets `ComposeSurface.disabled = true` and logs once. `ComposeOverlay` and
+`DockInputRouter` no-op when
 disabled. `WindowMixin`'s shrink and `MinecraftPresentMixin`'s composite are independent of the dock
 being enabled: a disabled Compose surface still renders `MinecraftPresentMixin`'s composite (or, when
 the viewport-shrink keybind itself is off, byte-for-byte vanilla presentation) — only the panel UI on

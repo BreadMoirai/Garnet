@@ -6,7 +6,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
-import com.breadmoirai.garnet.ui.compose.ComposeSurface
+import com.breadmoirai.garnet.ui.compose.ComposeInput
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import net.minecraft.client.Minecraft
@@ -47,23 +47,23 @@ object DockInputRouter {
 
     fun onGlfwMove(x: Double, y: Double) {
         lastX = x; lastY = y
-        if (captured) ComposeSurface.sendPointerMove(Offset(x.toFloat(), y.toFloat()))
+        if (captured) ComposeInput.sendPointerMove(Offset(x.toFloat(), y.toFloat()))
     }
 
     fun onGlfwPress(button: Int) {
         if (!captured) return
         val composeButton = glfwMouseButtonToPointerButton(button) ?: return
-        ComposeSurface.sendPointerPress(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
+        ComposeInput.sendPointerPress(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
     }
 
     fun onGlfwRelease(button: Int) {
         if (!captured) return
         val composeButton = glfwMouseButtonToPointerButton(button) ?: return
-        ComposeSurface.sendPointerRelease(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
+        ComposeInput.sendPointerRelease(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
     }
 
     fun onGlfwScroll(dx: Double, dy: Double) {
-        if (captured) ComposeSurface.sendScroll(Offset(lastX.toFloat(), lastY.toFloat()), Offset(dx.toFloat(), dy.toFloat()))
+        if (captured) ComposeInput.sendScroll(Offset(lastX.toFloat(), lastY.toFloat()), Offset(dx.toFloat(), dy.toFloat()))
     }
 
     /**
@@ -98,7 +98,7 @@ object DockInputRouter {
     fun onGlfwKey(key: Int, action: Int, mods: Int = 0): Boolean {
         if (!captured) return false
         if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_PRESS) {
-            val consumedByScene = ComposeSurface.sendKey(
+            val consumedByScene = ComposeInput.sendKey(
                 KeyEvent(
                     key = Key.Escape,
                     type = KeyEventType.KeyDown,
@@ -118,7 +118,7 @@ object DockInputRouter {
             GLFW.GLFW_RELEASE -> KeyEventType.KeyUp
             else -> return false
         }
-        ComposeSurface.sendKey(
+        ComposeInput.sendKey(
             KeyEvent(
                 key = composeKey,
                 type = type,
@@ -193,7 +193,7 @@ object DockInputRouter {
             AwtKeyEvent.VK_UNDEFINED,
             codePoint.toChar(),
         )
-        ComposeSurface.sendKey(
+        ComposeInput.sendKey(
             KeyEvent(
                 key = Key.Unknown,
                 type = KeyEventType.KeyDown,

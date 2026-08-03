@@ -81,7 +81,7 @@ painted over the panel after the dock was hidden and shown again, with ESC unabl
    `ComposeOverlay.enabled` off `DockState.anyActive()`, so the frame after a hide never happens: the
    scene freezes with the panel still mounted, still focused, popup layers still attached. Guard:
    `ComposeOverlay.enabled`'s **setter** calls `ComposeSurface.markSceneStale()`, which makes the next
-   `renderFrame` discard and rebuild the whole scene, and makes `ComposeSurface`'s input forwarders
+   `renderFrame` discard and rebuild the whole scene, and makes `ComposeInput`'s input forwarders
    refuse events in between (a stale focused widget would otherwise keep consuming keys — enough to
    swallow the ESC that is supposed to drop dock focus). Putting it in the setter rather than at each
    hide site is deliberate: that flag is the choke point every hide path already goes through.

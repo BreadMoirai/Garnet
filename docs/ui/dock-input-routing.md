@@ -54,19 +54,19 @@ descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel van
 
 ## What is and isn't forwarded
 
-- Pointer move/press/release/scroll are forwarded into `ComposeSurface.sendPointer*/sendScroll`
+- Pointer move/press/release/scroll are forwarded into `ComposeInput.sendPointer*/sendScroll`
   (guarded — a `disabled` Compose surface no-ops). This is the load-bearing dispatch the Explorer
   relies on (pointer-driven interactions). **The GLFW button index is threaded all the way
   through as of the context-menu work**: `onGlfwPress(button: Int)`/`onGlfwRelease(button: Int)`
   map the raw index via `glfwMouseButtonToPointerButton` (file-scope function in
   `DockInputRouter.kt`; `LEFT→Primary`, `RIGHT→Secondary`, `MIDDLE→Tertiary`, anything else →
   `null`, dropped rather than mislabelled) and pass the resulting `PointerButton?` down through
-  `ComposeSurface.sendPointerPress/Release(pos, button)` → `ComposeSceneHost.pointerPress/Release(pos,
+  `ComposeInput.sendPointerPress/Release(pos, button)` → `ComposeSceneHost.pointerPress/Release(pos,
   button)` → `ImageComposeScene.sendPointerEvent(.., button = button)`. Previously the button index
   was discarded and every dock click reached Compose as `PointerButton.Primary`, which made
   right-click context menus impossible to distinguish from a left click.
 - **Key→Compose translation and typed characters are wired (Task 3).** `DockInputRouter.onGlfwKey(key,
-  action, mods)` forwards every non-ESC key while captured into `ComposeSurface.sendKey`, building a
+  action, mods)` forwards every non-ESC key while captured into `ComposeInput.sendKey`, building a
   Compose `KeyEvent` via the synthetic desktop factory
   `androidx.compose.ui.input.key.KeyEvent(key, type, codePoint, isCtrlPressed, isMetaPressed,
   isAltPressed, isShiftPressed, nativeEvent)` (opt-in: `@OptIn(InternalComposeUiApi::class)` — despite
@@ -160,7 +160,7 @@ unaffected by `syncDockViewport()`.
 
 `DockInputSpec` (clientTest) closes the Task-3 coverage gap: it mounts a LEFT panel containing a
 `clickable` Box wired to an `AtomicInteger`, focuses via `DockInputRouter.focus(LEFT)`, drives a
-`onGlfwMove` + `onGlfwPress`/`onGlfwRelease` through the **real** router→`ComposeSurface`→scene path
+`onGlfwMove` + `onGlfwPress`/`onGlfwRelease` through the **real** router→`ComposeInput`→scene path
 at the element's window coords, and asserts the counter incremented (skipped only if
 `ComposeSurface.disabled`). A second `DockInputSpec` case is a pure router-level test (no
 mixin/GLFW window needed) covering the ESC policy: focuses LEFT, calls
@@ -172,7 +172,7 @@ it asserts the flags stay `false` when nothing is visible, flip to `true` once `
 visible, revert to `false` once hidden again, and also flip to `true` when only `focusedRegion` is
 set (no visible region). Two more cases (Task 3) close the key-delivery gap: one mounts a
 `focusable().onKeyEvent { }` Box, focuses it via `FocusRequester`, drives a real
-`DockInputRouter.onGlfwKey(GLFW_KEY_DOWN, GLFW_PRESS, 0)` through the router→`ComposeSurface`→scene
+`DockInputRouter.onGlfwKey(GLFW_KEY_DOWN, GLFW_PRESS, 0)` through the router→`ComposeInput`→scene
 path, and asserts the widget observed `Key.DirectionDown`; the other re-asserts the ESC-only-consumed
 contract now that `onGlfwKey` takes a third `mods` param, confirming a non-ESC key while captured is
 delivered but still reported `false` (not consumed) and ESC is still the only key returning `true`.
@@ -182,7 +182,7 @@ Two more cases cover the button-threading fix above: a pure-function test assert
 `glfwMouseButtonToPointerButton` maps `LEFT`/`RIGHT`/`MIDDLE` to `Primary`/`Secondary`/`Tertiary`
 and an unmapped index (`7`) to `null`; a router-level test mounts a panel with a raw
 `pointerInput { awaitPointerEventScope { ... } }` probe, drives `onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`
-through the real router→`ComposeSurface`→scene path, and asserts the probe observed exactly
+through the real router→`ComposeInput`→scene path, and asserts the probe observed exactly
 `PointerButton.Secondary`. That test must call `DockState.reset()` before mounting its panel —
 `DockState.leftPanels` already holds the production Explorer panel at tab index 0, so a panel
 appended without a reset lands on a non-active tab and its `content()` is never composed

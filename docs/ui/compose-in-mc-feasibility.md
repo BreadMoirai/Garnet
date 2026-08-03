@@ -82,7 +82,7 @@ rolls every row → the whole Compose image wraps horizontally by ~120 px. The o
 uploaded nothing (it drew vector geometry straight onto the GPU surface) so it never hit this — and
 because that panel was near-symmetric (full-width fill + bars) even a shift would have been invisible.
 The fix: reset `GL_UNPACK_ALIGNMENT/ROW_LENGTH/SKIP_PIXELS/SKIP_ROWS` to their GL defaults right before
-the upload and restore MC's values after (`ComposeSurface.saveAndResetUnpack`/`restoreUnpack`). **Any
+the upload and restore MC's values after (`GlStateStash.saveAndResetUnpack`/`restoreUnpack`). **Any
 raw CPU→GPU texture upload sharing Blaze3D's context must neutralize the unpack pixel-store state.**
 
 ## Build wiring

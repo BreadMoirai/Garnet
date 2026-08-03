@@ -178,7 +178,8 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
 ## `ui/` — the Compose dock shell (client only)
 
 - `compose/` — `ComposeOverlay.kt` (render/enable gate), `ComposeSceneHost.kt` (generic
-  `ImageComposeScene` wrapper), `ComposeSurface.kt` (blit + input entry points).
+  `ImageComposeScene` wrapper), `ComposeSurface.kt` (lifecycle + blit rendering), `ComposeInput.kt`
+  (pointer/scroll/key entry points), `GlStateStash.kt` (GL state save/restore around Skia draws).
 - `dock/` — `GarnetDock.kt` (the root composable), `DockState.kt`, `DockRegion.kt`,
   `DockInsets.kt`, `Panel.kt`.
 - `input/` — `DockInputRouter.kt`, `GlfwKeyMap.kt`.
