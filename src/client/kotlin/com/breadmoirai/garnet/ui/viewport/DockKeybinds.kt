@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.ui.viewport
 
-import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.input.DockInputRouter

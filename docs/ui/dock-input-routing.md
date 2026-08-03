@@ -160,29 +160,28 @@ unaffected by `syncDockViewport()`.
 
 ## Test coverage
 
-`DockInputSpec` (clientTest) closes the Task-3 coverage gap: it mounts a LEFT panel containing a
-`clickable` Box wired to an `AtomicInteger`, focuses via `DockInputRouter.focus(LEFT)`, drives a
-`onGlfwMove` + `onGlfwPress`/`onGlfwRelease` through the **real** router→`ComposeInput`→scene path
-at the element's window coords, and asserts the counter incremented (skipped only if
-`ComposeSurface.disabled`). A second `DockInputSpec` case is a pure router-level test (no
-mixin/GLFW window needed) covering the ESC policy: focuses LEFT, calls
-`DockInputRouter.onGlfwKey(GLFW_KEY_ESCAPE, GLFW_PRESS)` and asserts it returns `true` and
-`DockState.focusedRegion` becomes `null`; asserts a non-ESC key returns `false` and leaves focus
-intact; and asserts ESC returns `false` when not captured. Two more cases (Task 3) close the key-delivery gap: one mounts a
-`focusable().onKeyEvent { }` Box, focuses it via `FocusRequester`, drives a real
-`DockInputRouter.onGlfwKey(GLFW_KEY_DOWN, GLFW_PRESS, 0)` through the router→`ComposeInput`→scene
-path, and asserts the widget observed `Key.DirectionDown`; the other re-asserts the ESC-only-consumed
-contract now that `onGlfwKey` takes a third `mods` param, confirming a non-ESC key while captured is
-delivered but still reported `false` (not consumed) and ESC is still the only key returning `true`.
-`DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
+`DockInputSpec` (clientTest) is a single merged story — one probe panel, mounted once via
+`DockState.reset()` + a LEFT panel append (necessary because `DockState.leftPanels` already holds
+the production Explorer panel at tab index 0, and a panel appended without a reset would land on a
+non-active tab whose `content()` is never composed, since `RegionColumn` only invokes
+`panels[active].content(panels[active])`) — exercised through six numbered steps, all through the
+**real** router→`ComposeInput`→scene path:
 
-A router-level case covers the button-threading fix above: it mounts a panel with a raw
-`pointerInput { awaitPointerEventScope { ... } }` probe, drives `onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`
-through the real router→`ComposeInput`→scene path, and asserts the probe observed exactly
-`PointerButton.Secondary`. That test must call `DockState.reset()` before mounting its panel —
-`DockState.leftPanels` already holds the production Explorer panel at tab index 0, so a panel
-appended without a reset lands on a non-active tab and its `content()` is never composed
-(`RegionColumn` only invokes `panels[active].content(panels[active])`).
+1. A raw secondary press (`onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`) is collected by a
+   `pointerInput { awaitPointerEventScope { ... } }` probe and asserted to arrive as exactly
+   `PointerButton.Secondary` (skipped only if `ComposeSurface.disabled`) — covers the button-threading
+   fix above.
+2. After `DockInputRouter.focus(LEFT)`, a routed primary click at the probe box's window coords
+   increments an `AtomicInteger`, asserting the click reaches the focused panel.
+3. A non-ESC key (`onGlfwKey(GLFW_KEY_DOWN, GLFW_PRESS, 0)`) delivered to a
+   `focusable().onKeyEvent { }` Box is observed as `Key.DirectionDown` — covers the key-delivery path.
+4. `onGlfwChar` delivers typed characters ("hi") into a focused `BasicTextField`'s committed text.
+5. ESC while captured (`onGlfwKey(GLFW_KEY_ESCAPE, GLFW_PRESS, 0)`) returns `true` and drops
+   `DockState.focusedRegion` to `null`, while a non-ESC key while captured is delivered but reported
+   `false` (not consumed) — the ESC-only-consumed contract.
+6. An uncaptured ESC (focus already `null`) reports `false` and drops nothing.
+
+`DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
 
 The pure-function half of that fix (`glfwMouseButtonToPointerButton` maps `LEFT`/`RIGHT`/`MIDDLE`
 to `Primary`/`Secondary`/`Tertiary` and an unmapped index (`7`) to `null`) and the

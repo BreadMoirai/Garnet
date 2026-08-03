@@ -264,7 +264,7 @@ dependencies {
     // foundation's clickable + hoverable + InteractionSource, which is pure Compose interaction plumbing.
     //
     // `runtime` is `clientImplementation`-scoped, same as `ui`/`foundation`, keeping Compose out of
-    // the server jar entirely (see docs/build/compose-runtime-scoping.md). This only works because
+    // the server jar entirely (see docs/tooling/compose-runtime-scoping.md). This only works because
     // the compiler-plugin-classpath strip below removes the Compose compiler subplugin from the
     // non-client `KotlinCompile` tasks; without that strip, the project-wide Compose compiler plugin's
     // VersionChecker fails `main`/`gametest`/`testSupport` compilation for lacking the runtime on
@@ -292,7 +292,7 @@ dependencies {
 // (main, gametest, testSupport) by filtering the Compose subplugin out of their KotlinCompile
 // pluginClasspath — this is what lets `runtime-desktop` above stay client-scoped instead of
 // sitting on the base `implementation` for every source set. See
-// docs/build/compose-runtime-scoping.md for what was tried and why this approach was chosen.
+// docs/tooling/compose-runtime-scoping.md for what was tried and why this approach was chosen.
 // `compileTestKotlin` is deliberately absent: `test` now carries `client`'s compile classpath
 // (and therefore `runtime-desktop`), so the Compose plugin's VersionChecker passes there, and
 // the plugin is REQUIRED — `Panel.content` is `@Composable (Panel) -> Unit`, so any test that
