@@ -20,7 +20,7 @@ import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
-import com.breadmoirai.garnet.editor.data.EditorNewStructure
+import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.structure.StructureEditWatcher

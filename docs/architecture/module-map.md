@@ -148,8 +148,10 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
 
 - `data/` — pure data: `EditorRoot` (path-traversal-safe `resolveSubpath`), `EditorSession`
   (per-player active-folder pointer), `EditorCell`, `FileTree`/`EditorFolderTree` (tree scan
-  models), `EditorNames` (name validation), `EditorNewSpec`/`EditorNewStructure` (stub writers),
-  `EditorSaveNaming`, `LoadedSpec`.
+  models), `EditorNames` (name validation), `EditorSaveNaming`, `LoadedSpec`.
+- `ops/` — filesystem-mutating create operations: `EditorNewSpec` (stub `.spec.kts` writer),
+  `EditorNewStructure` (empty `.nbt` writer). Split out of `data/` because those two files were
+  the only IO in an otherwise pure, unit-tested package.
 - `world/` — the dimension/grid substrate: `EditorWorld` (per-server loaded-folder map),
   `EditorDimRegistry` (region assignment in `server.overworld()`), `EditorDimLifecycle`
   (place/save the grid), `EditorCellSaver` (dirty-diff a cell and rewrite its structure NBT),

@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.ops
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec

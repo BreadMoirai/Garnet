@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.ops
 
 import com.breadmoirai.garnet.playback.recorder.RecordingDslEmitter
 import org.slf4j.LoggerFactory

@@ -86,6 +86,7 @@ because it was never test-only.
 
   editor/           workspace, project model, explorer
     data/           pure model — no server side effects, unit-testable
+    ops/            filesystem-mutating create operations (new spec / new structure)
     world/          dimension/grid substrate — server side effects
     structure/      live structure-commit pipeline — dirty-track → debounce → commit → history
     command/        EditorCommand
@@ -112,6 +113,13 @@ already has unit tests; `world` mutates dimensions and is gametest-covered.
 > `docs/superpowers/plans/2026-08-02-refactor-package-cohesion.md` for the rationale. `editor/structure`
 > is distinct from the pre-existing top-level `structure/` package (pure NBT/region geometry, no
 > server state) documented above.
+
+> **Amendment (2026-08-02):** `editor/data/` held two files that violated this package's own
+> "pure model — no server side effects" description: `EditorNewSpec` and `EditorNewStructure`
+> both create files on disk. They moved to a new `editor/ops/` package. `EditorNames` and
+> `EditorSaveNaming` were checked against the same criterion and confirmed to do no filesystem
+> IO (string/hash logic only), so they stayed in `data/`. See
+> `docs/superpowers/plans/2026-08-02-refactor-package-cohesion.md` (Task 5) for the rationale.
 
 ### Dependency direction
 
@@ -293,8 +301,8 @@ The audit also found assets that are *already* orphaned and should go in the sam
 | `project/ProjectCell.kt` | `editor/data/EditorCell.kt` |
 | `project/ProjectNames.kt` | `editor/data/EditorNames.kt` |
 | `project/ProjectSaveNaming.kt` | `editor/data/EditorSaveNaming.kt` |
-| `project/ProjectNewSpec.kt` | `editor/data/EditorNewSpec.kt` |
-| `project/ProjectNewStructure.kt` | `editor/data/EditorNewStructure.kt` |
+| `project/ProjectNewSpec.kt` | `editor/ops/EditorNewSpec.kt` (moved from `editor/data/` 2026-08-02, see amendment below) |
+| `project/ProjectNewStructure.kt` | `editor/ops/EditorNewStructure.kt` (moved from `editor/data/` 2026-08-02, see amendment below) |
 | `project/ProjectFolderTree.kt` | `editor/data/EditorFolderTree.kt` |
 | `project/FileTree.kt` | `editor/data/FileTree.kt` |
 | `project/ProjectDimRegistry.kt` | `editor/world/EditorDimRegistry.kt` |

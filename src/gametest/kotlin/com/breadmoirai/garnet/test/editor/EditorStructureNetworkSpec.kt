@@ -13,7 +13,7 @@ import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
-import com.breadmoirai.garnet.editor.data.EditorNewStructure
+import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.data.EditorSession

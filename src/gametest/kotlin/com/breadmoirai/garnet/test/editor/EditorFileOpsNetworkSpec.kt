@@ -10,7 +10,7 @@ import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
-import com.breadmoirai.garnet.editor.data.EditorNewStructure
+import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave

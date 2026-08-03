@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.ops
 
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtIo
