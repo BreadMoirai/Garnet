@@ -144,7 +144,9 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
 - `world/` — server-side lifecycle and state: `EditorWorld` (per-server loaded-folder map),
   `EditorDimRegistry` (region assignment in `server.overworld()`), `EditorDimLifecycle`
   (place/save the grid), `EditorCellSaver` (dirty-diff a cell and rewrite its structure NBT),
-  `EditorTeleport`, `EditorServerContext`, `GridLayout` (pure row-major slot math).
+  `EditorTeleport`, `EditorServerContext`, `EditorRootResolver` (the active managed root:
+  loaded world's, else pinned server context's, else configured path), `GridLayout` (pure
+  row-major slot math).
 - `command/EditorCommand.kt` — `/garnet project`.
 - `network/EditorPackets.kt` + `EditorNetworkRegistry.kt` + `EditorTreeHandlers.kt` +
   `EditorStructureHandlers.kt` + `EditorFileOpsHandlers.kt` + `EditorHandlerSupport.kt` (main) —

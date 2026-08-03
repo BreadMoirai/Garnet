@@ -156,7 +156,8 @@ class EditorDimRegistry(private val server: MinecraftServer) {
      * `EditorRootResolver.rootFor(server).resolveSubpath(subpath)` and returns null, silently
      * skipping it) and lets a click on the new path re-place a second copy in a fresh region.
      *
-     * The boundary is a full path segment, matching [repointSession]'s logic: renaming "redstone"
+     * The boundary is a full path segment, matching
+     * [com.breadmoirai.garnet.editor.data.EditorSession.repointSession]'s logic: renaming "redstone"
      * must rekey "redstone" and "redstone/clock.nbt", but never "redstoneworks/clocks" — a plain
      * `startsWith(oldSubpath)` would wrongly catch that sibling.
      *

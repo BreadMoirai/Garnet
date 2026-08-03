@@ -85,6 +85,8 @@ Server state and lifecycle:
 - `EditorTeleport` — `toFolder(server, player, subpath)`. Separate concern from placement.
 - `EditorNewSpec` — stub `.spec.kts` writer.
 - `EditorServerContext` — per-server pin for the active root.
+- `EditorRootResolver` — `rootFor(server)`: the active managed root, priority-chained —
+  loaded world's, else pinned `EditorServerContext`'s, else `SharedSettings.projectRootPath`.
 - `EditorCommand` — `/garnet project`.
 
 Network:
