@@ -47,6 +47,7 @@ import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.data.NewNodeKind
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
+import org.jetbrains.jewel.foundation.lazy.tree.DefaultTreeViewKeyActions
 import org.jetbrains.jewel.intui.standalone.styling.defaults
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.Outline
@@ -103,10 +104,18 @@ private fun ProjectExplorer() {
                     ExplorerTreeState.treeState.openNodes += ExplorerTreeState.ROOT_PATH
                     ExplorerTreeState.buildTreeFrom(snap.root, edit)
                 }
+                // See [EditAwareKeyActions]: without this the tree's preview key handler swallows
+                // every caret/selection key before the open InlineNameField can see it.
+                val treeState = ExplorerTreeState.treeState
+                val editing = edit != null
+                val keyActions = remember(treeState, editing) {
+                    EditAwareKeyActions(DefaultTreeViewKeyActions(treeState), editing)
+                }
                 LazyTree(
                     tree = tree,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     treeState = ExplorerTreeState.treeState,
+                    keyActions = keyActions,
                     style = flushTreeStyle(),
                     onElementClick = { element -> onElementClick(element.data, ExplorerTreeState.pathOf(element)) },
                 ) { element ->
@@ -274,6 +283,10 @@ private fun TreeRow(
  *
  * EditBox-style note does not apply here: this is a Jewel TextField over a Compose TextFieldState,
  * and `setTextAndPlaceCursorAtEnd` does not fire a responder, so seeding [initial] is safe.
+ *
+ * Caret movement, keyboard selection and Ctrl+A only reach this field because the enclosing
+ * LazyTree is handed an [EditAwareKeyActions] while an edit is open — see that class for why a
+ * nested field otherwise loses those keys to the tree's preview handler.
  */
 @Composable
 private fun RowScope.InlineNameField(

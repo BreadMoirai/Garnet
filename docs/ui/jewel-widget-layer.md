@@ -275,3 +275,8 @@ which only work because GLFW key and character callbacks are now wired end-to-en
 (`DockInputRouter.onGlfwKey`/`onGlfwChar`, fed by a `charTyped` mixin injection) — see
 [dock-input-routing.md](dock-input-routing.md) for the mixin targets and the AWT-`KeyEvent`
 `nativeEvent` trick typed text requires.
+
+Delivery into the scene is only half of it, though: a `TextField` **nested inside a `LazyTree` row**
+loses most of its keys to the tree, because `SelectableLazyColumn` registers its keybindings with
+`Modifier.onPreviewKeyEvent` on the tree container and preview events dispatch root → leaf. See
+[explorer-toolbar-and-context-menu.md#the-tree-steals-the-name-fields-keys](explorer-toolbar-and-context-menu.md#the-tree-steals-the-name-fields-keys).

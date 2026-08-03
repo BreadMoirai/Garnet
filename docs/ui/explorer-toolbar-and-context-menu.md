@@ -1,7 +1,7 @@
 ---
 title: Explorer toolbar and context menu
-tags: [explorer, toolbar, context-menu, inline-edit, jewel, packets]
-summary: The Project Explorer's kebab/Refresh/Collapse-All toolbar, its right-click New/Rename menu, and the inline name field that commits through ExplorerActions.
+tags: [explorer, toolbar, context-menu, inline-edit, jewel, packets, keyboard]
+summary: The Project Explorer's kebab/Refresh/Collapse-All toolbar, its right-click New/Rename menu, the inline name field that commits through ExplorerActions, and why the LazyTree's preview key handler had to stop eating that field's caret/selection keys.
 ---
 
 # Explorer toolbar and context menu
@@ -122,3 +122,40 @@ that hasn't run yet. This governs both the project-root auto-open and the contex
 full — including why the fix must be synchronous, not a `LaunchedEffect` — in
 [jewel-widget-layer.md#tree-state-is-jewels-not-a-custom-model](jewel-widget-layer.md#tree-state-is-jewels-not-a-custom-model).
 Not duplicated here.
+
+## The tree steals the name field's keys
+
+`InlineNameField` is a Jewel `TextField` over a Compose `TextFieldState`, rendered *in place of* a
+tree row's label — so it is a **descendant of the `LazyTree`**. That nesting silently broke it as a
+text field: the caret would not move, keyboard selection did nothing, and Ctrl+A selected nothing,
+while typed characters landed normally. The half-working combination is what made it read as a fake
+text box rather than a dead one.
+
+The cause is dispatch order, not delivery. Jewel's `SelectableLazyColumn` (which `LazyTree` is built
+on) installs its keybindings with **`Modifier.onPreviewKeyEvent` on the tree container**, and Compose
+dispatches preview events **root → leaf** — so the tree gets first refusal on every key before the
+focused field nested inside one of its rows. Its default `KeyActions` bind exactly the keys a text
+field needs: Left/Right/Up/Down (move selection), Home/End (first/last item), PageUp/PageDown, and
+**Ctrl+A** (its own select-all-rows). Each one is reported handled and never reaches the field.
+Typed characters survive only because the tree has no binding for them. Mouse input is unaffected:
+click-to-place-caret and drag-to-select go through pointer dispatch, which has no such ancestor
+veto, and always worked.
+
+A nested widget cannot out-rank an ancestor's preview handler, so the fix has to come from the tree
+side. `EditAwareKeyActions` (`ExplorerKeyActions.kt`) wraps the stock
+`DefaultTreeViewKeyActions(treeState)` and overrides `handleOnKeyEvent` to return a handler that
+never reports a key as handled **while an edit is open** (`edit != null`); `keybindings` and
+`actions` delegate untouched, so ordinary tree navigation is byte-for-byte the default whenever no
+name field is showing. The tree has no use for keyboard navigation while the user is typing a
+filename, and Enter/Escape are still the field's own (`onPreviewKeyEvent` on the field commits and
+cancels).
+
+Regression coverage is `InlineNameFieldKeyRoutingTest` (plain JVM `src/test`, no Minecraft): it
+drives a `TextField` nested in a real `LazyTree` inside a raster `ComposeSceneHost`, feeding
+synthetic key events built exactly the way `DockInputRouter.onGlfwKey` builds them. Three cases pin
+the fixed behavior (Ctrl+A, Home + Shift+Right, arrow keys) and a fourth pins the *stock* actions
+still swallowing all of them — if that guard ever starts passing the others' assertions, the wrapper
+has stopped being load-bearing and the spec has stopped proving anything.
+
+Clipboard (Ctrl+C/X/V) needs no help here — Compose Desktop's clipboard path is not a tree binding,
+so it reached the field before this change and still does.
