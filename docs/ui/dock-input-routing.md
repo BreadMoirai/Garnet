@@ -169,10 +169,10 @@ non-active tab whose `content()` is never composed, since `RegionColumn` only in
 
 1. A raw secondary press (`onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`) is collected by a
    `pointerInput { awaitPointerEventScope { ... } }` probe and asserted to arrive as exactly
-   `PointerButton.Secondary` (skipped only if `ComposeSurface.disabled`) — covers the button-threading
-   fix above.
+   `PointerButton.Secondary` — covers the button-threading fix above.
 2. After `DockInputRouter.focus(LEFT)`, a routed primary click at the probe box's window coords
-   increments an `AtomicInteger`, asserting the click reaches the focused panel.
+   increments an `AtomicInteger`, asserting the click reaches the focused panel (skipped only if
+   `ComposeSurface.disabled`).
 3. A non-ESC key (`onGlfwKey(GLFW_KEY_DOWN, GLFW_PRESS, 0)`) delivered to a
    `focusable().onKeyEvent { }` Box is observed as `Key.DirectionDown` — covers the key-delivery path.
 4. `onGlfwChar` delivers typed characters ("hi") into a focused `BasicTextField`'s committed text.
