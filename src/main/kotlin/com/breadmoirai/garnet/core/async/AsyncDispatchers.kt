@@ -9,10 +9,10 @@ object AsyncDispatchers {
     @Volatile private var _currentServer: MinecraftServer? = null
 
     val Server: CoroutineDispatcher
-        get() = _server ?: error("McDispatchers.Server accessed before SERVER_STARTED or after SERVER_STOPPED")
+        get() = _server ?: error("AsyncDispatchers.Server accessed before SERVER_STARTED or after SERVER_STOPPED")
 
     val currentServer: MinecraftServer
-        get() = _currentServer ?: error("McDispatchers.currentServer accessed before SERVER_STARTED or after SERVER_STOPPED")
+        get() = _currentServer ?: error("AsyncDispatchers.currentServer accessed before SERVER_STARTED or after SERVER_STOPPED")
 
     internal fun install(server: MinecraftServer) {
         _server = ServerThreadDispatcher(server)

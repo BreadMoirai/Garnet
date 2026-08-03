@@ -12,7 +12,7 @@ summary: Four-thread layering of `clientTest` specs, where to do each kind of wo
 
 - **Fabric test thread.** The thread `FabricClientGameTest.runTest` is invoked on. Methods like `ClientGameTestContext.waitTick`, `waitFor`, `waitForScreen`, `takeScreenshot`, and `TestSingleplayerContext.runOnServer` assert via `ThreadingImpl.checkOnGametestThread(...)` and throw `IllegalStateException` from any other thread. To touch `Minecraft.getInstance()`, use `ctx.runOnClient` / `computeOnClient` from this thread; those internally hop to the render thread.
 - **Kotest worker thread.** `ClientTestSentinel.runKotestOnWorker` spawns a daemon (`garnet-kotest-worker`) and runs `launchKotest` on it. The Fabric test thread loops on `context.waitTick()` until the worker signals done. This is the only way to drive client ticks while a Kotest spec executes — calling `launchKotest` synchronously from the Fabric test thread would block tick advancement and deadlock any suspending primitive.
-- **Server thread.** The integrated server's main loop. `onServer { … }` (`withContext(McDispatchers.Server)`) hops the calling coroutine here.
+- **Server thread.** The integrated server's main loop. `onServer { … }` (`withContext(AsyncDispatchers.Server)`) hops the calling coroutine here.
 - **Render thread.** Minecraft's main thread. Owns `Minecraft.getInstance()`, the screen field, and any UI mutation. `ctx.runOnClient`/`computeOnClient` runs work here.
 
 ## Where test code runs by default
@@ -21,7 +21,7 @@ Two base classes; they dispatch test bodies differently.
 
 | Spec base | Default thread | Use for |
 |---|---|---|
-| `GarnetTestSpec` | Server thread (via `withContext(McDispatchers.Server)`) | Gametest sourceset — `level.setBlock`, BE queries, `awaitTicks`, etc. |
+| `GarnetTestSpec` | Server thread (via `withContext(AsyncDispatchers.Server)`) | Gametest sourceset — `level.setBlock`, BE queries, `awaitTicks`, etc. |
 | `ClientSpec` | Kotest worker thread (no special dispatcher) | ClientTest sourceset — UI assertions, packet round-trips, screenshots. |
 
 A `RecordingHolder` is installed in both, so `runGarnetSpec` works from either base.

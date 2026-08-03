@@ -32,11 +32,11 @@ These UCs describe how author-written tests interact with the harness. They are 
 
 **Actor:** Test author
 **Trigger:** A `GarnetTestSpec` test body calls `runGarnetSpec(spec, originPos, level)` to execute a DSL-defined `GarnetSpec` against a live world.
-**Preconditions:** The caller is executing within a `GarnetTestSpec` coroutine (so `RecordingHolder` is installed in the coroutine context and `McDispatchers.Server` is the active dispatcher); `originPos` and `level` are bound via `GarnetTestSpecContext` (set before the spec is instantiated by `EngineDrivenRun`).
+**Preconditions:** The caller is executing within a `GarnetTestSpec` coroutine (so `RecordingHolder` is installed in the coroutine context and `AsyncDispatchers.Server` is the active dispatcher); `originPos` and `level` are bound via `GarnetTestSpecContext` (set before the spec is instantiated by `EngineDrivenRun`).
 **Outcome:** The `GarnetSpec` lambda is replayed tick-by-tick against the world; a `StateRecording` is returned and stored in `RecordingHolder.recording` so `DiagnosticRecorderListener` can retrieve it after the test; the run throws `AssertionError` if any assertion fails.
 
 **System interactions:**
-- UC-GT-02.a — `GarnetTestSpec` installs a `CoroutineDispatcherFactory` that wraps every test body and lifecycle hook in `withContext(McDispatchers.Server + RecordingHolder())`; this ensures the `RecordingHolder` slot is in-context for both the test body and the `afterTest` hook called by `DiagnosticRecorderListener`.
+- UC-GT-02.a — `GarnetTestSpec` installs a `CoroutineDispatcherFactory` that wraps every test body and lifecycle hook in `withContext(AsyncDispatchers.Server + RecordingHolder())`; this ensures the `RecordingHolder` slot is in-context for both the test body and the `afterTest` hook called by `DiagnosticRecorderListener`.
 - UC-GT-02.b — `runGarnetSpec(spec, originPos, level)` delegates to the engine's `runEngine(level, originPos, spec)` and then sets `coroutineContext[RecordingHolder]?.recording = recording` so the holder carries the result.
 - UC-GT-02.c — Inside the tick loop, test bodies use `awaitTicks(n)` / `awaitTickEnd()` from `Suspending.kt` to suspend until `serverTickEnd` emits; `emitServerTickEnd` calls `server.managedBlock { server.pendingTasksCount == 0 }` after `tryEmit`, so resumed continuations drain synchronously within the same tick.
 - UC-GT-02.d — The same-tick guarantee means any `onServer { }` work done between two consecutive `awaitTicks` calls executes atomically within one tick's drain window; authors must enter `awaitTicks` *before* performing the action whose ticks they need to observe, because `serverTickEnd` has `replay = 0` and `DROP_OLDEST` overflow — emissions while no consumer is suspended are dropped.
@@ -50,7 +50,7 @@ These UCs describe how author-written tests interact with the harness. They are 
 
 **Actor:** Test author
 **Trigger:** A `clientTest` spec needs to exercise a screen, widget, or payload round-trip that requires a real MC client.
-**Preconditions:** `ClientTestSentinel.runTest` has called `SpecTestContext.createWorld(context)` and wrapped the resulting `TestSingleplayerContext` in `SpecTestContext`; `McDispatchers` is installed because `createWorld` fires `SERVER_STARTED`; the test is running on the Kotest worker thread while the Fabric test thread drives ticks via `context.waitTick()`.
+**Preconditions:** `ClientTestSentinel.runTest` has called `SpecTestContext.createWorld(context)` and wrapped the resulting `TestSingleplayerContext` in `SpecTestContext`; `AsyncDispatchers` is installed because `createWorld` fires `SERVER_STARTED`; the test is running on the Kotest worker thread while the Fabric test thread drives ticks via `context.waitTick()`.
 **Outcome:** The screen under test opens, the author's assertions run against live widget state, and the world is cleanly closed via the `Closeable` `TestSingleplayerContext` at the end of the `use { }` block.
 
 **System interactions:**
@@ -75,7 +75,7 @@ These UCs describe how author-written tests interact with the harness. They are 
 **System interactions:**
 - UC-GT-04.a — `launchKotest` constructs both a `ResultCollector` and a `DiagnosticRecorderListener` and registers them as extensions on the `TestEngineLauncher`; the final `LauncherResult` is assembled as `collector.result.copy(recordings = diagListener.snapshot())`.
 - UC-GT-04.b — `DiagnosticRecorderListener.afterTest` fires for every leaf test (`TestType.Test`); it reads `currentCoroutineContext()[RecordingHolder]?.recording` and stores any non-null `StateRecording` into a `ConcurrentHashMap<String, StateRecording>` keyed by `testCase.name.testName`.
-- UC-GT-04.c — The `RecordingHolder` is visible in `afterTest` because `GarnetTestSpec`'s `CoroutineDispatcherFactory` wraps both the test body and all per-test lifecycle hooks in the same `withContext(McDispatchers.Server + RecordingHolder())` scope; the holder is shared between the body (where `runGarnetSpec` writes to it) and the `afterTest` callback (where `DiagnosticRecorderListener` reads from it).
+- UC-GT-04.c — The `RecordingHolder` is visible in `afterTest` because `GarnetTestSpec`'s `CoroutineDispatcherFactory` wraps both the test body and all per-test lifecycle hooks in the same `withContext(AsyncDispatchers.Server + RecordingHolder())` scope; the holder is shared between the body (where `runGarnetSpec` writes to it) and the `afterTest` callback (where `DiagnosticRecorderListener` reads from it).
 - UC-GT-04.d — `ResultCollector` runs in parallel with `DiagnosticRecorderListener` as a separate `TestListener`; it tallies `passed`/`failed` counts and collects `TestFailureRecord` entries for every failure and error; the two listeners are independent and do not share mutable state.
 - UC-GT-04.e — `diagListener.snapshot()` returns an immutable copy of the map via `byTestName.toMap()`, so the `LauncherResult` value is safe to inspect after the engine has shut down without risk of concurrent modification.
 
@@ -93,7 +93,7 @@ These UCs describe how author-written tests interact with the harness. They are 
 | UC-GT-01.c | `launchKotest` forwards explicit list to `TestEngineLauncher.withClasses`; classpath walker bypassed | — | **GAP** |
 | UC-GT-01.d | `AsyncEventHandler.registerWithServer` called before any spec executes | `GametestSentinel.runAll`, `ClientTestSentinel.runTest` | **GAP-PARTIAL** |
 | UC-GT-02 | Drive a spec body via `runGarnetSpec` | `RunGarnetSpecSmokeTest."runGarnetSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
-| UC-GT-02.a | `GarnetTestSpec` installs `CoroutineDispatcherFactory` wrapping body in `McDispatchers.Server + RecordingHolder()` | `RecordingHolderTest."holder set in outer scope is visible in nested suspend functions"` | **GAP-PARTIAL** |
+| UC-GT-02.a | `GarnetTestSpec` installs `CoroutineDispatcherFactory` wrapping body in `AsyncDispatchers.Server + RecordingHolder()` | `RecordingHolderTest."holder set in outer scope is visible in nested suspend functions"` | **GAP-PARTIAL** |
 | UC-GT-02.b | `runGarnetSpec` delegates to engine and stores recording in `RecordingHolder` | `RunGarnetSpecSmokeTest."runGarnetSpec completes for a trivial empty spec"` | **GAP-PARTIAL** |
 | UC-GT-02.c | `awaitTicks`/`awaitTickEnd` suspend until `serverTickEnd` emits; drain synchronous | `SmokeSpec."awaitTicks advances the server tick counter"`, `SuspendingTest."take(n).last() resolves after n emissions"` | covered |
 | UC-GT-02.d | Same-tick guarantee: `onServer { }` work between `awaitTicks` is atomic | `SmokeSpec."test body runs on the server thread"` | **GAP-PARTIAL** |

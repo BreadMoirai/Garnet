@@ -26,7 +26,7 @@ All three produce Kotest's built-in HTML report under `build/reports/garnet/<sou
 abstract class GarnetTestSpec(body: GarnetTestSpec.() -> Unit = {}) : FunSpec()
 ```
 
-Extends Kotest's `FunSpec`. Uses `CoroutineDispatcherFactory` to wrap every test body and lifecycle hook in `withContext(McDispatchers.Server)`. Inside a `GarnetTestSpec`, you are always on the server thread — direct access to world state, block entities, and levels is safe without an `onServer { }` wrapper.
+Extends Kotest's `FunSpec`. Uses `CoroutineDispatcherFactory` to wrap every test body and lifecycle hook in `withContext(AsyncDispatchers.Server)`. Inside a `GarnetTestSpec`, you are always on the server thread — direct access to world state, block entities, and levels is safe without an `onServer { }` wrapper.
 
 `GarnetTestSpec` is also used by shipped `.spec.kts` scripts at runtime (outside the gametest harness). The same base class is registered at both test-time (via the Kotest JUnit Platform engine or the sentinel-based gametest paths) and script-runtime, so specs written for the editor run unchanged as game-test specs.
 
@@ -89,7 +89,7 @@ class ComparatorSpec : GarnetTestSpec({
         val s = spawnStructure(Identifier.fromNamespaceAndPath("garnet", "comparator_basic"))
         try {
             // server-thread direct access — no onServer { } wrapper needed
-            McDispatchers.currentServer.overworld().setBlock(
+            AsyncDispatchers.currentServer.overworld().setBlock(
                 s.absolute(BlockPos(2, 2, 1)), Blocks.OAK_BUTTON.defaultBlockState(), 2,
             )
             awaitTicks(4)

@@ -20,7 +20,7 @@ class ClientTestSentinel : FabricClientGameTest {
     override fun runTest(context: ClientGameTestContext) {
         AsyncEventHandler.register()
         ClientContextHolder.install(context)
-        // Construct a singleplayer world to fire SERVER_STARTED, which installs McDispatchers.
+        // Construct a singleplayer world to fire SERVER_STARTED, which installs AsyncDispatchers.
         // `use { }` closes the world before runTest returns — Fabric asserts no server is still
         // running when the test exits.
         SpecTestContext.createWorld(context).use { world ->
