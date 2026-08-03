@@ -62,9 +62,7 @@ class ClientTestSentinel : FabricClientGameTest {
                     reportsDir = Path.of("build/reports/garnet/clientTest"),
                     specs = listOf(
                         RunGarnetSpecSmokeTest::class,
-                        ViewportCompositeSpec::class,
-                        ViewportPickingSpec::class,
-                        ViewportCursorMappingSpec::class,
+                        ViewportSpec::class,
                         CursorFocusToggleSpec::class,
                         DockRenderSpec::class,
                         DockInputSpec::class,
