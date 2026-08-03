@@ -9,6 +9,7 @@ import java.nio.file.Path
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
+import org.lwjgl.system.Platform
 
 /**
  * Compose-observable state + action controller for the Explorer's root-picker header.
@@ -19,8 +20,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
  * [sender] (network), [persist] (disk).
  */
 object RootPickerController {
-    var picker: FolderPicker = TinyfdFolderPicker
-    var runner: (Runnable) -> Unit = { Thread(it, "garnet-folder-picker").start() }
+    var picker: FolderPicker = NfdFolderPicker
+    var runner: (Runnable) -> Unit = defaultRunner()
     var executor: (Runnable) -> Unit = { Minecraft.getInstance().execute(it) }
     var sender: (CustomPacketPayload) -> Unit = { ClientPlayNetworking.send(it) }
     var persist: (String) -> Unit = { path -> ModConfig.projectRootPath = path; ModConfig.save() }
@@ -57,11 +58,26 @@ object RootPickerController {
 
     /** Restore default seams + flags between tests. */
     fun resetForTest() {
-        picker = TinyfdFolderPicker
-        runner = { Thread(it, "garnet-folder-picker").start() }
+        picker = NfdFolderPicker
+        runner = defaultRunner()
         executor = { Minecraft.getInstance().execute(it) }
         sender = { ClientPlayNetworking.send(it) }
         persist = { path -> ModConfig.projectRootPath = path; ModConfig.save() }
         picking = false
     }
 }
+
+/**
+ * Where the blocking dialog runs.
+ *
+ * Everywhere but macOS: a worker thread, because the dialog blocks until dismissed and the caller is
+ * the render thread.
+ *
+ * On macOS: **inline on the calling (render) thread**. NFD drives `NSOpenPanel`, which must be
+ * called from the AppKit main thread — and under `-XstartOnFirstThread` that thread *is* Minecraft's
+ * render thread, so the worker-thread rule and the AppKit rule cannot both hold. The game visibly
+ * freezes behind the modal until it is dismissed; that is the accepted trade over an AppKit crash.
+ */
+private fun defaultRunner(): (Runnable) -> Unit =
+    if (Platform.get() == Platform.MACOSX) Runnable::run
+    else { r -> Thread(r, "garnet-folder-picker").start() }
