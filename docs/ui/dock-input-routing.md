@@ -131,7 +131,9 @@ One `KeyMapping` on `1`; the Alt/Shift distinction is read from live GLFW modifi
   [dock-framework.md](dock-framework.md#world-session-lifecycle) for the disconnect-time teardown
   this guard pairs with.
 
-Both branches also call `syncDockViewport()` (defined in `DockKeybinds.kt`) right after mutating
+Both branches also call `syncDockViewport()` (defined in `viewport/DockViewportSync.kt`, split out
+of `DockKeybinds.kt` so it can be exercised by a plain-JVM test — see "Test coverage" below) right
+after mutating
 `DockState` and before the framebuffer-resize call — see "Render enablement is derived from
 DockState" below for what it does and why it makes the dock reachable on its own.
 
@@ -142,13 +144,13 @@ Registered from `GarnetClient.onInitializeClient()` next to `registerViewportTog
 The dock keybind is now self-sufficient: pressing Shift+1 (or Alt+1) is enough to see the dock
 in-world. `DockState.anyActive()` reports whether the dock has anything to show (any of
 `leftVisible`/`rightVisible`/`bottomVisible`, a non-empty `centerPanels`, or a non-null
-`focusedRegion`), and `syncDockViewport()` (`DockKeybinds.kt`) sets `ViewportState.active` and
+`focusedRegion`), and `syncDockViewport()` (`viewport/DockViewportSync.kt`) sets `ViewportState.active` and
 `ComposeOverlay.enabled` to that value. When nothing is visible/focused, both flags go back to
 `false` and the client is byte-for-byte vanilla (`WindowMixin.shouldModify()` is false, and
 `ComposeOverlay.renderInto` early-returns).
 
 `syncDockViewport()` is intentionally free of any `Window` dependency (it only flips the two
-flags) so it can be exercised by a clientTest without GLFW; the keybind handler calls
+flags) so it can be exercised by a plain-JVM test without a live client or GLFW; the keybind handler calls
 `garnet$updateScaledFramebuffer(true)` separately, right after, to apply the shrink using
 the live window.
 
@@ -166,11 +168,7 @@ at the element's window coords, and asserts the counter incremented (skipped onl
 mixin/GLFW window needed) covering the ESC policy: focuses LEFT, calls
 `DockInputRouter.onGlfwKey(GLFW_KEY_ESCAPE, GLFW_PRESS)` and asserts it returns `true` and
 `DockState.focusedRegion` becomes `null`; asserts a non-ESC key returns `false` and leaves focus
-intact; and asserts ESC returns `false` when not captured. A third case exercises
-`syncDockViewport()` directly (no GLFW): starting from `DockState.reset()` with both flags `false`,
-it asserts the flags stay `false` when nothing is visible, flip to `true` once `LEFT` becomes
-visible, revert to `false` once hidden again, and also flip to `true` when only `focusedRegion` is
-set (no visible region). Two more cases (Task 3) close the key-delivery gap: one mounts a
+intact; and asserts ESC returns `false` when not captured. Two more cases (Task 3) close the key-delivery gap: one mounts a
 `focusable().onKeyEvent { }` Box, focuses it via `FocusRequester`, drives a real
 `DockInputRouter.onGlfwKey(GLFW_KEY_DOWN, GLFW_PRESS, 0)` through the router→`ComposeInput`→scene
 path, and asserts the widget observed `Key.DirectionDown`; the other re-asserts the ESC-only-consumed
@@ -178,12 +176,18 @@ contract now that `onGlfwKey` takes a third `mods` param, confirming a non-ESC k
 delivered but still reported `false` (not consumed) and ESC is still the only key returning `true`.
 `DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
 
-Two more cases cover the button-threading fix above: a pure-function test asserts
-`glfwMouseButtonToPointerButton` maps `LEFT`/`RIGHT`/`MIDDLE` to `Primary`/`Secondary`/`Tertiary`
-and an unmapped index (`7`) to `null`; a router-level test mounts a panel with a raw
+A router-level case covers the button-threading fix above: it mounts a panel with a raw
 `pointerInput { awaitPointerEventScope { ... } }` probe, drives `onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`
 through the real router→`ComposeInput`→scene path, and asserts the probe observed exactly
 `PointerButton.Secondary`. That test must call `DockState.reset()` before mounting its panel —
 `DockState.leftPanels` already holds the production Explorer panel at tab index 0, so a panel
 appended without a reset lands on a non-active tab and its `content()` is never composed
 (`RegionColumn` only invokes `panels[active].content(panels[active])`).
+
+The pure-function half of that fix (`glfwMouseButtonToPointerButton` maps `LEFT`/`RIGHT`/`MIDDLE`
+to `Primary`/`Secondary`/`Tertiary` and an unmapped index (`7`) to `null`) and the
+`syncDockViewport()` state-derivation case (starting from `DockState.reset()` with both flags
+`false`: stays `false` when nothing is visible, flips to `true` once `LEFT` becomes visible,
+reverts to `false` once hidden again, and also flips to `true` when only `focusedRegion` is set)
+don't need a client at all, so they live in `DockViewportSyncTest`
+(`src/test/kotlin/com/breadmoirai/garnet/client/ui/dock/`) instead of `DockInputSpec`.

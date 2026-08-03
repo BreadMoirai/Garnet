@@ -194,8 +194,9 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
 - `dock/` — `GarnetDock.kt` (the root composable), `DockState.kt`, `DockRegion.kt`,
   `DockInsets.kt`, `Panel.kt`.
 - `input/` — `DockInputRouter.kt`, `GlfwKeyMap.kt`.
-- `viewport/` — `ViewportState.kt`, `ViewportToggle.kt`, `DockKeybinds.kt`,
-  `CursorFocusToggle.kt`, `CompositeTarget.kt`, `BlitUvPipeline.kt` (blend pipeline).
+- `viewport/` — `ViewportState.kt`, `ViewportToggle.kt`, `DockKeybinds.kt`, `DockViewportSync.kt`
+  (`syncDockViewport`, split out so it has no live-client class-init dependency and can run under a
+  plain-JVM test), `CursorFocusToggle.kt`, `CompositeTarget.kt`, `BlitUvPipeline.kt` (blend pipeline).
 - `widget/GarnetIconButton.kt` — the one surviving legacy-style (`GuiGraphicsExtractor`-based)
   widget, the title-screen "Redstone Projects…" button.
 
