@@ -29,10 +29,13 @@ class EditorNewStructureTest : FunSpec({
         tag.contains("size").shouldBeTrue()
     }
 
-    test("create rejects a blank or illegal name and an existing file") {
+    test("create handles valid names (including spaces) and rejects blank, illegal, or duplicate names") {
         val dir = Files.createTempDirectory("new-structure-bad")
         shouldThrow<IllegalArgumentException> { EditorNewStructure.create(dir, "") }
-        shouldThrow<IllegalArgumentException> { EditorNewStructure.create(dir, "has space") }
+        val spaceFile = EditorNewStructure.create(dir, "has space")
+        spaceFile.name shouldBe "has space.nbt"
+        spaceFile.exists().shouldBeTrue()
+        shouldThrow<IllegalArgumentException> { EditorNewStructure.create(dir, "has/slash") }
         EditorNewStructure.create(dir, "dup")
         shouldThrow<IllegalArgumentException> { EditorNewStructure.create(dir, "dup") }
     }
