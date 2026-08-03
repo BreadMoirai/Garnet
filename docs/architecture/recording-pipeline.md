@@ -33,7 +33,7 @@ Compose dock panel is the intended replacement for the deleted blocks; see
 
 ## Stage 1 — Record (capture)
 
-**Owner:** `playback/recorder/StateRecorder.kt`, driven by `mc/SubTickPhaseEvents.kt` (registered
+**Owner:** `playback/recorder/StateRecorder.kt`, driven by `core/events/SubTickPhaseEvents.kt` (registered
 once in `Garnet.onInitialize`, which forwards every `Phase` tick to
 `StateRecorder.onPhaseForActiveRecorders`). **No product caller activates a recorder** — the
 plumbing that would drive it from a product surface (the recorder block) is gone. The live caller

@@ -101,7 +101,8 @@ registry entry and re-places a second copy in a brand-new region, orphaning the 
 
 **The teardown must run only after the file move succeeds, never before.** `handleRename` moves the
 `.nbt` first, inside a `try` — carrying its `LocalHistoryStore` revisions across via
-`LocalHistoryStore.moveHistory` — and only calls
+`LocalHistoryStore.moveDescendantHistories` (which walks the moved subtree and calls the
+single-file `moveHistory` primitive for each `.nbt` under it) — and only calls
 `EditorDimRegistry.unplaceStructure`/`rekeyForRename` in the success path afterward. A file move is
 an IO operation that can fail (a lock, a permission problem, a full disk) for reasons the server
 can't always predict up front. If the registry teardown ran first — clearing the placed blocks and

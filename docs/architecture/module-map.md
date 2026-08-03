@@ -20,7 +20,7 @@ Compose dock panel is the intended replacement caller for `playback`/`testing`; 
 
 ## Top level (`src/main/kotlin/com/breadmoirai/garnet/`)
 
-- `Garnet.kt` — `ModInitializer`. Registers `EditorNetworkRegistry`, `McLifecycle`, the
+- `Garnet.kt` — `ModInitializer`. Registers `EditorNetworkRegistry`, `AsyncEventHandler`, the
   `SubTickPhaseEvents.PHASE` listener that still drives any active `StateRecorder` (no *product*
   surface creates one today — the live caller is `testing/runner/runGarnetSpec.kt`, on the
   test-execution path), the project-root `SERVER_STARTING`/
@@ -50,16 +50,23 @@ Construction is via `garnetSpec(id) { … }`.
   `ButtonBlock.press` so scheduled-tick paths fire correctly; other blocks fall through to
   `setBlock`. See [runner/player-interaction-dispatch.md](../runner/player-interaction-dispatch.md).
 
-## `mc/` — MC coroutine + tick plumbing
+## `core/async/` + `core/events/` — MC coroutine + tick plumbing
 
-- `McLifecycle.kt` — registers the level-tick hooks that drive `McDispatchers` and
-  `SubTickPhaseEvents` against a live `MinecraftServer`.
-- `Dispatchers.kt` (`McDispatchers`) — coroutine dispatchers bound to the server thread.
-- `SubTickPhaseEvents.kt` — the `Phase` emitter (level tick → recorder `onPhase`); `PHASE` is
-  registered once in `Garnet.onInitialize`.
-- `Suspending.kt` — `awaitTicks`/`awaitTickEnd` primitives used by both the test harness and
-  `runGarnetSpec`'s tick loop.
-- `Ticks.kt` — tick-counting helpers.
+- `core/async/AsyncEventHandler.kt` — idempotent registration of the Fabric lifecycle/tick event
+  subscriptions: installs `AsyncDispatchers` on `SERVER_STARTED`/uninstalls on `SERVER_STOPPED`,
+  and forwards `START_SERVER_TICK`/`END_SERVER_TICK` into `ServerTickFlows`. `registerWithServer`
+  is the gametest-sentinel variant for contexts where `SERVER_STARTED` has already fired.
+- `core/async/AsyncDispatchers.kt` (`AsyncDispatchers`) — coroutine dispatcher bound to the server
+  thread (`ServerThreadDispatcher`), installed/uninstalled by `AsyncEventHandler`.
+- `core/async/ServerThreadDispatcher.kt` — the `CoroutineDispatcher` itself: posts continuations to
+  `MinecraftServer.execute`, short-circuiting when already on the server thread.
+- `core/async/ServerTickFlows.kt` — `SharedFlow`s of `START_SERVER_TICK`/`END_SERVER_TICK`, with
+  the same-tick contract that keeps a resumed `awaitTicks`/`awaitTickEnd` continuation's
+  server-thread work draining before MC moves on.
+- `core/async/Suspending.kt` — `awaitTicks`/`awaitTickEnd`/`awaitTickWhere`/`onServer` primitives
+  used by both the test harness and `runGarnetSpec`'s tick loop.
+- `core/events/SubTickPhaseEvents.kt` — the `Phase` emitter (level tick → recorder `onPhase`);
+  `PHASE` is registered once in `Garnet.onInitialize`.
 
 ## `structure/` — structure NBT + region math
 
@@ -146,12 +153,14 @@ state): `editor/structure/` is dirty-track → debounce → commit → history, 
 The Explorer and the void-workspace grid are the only reachable in-game feature today. See
 [redstone-project.md](redstone-project.md) for the full design; summary of package layout:
 
-- `data/` — pure data: `EditorRoot` (path-traversal-safe `resolveSubpath`), `EditorSession`
-  (per-player active-folder pointer), `EditorCell`, `FileTree`/`EditorFolderTree` (tree scan
-  models), `EditorNames` (name validation), `EditorSaveNaming`, `LoadedSpec`.
+- `data/` — read-only data: `EditorRoot` (path-traversal-safe `resolveSubpath`, plus read-only
+  `exists`/`isDirectory` checks), `EditorSession` (per-player active-folder pointer), `EditorCell`,
+  `FileTree`/`EditorFolderTree` (tree scan models — both walk the filesystem to build their view,
+  but only ever read it), `EditorNames` (name validation), `EditorSaveNaming`, `LoadedSpec`.
 - `ops/` — filesystem-mutating create operations: `EditorNewSpec` (stub `.spec.kts` writer),
-  `EditorNewStructure` (empty `.nbt` writer). Split out of `data/` because those two files were
-  the only IO in an otherwise pure, unit-tested package.
+  `EditorNewStructure` (empty `.nbt` writer). Split out of `data/` on a mutating-vs-read-only
+  seam: `data/` reads the filesystem (directory scans, existence checks) but never writes to it;
+  `ops/` is where writes live.
 - `world/` — the dimension/grid substrate: `EditorWorld` (per-server loaded-folder map),
   `EditorDimRegistry` (region assignment in `server.overworld()`), `EditorDimLifecycle`
   (place/save the grid), `EditorCellSaver` (dirty-diff a cell and rewrite its structure NBT),
@@ -221,12 +230,13 @@ GLFW-input and viewport-shrink/composite mixins backing `ui/`. See
 ## Dependency direction
 
 ```
-spec/  mc/  structure/  config/  ui/   →   playback/   →   testing/   →   editor/
+spec/  core/async/  core/events/  structure/  config/  ui/   →   playback/   →   testing/   →   editor/
 ```
 
-`spec/`, `mc/`, `structure/`, `config/`, and `ui/` are the base packages — none of them depends
-on any of the others in this list, and none depends up the chain. `playback/` consumes only
-`spec/`. `testing/` consumes `playback/` (for `RecordingDslEmitter`) plus `spec/`/`mc/`.
+`spec/`, `core/async/`, `core/events/`, `structure/`, `config/`, and `ui/` are the base packages —
+none of them depends on any of the others in this list, and none depends up the chain. `playback/`
+consumes only `spec/`. `testing/` consumes `playback/` (for `RecordingDslEmitter`) plus
+`spec/`/`core/async/`.
 `editor/` is the top of the stack: it consumes `structure/`, `config/`, `testing/`'s
 persistence pieces, `spec/`, `playback/`, and `ui/` (its client half's panels drive the `ui/`
 dock shell). Nothing outside `editor/` depends on `editor/`.

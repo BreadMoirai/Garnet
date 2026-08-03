@@ -323,7 +323,7 @@ object StructureCommit {
     /**
      * Unsolicited fan-out: tells every OTHER connected player (`exclude`, if given, is typically
      * the player who just triggered the commit and was already replied to directly — see
-     * [EditorStructureHandlers.handleSaveStructure]) that a structure changed, so their Explorer status
+     * `EditorStructureHandlers.handleSaveStructure`) that a structure changed, so their Explorer status
      * lines can update. Nothing here is a reply to anything these players sent, so — unlike every
      * other S2C in this mod — the receiver isn't provably running the mod at all: a vanilla/unmodded
      * client on a dedicated server can be disconnected for an unknown play-phase payload (F6). Guard

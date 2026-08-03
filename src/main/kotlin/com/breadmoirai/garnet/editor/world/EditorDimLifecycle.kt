@@ -162,7 +162,7 @@ object EditorDimLifecycle {
      * Release all server-scoped managed state on server stop. The three holders are
      * `WeakHashMap`-keyed by server so they would eventually be GC'd once the server is
      * dereferenced, but this makes the release prompt and deterministic (UC-MAN-08.d).
-     * Per-player [EditorSession] entries are not touched here — they are released on each
+     * Per-player `EditorSession` entries are not touched here — they are released on each
      * player's DISCONNECT (UC-MAN-08.c), which fires for every player as the server closes.
      */
     fun releaseServerState(server: MinecraftServer) {

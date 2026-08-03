@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Per-player UI focus. The player's currently "active" folder for save / new-spec actions.
- * The actual loaded-folder state lives in [EditorWorld].
+ * The actual loaded-folder state lives in `EditorWorld`.
  */
 data class EditorSession(
     val playerId: UUID,

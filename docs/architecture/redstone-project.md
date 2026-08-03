@@ -134,7 +134,9 @@ Client:
   a placed-and-dirty structure's pending edits through `StructureCommit.commit` BEFORE the file
   move (so the dirty state, keyed by subpath, is never stranded under a name nothing will commit
   again), then moves the file and carries its `LocalHistoryStore` revisions across via
-  `LocalHistoryStore.moveHistory`, unloads and re-places a currently-placed structure under the new
+  `LocalHistoryStore.moveDescendantHistories` (walks the moved subtree and calls the single-file
+  `moveHistory` primitive for each `.nbt` under it, so a folder rename carries history for every
+  descendant, not just the renamed node), unloads and re-places a currently-placed structure under the new
   subpath (`EditorDimRegistry.unplaceStructure` then `EditorStructureHandlers.placeStructureFrom` — the structure lands in
   a fresh region since `nextStructureIndex` is never recycled), rekeys
   every OTHER registry entry nested under a renamed folder onto the new subpath
