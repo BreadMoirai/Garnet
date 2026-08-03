@@ -20,7 +20,7 @@ import kotlin.io.path.createDirectories
 
 class EditorCommandSpec : GarnetTestSpec({
 
-    test("/garnet managed without root configured sends an error message") {
+    test("/garnet editor without root configured sends an error message") {
         // Save and restore the global SharedSettings.projectRootPath since the gametest server is shared.
         val prior = SharedSettings.projectRootPath
         SharedSettings.projectRootPath = ""
@@ -32,7 +32,7 @@ class EditorCommandSpec : GarnetTestSpec({
                 EditorCommand.register(dispatcher)
 
                 val source = player.createCommandSourceStack()
-                val rc = dispatcher.execute("garnet project", source)
+                val rc = dispatcher.execute("garnet editor", source)
                 rc shouldBe 0
                 // No tree snapshot should have been sent.
                 val payloads = drainPayloads(player)
@@ -43,7 +43,7 @@ class EditorCommandSpec : GarnetTestSpec({
         }
     }
 
-    test("/garnet managed with context sends a EditorTreeSnapshotS2C") {
+    test("/garnet editor with context sends a EditorTreeSnapshotS2C") {
         withTempRoot("project-cmd-ok") { tmp ->
             val folder = tmp.resolve("set").also { it.createDirectories() }
             writeStub(folder, "a")
@@ -55,7 +55,7 @@ class EditorCommandSpec : GarnetTestSpec({
                 EditorCommand.register(dispatcher)
 
                 val source = player.createCommandSourceStack()
-                val rc = dispatcher.execute("garnet project", source)
+                val rc = dispatcher.execute("garnet editor", source)
                 (rc > 0) shouldBe true
 
                 val snap = drainPayloads(player).filterIsInstance<EditorTreeSnapshotS2C>().single()
@@ -66,7 +66,7 @@ class EditorCommandSpec : GarnetTestSpec({
         }
     }
 
-    test("/garnet managed falls back to SharedSettings.projectRootPath when no server context") {
+    test("/garnet editor falls back to SharedSettings.projectRootPath when no server context") {
         withTempRoot("project-cmd-fallback") { tmp ->
             val folder = tmp.resolve("cfg").also { it.createDirectories() }
             writeStub(folder, "a")
@@ -81,7 +81,7 @@ class EditorCommandSpec : GarnetTestSpec({
                     EditorCommand.register(dispatcher)
 
                     val source = player.createCommandSourceStack()
-                    val rc = dispatcher.execute("garnet project", source)
+                    val rc = dispatcher.execute("garnet editor", source)
                     (rc > 0) shouldBe true
 
                     val snap = drainPayloads(player).filterIsInstance<EditorTreeSnapshotS2C>().single()
@@ -93,7 +93,7 @@ class EditorCommandSpec : GarnetTestSpec({
         }
     }
 
-    test("/garnet managed snapshot carries intermediates and the player's active subpath") {
+    test("/garnet editor snapshot carries intermediates and the player's active subpath") {
         withTempRoot("project-cmd-session") { tmp ->
             // Tree: parent/ (intermediate) → parent/leaf/a.spec.kts
             val parent = tmp.resolve("parent").also { it.createDirectories() }
@@ -107,7 +107,7 @@ class EditorCommandSpec : GarnetTestSpec({
                 val dispatcher = CommandDispatcher<CommandSourceStack>()
                 EditorCommand.register(dispatcher)
 
-                val rc = dispatcher.execute("garnet project", player.createCommandSourceStack())
+                val rc = dispatcher.execute("garnet editor", player.createCommandSourceStack())
                 (rc > 0) shouldBe true
 
                 val snap = drainPayloads(player).filterIsInstance<EditorTreeSnapshotS2C>().single()

@@ -16,6 +16,6 @@ The prefix list is closed: `PER` (persistence), `NET` (networking), `MAN` (redst
 - [Structure lifecycle](structure-lifecycle.md) — `.nbt` save/load on both paths, standalone-`.nbt` debounced auto-save with local history (UC-MAN-10, UC-PER-06/07). Tags: structure, autosave, save, history.
 - [Networking](networking.md) — UNREACHABLE: documents the deleted recorder/runner C2S/S2C protocol, kept as a design spec for a future dock panel. Tags: payloads, sync, authority, unreachable.
 - [Redstone project](redstone-project.md) — Void-dim workspace, grid placement, folder-tree, per-spec save-back. (Standalone `.nbt` structures moved to structure-lifecycle.md.) Tags: redstone-project, dimensions, grid.
-- [Command surface](command.md) — `/garnet project` dispatcher. Tags: command, dispatch.
+- [Command surface](command.md) — `/garnet editor` dispatcher. Tags: command, dispatch.
 - [Gametest harness](gametest-harness.md) — Test infrastructure use-cases: fixtures, sentinels, replay. Tags: gametest, harness, fixtures.
 - [Cross-cutting](cross-cutting.md) — End-to-end journeys spanning ≥3 subsystems. Tags: e2e, integration, regression.

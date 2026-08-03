@@ -24,7 +24,7 @@ Compose dock panel is the intended replacement caller for `playback`/`testing`; 
   `SubTickPhaseEvents.PHASE` listener that still drives any active `StateRecorder` (no *product*
   surface creates one today — the live caller is `testing/runner/runGarnetSpec.kt`, on the
   test-execution path), the project-root `SERVER_STARTING`/
-  `SERVER_STARTED`/`SERVER_STOPPED`/`BEFORE_SAVE` hooks, `/garnet project`, and the per-player
+  `SERVER_STARTED`/`SERVER_STOPPED`/`BEFORE_SAVE` hooks, `/garnet editor`, and the per-player
   session cleanup on disconnect.
 
 ## `spec/` — the spec DSL (the spec *is* the lambda)
@@ -147,7 +147,7 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   `EditorTeleport`, `EditorServerContext`, `EditorRootResolver` (the active managed root:
   loaded world's, else pinned server context's, else configured path), `GridLayout` (pure
   row-major slot math).
-- `command/EditorCommand.kt` — `/garnet project`.
+- `command/EditorCommand.kt` — `/garnet editor`.
 - `network/EditorPackets.kt` + `EditorNetworkRegistry.kt` + `EditorTreeHandlers.kt` +
   `EditorStructureHandlers.kt` + `EditorFileOpsHandlers.kt` + `EditorHandlerSupport.kt` (main) —
   the wire protocol and its server handlers, split by concern (registration; tree/root ops;
@@ -158,7 +158,7 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
 - `ui/` (client) — `ProjectExplorerPanel.kt`, `ExplorerToolbar.kt`, `ExplorerContextMenu.kt`,
   `ExplorerEdit.kt`, `ExplorerLifecycle.kt`, `ExplorerTreeState.kt`, `ProjectTreeState.kt`,
   `FolderPicker.kt`, `RootPickerController.kt` — the Compose LEFT-dock panel and its state. Note
-  these classes keep the `Project*`/legacy names deliberately (the `/garnet project` command
+  these classes keep the `Project*`/legacy names deliberately (the `/garnet editor` command
   literal and "redstone project" domain term are unchanged); they are not `Editor*`.
 - `world/EditorIntegratedBoot.kt` (client) — `bootWorkspace()`, the "Redstone Projects…" title-screen
   entry point.

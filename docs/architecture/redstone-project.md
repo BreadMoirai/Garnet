@@ -87,7 +87,7 @@ Server state and lifecycle:
 - `EditorServerContext` — per-server pin for the active root.
 - `EditorRootResolver` — `rootFor(server)`: the active managed root, priority-chained —
   loaded world's, else pinned `EditorServerContext`'s, else `SharedSettings.projectRootPath`.
-- `EditorCommand` — `/garnet project`.
+- `EditorCommand` — `/garnet editor`.
 
 Network:
 - `editor/network/EditorPackets` + `EditorNetworkRegistry` + `EditorTreeHandlers` /

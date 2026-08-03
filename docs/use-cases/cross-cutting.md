@@ -65,7 +65,7 @@ through the deleted blocks.
 - UC-PER-02, UC-PER-04, UC-PER-05 — scripting-host loads the hand-authored file; malformed files are rejected; round-trip equality holds after save-back
 - UC-MAN-02, UC-MAN-03, UC-MAN-04 — project world boots, folder tree scanned, cell placed in grid
 - UC-MAN-07, UC-MAN-08 — cell edits saved back to disk; session ends cleanly
-- UC-CMD-01, UC-CMD-03 — `/garnet project` opens the folder UI; root resolved via priority chain
+- UC-CMD-01, UC-CMD-03 — `/garnet editor` opens the folder UI; root resolved via priority chain
 
 ---
 
