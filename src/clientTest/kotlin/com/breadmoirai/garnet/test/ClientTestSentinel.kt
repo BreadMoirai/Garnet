@@ -68,7 +68,6 @@ class ClientTestSentinel : FabricClientGameTest {
                         CursorFocusToggleSpec::class,
                         DockRenderSpec::class,
                         DockInputSpec::class,
-                        ExplorerLifecycleSpec::class,
                         ProjectExplorerSpec::class,
                         JewelExplorerSpec::class,
                         ExplorerContextMenuSpec::class,

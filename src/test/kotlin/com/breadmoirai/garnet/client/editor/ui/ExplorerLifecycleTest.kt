@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.editor.ui
 
 import com.breadmoirai.garnet.config.ExplorerStateStore
 import com.breadmoirai.garnet.config.SharedSettings
@@ -9,7 +9,7 @@ import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.ui.ProjectTreeState
 import com.breadmoirai.garnet.editor.ui.armRestoreIfSingleplayer
 import com.breadmoirai.garnet.editor.ui.saveExplorerSession
-import com.breadmoirai.garnet.harness.ClientSpec
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull
@@ -19,10 +19,10 @@ import kotlin.io.path.createTempDirectory
 /**
  * Proves the singleplayer gate is genuinely two-sided: both [saveExplorerSession] and
  * [armRestoreIfSingleplayer] must route through [ExplorerSessionGate.isSingleplayer], not a direct
- * `Minecraft.getInstance().hasSingleplayerServer()` call. Modeled on `ExplorerStateStoreSpec` for the
- * config-file seam and `ExplorerTreeStateSpec` for the `SharedSettings`/`runOnClient` discipline.
+ * `Minecraft.getInstance().hasSingleplayerServer()` call. Modeled on `ExplorerStateStoreTest` for the
+ * config-file seam and `ExplorerTreeStateTest` for the `SharedSettings`/`runOnClient` discipline.
  */
-class ExplorerLifecycleSpec : ClientSpec({
+class ExplorerLifecycleTest : FunSpec({
 
     val tree = FolderNode("root", listOf(
         FolderNode("adders", listOf()),
@@ -36,10 +36,8 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerSessionGate.isSingleplayer = { true }
             SharedSettings.projectRootPath = "/tmp/proj"
             ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, null))
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.toggleExpanded("adders")
-            }
+            ExplorerTreeState.reset()
+            ExplorerTreeState.toggleExpanded("adders")
 
             saveExplorerSession()
 
@@ -51,7 +49,7 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
             ProjectTreeState.reset()
-            runOnClient { ExplorerTreeState.reset() }
+            ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }
     }
@@ -65,10 +63,8 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerSessionGate.isSingleplayer = { false }
             SharedSettings.projectRootPath = "/tmp/proj"
             ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, null))
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.toggleExpanded("adders")
-            }
+            ExplorerTreeState.reset()
+            ExplorerTreeState.toggleExpanded("adders")
 
             saveExplorerSession()
 
@@ -79,7 +75,7 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
             ProjectTreeState.reset()
-            runOnClient { ExplorerTreeState.reset() }
+            ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }
     }
@@ -93,9 +89,9 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerStateStore.save("/tmp/proj", setOf("adders"), null)
             ExplorerSessionGate.isSingleplayer = { false }
 
-            runOnClient { ExplorerTreeState.reset() }
+            ExplorerTreeState.reset()
             armRestoreIfSingleplayer()
-            runOnClient { ExplorerTreeState.applyPendingRestore(tree) }
+            ExplorerTreeState.applyPendingRestore(tree)
 
             ExplorerTreeState.expandedPaths.shouldBeEmpty()
         } finally {
@@ -103,7 +99,7 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
             ProjectTreeState.reset()
-            runOnClient { ExplorerTreeState.reset() }
+            ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }
     }
@@ -117,9 +113,9 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerStateStore.save("/tmp/proj", setOf("adders"), null)
             ExplorerSessionGate.isSingleplayer = { true }
 
-            runOnClient { ExplorerTreeState.reset() }
+            ExplorerTreeState.reset()
             armRestoreIfSingleplayer()
-            runOnClient { ExplorerTreeState.applyPendingRestore(tree) }
+            ExplorerTreeState.applyPendingRestore(tree)
 
             ExplorerTreeState.expandedPaths shouldContainExactly setOf("adders")
         } finally {
@@ -127,7 +123,7 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
             ProjectTreeState.reset()
-            runOnClient { ExplorerTreeState.reset() }
+            ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }
     }
