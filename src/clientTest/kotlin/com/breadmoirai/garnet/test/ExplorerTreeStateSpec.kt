@@ -1,5 +1,7 @@
 package com.breadmoirai.garnet.test
 
+import com.breadmoirai.garnet.config.ExplorerSession
+import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.ui.ExplorerEdit
 import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.data.FileNode
@@ -13,6 +15,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.jetbrains.jewel.foundation.lazy.tree.Tree
 
@@ -38,6 +41,105 @@ class ExplorerTreeStateSpec : ClientSpec({
         ExplorerTreeState.expandedPaths shouldContain "adders"
         runOnClient { ExplorerTreeState.toggleExpanded("adders") }
         ExplorerTreeState.treeState.openNodes shouldNotContain "adders"
+    }
+
+    test("an armed restore reopens the persisted folders when the snapshot lands") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = "/tmp/proj"
+            runOnClient {
+                ExplorerTreeState.reset()
+                ExplorerTreeState.armRestore(
+                    ExplorerSession("/tmp/proj", setOf("", "adders"), "adders/full-adder"),
+                )
+                ExplorerTreeState.applyPendingRestore(tree)
+            }
+            ExplorerTreeState.expandedPaths shouldContainExactly setOf("", "adders")
+            ExplorerTreeState.selectedPath shouldBe "adders/full-adder"
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
+    }
+
+    test("a restore captured against a different root is discarded") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = "/tmp/other"
+            runOnClient {
+                ExplorerTreeState.reset()
+                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), "adders"))
+                ExplorerTreeState.applyPendingRestore(tree)
+            }
+            ExplorerTreeState.expandedPaths.shouldBeEmpty()
+            ExplorerTreeState.selectedPath.shouldBeNull()
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
+    }
+
+    test("paths that no longer exist are dropped from the restore") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = "/tmp/proj"
+            runOnClient {
+                ExplorerTreeState.reset()
+                ExplorerTreeState.armRestore(
+                    ExplorerSession("/tmp/proj", setOf("adders", "deleted-folder"), "gone.nbt"),
+                )
+                ExplorerTreeState.applyPendingRestore(tree)
+            }
+            ExplorerTreeState.expandedPaths shouldContainExactly setOf("adders")
+            ExplorerTreeState.selectedPath.shouldBeNull()
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
+    }
+
+    test("a file path is never restored as an expanded node") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = "/tmp/proj"
+            runOnClient {
+                ExplorerTreeState.reset()
+                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("dirty.nbt"), null))
+                ExplorerTreeState.applyPendingRestore(tree)
+            }
+            ExplorerTreeState.expandedPaths.shouldBeEmpty()
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
+    }
+
+    test("the restore is one-shot: a second snapshot does not clobber live expansion") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = "/tmp/proj"
+            runOnClient {
+                ExplorerTreeState.reset()
+                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), null))
+                ExplorerTreeState.applyPendingRestore(tree)
+                ExplorerTreeState.collapseAll()
+                ExplorerTreeState.applyPendingRestore(tree)
+            }
+            ExplorerTreeState.expandedPaths.shouldBeEmpty()
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
+    }
+
+    test("reset disarms a pending restore") {
+        val prior = SharedSettings.projectRootPath
+        try {
+            SharedSettings.projectRootPath = "/tmp/proj"
+            runOnClient {
+                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), null))
+                ExplorerTreeState.reset()
+                ExplorerTreeState.applyPendingRestore(tree)
+            }
+            ExplorerTreeState.expandedPaths.shouldBeEmpty()
+        } finally {
+            SharedSettings.projectRootPath = prior
+        }
     }
 
     test("buildTreeFrom emits the project root as the single top-level node") {

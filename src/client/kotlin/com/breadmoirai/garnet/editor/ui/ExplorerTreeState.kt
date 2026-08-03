@@ -4,9 +4,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.breadmoirai.garnet.config.ExplorerSession
+import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FileTreeNode
 import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.data.resolve
 import org.jetbrains.jewel.foundation.lazy.SelectableLazyListState
 import org.jetbrains.jewel.foundation.lazy.SelectionMode
 import org.jetbrains.jewel.foundation.lazy.tree.Tree
@@ -52,6 +55,44 @@ object ExplorerTreeState {
         treeState.openNodes = emptySet()
     }
 
+    private var pendingRestore: ExplorerSession? = null
+
+    /**
+     * Arm a one-shot restore, applied by [applyPendingRestore] when the next tree snapshot lands.
+     *
+     * The restore cannot be applied at arm time: expanding the id `"adders/full-adder"` is
+     * meaningless before a tree containing that id exists. A null [session] simply disarms.
+     */
+    fun armRestore(session: ExplorerSession?) {
+        pendingRestore = session
+    }
+
+    /**
+     * Apply an armed restore against the snapshot's [root], then disarm.
+     *
+     * One-shot on purpose: a later manual Refresh, or a snapshot pushed after a file operation,
+     * must not clobber the expansion the player has changed since rejoining.
+     *
+     * No-op when nothing is armed, when the client has no configured root, or when the record was
+     * captured against a different root — the latter is the correct outcome both after an Open
+     * Folder swap and on a multiplayer server whose root differs from this client's config.
+     *
+     * Paths absent from [root] are dropped. Writing a stale id into `openNodes` would be inert
+     * rather than harmful, but filtering stops the persisted set accumulating garbage across
+     * sessions. Only folders can be expanded, so a persisted file path is dropped too.
+     */
+    fun applyPendingRestore(root: FolderNode) {
+        val session = pendingRestore ?: return
+        pendingRestore = null
+        val active = SharedSettings.projectRootPath
+        if (active.isBlank() || active != session.root) return
+        treeState.openNodes = session.expanded.filter { root.resolve(it) is FolderNode }.toSet()
+        treeState.selectedKeys = session.selected
+            ?.takeIf { root.resolve(it) != null }
+            ?.let { setOf(it) }
+            ?: emptySet()
+    }
+
     /** The tree id of the project root itself. `FolderNode.resolve("")` and
      *  `EditorRoot.resolveSubpath("")` both already mean "the root", so this needs no translation. */
     const val ROOT_PATH: String = ""
@@ -78,9 +119,12 @@ object ExplorerTreeState {
     /** The `/`-joined path a tree element was built with. */
     fun pathOf(element: Tree.Element<FileTreeNode>): String = element.id as String
 
-    /** Test/reset hook: drops selection and expansion by replacing the state wholesale. */
+    /** Test/reset hook: drops selection, expansion and any armed restore. */
     fun reset() {
         treeState = newTreeState()
+        // A disconnect between JOIN and the first snapshot must not leak an armed restore into the
+        // next session, where it would be applied against a different project's tree.
+        pendingRestore = null
     }
 }
 
