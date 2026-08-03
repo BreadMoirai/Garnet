@@ -140,7 +140,8 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   confirmed to render Compose `Popup`s in-scene — see [ui/dock-dialogs.md](../ui/dock-dialogs.md));
   clicking it opens the menu itself. **Open Folder**
   calls `RootPickerController.openFolder`, which runs the injectable `FolderPicker` (default
-  `TinyfdFolderPicker` → `TinyFileDialogs.tinyfd_selectFolderDialog`) on a worker thread.
+  `NfdFolderPicker` → `NativeFileDialog.NFD_PickFolder`) on a worker thread — inline on the
+  render thread on macOS instead; see [ui/dock-dialogs.md](../ui/dock-dialogs.md) for why.
 - **UC-MAN-09.b** On a non-null pick, the controller normalizes the path to absolute (matching
   the server's canonical form) and persists it client-side (`ModConfig.projectRootPath` →
   `garnet.json`, also mirrored to `SharedSettings.projectRootPath`) and sends
@@ -180,6 +181,40 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   **cells** still remain in the workspace overworld — those live in `EditorDimRegistry.bySubpath`,
   which `resetAllStructures` deliberately does not touch. **Attach Folder** (a second root) is not
   implemented.
+
+---
+
+### UC-MAN-11 — Rejoin a world and find the tree already loaded
+
+A player who quit mid-session (or closed the game window outright) rejoins the same project and
+sees the Explorer populate itself, with the same folders expanded and the same node selected as
+when they left — no Refresh click required. See
+[persistence/explorer-session-state.md](../persistence/explorer-session-state.md) for the full
+save/restore mechanics; this use case is the player-visible behavior it produces.
+
+- **UC-MAN-11.a** `ExplorerLifecycle`'s `ClientPlayConnectionEvents.JOIN` handler arms a restore
+  from `ExplorerStateStore.load()` and immediately sends `ListEditorTreeC2S` (guarded by
+  `ClientPlayNetworking.canSend`, so joining a vanilla server without the mod is a no-op rather
+  than a throw) — the same request UC-MAN-05.a's `/garnet editor` command sends, but fired
+  automatically on join instead of waiting for the player to type a command.
+- **UC-MAN-11.b** When `EditorTreeSnapshotS2C` lands, `EditorClientNetworking` feeds it to
+  `ProjectTreeState.onSnapshot` as usual (UC-MAN-05.b) and then calls
+  `ExplorerTreeState.applyPendingRestore(payload.root)`, which reopens the persisted folders and
+  reselects the persisted node — but only if the record's `root` matches the client's currently
+  configured root; a mismatch (a different server, or a root swapped via UC-MAN-09 since the
+  record was saved) is silently discarded and the tree opens fresh instead.
+- **UC-MAN-11.c** Folders or files renamed or deleted since the session that saved the record are
+  dropped from the restore rather than restored as broken references: only paths that still
+  resolve in the fresh snapshot are reopened, and only as folders (a persisted path that now
+  resolves to a file is dropped, since a file cannot be "expanded").
+- **UC-MAN-11.d** The restore is one-shot — applying it, or disconnecting before it applies,
+  disarms it — so it never fires twice and never clobbers expansion the player changes after
+  rejoining.
+- **UC-MAN-11.e** The record itself is written on `ClientPlayConnectionEvents.DISCONNECT` (before
+  the tree state resets) and again, idempotently, on `ClientLifecycleEvents.CLIENT_STOPPING` — the
+  latter covers closing the game window from inside a world, which does not always fire
+  DISCONNECT. A session that never received a tree snapshot (joined a vanilla server, or quit
+  before the first snapshot arrived) does not overwrite a good prior record with an empty one.
 
 ---
 
@@ -249,6 +284,12 @@ alongside the spec-cell sidecar path:
 | UC-MAN-09.c | `handleSetRoot` validates dir, commits the old root's dirty structures (refusing the swap if any fails), swaps root, clears the old root's structure blocks and all region assignments, re-places, re-snapshots; non-dir → `EditorErrorS2C` | `EditorNetworkRegistrySpec."handleSetRoot switches root, persists it, and sends a snapshot of the new folder"`, `EditorNetworkRegistrySpec."handleSetRoot rejects a non-directory path with EditorErrorS2C"`, `EditorNetworkRegistrySpec."handleSetRoot commits the OLD root's dirty structure and never touches the NEW root's same-named file"`, `EditorNetworkRegistrySpec."a failed commit during a root swap aborts the swap and reports an error"`, `EditorNetworkRegistrySpec."a root swap clears the old root's blocks and drops region assignments that never got a placed box"` | covered |
 | UC-MAN-09.d | *(Plan B)* old grid persists; region assignments accumulate; Attach not implemented | — | n/a |
 | UC-MAN-10 | Place, save, create standalone `.nbt` structures; debounced auto-save + local history *(moved)* | see [structure-lifecycle.md — coverage matrix](structure-lifecycle.md#coverage-matrix) | moved |
+| UC-MAN-11 | Rejoin a world and find the tree already loaded, with last session's expansion restored | `ExplorerStateStoreSpec`, `ExplorerTreeStateSpec` | **GAP-PARTIAL** |
+| UC-MAN-11.a | `JOIN` handler arms the restore and sends `ListEditorTreeC2S` (guarded by `canSend`) | — | **GAP** |
+| UC-MAN-11.b | Snapshot dispatch applies the pending restore; a root mismatch discards it | `ExplorerTreeStateSpec."an armed restore reopens the persisted folders when the snapshot lands"`, `ExplorerTreeStateSpec."a restore captured against a different root is discarded"` | covered |
+| UC-MAN-11.c | Stale/renamed paths dropped; only folders are restored to `openNodes` | `ExplorerTreeStateSpec."paths that no longer exist are dropped from the restore"`, `ExplorerTreeStateSpec."a file path is never restored as an expanded node"` | covered |
+| UC-MAN-11.d | Restore is one-shot; `reset()` disarms a pending restore | `ExplorerTreeStateSpec."the restore is one-shot: a second snapshot does not clobber live expansion"`, `ExplorerTreeStateSpec."reset disarms a pending restore"` | covered |
+| UC-MAN-11.e | `ExplorerStateStore` round-trips `garnet-explorer.json`; blank root / no-snapshot skip writing | `ExplorerStateStoreSpec."a session round-trips through garnet-explorer.json"`, `ExplorerStateStoreSpec."a null selection round-trips as null rather than an empty string"`, `ExplorerStateStoreSpec."a missing file loads as null"`, `ExplorerStateStoreSpec."a malformed file loads as null instead of throwing"`, `ExplorerStateStoreSpec."a record with no root loads as null"`, `ExplorerStateStoreSpec."saving with a blank root writes nothing"` | covered |
 
 **UI-caller gap (not a test gap):** UC-MAN-01/02/06/07/08's `.a` rows above are marked historical
 because their only client trigger (`ProjectScreen`/`ProjectRootListScreen`) was deleted in the

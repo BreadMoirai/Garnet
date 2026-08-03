@@ -112,7 +112,13 @@ Client:
   `currentSubpath`. `ExplorerToolbar()` is the panel's single top row: a kebab `IconButton` opening
   a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Refresh
   (sends `ListEditorTreeC2S`) and Collapse All (`ExplorerTreeState.collapseAll()`) icon buttons.
-  This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
+  The tree is not only reloaded on that explicit Refresh click: `ExplorerLifecycle`'s
+  `ClientPlayConnectionEvents.JOIN` handler also sends `ListEditorTreeC2S` automatically on every
+  world join, so the Explorer auto-populates without the player having to ask for it. That same
+  JOIN handler arms a one-shot restore of last session's expansion/selection, applied once the
+  resulting snapshot lands — see
+  [persistence/explorer-session-state.md](../persistence/explorer-session-state.md) for the
+  save/restore mechanics. This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
   row. `New`/`Rename` now have a client UI trigger again — the right-click `ExplorerContextMenu` (see
   [ui/explorer-toolbar-and-context-menu.md](../ui/explorer-toolbar-and-context-menu.md)) — while
   `Save` (`SaveStructureC2S`, now a force-commit through `StructureCommit`) still has none: it
