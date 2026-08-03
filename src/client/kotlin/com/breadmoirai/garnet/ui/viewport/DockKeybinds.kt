@@ -17,20 +17,6 @@ private val keyExplorerFocus = KeyMappingHelper.registerKeyMapping(
 )
 
 /**
- * Derives [ViewportState.active] and [ComposeOverlay.enabled] from [DockState.anyActive]: the
- * viewport shrink + Compose overlay render exactly when the dock has something to show, and the
- * game is plain vanilla otherwise. This is the seam that makes the dock keybind self-sufficient
- * (no dependency on the separate V/C debug toggles in `ViewportToggle.kt`) — call it after any
- * `DockState` mutation. Does **not** touch the framebuffer; callers with a live `Window` must
- * follow up with `WindowViewportExt.garnet$updateScaledFramebuffer(true)` to apply it.
- */
-fun syncDockViewport() {
-    val active = DockState.anyActive()
-    ViewportState.active = active
-    ComposeOverlay.enabled = active
-}
-
-/**
  * Alt+1 focuses the Explorer (releases the cursor, routes input to Compose); Shift+1 toggles the
  * LEFT region's visibility (freeing/reclaiming its inset, which resizes the world). Bound to a
  * single mapping on `1`; the Alt/Shift distinction is read from live GLFW modifier state on click.

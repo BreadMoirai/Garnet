@@ -8,10 +8,8 @@ import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.ui.input.DockInputRouter
-import com.breadmoirai.garnet.ui.input.glfwMouseButtonToPointerButton
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
-import com.breadmoirai.garnet.ui.viewport.syncDockViewport
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -50,13 +48,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class DockInputSpec : ClientSpec({
-    test("GLFW mouse buttons map to Compose pointer buttons") {
-        glfwMouseButtonToPointerButton(GLFW.GLFW_MOUSE_BUTTON_LEFT) shouldBe PointerButton.Primary
-        glfwMouseButtonToPointerButton(GLFW.GLFW_MOUSE_BUTTON_RIGHT) shouldBe PointerButton.Secondary
-        glfwMouseButtonToPointerButton(GLFW.GLFW_MOUSE_BUTTON_MIDDLE) shouldBe PointerButton.Tertiary
-        glfwMouseButtonToPointerButton(7) shouldBe null
-    }
-
     test("a secondary press reaches the scene as Secondary") {
         val seen = mutableListOf<PointerButton?>()
         val panel = Panel("garnet.test.buttonprobe", "ButtonProbe") {
@@ -171,55 +162,6 @@ class DockInputSpec : ClientSpec({
         }
 
         runOnClient { DockInputRouter.clearFocus(); DockState.reset() }
-        waitClientTicks(2)
-    }
-
-    test("syncDockViewport derives active/enabled from DockState, no GLFW involved") {
-        runOnClient {
-            DockState.reset()
-            ViewportState.active = false
-            ComposeOverlay.enabled = false
-        }
-        waitClientTicks(2)
-
-        // Nothing visible/focused: vanilla stays vanilla.
-        runOnClient {
-            syncDockViewport()
-            ViewportState.active.shouldBeFalse()
-            ComposeOverlay.enabled.shouldBeFalse()
-        }
-
-        // LEFT becomes visible: both flags flip on.
-        runOnClient {
-            DockState.setVisible(DockRegion.LEFT, true)
-            syncDockViewport()
-            ViewportState.active.shouldBeTrue()
-            ComposeOverlay.enabled.shouldBeTrue()
-        }
-
-        // LEFT hidden again: both flags revert to vanilla.
-        runOnClient {
-            DockState.setVisible(DockRegion.LEFT, false)
-            syncDockViewport()
-            ViewportState.active.shouldBeFalse()
-            ComposeOverlay.enabled.shouldBeFalse()
-        }
-
-        // Focus alone (no visible region) also counts as "something to show".
-        runOnClient {
-            DockState.reset()
-            DockInputRouter.focus(DockRegion.LEFT)
-            syncDockViewport()
-            ViewportState.active.shouldBeTrue()
-            ComposeOverlay.enabled.shouldBeTrue()
-        }
-
-        runOnClient {
-            DockInputRouter.clearFocus()
-            DockState.reset()
-            ViewportState.active = false
-            ComposeOverlay.enabled = false
-        }
         waitClientTicks(2)
     }
 

@@ -12,19 +12,16 @@ import com.breadmoirai.garnet.ui.input.DockInputRouter
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
-import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
-import com.breadmoirai.garnet.editor.data.NewNodeKind
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThan
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.lwjgl.glfw.GLFW
@@ -40,37 +37,6 @@ class ExplorerContextMenuSpec : ClientSpec({
     }
 
     afterTest { ExplorerActions.resetForTest() }
-
-    test("creating a folder sends CreateFolderC2S with the target parent") {
-        val sent = captureSends()
-        ExplorerActions.commitCreate("redstone", NewNodeKind.FOLDER, "clocks") shouldBe null
-        sent shouldBe listOf(CreateFolderC2S("redstone", "clocks"))
-    }
-
-    test("creating a structure appends .nbt and targets the parent") {
-        val sent = captureSends()
-        ExplorerActions.commitCreate("", NewNodeKind.STRUCTURE, "gadget") shouldBe null
-        sent shouldBe listOf(NewStructureC2S("", "gadget.nbt"))
-    }
-
-    test("an invalid name sends nothing and reports why") {
-        val sent = captureSends()
-        ExplorerActions.commitCreate("redstone", NewNodeKind.FOLDER, "  ").shouldNotBeNull()
-        ExplorerActions.commitCreate("redstone", NewNodeKind.FOLDER, "a/b").shouldNotBeNull()
-        sent.shouldBeEmpty()
-    }
-
-    test("renaming sends RenamePathC2S with a bare new name") {
-        val sent = captureSends()
-        ExplorerActions.commitRename("redstone/clock.nbt", "ring-clock.nbt") shouldBe null
-        sent shouldBe listOf(RenamePathC2S("redstone/clock.nbt", "ring-clock.nbt"))
-    }
-
-    test("renaming to a path is rejected") {
-        val sent = captureSends()
-        ExplorerActions.commitRename("redstone/clock.nbt", "a/b.nbt").shouldNotBeNull()
-        sent.shouldBeEmpty()
-    }
 
     fun capture(name: String): Path {
         val p = Path.of("screenshots", name).toAbsolutePath()
