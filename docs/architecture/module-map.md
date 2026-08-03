@@ -75,7 +75,10 @@ Construction is via `garnetSpec(id) { … }`.
   tight-boxing a structure inside an assigned region.
 - `PlacedBox.kt` — `(origin, size)` record for a structure's last-placed footprint.
 
-## `editor/world/` — auto-save
+## `editor/structure/` — the live structure-commit pipeline
+
+Distinct from the top-level `structure/` package above (pure NBT/region geometry, no server
+state): `editor/structure/` is dirty-track → debounce → commit → history, all server-state-backed.
 
 - `StructureAutoSave.kt` — per-server dirty-state tracking (fed by the setBlock-mixin watcher):
   which subpaths are dirty, their touched-box, and debounce due-time.
@@ -141,12 +144,15 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   (per-player active-folder pointer), `EditorCell`, `FileTree`/`EditorFolderTree` (tree scan
   models), `EditorNames` (name validation), `EditorNewSpec`/`EditorNewStructure` (stub writers),
   `EditorSaveNaming`, `LoadedSpec`.
-- `world/` — server-side lifecycle and state: `EditorWorld` (per-server loaded-folder map),
+- `world/` — the dimension/grid substrate: `EditorWorld` (per-server loaded-folder map),
   `EditorDimRegistry` (region assignment in `server.overworld()`), `EditorDimLifecycle`
   (place/save the grid), `EditorCellSaver` (dirty-diff a cell and rewrite its structure NBT),
   `EditorTeleport`, `EditorServerContext`, `EditorRootResolver` (the active managed root:
   loaded world's, else pinned server context's, else configured path), `GridLayout` (pure
   row-major slot math).
+- `structure/` — the live structure-commit pipeline (dirty-track → debounce → commit → history):
+  `StructureAutoSave`, `StructureEditWatcher`, `StructureCommit`. See the `editor/structure/`
+  section above.
 - `command/EditorCommand.kt` — `/garnet editor`.
 - `network/EditorPackets.kt` + `EditorNetworkRegistry.kt` + `EditorTreeHandlers.kt` +
   `EditorStructureHandlers.kt` + `EditorFileOpsHandlers.kt` + `EditorHandlerSupport.kt` (main) —

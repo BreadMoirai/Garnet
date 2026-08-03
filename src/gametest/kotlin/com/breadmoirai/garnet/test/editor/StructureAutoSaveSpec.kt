@@ -7,9 +7,9 @@ import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorServerContext
-import com.breadmoirai.garnet.editor.world.StructureAutoSave
-import com.breadmoirai.garnet.editor.world.StructureCommit
-import com.breadmoirai.garnet.editor.world.StructureEditWatcher
+import com.breadmoirai.garnet.editor.structure.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.core.async.onServer
@@ -37,7 +37,7 @@ import kotlin.io.path.writeBytes
 
 /**
  * Dirty-state bookkeeping only — the commit itself is covered by the network-level tests once
- * [com.breadmoirai.garnet.editor.world.StructureCommit] exists.
+ * [com.breadmoirai.garnet.editor.structure.StructureCommit] exists.
  *
  * These drive [StructureEditWatcher.onBlockChanged] directly rather than calling `level.setBlock`:
  * the setBlock mixin is unreliable under the gametest harness, and what needs testing here is the

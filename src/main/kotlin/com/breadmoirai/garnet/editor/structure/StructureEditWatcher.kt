@@ -1,9 +1,13 @@
-package com.breadmoirai.garnet.editor.world
+package com.breadmoirai.garnet.editor.structure
 
+import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 
 /**
+ * Layer: `editor.structure` — the live editing pipeline, distinct from the top-level
+ * [com.breadmoirai.garnet.structure] package (pure NBT and region geometry, no server state).
+ *
  * The bridge from a successful world block change to auto-save bookkeeping.
  *
  * Called from `ServerLevelSetBlockMixin` on every successful server-side `setBlock` — the hottest

@@ -1,7 +1,9 @@
-package com.breadmoirai.garnet.editor.world
+package com.breadmoirai.garnet.editor.structure
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.world.EditorRootResolver
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.PlacedBox
 import com.breadmoirai.garnet.structure.StructurePersistence
@@ -23,6 +25,10 @@ import kotlin.io.path.exists
 private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 /**
+ * Layer: `editor.structure` — the live editing pipeline (dirty-track → debounce → commit →
+ * history), distinct from the top-level [com.breadmoirai.garnet.structure] package (pure NBT and
+ * region geometry, no server state).
+ *
  * Turns a structure's dirty state into a committed `.nbt` plus a history revision.
  *
  * This replaces the old `.nbt.unsaved` sidecar flush: there is no dirty buffer any more, so a

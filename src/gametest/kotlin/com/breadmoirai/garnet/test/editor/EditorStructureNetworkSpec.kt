@@ -9,7 +9,7 @@ import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
-import com.breadmoirai.garnet.editor.world.StructureEditWatcher
+import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry

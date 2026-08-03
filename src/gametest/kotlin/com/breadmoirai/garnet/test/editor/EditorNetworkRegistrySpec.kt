@@ -21,9 +21,9 @@ import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
 import com.breadmoirai.garnet.editor.data.EditorNewStructure
-import com.breadmoirai.garnet.editor.world.StructureAutoSave
-import com.breadmoirai.garnet.editor.world.StructureCommit
-import com.breadmoirai.garnet.editor.world.StructureEditWatcher
+import com.breadmoirai.garnet.editor.structure.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.PlacedBox
 import net.minecraft.core.Vec3i

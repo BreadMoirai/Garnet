@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.mixin;
 
-import com.breadmoirai.garnet.editor.world.StructureEditWatcher;
+import com.breadmoirai.garnet.editor.structure.StructureEditWatcher;
 import com.breadmoirai.garnet.playback.recorder.StateRecorder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

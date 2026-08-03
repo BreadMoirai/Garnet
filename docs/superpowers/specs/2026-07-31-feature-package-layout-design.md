@@ -87,6 +87,7 @@ because it was never test-only.
   editor/           workspace, project model, explorer
     data/           pure model — no server side effects, unit-testable
     world/          dimension/grid substrate — server side effects
+    structure/      live structure-commit pipeline — dirty-track → debounce → commit → history
     command/        EditorCommand
     network/        payloads + registration (main) and client sender (client)
     ui/             the Project Explorer
@@ -99,6 +100,18 @@ speculatively.
 `editor/` splits `data` from `world` because a flat `editor.data` would hold 20 files, which is
 the problem this restructure exists to fix. The split is along a real seam: `data` is pure and
 already has unit tests; `world` mutates dimensions and is gametest-covered.
+
+> **Amendment (2026-08-02):** the two-way `data`/`world` split above was later widened to three.
+> `editor/world/` had grown to hold two unrelated subsystems: the dimension/grid substrate
+> (`EditorWorld`, `EditorDimRegistry`, `EditorDimLifecycle`, `EditorServerContext`,
+> `EditorTeleport`, `GridLayout`, `EditorCellSaver`, `EditorRootResolver`) and the live
+> structure-commit pipeline (`StructureAutoSave`, `StructureEditWatcher`, `StructureCommit`). The
+> commit pipeline moved to its own `editor/structure/` package: `data` stays pure, `world` stays
+> the dimension/grid substrate, and `structure` is the dirty-track → debounce → commit → history
+> pipeline. This is a deliberate, approved deviation from this spec's original two-way split — see
+> `docs/superpowers/plans/2026-08-02-refactor-package-cohesion.md` for the rationale. `editor/structure`
+> is distinct from the pre-existing top-level `structure/` package (pure NBT/region geometry, no
+> server state) documented above.
 
 ### Dependency direction
 

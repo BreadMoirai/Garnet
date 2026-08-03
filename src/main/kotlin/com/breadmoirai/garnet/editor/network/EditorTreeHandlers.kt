@@ -4,6 +4,8 @@ import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.*
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
+import com.breadmoirai.garnet.editor.structure.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence

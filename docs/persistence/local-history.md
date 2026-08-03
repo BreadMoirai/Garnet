@@ -157,7 +157,7 @@ those are written from a `CapturedStructure` produced by scanning the world.
 
 ## The only writer
 
-`com.breadmoirai.garnet.editor.world.StructureCommit` is the only caller that writes autosave,
+`com.breadmoirai.garnet.editor.structure.StructureCommit` is the only caller that writes autosave,
 manual, or external revisions; `EditorStructureHandlers` writes the one `placed` baseline revision at
 place time. No other code path calls `LocalHistoryStore.writeRevision` — there is no separate
 "manual snapshot" feature. See `docs/architecture/redstone-project.md#standalone-structure-files`
