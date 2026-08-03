@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.editor.ui
 
 import com.breadmoirai.garnet.config.ExplorerSession
 import com.breadmoirai.garnet.config.SharedSettings
@@ -8,7 +8,7 @@ import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FileTreeNode
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.data.NewNodeKind
-import com.breadmoirai.garnet.harness.ClientSpec
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -19,7 +19,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.jetbrains.jewel.foundation.lazy.tree.Tree
 
-class ExplorerTreeStateSpec : ClientSpec({
+class ExplorerTreeStateTest : FunSpec({
 
     val tree = FolderNode("root", listOf(
         FolderNode("adders", listOf(
@@ -30,16 +30,18 @@ class ExplorerTreeStateSpec : ClientSpec({
     ))
 
     test("selection is stored in Jewel's TreeState, keyed by path") {
-        runOnClient { ExplorerTreeState.reset(); ExplorerTreeState.select("adders/full-adder") }
+        ExplorerTreeState.reset()
+        ExplorerTreeState.select("adders/full-adder")
         ExplorerTreeState.treeState.selectedKeys shouldContainExactly setOf("adders/full-adder")
         ExplorerTreeState.selectedPath shouldBe "adders/full-adder"
     }
 
     test("expansion toggles Jewel's openNodes, keyed by path") {
-        runOnClient { ExplorerTreeState.reset(); ExplorerTreeState.toggleExpanded("adders") }
+        ExplorerTreeState.reset()
+        ExplorerTreeState.toggleExpanded("adders")
         ExplorerTreeState.treeState.openNodes shouldContain "adders"
         ExplorerTreeState.expandedPaths shouldContain "adders"
-        runOnClient { ExplorerTreeState.toggleExpanded("adders") }
+        ExplorerTreeState.toggleExpanded("adders")
         ExplorerTreeState.treeState.openNodes shouldNotContain "adders"
     }
 
@@ -47,13 +49,11 @@ class ExplorerTreeStateSpec : ClientSpec({
         val prior = SharedSettings.projectRootPath
         try {
             SharedSettings.projectRootPath = "/tmp/proj"
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.armRestore(
-                    ExplorerSession("/tmp/proj", setOf("", "adders"), "adders/full-adder"),
-                )
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            ExplorerTreeState.reset()
+            ExplorerTreeState.armRestore(
+                ExplorerSession("/tmp/proj", setOf("", "adders"), "adders/full-adder"),
+            )
+            ExplorerTreeState.applyPendingRestore(tree)
             ExplorerTreeState.expandedPaths shouldContainExactly setOf("", "adders")
             ExplorerTreeState.selectedPath shouldBe "adders/full-adder"
         } finally {
@@ -65,11 +65,9 @@ class ExplorerTreeStateSpec : ClientSpec({
         val prior = SharedSettings.projectRootPath
         try {
             SharedSettings.projectRootPath = "/tmp/other"
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), "adders"))
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            ExplorerTreeState.reset()
+            ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), "adders"))
+            ExplorerTreeState.applyPendingRestore(tree)
             ExplorerTreeState.expandedPaths.shouldBeEmpty()
             ExplorerTreeState.selectedPath.shouldBeNull()
         } finally {
@@ -81,13 +79,11 @@ class ExplorerTreeStateSpec : ClientSpec({
         val prior = SharedSettings.projectRootPath
         try {
             SharedSettings.projectRootPath = "/tmp/proj"
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.armRestore(
-                    ExplorerSession("/tmp/proj", setOf("adders", "deleted-folder"), "gone.nbt"),
-                )
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            ExplorerTreeState.reset()
+            ExplorerTreeState.armRestore(
+                ExplorerSession("/tmp/proj", setOf("adders", "deleted-folder"), "gone.nbt"),
+            )
+            ExplorerTreeState.applyPendingRestore(tree)
             ExplorerTreeState.expandedPaths shouldContainExactly setOf("adders")
             ExplorerTreeState.selectedPath.shouldBeNull()
         } finally {
@@ -99,11 +95,9 @@ class ExplorerTreeStateSpec : ClientSpec({
         val prior = SharedSettings.projectRootPath
         try {
             SharedSettings.projectRootPath = "/tmp/proj"
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("dirty.nbt"), null))
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            ExplorerTreeState.reset()
+            ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("dirty.nbt"), null))
+            ExplorerTreeState.applyPendingRestore(tree)
             ExplorerTreeState.expandedPaths.shouldBeEmpty()
         } finally {
             SharedSettings.projectRootPath = prior
@@ -114,13 +108,11 @@ class ExplorerTreeStateSpec : ClientSpec({
         val prior = SharedSettings.projectRootPath
         try {
             SharedSettings.projectRootPath = "/tmp/proj"
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), null))
-                ExplorerTreeState.applyPendingRestore(tree)
-                ExplorerTreeState.collapseAll()
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            ExplorerTreeState.reset()
+            ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), null))
+            ExplorerTreeState.applyPendingRestore(tree)
+            ExplorerTreeState.collapseAll()
+            ExplorerTreeState.applyPendingRestore(tree)
             ExplorerTreeState.expandedPaths.shouldBeEmpty()
         } finally {
             SharedSettings.projectRootPath = prior
@@ -131,11 +123,9 @@ class ExplorerTreeStateSpec : ClientSpec({
         val prior = SharedSettings.projectRootPath
         try {
             SharedSettings.projectRootPath = "/tmp/proj"
-            runOnClient {
-                ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), null))
-                ExplorerTreeState.reset()
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", setOf("adders"), null))
+            ExplorerTreeState.reset()
+            ExplorerTreeState.applyPendingRestore(tree)
             ExplorerTreeState.expandedPaths.shouldBeEmpty()
         } finally {
             SharedSettings.projectRootPath = prior
@@ -195,12 +185,10 @@ class ExplorerTreeStateSpec : ClientSpec({
     }
 
     test("reset clears selection and expansion") {
-        runOnClient {
-            ExplorerTreeState.reset()
-            ExplorerTreeState.select("dirty.nbt")
-            ExplorerTreeState.toggleExpanded("adders")
-            ExplorerTreeState.reset()
-        }
+        ExplorerTreeState.reset()
+        ExplorerTreeState.select("dirty.nbt")
+        ExplorerTreeState.toggleExpanded("adders")
+        ExplorerTreeState.reset()
         ExplorerTreeState.selectedPath shouldBe null
         ExplorerTreeState.expandedPaths shouldBe emptySet()
     }

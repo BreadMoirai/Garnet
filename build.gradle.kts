@@ -131,9 +131,18 @@ afterEvaluate {
             sourceSets["client"].runtimeClasspath +
             testSupportSourceSet.output
     }
+    // `test` sees `client` for the same reason `clientTest` does: a large share of this mod's
+    // testable logic (Explorer tree state, dock geometry, config round-trips, payload builders)
+    // lives in the client source set but needs no live client to exercise. Without this, those
+    // tests could only run inside a booted MC client — see
+    // docs/gametest/unit-vs-gametest-split.md for the decision rule this enables.
     sourceSets.named("test") {
-        compileClasspath += testSupportSourceSet.output
-        runtimeClasspath += testSupportSourceSet.output
+        compileClasspath += sourceSets["client"].output +
+            sourceSets["client"].compileClasspath +
+            testSupportSourceSet.output
+        runtimeClasspath += sourceSets["client"].output +
+            sourceSets["client"].runtimeClasspath +
+            testSupportSourceSet.output
     }
 }
 
@@ -278,11 +287,15 @@ dependencies {
 
 // Compose compiler plugin is applied project-wide (plugins {}); it only needs to run on the
 // compilations that contain @Composable code (client, clientTest). Strip it from the others
-// (main, test, gametest) by filtering the Compose subplugin out of their KotlinCompile
+// (main, gametest, testSupport) by filtering the Compose subplugin out of their KotlinCompile
 // pluginClasspath — this is what lets `runtime-desktop` above stay client-scoped instead of
 // sitting on the base `implementation` for every source set. See
 // docs/build/compose-runtime-scoping.md for what was tried and why this approach was chosen.
-listOf("compileKotlin", "compileTestKotlin", "compileGametestKotlin", "compileTestSupportKotlin").forEach { name ->
+// `compileTestKotlin` is deliberately absent: `test` now carries `client`'s compile classpath
+// (and therefore `runtime-desktop`), so the Compose plugin's VersionChecker passes there, and
+// the plugin is REQUIRED — `Panel.content` is `@Composable (Panel) -> Unit`, so any test that
+// constructs a Panel needs the plugin to compile its lambda.
+listOf("compileKotlin", "compileGametestKotlin", "compileTestSupportKotlin").forEach { name ->
     tasks.findByName(name)?.let { t ->
         (t as org.jetbrains.kotlin.gradle.tasks.KotlinCompile).pluginClasspath.setFrom(
             t.pluginClasspath.filter { !it.name.contains("compose") }
