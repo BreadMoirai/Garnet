@@ -1,17 +1,17 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.editor.ui
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.ui.FolderPicker
 import com.breadmoirai.garnet.editor.ui.RootPickerController
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
-import com.breadmoirai.garnet.harness.ClientSpec
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
-class RootPickerSpec : ClientSpec({
+class RootPickerControllerTest : FunSpec({
 
     afterTest { RootPickerController.resetForTest() }
 

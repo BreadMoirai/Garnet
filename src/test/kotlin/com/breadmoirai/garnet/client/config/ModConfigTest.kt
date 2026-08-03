@@ -1,8 +1,8 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.config
 
 import com.breadmoirai.garnet.config.ModConfig
 import com.breadmoirai.garnet.config.SharedSettings
-import com.breadmoirai.garnet.harness.ClientSpec
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlin.io.path.createTempDirectory
 
@@ -38,7 +38,7 @@ private data class SettingsSnapshot(
     }
 }
 
-class ModConfigSpec : ClientSpec({
+class ModConfigTest : FunSpec({
 
     test("every setting round-trips through garnet.json") {
         val dir = createTempDirectory("garnet-config")

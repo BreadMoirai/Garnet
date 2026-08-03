@@ -1,13 +1,13 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.config
 
 import com.breadmoirai.garnet.config.ExplorerStateStore
-import com.breadmoirai.garnet.harness.ClientSpec
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import kotlin.io.path.createTempDirectory
 
-class ExplorerStateStoreSpec : ClientSpec({
+class ExplorerStateStoreTest : FunSpec({
 
     test("a session round-trips through garnet-explorer.json") {
         val dir = createTempDirectory("garnet-explorer")
