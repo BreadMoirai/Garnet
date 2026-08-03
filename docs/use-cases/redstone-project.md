@@ -83,7 +83,7 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
 
 - **UC-MAN-05.a** `/garnet editor` immediately sends `ListEditorTreeC2S`. `EditorTreeHandlers.handleListTree` (via `EditorHandlerSupport.sendTree`) calls `scanFolder(root.path)` on the server and replies with `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` carrying the full recursive folder tree (every file/folder, not just spec leaves) and the player's current `activeSubpath`.
-- **UC-MAN-05.b** `EditorClientNetworking` receives `EditorTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot`, converts it via `ExplorerTreeState.buildTreeFrom(snapshot.root)`, and renders it with Jewel's `LazyTree`, recomposing on change. This is the **only** client-side reaction to the snapshot — the legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the `ExplorerTreeState`/`ProjectTreeState` split (expand/select state vs. server data).
+- **UC-MAN-05.b** `EditorClientNetworking` receives `EditorTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot`, converts it via `ExplorerTreeState.buildTreeFrom(snapshot.root)`, and renders it with Jewel's `LazyTree`, recomposing on change. `EditorClientNetworking` also calls `ExplorerTreeState.applyPendingRestore(payload.root)` right after — see UC-MAN-11.b — so `ProjectTreeState.onSnapshot` is no longer the *only* client-side reaction to the snapshot, just the one that rebuilds the visible tree. The legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the `ExplorerTreeState`/`ProjectTreeState` split (expand/select state vs. server data).
 - **UC-MAN-05.c** Clicking a "spec-folder" row (a folder directly containing a `*.spec.kts` file) sends `LoadEditorFolderC2S(path)`. `EditorTreeHandlers.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `EditorTeleport.toFolder`, and sends `EditorFolderLoadedS2C` with the spec-id list and any errors. Clicking a non-spec folder or its expand triangle just toggles expand client-side (no packet); clicking a file row selects/highlights it client-side (no packet).
 - **UC-MAN-05.d** `EditorTeleport.toFolder` looks up `EditorDimRegistry.regionOriginOf(subpath)`, teleports the player to `(region.x+0.5, yBase+2, region.z+0.5)` in `projectLevel()`, and calls `EditorSession.setActive(player.uuid, subpath)` so subsequent server actions (save, new-spec) scope to the right folder.
 - **UC-MAN-05.e** If the subpath's region has not been assigned (folder not yet placed), `toFolder` returns `false` and the server replies with `EditorErrorS2C`. `ProjectTreeState.onError(payload)` sets `status = "error: ${payload.reason}"`, which the Explorer panel renders as its status line — the same mechanism that used to update `ProjectScreen`'s status label.
@@ -144,11 +144,14 @@ in the OS dialog; the workspace root switches to it. **Attach Folder** is presen
   render thread on macOS instead; see [ui/dock-dialogs.md](../ui/dock-dialogs.md) for why.
 - **UC-MAN-09.b** On a non-null pick, the controller normalizes the path to absolute (matching
   the server's canonical form) and persists it client-side (`ModConfig.projectRootPath` →
-  `garnet.json`, also mirrored to `SharedSettings.projectRootPath`) and sends
-  `SetEditorRootC2S(path)` on the client thread via `Minecraft.execute`. A cancel (null) sends
-  nothing. **Persistence is client-side only:** in singleplayer/LAN the integrated server shares
-  the JVM so the choice is restored via `ModConfig.load()`; a dedicated-server root swap is not
-  durable across restart.
+  `garnet.json`, also mirrored to `SharedSettings.projectRootPath`). Back on the client thread
+  (via `Minecraft.execute`), it calls `ExplorerTreeState.reset()` before sending
+  `SetEditorRootC2S(path)` — the old root's expansion/selection (and any pending restore armed for
+  it, see UC-MAN-11.a) are meaningless against the new tree, and without this reset a path like
+  `src` that happens to exist in both projects would restore as expansion the player never made in
+  the new one. A cancel (null) sends nothing and leaves the tree state untouched. **Persistence is
+  client-side only:** in singleplayer/LAN the integrated server shares the JVM so the choice is
+  restored via `ModConfig.load()`; a dedicated-server root swap is not durable across restart.
 - **UC-MAN-09.c** `EditorTreeHandlers.handleSetRoot` rejects a non-directory / invalid path
   with `EditorErrorS2C`. Otherwise it first flushes every dirty standalone structure against the
   **old** root via `StructureCommit.commitAll` — once the root swaps, `commit` resolves subpaths
@@ -203,16 +206,22 @@ when they left — no Refresh click required. See
 save/restore mechanics; this use case is the player-visible behavior it produces.
 
 - **UC-MAN-11.a** `ExplorerLifecycle`'s `ClientPlayConnectionEvents.JOIN` handler arms a restore
-  from `ExplorerStateStore.load()` and immediately sends `ListEditorTreeC2S` (guarded by
-  `ClientPlayNetworking.canSend`, so joining a vanilla server without the mod is a no-op rather
-  than a throw) — the same request UC-MAN-05.a's `/garnet editor` command sends, but fired
-  automatically on join instead of waiting for the player to type a command.
+  from `ExplorerStateStore.load()` **only when `Minecraft.hasSingleplayerServer()`** — the
+  integrated server is the one case where `SharedSettings.projectRootPath` genuinely describes
+  this session, since nothing on the client updates it from a remote server's root. On any other
+  connection (multiplayer, including a friend's Garnet server) nothing is armed, and
+  `saveExplorerSession` mirrors the same guard on the way out, so a remote session never reads or
+  writes `garnet-explorer.json` at all. The handler then unconditionally sends `ListEditorTreeC2S`
+  (guarded by `ClientPlayNetworking.canSend`, so joining a vanilla server without the mod is a
+  no-op rather than a throw) — the same request UC-MAN-05.a's `/garnet editor` command sends, but
+  fired automatically on join instead of waiting for the player to type a command.
 - **UC-MAN-11.b** When `EditorTreeSnapshotS2C` lands, `EditorClientNetworking` feeds it to
   `ProjectTreeState.onSnapshot` as usual (UC-MAN-05.b) and then calls
   `ExplorerTreeState.applyPendingRestore(payload.root)`, which reopens the persisted folders and
-  reselects the persisted node — but only if the record's `root` matches the client's currently
-  configured root; a mismatch (a different server, or a root swapped via UC-MAN-09 since the
-  record was saved) is silently discarded and the tree opens fresh instead.
+  reselects the persisted node — but only if something was armed (see UC-MAN-11.a: never true on a
+  remote session) and the record's `root` matches the client's currently configured root; a
+  mismatch (a root swapped via UC-MAN-09 since the record was saved) is silently discarded and the
+  tree opens fresh instead.
 - **UC-MAN-11.c** Folders or files renamed or deleted since the session that saved the record are
   dropped from the restore rather than restored as broken references: only paths that still
   resolve in the fresh snapshot are reopened, and only as folders (a persisted path that now

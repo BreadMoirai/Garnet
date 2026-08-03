@@ -23,6 +23,10 @@ fun interface FolderPicker {
  */
 object NfdFolderPicker : FolderPicker {
     override fun pick(title: String, default: String?): String? {
+        // This early return skips the try/finally below, so NFD_Quit() never runs when init
+        // fails — that is intentional, not a missed cleanup: NFD_Quit() pairs with a *successful*
+        // NFD_Init(), and calling it after a failed init is undefined per NFD's own contract. Do
+        // not "fix" this into an unconditional finally.
         if (NativeFileDialog.NFD_Init() != NFD_OKAY) return null
         try {
             MemoryStack.stackPush().use { stack ->

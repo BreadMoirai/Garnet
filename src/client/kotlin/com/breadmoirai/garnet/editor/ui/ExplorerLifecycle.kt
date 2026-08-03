@@ -6,6 +6,7 @@ import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+import net.minecraft.client.Minecraft
 
 /**
  * Explorer session lifecycle: request the tree and restore last session's expansion on join,
@@ -18,9 +19,19 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 fun registerExplorerLifecycle() {
     ClientPlayConnectionEvents.JOIN.register { _, _, mc ->
         mc.execute {
-            // Arm before sending: the snapshot reply is what consumes the restore, and on a
-            // singleplayer join the reply can land in the very next tick.
-            ExplorerTreeState.armRestore(ExplorerStateStore.load())
+            // Only arm on singleplayer: SharedSettings.projectRootPath is local config, and
+            // nothing on the client updates it from a remote server's root (EditorTreeSnapshotS2C
+            // carries a FolderNode *name*, never an absolute path). On a remote server the key
+            // ExplorerLifecycle/ExplorerTreeState compare against is therefore always this
+            // client's own local-project key, which would restore (and later overwrite) the local
+            // record against a tree that has nothing to do with it. hasSingleplayerServer() is the
+            // one case where the integrated server runs in this JVM and SharedSettings is
+            // genuinely describing the session we're in.
+            if (mc.hasSingleplayerServer()) {
+                // Arm before sending: the snapshot reply is what consumes the restore, and on a
+                // singleplayer join the reply can land in the very next tick.
+                ExplorerTreeState.armRestore(ExplorerStateStore.load())
+            }
             // A vanilla server without the mod has no receiver registered for this payload, and
             // sending it anyway throws. canSend is the standard Fabric guard.
             if (ClientPlayNetworking.canSend(ListEditorTreeC2S.TYPE)) {
@@ -52,11 +63,18 @@ fun registerExplorerLifecycle() {
 /**
  * Persist the live tree state against the configured root.
  *
- * Skipped when no snapshot was ever loaded this session: the tree state is empty because the player
- * never saw a tree, and writing it would overwrite a good record with nothing. That is exactly the
- * case when the player joins a vanilla server, or quits before the snapshot arrives.
+ * Skipped outside singleplayer: see the matching guard on the JOIN handler above for why
+ * `SharedSettings.projectRootPath` cannot be trusted as this session's key on a remote server.
+ * Without this guard, disconnecting from someone else's Garnet server would write *their* tree's
+ * expansion/selection into the local record keyed by *this* client's own configured root,
+ * corrupting the singleplayer record the next local join restores from.
+ *
+ * Also skipped when no snapshot was ever loaded this session: the tree state is empty because the
+ * player never saw a tree, and writing it would overwrite a good record with nothing. That is
+ * exactly the case when the player joins a vanilla server, or quits before the snapshot arrives.
  */
 private fun saveExplorerSession() {
+    if (!Minecraft.getInstance().hasSingleplayerServer()) return
     val root = SharedSettings.projectRootPath
     if (root.isBlank()) return
     if (ProjectTreeState.snapshot == null) return

@@ -42,7 +42,16 @@ object RootPickerController {
                         // canonical form the server stores (handleSetRoot's toAbsolutePath()).
                         val abs = Path.of(path).toAbsolutePath().toString()
                         persist(abs)
-                        executor { sender(SetEditorRootC2S(abs)) }
+                        executor {
+                            // The old root's expansion/selection (and any pending restore armed
+                            // for it) are meaningless against the new tree — a path like "src"
+                            // that happens to exist in both projects would otherwise restore as
+                            // expansion the player never made here. reset() also clears
+                            // pendingRestore, which is correct: a restore armed for the old root
+                            // must not later apply against the new one's snapshot.
+                            ExplorerTreeState.reset()
+                            sender(SetEditorRootC2S(abs))
+                        }
                     }
                 } finally {
                     executor { picking = false }

@@ -201,7 +201,7 @@ dependencies {
     // kotlinx-coroutines-core (also pulled by fabric-language-kotlin transitively, declared explicitly).
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
-    // LWJGL NativeFileDialog backs the Explorer's Open Folder dialog (editor/ui/NfdFolderPicker.kt).
+    // LWJGL NativeFileDialog backs the Explorer's Open Folder dialog (editor/ui/FolderPicker.kt).
     // MC 26.2 ships LWJGL 3.4.1 with lwjgl-tinyfd but NOT lwjgl-nfd, so the module and its natives
     // are added here. The version MUST stay pinned to MC's own LWJGL: lwjgl-core comes from MC, and
     // a module built against a different version trips LWJGL's load-time version check.

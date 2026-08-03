@@ -74,8 +74,13 @@ object ExplorerTreeState {
      * must not clobber the expansion the player has changed since rejoining.
      *
      * No-op when nothing is armed, when the client has no configured root, or when the record was
-     * captured against a different root — the latter is the correct outcome both after an Open
-     * Folder swap and on a multiplayer server whose root differs from this client's config.
+     * captured against a different root — the latter is the correct outcome after an Open Folder
+     * swap, whose success handler resets this state (see [RootPickerController.openFolder]) before
+     * a stale restore could ever land here. Note that nothing is armed at all on a non-singleplayer
+     * join in the first place — [ExplorerLifecycle]'s JOIN handler only calls [armRestore] when
+     * `Minecraft.hasSingleplayerServer()`, because `SharedSettings.projectRootPath` is local config
+     * that a remote server never overwrites, so it cannot be used to detect "this is a different
+     * server's tree".
      *
      * Paths absent from [root] are dropped. Writing a stale id into `openNodes` would be inert
      * rather than harmful, but filtering stops the persisted set accumulating garbage across

@@ -36,15 +36,33 @@ Every load failure — missing file, malformed JSON, a record with no `root` —
 rather than throwing. Restoring last session's tree state is a convenience; the fallback is simply
 opening the tree fresh, the same as a first run.
 
+## Singleplayer-only: the key has no cross-session meaning otherwise
+
+Both save and restore are gated on `Minecraft.getInstance().hasSingleplayerServer()`. The record is
+keyed by `SharedSettings.projectRootPath`, which is local client config — nothing on the client ever
+overwrites it from a remote server's root (`EditorTreeSnapshotS2C` carries only a `FolderNode`
+*name*, never an absolute path). Without the gate, the comparison on a remote connection is always
+"this client's local key" against "this client's local key" — it always matches, regardless of
+which server is actually on the other end. That would let a multiplayer disconnect persist a
+remote server's tree state under the *local* project's key, corrupting the singleplayer record the
+next local join restores from.
+
+`hasSingleplayerServer()` is true exactly when the integrated server runs in this JVM, which is the
+one case `SharedSettings` genuinely describes a session sharing state with the server. On any other
+connection — a dedicated server, a friend's Garnet server, a vanilla server — nothing is armed on
+JOIN and `saveExplorerSession` returns early on DISCONNECT/CLIENT_STOPPING, so
+`config/garnet-explorer.json` is neither read nor written for that session.
+
 ## Arm at JOIN, apply at snapshot
 
 The restore is a two-step, one-shot handshake between `ExplorerLifecycle` and
 `ExplorerTreeState`, not a single "load and apply" call:
 
 1. **Arm** — `ExplorerLifecycle`'s `ClientPlayConnectionEvents.JOIN` handler calls
-   `ExplorerTreeState.armRestore(ExplorerStateStore.load())` before sending `ListEditorTreeC2S`
-   (guarded by `ClientPlayNetworking.canSend`, so joining a vanilla server without the mod doesn't
-   throw). This just stashes the loaded `ExplorerSession?` in `pendingRestore`.
+   `ExplorerTreeState.armRestore(ExplorerStateStore.load())`, guarded by the singleplayer check
+   above, before sending `ListEditorTreeC2S` (itself guarded by `ClientPlayNetworking.canSend`, so
+   joining a vanilla server without the mod doesn't throw). This just stashes the loaded
+   `ExplorerSession?` in `pendingRestore`.
 2. **Apply** — `EditorClientNetworking`'s snapshot receiver calls
    `ExplorerTreeState.applyPendingRestore(payload.root)` immediately after feeding the same
    payload to `ProjectTreeState.onSnapshot`, then clears `pendingRestore`.
@@ -80,6 +98,16 @@ blank out a perfectly good record from a prior session.
 - **`ClientLifecycleEvents.CLIENT_STOPPING`** — an idempotent second save, because DISCONNECT does
   not reliably fire when the player closes the game window from inside a world (the common way a
   session actually ends).
+
+## Root swap also resets the live tree state
+
+`RootPickerController.openFolder`'s success path calls `ExplorerTreeState.reset()` (on the client
+thread, alongside sending `SetEditorRootC2S`) before the new root's snapshot ever arrives. Without
+this, `openNodes`/`selectedKeys` would still hold the **old** root's paths after a swap, and a
+later disconnect would persist them under the **new** root's key — any path that happens to exist
+in both projects (`src`, `adders`) would then restore as expansion the player never made there.
+`reset()` also clears `pendingRestore`, which is correct here too: a restore armed for the old root
+must not later apply against the new root's snapshot.
 
 See [ui/dock-dialogs.md](../ui/dock-dialogs.md) for the root picker that produces the `root` this
 state is keyed against, and
