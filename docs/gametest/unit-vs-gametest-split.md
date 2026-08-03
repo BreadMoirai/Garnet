@@ -13,10 +13,16 @@ itself (`GarnetTestSpec`, `ClientSpec`, `launchKotest`, and friends, package
 the other three, not a test suite in its own right, and it is the only place Kotest is a
 dependency; `main`/`client` do not ship it in the jar.
 
-- `src/test/` — Kotest unit specs, run on the JVM with no MC client or
-  server. Bootstrap MC via `SharedConstants.tryDetectVersion()` +
-  `Bootstrap.bootStrap()` when registries are needed
-  (`StateRecordingStorageTest` is the canonical example).
+- `src/test/` — Kotest unit specs, run on the JVM with no live MC client or
+  server (no window, no GL, no GLFW). Bootstrap MC via
+  `SharedConstants.tryDetectVersion()` + `Bootstrap.bootStrap()` when
+  registries are needed (`StateRecordingStorageTest` is the canonical
+  example). Since 2026-08-03 this source set also carries `client`'s
+  compile classpath and runs the Compose compiler plugin, so it also holds
+  the pure-JVM client-code specs under
+  `src/test/kotlin/com/breadmoirai/garnet/client/` (mirroring the client
+  package tree) — Compose snapshot-state and `@Composable` code included,
+  as long as no live `Minecraft`/GL/GLFW is required.
 - `src/gametest/` — Kotest specs driven by a single `@GameTest` sentinel
   that runs inside a dedicated MC server instance (`runGameTest`). Use the
   `awaitTicks`/`spawnStructure` primitives from the bridge.
@@ -29,31 +35,46 @@ dependency; `main`/`client` do not ship it in the jar.
 
 ## Decision rule
 
-If the logic is **pure** — given inputs in, asserts outputs, no MC
-ticks, no levels, no scheduled-tick semantics — it belongs in
-`src/test/`. If correctness depends on MC's tick loop, neighbor
-updates, scheduled ticks, or BE persistence on the server, it belongs
-in `src/gametest/`. If it requires a real client — screens, widgets,
-keybinds, payload round-trips driven from the client — it belongs in
-`src/clientTest/`.
+If it needs a live `Minecraft` instance, a GL context, or GLFW — pixel probes,
+`Minecraft.hitResult`, `MouseHandler` state, routing events into a running `ComposeScene` — it
+belongs in `src/clientTest/`. Everything else belongs in `src/test/`, **including Compose
+snapshot state and `@Composable` code**: since 2026-08-03 the `test` source set carries
+`client`'s compile classpath and runs the Compose compiler plugin. If correctness depends on
+MC's tick loop, neighbor updates, scheduled ticks, or BE persistence on the server, it belongs in
+`src/gametest/` instead — that axis (pure vs. tick-dependent) is orthogonal to the client-or-not
+axis above and still decides the `src/test/` vs `src/gametest/` boundary.
+
+### Why `src/test` can see `client`
+
+It could not until 2026-08-03, which stranded ~55 pure-JVM assertions inside a full client boot —
+Gson round-trips, a GLFW→Compose lookup table, and a picker spec that stubbed every seam it had.
+The fix was two lines of `build.gradle.kts`: the client source set on the test classpath, and
+`compileTestKotlin` removed from the Compose-plugin strip list. The strip remains for `main`,
+`gametest` and `testSupport`, which is what keeps Compose off the server jar.
 
 ## Where the contracts actually live
 
 - **Unit (`src/test/`):** `KtsSpecLoaderTest`,
   `SpecPersistenceTest`, `StateConditionTest`, `StateRecordingStorageTest`,
-  `StateRecordingViewTest`, `GridLayoutTest`, `SimTimeTest`. All
-  pure data / algorithm checks; no level, no runner.
+  `StateRecordingViewTest`, `GridLayoutTest`, `SimTimeTest`, and — relocated from
+  `src/clientTest/` on 2026-08-03 because none of them need a live client —
+  `ExplorerTreeStateTest`, `ExplorerStateStoreTest`, `ModConfigTest`, `RootPickerControllerTest`,
+  `StructureExplorerStatusTest`, `ExplorerLifecycleTest`, `DockInsetsTest`, `DockLifecycleTest`,
+  `GlfwKeyMapTest`, `ExplorerActionsTest`, `DockViewportSyncTest`, under
+  `src/test/kotlin/com/breadmoirai/garnet/client/` mirroring the client package tree. All
+  pure data / algorithm / Compose-state checks; no level, no runner, no live client.
 - **Server gametest (`src/gametest/`):** the `*Spec` classes registered in
   `GametestSentinel` (`SmokeSpec`, `editor/*Spec`, `structure/*Spec`). These need a real level:
   only the live MC tick loop produces accurate scheduled-tick cadence, neighbor-update
   ordering, and comparator/piston timing. Author new tests using
   `runGarnetSpec` with the DSL lambda; see
   [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
-- **Client gametest (`src/clientTest/`):** the `*Spec` classes registered in
-  `ClientTestSentinel` (`RunGarnetSpecSmokeTest`, `Dock*Spec`, `Viewport*Spec`,
-  `*ExplorerSpec`, `RootPickerSpec`, …). Runs via `runClientTest`; exercises the Compose dock
-  (viewport, input routing, Explorer) — there is no recorder-screen/runner-block flow to exercise
-  anymore, since that UI and its blocks were deleted.
+- **Client gametest (`src/clientTest/`):** the seven specs registered in
+  `ClientTestSentinel` — `RunGarnetSpecSmokeTest`, `ViewportSpec`, `DockRenderSpec`,
+  `DockInputSpec`, `CursorFocusToggleSpec`, `JewelExplorerSpec`, `ExplorerUiSpec` — one user
+  story each. Runs via `runClientTest`; exercises the Compose dock (viewport, input routing,
+  Explorer) with a real `Minecraft` instance and GL context — there is no recorder-screen/
+  runner-block flow to exercise anymore, since that UI and its blocks were deleted.
 
 ## Why DSL/algorithm logic is unit-tested but circuit behaviour is gametested
 
@@ -79,9 +100,14 @@ the real-world circuit behaviour.
   or scheduling? Add a gametest spec under `src/gametest/`
   using `GarnetTestSpec` + `awaitTicks`/`spawnStructure`, and register it
   in `GametestSentinel`.
-- New dock panel, widget, or payload flow? Add a `ClientSpec`
-  under `src/clientTest/` (uses `ClientContextHolder` to access
-  `ClientGameTestContext`), and register it in `ClientTestSentinel`.
+- New dock panel, widget, or payload-flow logic — including `@Composable`
+  code and Compose snapshot state? Default to a plain Kotest spec under
+  `src/test/kotlin/com/breadmoirai/garnet/client/`, mirroring the client
+  package it tests; `test` carries `client`'s compile classpath and the
+  Compose compiler plugin, so no live client is needed. Only reach for
+  `ClientSpec` under `src/clientTest/` (registered in `ClientTestSentinel`)
+  when the assertion genuinely needs a live `Minecraft` instance, a GL
+  context, or GLFW — see the decision rule above.
 - See `kotest-bridge.md` for the full DSL reference and cookbook.
 
 ## Bootstrap caveat for unit tests

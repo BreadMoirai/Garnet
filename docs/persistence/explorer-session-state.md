@@ -56,7 +56,7 @@ JOIN and `saveExplorerSession` returns early on DISCONNECT/CLIENT_STOPPING, so
 `config/garnet-explorer.json` is neither read nor written for that session.
 
 The gate is a swappable `var` (`ExplorerSessionGate.isSingleplayer`, with `resetForTest()` to
-restore the default) precisely so `ExplorerLifecycleSpec` can drive both branches without a live
+restore the default) precisely so `ExplorerLifecycleTest` can drive both branches without a live
 client or a network connection — it is the one thing standing between a remote session and
 overwriting the local project's saved record, so it is not left untested. The arm step is its own
 top-level function, `armRestoreIfSingleplayer()`, so a test can call it directly without going

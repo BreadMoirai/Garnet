@@ -267,7 +267,9 @@ dependencies {
     // the server jar entirely (see docs/build/compose-runtime-scoping.md). This only works because
     // the compiler-plugin-classpath strip below removes the Compose compiler subplugin from the
     // non-client `KotlinCompile` tasks; without that strip, the project-wide Compose compiler plugin's
-    // VersionChecker fails `main`/`test`/`gametest` compilation for lacking the runtime on their classpath.
+    // VersionChecker fails `main`/`gametest`/`testSupport` compilation for lacking the runtime on
+    // their classpath. `test` is exempt from the strip — it carries `client`'s compile classpath
+    // (and therefore the runtime) since 2026-08-03, so the plugin is required there instead.
     "clientImplementation"("org.jetbrains.compose.runtime:runtime-desktop:1.11.0")
     "clientImplementation"("org.jetbrains.compose.ui:ui-desktop:1.11.0")
     "clientImplementation"("org.jetbrains.compose.foundation:foundation-desktop:1.11.0")

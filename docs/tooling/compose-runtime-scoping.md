@@ -27,7 +27,7 @@ to satisfy the checker on source sets that never use Compose.
    `pluginClasspath`.** In `build.gradle.kts`, after the `dependencies { }` block:
 
    ```kotlin
-   listOf("compileKotlin", "compileTestKotlin", "compileGametestKotlin").forEach { name ->
+   listOf("compileKotlin", "compileGametestKotlin", "compileTestSupportKotlin").forEach { name ->
        tasks.findByName(name)?.let { t ->
            (t as org.jetbrains.kotlin.gradle.tasks.KotlinCompile).pluginClasspath.setFrom(
                t.pluginClasspath.filter { !it.name.contains("compose") }
@@ -46,14 +46,27 @@ anticipated a Gradle-UI-submodule split as the only real fix) — `pluginClasspa
 public, mutable `ConfigurableFileCollection` property on `KotlinCompile` in the Kotlin
 Gradle plugin version this project pins, and filtering jars whose filename contains
 `"compose"` out of it before task execution reliably removes the subplugin from
-`compileKotlin`/`compileTestKotlin`/`compileGametestKotlin` without affecting
+`compileKotlin`/`compileGametestKotlin`/`compileTestSupportKotlin` without affecting
 `compileClientKotlin`/`compileClientTestKotlin` (left untouched, still carry the
 Compose subplugin and the runtime).
+
+**`compileTestKotlin` was removed from the strip list on 2026-08-03.** `src/test` was widened to
+carry `client`'s compile classpath (so it can see `Panel`, `ExplorerTreeState`, and the rest of the
+client package for pure-JVM assertions relocated out of `src/clientTest/` — see
+[gametest/unit-vs-gametest-split.md](../gametest/unit-vs-gametest-split.md)), and `DockLifecycleTest`
+constructs a `Panel(...) { }`, whose `content` parameter is `@Composable (Panel) -> Unit`. That
+requires the Compose compiler plugin to compile `test`'s Kotlin, not just the runtime on its
+classpath, so `test` was dropped from the strip rather than left in it. The strip still runs for
+`main`, `gametest`, and `testSupport` — none of those need `@Composable` code, and stripping them
+is what keeps the Compose compiler off the dedicated-server jar's compilation.
 
 ## Current state
 
 - `runtime-desktop`, `ui-desktop`, `foundation-desktop` are all `clientImplementation`
-  — none of the Compose Multiplatform jars ship in the server jar.
+  — none of the Compose Multiplatform jars ship in the server jar. `test` sees them
+  transitively via `client`'s compile classpath (not its own `clientImplementation`
+  dependency), which is enough to compile against but does not change what ships in
+  any jar.
 - The pluginClasspath-stripping block lives directly below the `dependencies { }`
   block in `build.gradle.kts`, immediately before the `tasks { }` block.
 - Compose is pinned to **`1.11.0` (stable)**, with skiko `0.144.6` — down from the

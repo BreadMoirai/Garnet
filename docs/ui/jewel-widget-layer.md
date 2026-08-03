@@ -255,8 +255,9 @@ picks *what* to edit, the field does the actual typing.
   from the inline field's `onCommit`. It re-runs `EditorNames.validate` against the client's own
   tree snapshot before sending a C2S packet — a pre-check, not a replacement for the server's own
   validation, since the client's snapshot can be stale. `ExplorerActions.sender` is swappable
-  (mirrors `RootPickerController`'s pattern) so clientTests can assert on payloads without a live
-  connection; `resetForTest()` restores the real `ClientPlayNetworking.send`.
+  (mirrors `RootPickerController`'s pattern) so `ExplorerActionsTest` (`src/test/`) can assert on
+  payloads without a live client or connection; `resetForTest()` restores the real
+  `ClientPlayNetworking.send`.
 - **`New` targets the clicked folder itself, or a clicked file's parent** — the IDE convention.
   `ExplorerContextMenu` resolves this by reading the live snapshot (`root.resolve(target)`) rather
   than guessing from the path string, since a folder name may legitimately contain a dot. `Rename`

@@ -28,6 +28,14 @@ A `RecordingHolder` is installed in both, so `runGarnetSpec` works from either b
 
 `clientTest` specs should extend `ClientSpec`. `GarnetTestSpec` in the clientTest sourceset puts test bodies on the server thread, which prevents the local network channel from pumping (you can't observe client-side screen state when you hold the server thread).
 
+**`ClientSpec`/`runOnClient` are reserved for specs that genuinely drive the client.** Since
+2026-08-03, `src/test/` carries `client`'s compile classpath and runs the Compose compiler plugin,
+so pure-JVM client-code assertions (Compose snapshot state, `@Composable` code, payload/config
+round-trips) belong there instead — see
+[unit-vs-gametest-split.md](unit-vs-gametest-split.md). A new test reaching for `ClientSpec` should
+first ask whether it actually needs a live `Minecraft` instance, a GL context, or GLFW; if not, it
+belongs in `src/test/`, not here.
+
 ## Helpers for crossing threads
 
 Split across two same-package files (no imports needed between them):

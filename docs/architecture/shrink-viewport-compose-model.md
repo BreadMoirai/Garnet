@@ -95,4 +95,4 @@ ViewportState.contentOffsetX())` (and the Y mate). It deliberately does **not** 
 camera-turn accumulation) that must not be offset. When the shrink is off both offsets are `0` and
 the injections fall through, leaving vanilla coordinate mapping byte-for-byte. `contentOffsetX/Y`
 read the same `ViewportState.contentRect` the composite blit uses, so hitbox and paint stay in
-lockstep. Covered by `ViewportCursorMappingSpec` (clientTest).
+lockstep. Covered by `ViewportSpec` (clientTest).

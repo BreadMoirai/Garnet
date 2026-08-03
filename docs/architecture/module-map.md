@@ -215,7 +215,9 @@ GLFW-input and viewport-shrink/composite mixins backing `ui/`. See
 ## Test source sets
 
 - `src/test/kotlin/...` — pure JUnit/Kotest (DSL, kts loader/emitter, persistence, structure
-  math, editor data). Mirrors the main-package layout under `com.breadmoirai.garnet`. See
+  math, editor data). Mirrors the main-package layout under `com.breadmoirai.garnet`. Since
+  2026-08-03 it also carries `client`'s compile classpath and holds pure-JVM client-code specs
+  under `com/breadmoirai/garnet/client/` (mirroring the client package tree instead). See
   [gametest/unit-vs-gametest-split.md](../gametest/unit-vs-gametest-split.md).
 - `src/gametest/kotlin/.../test/` — server-side Kotest specs driven by a `@GameTest` sentinel
   (`GametestSentinel`, `runGameTest`), under `test/editor/` and `test/structure/`.
