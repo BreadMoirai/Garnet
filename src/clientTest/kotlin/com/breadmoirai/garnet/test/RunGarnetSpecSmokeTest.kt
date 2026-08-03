@@ -2,7 +2,7 @@ package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.spec.garnetSpec
 import com.breadmoirai.garnet.harness.ClientSpec
-import com.breadmoirai.garnet.mc.McDispatchers
+import com.breadmoirai.garnet.core.async.AsyncDispatchers
 import com.breadmoirai.garnet.harness.runGarnetSpec
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import net.minecraft.core.BlockPos
@@ -17,7 +17,7 @@ class RunGarnetSpecSmokeTest : ClientSpec({
             structure = null,
             strict = false,
         ) {}
-        val server = McDispatchers.currentServer
+        val server = AsyncDispatchers.currentServer
         val recording = runGarnetSpec(spec, BlockPos(0, 64, 0), server.overworld())
         recording.changes.size shouldBeGreaterThanOrEqual 0
     }

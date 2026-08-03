@@ -2,7 +2,7 @@
 
 package com.breadmoirai.garnet.harness
 
-import com.breadmoirai.garnet.mc.McDispatchers
+import com.breadmoirai.garnet.core.async.AsyncDispatchers
 import com.breadmoirai.garnet.harness.RecordingHolder
 import io.kotest.core.concurrency.CoroutineDispatcherFactory
 import io.kotest.core.spec.style.FunSpec
@@ -33,7 +33,7 @@ abstract class GarnetTestSpec(body: GarnetTestSpec.() -> Unit = {}) : FunSpec() 
     init {
         coroutineDispatcherFactory = object : CoroutineDispatcherFactory {
             override suspend fun <T> withDispatcher(testCase: TestCase, block: suspend () -> T): T =
-                withContext(McDispatchers.Server + RecordingHolder()) { block() }
+                withContext(AsyncDispatchers.Server + RecordingHolder()) { block() }
 
             override fun close() = Unit
         }
