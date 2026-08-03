@@ -93,11 +93,9 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerStateStore.save("/tmp/proj", setOf("adders"), null)
             ExplorerSessionGate.isSingleplayer = { false }
 
+            runOnClient { ExplorerTreeState.reset() }
             armRestoreIfSingleplayer()
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            runOnClient { ExplorerTreeState.applyPendingRestore(tree) }
 
             ExplorerTreeState.expandedPaths.shouldBeEmpty()
         } finally {
@@ -119,11 +117,9 @@ class ExplorerLifecycleSpec : ClientSpec({
             ExplorerStateStore.save("/tmp/proj", setOf("adders"), null)
             ExplorerSessionGate.isSingleplayer = { true }
 
+            runOnClient { ExplorerTreeState.reset() }
             armRestoreIfSingleplayer()
-            runOnClient {
-                ExplorerTreeState.reset()
-                ExplorerTreeState.applyPendingRestore(tree)
-            }
+            runOnClient { ExplorerTreeState.applyPendingRestore(tree) }
 
             ExplorerTreeState.expandedPaths shouldContainExactly setOf("adders")
         } finally {
