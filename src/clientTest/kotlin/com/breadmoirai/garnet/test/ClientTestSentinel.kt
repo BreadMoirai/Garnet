@@ -67,7 +67,7 @@ class ClientTestSentinel : FabricClientGameTest {
                         DockRenderSpec::class,
                         DockInputSpec::class,
                         JewelExplorerSpec::class,
-                        ExplorerContextMenuSpec::class,
+                        ExplorerUiSpec::class,
                     ),
                 )
             } catch (t: Throwable) {

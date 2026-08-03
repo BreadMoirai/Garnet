@@ -230,8 +230,8 @@ picks *what* to edit, the field does the actual typing.
   arrives: `New` kept its highlight indefinitely, `Rename` never highlighted, and a click on
   `Rename` only dismissed the flyout. Nothing at the call site can change this — both the
   `focusable` flag and the layer gating are internal. The same trap applies to any nested popup,
-  dropdown-inside-a-menu, or tooltip-over-a-popup in this dock. `ExplorerContextMenuSpec`'s "hover
-  moves between context-menu rows" test pins the behaviour with a pixel probe on the hover bar.
+  dropdown-inside-a-menu, or tooltip-over-a-popup in this dock. `ExplorerUiSpec`'s "right-click a
+  nested folder..." story pins the behaviour with a pixel probe on the hover bar (the hover step).
 - **`ExplorerMenuState` (`target`, `anchor`) is `remember`-ed inside `ProjectExplorer()`, never a
   top-level `object`.** Same reasoning as the mount-lifecycle guards above: a popup layer belongs
   to the composition that opened it, and a global menu-state object would survive a panel

@@ -127,6 +127,6 @@ a timing failure. Poll for *decodability* (`PanelPixelProbe.awaitDecodable`), no
 
 - `docs/gametest/client-test-threading.md` — pump and `onClient`/`runOnClient` mechanics.
 - `src/clientTest/.../ClientTestSupport.kt` — `takeClientScreenshot` implementation.
-- `src/clientTest/.../PanelPixelProbe.kt` — the dock-composite probes; used by `JewelExplorerSpec` and `ProjectExplorerSpec`.
+- `src/clientTest/.../PanelPixelProbe.kt` — the dock-composite probes; used by `JewelExplorerSpec` and `ExplorerUiSpec`.
 - `docs/ui/dock-framework.md` — the panel-mount-lifecycle defect these probes regression-test.
 - Fabric API source: `net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotComparisonOptions`.
