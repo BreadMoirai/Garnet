@@ -32,6 +32,12 @@ class ExplorerActionsTest : FunSpec({
         sent shouldBe listOf(CreateFolderC2S("redstone", "clocks"))
     }
 
+    test("creating a folder at the root sends CreateFolderC2S with an empty parent") {
+        val sent = captureSends()
+        ExplorerActions.commitCreate("", NewNodeKind.FOLDER, "gadget") shouldBe null
+        sent shouldBe listOf(CreateFolderC2S("", "gadget"))
+    }
+
     test("creating a structure appends .nbt and targets the parent") {
         val sent = captureSends()
         ExplorerActions.commitCreate("", NewNodeKind.STRUCTURE, "gadget") shouldBe null
