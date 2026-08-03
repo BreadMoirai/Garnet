@@ -1,16 +1,16 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.ui.input
 
 import androidx.compose.ui.input.key.Key
 import com.breadmoirai.garnet.ui.input.GlfwMods
 import com.breadmoirai.garnet.ui.input.glfwKeyToComposeKey
-import com.breadmoirai.garnet.harness.ClientSpec
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.lwjgl.glfw.GLFW
 
-class GlfwKeyMapSpec : ClientSpec({
+class GlfwKeyMapTest : FunSpec({
 
     test("maps the navigation keys the tree needs") {
         glfwKeyToComposeKey(GLFW.GLFW_KEY_DOWN) shouldBe Key.DirectionDown

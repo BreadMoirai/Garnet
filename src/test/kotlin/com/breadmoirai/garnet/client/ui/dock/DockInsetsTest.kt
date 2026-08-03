@@ -1,5 +1,6 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.ui.dock
 
+import com.breadmoirai.garnet.ui.dock.DockInsets
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.insets
@@ -9,21 +10,20 @@ import io.kotest.matchers.shouldBe
 
 /**
  * Pure geometry of the dock: region sizes -> reserved insets -> the shrunk content rect.
- * Runs in the clientTest source set (which can see `client` classes) but touches no render
- * context, so it does not extend ClientSpec.
+ * Runs in `src/test` -- no client, no render context.
  */
-class DockInsetsSpec : StringSpec({
+class DockInsetsTest : StringSpec({
 
     "hidden regions reserve no space" {
         DockState.reset()
-        DockState.insets() shouldBe com.breadmoirai.garnet.ui.dock.DockInsets(0, 0, 0, 0)
+        DockState.insets() shouldBe DockInsets(0, 0, 0, 0)
     }
 
     "a visible left region reserves its width" {
         DockState.reset()
         DockState.setVisible(DockRegion.LEFT, true)
         DockState.setSize(DockRegion.LEFT, 260)
-        DockState.insets() shouldBe com.breadmoirai.garnet.ui.dock.DockInsets(260, 0, 0, 0)
+        DockState.insets() shouldBe DockInsets(260, 0, 0, 0)
     }
 
     "insets drive the content rect, clamped to the minimum" {

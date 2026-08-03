@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.client.ui.dock
 
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
@@ -8,9 +8,9 @@ import io.kotest.matchers.shouldBe
 
 /**
  * World-session teardown of the dock. `closeAll()` touches only snapshot state and never calls into
- * `Minecraft`, so — like DockInsetsSpec — this needs no render context and is a plain StringSpec.
+ * `Minecraft`, so -- like DockInsetsTest -- this needs no render context and is a plain StringSpec.
  */
-class DockLifecycleSpec : StringSpec({
+class DockLifecycleTest : StringSpec({
 
     fun seedOpenDock() {
         DockState.reset()
