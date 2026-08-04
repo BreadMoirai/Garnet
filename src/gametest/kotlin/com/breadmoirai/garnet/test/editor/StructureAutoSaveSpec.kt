@@ -808,6 +808,15 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     val registry = EditorDimRegistry.of(this)
                     val region = registry.structureRegionOriginOf("frozen.nbt")!!
                     val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    // The gametest world persists between suite runs, and the default platform
+                    // means the capture is no longer just the edited cell -- clear the region so a
+                    // leftover block from a previous run can't make an edit look like a no-op (this
+                    // test only cares about history-directory bookkeeping, not capture size).
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
                     val firstEdit = region.offset(1, 0, 1)
                     lvl.setBlock(firstEdit, Blocks.GOLD_BLOCK.defaultBlockState(), 2)
                     StructureEditWatcher.onBlockChanged(lvl, firstEdit)
@@ -870,6 +879,17 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                     val registry = EditorDimRegistry.of(this)
                     val region = registry.structureRegionOriginOf("churn.nbt")!!
                     val lvl = overworld()
+                    val width = SharedSettings.structureRegionChunks * 16
+                    // The gametest world persists between suite runs. The default platform makes
+                    // the capture a tall box that already spans all three loop positions on the
+                    // first iteration, so a leftover gold block from a previous run at pos i=1/2
+                    // would make that iteration's setBlock a no-op and its commit wrongly report
+                    // NoChange. Clear the region so every iteration starts from a deterministic,
+                    // known-empty world regardless of what an earlier run left behind.
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
 
                     repeat(3) { i ->
                         val pos = region.offset(1 + i, 0, 1)
