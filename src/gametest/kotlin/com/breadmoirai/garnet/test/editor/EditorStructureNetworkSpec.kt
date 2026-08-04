@@ -144,6 +144,21 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
                 EditorStructureHandlers.handleNewStructure(this, player, NewStructureC2S("", "fresh"))
                 tmp.resolve("fresh.nbt").exists() shouldBe true
                 drainPayloads(player).filterIsInstance<EditorTreeSnapshotS2C>() shouldHaveSize 1
+
+                // The created structure is seeded with the default platform, so placing it puts a
+                // 3x3 smooth-stone build plane at projectGridYBase (64) -- not nothing.
+                EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("fresh.nbt"))
+                drainPayloads(player)
+                val placed = EditorDimRegistry.of(this).placedBoxOf("fresh.nbt")!!
+                placed.size shouldBe Vec3i(3, 1, 3)
+                placed.origin.y shouldBe SharedSettings.projectGridYBase
+                val lvl = overworld()
+                for (dx in 0 until 3) {
+                    for (dz in 0 until 3) {
+                        lvl.getBlockState(placed.origin.offset(dx, 0, dz)).block shouldBe Blocks.SMOOTH_STONE
+                    }
+                }
+
                 EditorSession.clear(player.uuid)
             }
         }
