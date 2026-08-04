@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.ops
 
+import com.breadmoirai.garnet.config.SharedSettings
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtIo
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
@@ -11,9 +12,10 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
 
 object EditorNewStructure {
     /**
-     * Creates an empty `<name>.nbt` structure in [folder]. Returns the path; throws if [name] is
-     * blank/illegal or the file already exists. Caller should re-scan the tree afterwards so the
-     * new file appears in the Explorer.
+     * Creates a `<name>.nbt` structure in [folder], seeded with the configured default platform
+     * (see [DefaultPlatform]). Returns the path; throws if [name] is blank/illegal or the file
+     * already exists. Caller should re-scan the tree afterwards so the new file appears in the
+     * Explorer.
      */
     fun create(folder: Path, name: String): Path {
         require(name.isNotBlank()) { "structure name must not be blank" }
@@ -25,7 +27,14 @@ object EditorNewStructure {
         }
         val file = folder.resolve("$name.nbt")
         require(!file.exists()) { "structure file already exists: $file" }
-        val nbt = StructureTemplate().save(CompoundTag())
+        // Seeded with the configured default platform so a freshly created structure places with a
+        // build plane instead of nothing. Settings are read here rather than passed in, matching
+        // StructureCommit/StructureAutoSave, so create's signature stays stable for its callers.
+        val nbt = DefaultPlatform.platformTag(
+            SharedSettings.newStructurePlatformWidth,
+            SharedSettings.newStructurePlatformDepth,
+            SharedSettings.newStructurePlatformBlock,
+        ) ?: StructureTemplate().save(CompoundTag())
         NbtIo.writeCompressed(nbt, file)
         LOGGER.info("[EditorNewStructure] created empty structure '{}'", file)
         return file
