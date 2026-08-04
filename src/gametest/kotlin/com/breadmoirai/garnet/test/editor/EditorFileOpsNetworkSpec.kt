@@ -62,8 +62,23 @@ private suspend fun withServer(block: suspend (server: MinecraftServer, player: 
                 EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
                 val player = makeMockServerPlayer(this)
                 drainPayloads(player)
-                block(this, player, tmp)
-                EditorSession.clear(player.uuid)
+                try {
+                    block(this, player, tmp)
+                } finally {
+                    // StructureAutoSave/StructureCommit backoff are keyed per-MinecraftServer and
+                    // survive across tests (the gametest harness reuses one server), but every test
+                    // gets a fresh withTempRoot. A dirty/backoff entry a test leaves behind (e.g. an
+                    // assertion failing before that test's own cleanup runs) would otherwise be
+                    // resolved against a LATER test's root, where the subpath no longer exists --
+                    // observed as handleRename's commit-before-move loop aborting on a stale,
+                    // unresolvable subpath. Clear all of it unconditionally so no subpath ever
+                    // leaks from one test's root into another's.
+                    for (subpath in StructureAutoSave.of(this).dirtySubpaths()) {
+                        StructureAutoSave.of(this).clear(subpath)
+                        StructureCommit.clearBackoff(this, subpath)
+                    }
+                    EditorSession.clear(player.uuid)
+                }
             }
         }
     } finally {
@@ -325,18 +340,27 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
         // Isolates Finding 3 from Findings 1/2: the structure is placed but NOT dirty, so the
         // commit-before-move loop has nothing to do for it, and any history movement observed here
         // is purely due to the folder-level moveDescendantHistories walk.
-        withServer { server, player, root ->
-            root.resolve("redstone").createDirectories()
-            EditorNewStructure.create(root.resolve("redstone"), "clock")
-            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
-            drainPayloads(player)
-            LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")).size shouldBe 1 // placed baseline
-            StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeFalse()
+        val prevPlatformWidth = SharedSettings.newStructurePlatformWidth
+        // This test isolates the history-move fallout from the commit-before-move fallout, so it
+        // needs placing to genuinely leave the structure NOT dirty. The default platform writes
+        // blocks through the setBlock mixin on every placement, which would mark it dirty here too.
+        SharedSettings.newStructurePlatformWidth = 0
+        try {
+            withServer { server, player, root ->
+                root.resolve("redstone").createDirectories()
+                EditorNewStructure.create(root.resolve("redstone"), "clock")
+                EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+                drainPayloads(player)
+                LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")).size shouldBe 1 // placed baseline
+                StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeFalse()
 
-            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+                EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
 
-            LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")) shouldHaveSize 0
-            LocalHistoryStore.revisions(root.resolve("logic/clock.nbt")) shouldHaveSize 1
+                LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")) shouldHaveSize 0
+                LocalHistoryStore.revisions(root.resolve("logic/clock.nbt")) shouldHaveSize 1
+            }
+        } finally {
+            SharedSettings.newStructurePlatformWidth = prevPlatformWidth
         }
     }
 

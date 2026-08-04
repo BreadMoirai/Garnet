@@ -553,6 +553,11 @@ class StructureAutoSaveSpec : GarnetTestSpec({
             // which is too small to distinguish bounded from region-wide capture.
             val histDir = kotlin.io.path.createTempDirectory("autosave-bounded-hist")
             SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            val prevPlatformWidth = SharedSettings.newStructurePlatformWidth
+            // This test proves the capture is BOUNDED to union(placedBox, dirtyBox) -- it needs a
+            // known-empty starting structure so blockCount/sizeX/Y/Z reflect only the one tracked
+            // edit, not the default platform's blocks too.
+            SharedSettings.newStructurePlatformWidth = 0
             EditorNewStructure.create(tmp, "bounded")
             try {
                 onServer {
@@ -607,6 +612,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
                 }
             } finally {
                 SharedSettings.localHistoryDir = prevHistDir
+                SharedSettings.newStructurePlatformWidth = prevPlatformWidth
                 histDir.toFile().deleteRecursively()
             }
         }
