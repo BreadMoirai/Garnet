@@ -54,6 +54,9 @@ object ModConfig {
                 json.get("localHistoryDays")?.let { SharedSettings.localHistoryDays = it.asInt }
                 json.get("localHistoryMaxRevisions")?.let { SharedSettings.localHistoryMaxRevisions = it.asInt }
                 json.get("localHistoryDir")?.let { SharedSettings.localHistoryDir = it.asString }
+                json.get("newStructurePlatformBlock")?.let { SharedSettings.newStructurePlatformBlock = it.asString }
+                json.get("newStructurePlatformWidth")?.let { SharedSettings.newStructurePlatformWidth = it.asInt }
+                json.get("newStructurePlatformDepth")?.let { SharedSettings.newStructurePlatformDepth = it.asInt }
                 json.getAsJsonObject("projectCellSize")?.let { size ->
                     SharedSettings.projectCellSize = net.minecraft.core.Vec3i(
                         size.get("x").asInt, size.get("y").asInt, size.get("z").asInt,
@@ -81,6 +84,9 @@ object ModConfig {
         json.addProperty("localHistoryDays", SharedSettings.localHistoryDays)
         json.addProperty("localHistoryMaxRevisions", SharedSettings.localHistoryMaxRevisions)
         json.addProperty("localHistoryDir", SharedSettings.localHistoryDir)
+        json.addProperty("newStructurePlatformBlock", SharedSettings.newStructurePlatformBlock)
+        json.addProperty("newStructurePlatformWidth", SharedSettings.newStructurePlatformWidth)
+        json.addProperty("newStructurePlatformDepth", SharedSettings.newStructurePlatformDepth)
         val size = JsonObject()
         size.addProperty("x", SharedSettings.projectCellSize.x)
         size.addProperty("y", SharedSettings.projectCellSize.y)

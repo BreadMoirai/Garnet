@@ -24,6 +24,9 @@ private data class SettingsSnapshot(
     val localHistoryMaxRevisions: Int = SharedSettings.localHistoryMaxRevisions,
     val localHistoryDir: String = SharedSettings.localHistoryDir,
     val structureRegionChunks: Int = SharedSettings.structureRegionChunks,
+    val newStructurePlatformBlock: String = SharedSettings.newStructurePlatformBlock,
+    val newStructurePlatformWidth: Int = SharedSettings.newStructurePlatformWidth,
+    val newStructurePlatformDepth: Int = SharedSettings.newStructurePlatformDepth,
 ) {
     fun restore() {
         SharedSettings.projectRootPath = projectRootPath
@@ -35,6 +38,9 @@ private data class SettingsSnapshot(
         SharedSettings.localHistoryMaxRevisions = localHistoryMaxRevisions
         SharedSettings.localHistoryDir = localHistoryDir
         SharedSettings.structureRegionChunks = structureRegionChunks
+        SharedSettings.newStructurePlatformBlock = newStructurePlatformBlock
+        SharedSettings.newStructurePlatformWidth = newStructurePlatformWidth
+        SharedSettings.newStructurePlatformDepth = newStructurePlatformDepth
     }
 }
 
@@ -55,6 +61,9 @@ class ModConfigTest : FunSpec({
             SharedSettings.localHistoryMaxRevisions = 9
             SharedSettings.localHistoryDir = "/tmp/hist"
             SharedSettings.structureRegionChunks = 2
+            SharedSettings.newStructurePlatformBlock = "minecraft:gold_block"
+            SharedSettings.newStructurePlatformWidth = 5
+            SharedSettings.newStructurePlatformDepth = 7
             ModConfig.save()
 
             // Clobber every field, then reload: each must come back from disk.
@@ -67,6 +76,9 @@ class ModConfigTest : FunSpec({
             SharedSettings.localHistoryMaxRevisions = 100
             SharedSettings.localHistoryDir = ""
             SharedSettings.structureRegionChunks = 9
+            SharedSettings.newStructurePlatformBlock = "minecraft:smooth_stone"
+            SharedSettings.newStructurePlatformWidth = 3
+            SharedSettings.newStructurePlatformDepth = 3
             ModConfig.load()
 
             SharedSettings.projectRootPath shouldBe "/tmp/proj"
@@ -78,6 +90,9 @@ class ModConfigTest : FunSpec({
             SharedSettings.localHistoryMaxRevisions shouldBe 9
             SharedSettings.localHistoryDir shouldBe "/tmp/hist"
             SharedSettings.structureRegionChunks shouldBe 2
+            SharedSettings.newStructurePlatformBlock shouldBe "minecraft:gold_block"
+            SharedSettings.newStructurePlatformWidth shouldBe 5
+            SharedSettings.newStructurePlatformDepth shouldBe 7
         } finally {
             ModConfig.resetConfigFileForTest()
             dir.toFile().deleteRecursively()

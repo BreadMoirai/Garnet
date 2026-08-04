@@ -37,4 +37,18 @@ object SharedSettings {
 
     /** Blank means `<gameDir>/.garnet/local-history`. */
     var localHistoryDir: String = ""
+
+    // === Default platform for new structures ===
+
+    /**
+     * Block a newly created structure's platform is made of. An unknown or malformed id logs a
+     * warning and falls back to `minecraft:smooth_stone` rather than blocking the create.
+     */
+    var newStructurePlatformBlock: String = "minecraft:smooth_stone"
+
+    /** Platform extent along X. Zero or negative creates the empty structure instead. */
+    var newStructurePlatformWidth: Int = 3
+
+    /** Platform extent along Z. Zero or negative creates the empty structure instead. */
+    var newStructurePlatformDepth: Int = 3
 }
