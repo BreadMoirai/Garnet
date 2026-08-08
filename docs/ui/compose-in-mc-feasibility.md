@@ -87,9 +87,15 @@ raw CPU→GPU texture upload sharing Blaze3D's context must neutralize the unpac
 
 ## Build wiring
 
-- `clientImplementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.144.6")` — desktop-GL Skia
-  native (Windows-x64 pinned to the dev/runtime host; switch to `skiko-awt` + per-OS runtimes for
-  cross-platform). **Re-pinned from the spike's original 0.150.1** when the jewel-widget-layer
+- `clientImplementation("org.jetbrains.skiko:skiko-awt-runtime-$skikoNativePlatform:0.144.6")` —
+  desktop-GL Skia native. Skiko publishes one artifact per platform with no KMP attributes to choose
+  between them, so without the Compose Gradle plugin the `skikoNativePlatform` val in
+  `build.gradle.kts` picks the classifier from the **host JVM's** `os.name`/`os.arch` at configuration
+  time (`windows-x64` / `linux-x64` / `macos-arm64` / …). Host-JVM, not host-machine: WSL2 reports
+  `os.name=Linux` and needs the linux natives even though the box is Windows. Getting this wrong is
+  not a build failure — `ensureNativeLoaded()` catches the `LibraryLoadException` and disables the
+  Compose surface, so the only symptom is Compose-dependent tests failing with an inert overlay.
+  **Re-pinned from the spike's original 0.150.1** when the jewel-widget-layer
   migration moved the whole triple down to Compose 1.11.0 (stable) to match Jewel — see
   [jewel-widget-layer.md](jewel-widget-layer.md) for why the three versions move together.
 - **Compose compiler plugin:** `kotlin("plugin.compose") version "2.3.20"` (versioned in lockstep with
@@ -129,4 +135,6 @@ and the client falls back to the plain solid-edge composite; it must never crash
   `sendPointerEvent`) into the scene, gated to the reserved strip, with focus handling vs MC's own input.
 - **Efficiency:** the spike re-renders + re-uploads every frame; a production path would render only on
   Compose invalidation (`scene.hasInvalidations()`) and reuse the snapshot otherwise.
-- **Cross-platform:** move off the Windows-x64-pinned skiko native.
+- **Cross-platform:** the skiko native is now selected per host JVM (see Build wiring), so Windows,
+  Linux/WSL2 and macOS all resolve a working native. What is still unproven is the *rendering* path
+  on non-Windows hosts beyond the test suite.

@@ -19,7 +19,8 @@ Three coordinates in `build.gradle.kts` are load-bearing as a set, not independe
 
 - `org.jetbrains.jewel:jewel-int-ui-standalone:0.39.1-262.9437.29`
 - `org.jetbrains.compose.{runtime,ui,foundation}-desktop:1.11.0` (stable)
-- `org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.144.6`
+- `org.jetbrains.skiko:skiko-awt-runtime-<host platform>:0.144.6` (classifier chosen per host JVM by
+  `skikoNativePlatform`; only the **version** is load-bearing here)
 
 Jewel `0.39.1-262.9437.29` is built against Compose `1.11.0`, whose transitive `skiko-awt` is
 `0.144.6`. The project also declares the desktop-GL skiko native directly (for the raster upload

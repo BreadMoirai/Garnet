@@ -175,6 +175,36 @@ repositories {
 
 
 
+// The `skiko-awt-runtime-<platform>` classifier for the host running this build. Skiko publishes the
+// desktop-GL Skia native as one artifact per platform with no KMP attributes to pick between them, so
+// without the Compose Gradle plugin the choice has to be made here, at configuration time.
+//
+// This is a HOST-JVM decision, not a target one: the natives are loaded by the same JVM that runs
+// `runClient`/`runClientTest`/`test`, so `os.name`/`os.arch` of the configuring JVM is exactly right.
+// Picking the wrong one is not a build failure — `ComposeSurface.ensureNativeLoaded()` catches the
+// LibraryLoadException and cleanly disables the Compose surface, which surfaces only as Compose-less
+// test failures. See docs/ui/compose-in-mc-feasibility.md.
+val skikoNativePlatform: String = run {
+    val os = System.getProperty("os.name").lowercase()
+    val arch = when (val a = System.getProperty("os.arch").lowercase()) {
+        "x86_64", "amd64" -> "x64"
+        "aarch64", "arm64" -> "arm64"
+        else -> error("Unsupported os.arch '$a' for skiko natives; see build.gradle.kts skikoNativePlatform")
+    }
+    when {
+        // Skiko publishes no windows-arm64 native, so fail with a readable message rather than
+        // letting dependency resolution die on a coordinate that was never published.
+        os.startsWith("windows") && arch == "arm64" ->
+            error("skiko publishes no windows-arm64 native; run the build under an x64 JVM")
+        os.startsWith("windows") -> "windows-$arch"
+        // WSL2 reports os.name=Linux and runs a Linux JVM, so it needs the linux natives even though
+        // the host machine is Windows — hence the check is on the JVM's OS, never on the machine.
+        os.startsWith("linux") -> "linux-$arch"
+        os.startsWith("mac") || os.startsWith("darwin") -> "macos-$arch"
+        else -> error("Unsupported os.name '$os' for skiko natives; see build.gradle.kts skikoNativePlatform")
+    }
+}
+
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft("com.mojang:minecraft:${project.property("minecraft_version")}")
@@ -242,16 +272,16 @@ dependencies {
 
     // === Compose-in-MC feasibility spike (docs/ui/compose-in-mc-feasibility.md) ==================
     // Skiko is JetBrains' Skia binding; the `skiko-awt-runtime-<platform>` artifact bundles the
-    // desktop-GL Skia native for that platform. This project's dev/runtime host is Windows-x64
-    // (runClient(Test) launches via cmd.exe on Windows), MC 26.2 ships LWJGL 3.4.1 + JDK 25, and
-    // Skiko 0.144.6 is the desktop-GL build Compose Multiplatform 1.11.x targets. We take Skiko
-    // directly (not the Compose Gradle plugin) so the Skia-over-Blaze3D-GL coexistence — the actual
-    // spike risk — is proven without dragging in the @Composable compiler. If this platform detail
-    // ever needs to be cross-platform, switch to `org.jetbrains.skiko:skiko-awt` + per-OS runtime.
+    // desktop-GL Skia native for that platform, chosen for the host JVM by `skikoNativePlatform`
+    // above (Windows-x64 is the usual dev host, but the tests also run under Linux/WSL2).
+    // MC 26.2 ships LWJGL 3.4.1 + JDK 25, and Skiko 0.144.6 is the desktop-GL build Compose
+    // Multiplatform 1.11.x targets. We take Skiko directly (not the Compose Gradle plugin) so the
+    // Skia-over-Blaze3D-GL coexistence — the actual spike risk — is proven without dragging in the
+    // @Composable compiler.
     // Re-pinned 0.150.1 -> 0.144.6: this must EXACTLY match the transitive skiko of the Compose line
     // below, which moved to 1.11.0 to match Jewel. A mismatch risks a skiko version-guard failure or
     // a native ABI break. See docs/ui/jewel-widget-layer.md.
-    "clientImplementation"("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.144.6")
+    "clientImplementation"("org.jetbrains.skiko:skiko-awt-runtime-$skikoNativePlatform:0.144.6")
 
     // Compose Multiplatform runtime (Step 3): a REAL ComposeScene renders to a Skia canvas, replacing
     // the plain-Skia proof panel. We pin 1.11.0 (stable) because Jewel 0.39.1-262.9437.29 is built
