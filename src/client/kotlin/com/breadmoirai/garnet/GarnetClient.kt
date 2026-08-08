@@ -23,7 +23,8 @@ class GarnetClient : ClientModInitializer {
         registerDockKeybinds()
         registerDockWorldLifecycle()
         registerExplorerLifecycle()
-        // Seed the Project Explorer into the LEFT dock (region stays hidden until Shift+1 reveals it).
+        // Seed the Project Explorer into the LEFT dock. The region starts hidden; joining a Garnet
+        // world reveals it (see applyDockAutoOpen), and Shift+1 toggles it by hand.
         com.breadmoirai.garnet.ui.dock.DockState.leftPanels
             .add(com.breadmoirai.garnet.editor.ui.explorerPanel())
         LOGGER.debug("[GarnetClient#onInitializeClient] client initialization complete")

@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
 tags: [compose, dock, input, mixin, glfw, keybind, hit-test]
-summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds, ESC-drops-focus, and the DockState.regionAt hit test behind click-to-focus in both directions.
+summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, and the DockState.regionAt hit test behind click-to-focus in both directions.
 ---
 
 # Dock input routing
@@ -180,6 +180,15 @@ of `DockKeybinds.kt` so it can be exercised by a plain-JVM test — see "Test co
 after mutating
 `DockState` and before the framebuffer-resize call — see "Render enablement is derived from
 DockState" below for what it does and why it makes the dock reachable on its own.
+
+Both branches also persist the resulting LEFT visibility via `DockLayoutStore.save(...)`: the Shift+1
+toggle always does, and Alt+1 only on its show-and-focus half (its focus-only half — clearing focus on
+an already-focused region — changes no visibility, so it does not write). This is what joining a
+Garnet world later reads back — see
+[dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world](dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world).
+Auto-open itself changes visibility only: `DockState.focusedRegion` stays `null`, so the mixins above
+keep routing to the game and the cursor stays grabbed — Alt+1 remains the only path to focusing the
+panel.
 
 Registered from `GarnetClient.onInitializeClient()` next to `registerViewportToggle()`.
 

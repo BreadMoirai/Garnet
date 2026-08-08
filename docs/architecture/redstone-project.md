@@ -98,8 +98,11 @@ Client:
 - `editor/ui/ProjectExplorerPanel` + `editor/ui/ExplorerToolbar` + `editor/ui/ProjectTreeState` +
   `editor/ui/ExplorerTreeState` — the Compose dock panel, built on Jewel widgets (`LazyTree`,
   `PopupMenu`, `IconButton`), that renders `snapshot.root` (`FolderNode`/`FileNode`) via
-  `ExplorerTreeState.buildTreeFrom`, with per-folder expand/collapse (LEFT region, hidden by
-  default — Shift+1 reveals it). `ProjectTreeState` is `mutableStateOf`-backed server-driven state
+  `ExplorerTreeState.buildTreeFrom`, with per-folder expand/collapse (LEFT region, auto-opened on
+  joining a Garnet-capable world subject to the remembered `garnet-dock.json` preference, with
+  Shift+1/Alt+1 as the manual toggles — see
+  [ui/dock-framework.md](../ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world)).
+  `ProjectTreeState` is `mutableStateOf`-backed server-driven state
   (snapshot + status) fed by the S2C receivers; `ExplorerTreeState` owns selection/expansion by
   wrapping a single Jewel `TreeState`; `explorerPanel()` returns the LEFT-dock `Panel`. A folder is
   a "spec-folder" (loadable) iff it directly contains a `FileNode` named `*.spec.kts`: clicking it
