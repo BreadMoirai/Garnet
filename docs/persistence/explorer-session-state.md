@@ -1,7 +1,7 @@
 ---
 title: Explorer session state
-tags: [storage, config, explorer, client, persistence]
-summary: The Explorer's expansion and selection persist to config/garnet-explorer.json, keyed by project root, restored one-shot when the first tree snapshot lands after a join.
+tags: [storage, config, explorer, client, persistence, dock]
+summary: The Explorer's expansion and selection persist to config/garnet-explorer.json, keyed by project root, restored one-shot when the first tree snapshot lands after a join; also covers the sibling config/garnet-dock.json store for remembered dock LEFT visibility.
 ---
 
 # Explorer session state
@@ -124,3 +124,26 @@ See [ui/dock-dialogs.md](../ui/dock-dialogs.md) for the root picker that produce
 state is keyed against, and
 [architecture/redstone-project.md](../architecture/redstone-project.md) for where
 `ExplorerTreeState`/`ProjectTreeState` sit in the Explorer's overall client-side split.
+
+## Sibling store: `config/garnet-dock.json`
+
+`com.breadmoirai.garnet.config.DockLayoutStore` round-trips a second, unrelated file:
+`config/garnet-dock.json`, a single `{ "leftVisible": true }` record of whether the dock's LEFT
+region should be visible. It is read on `ClientPlayConnectionEvents.JOIN` by
+`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`) to auto-open the Explorer on a Garnet-capable
+world — see [ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world](../ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world).
+
+It is a separate file from `garnet-explorer.json` above, not a field added to that record, because
+the two stores have opposite scoping. `garnet-explorer.json` is keyed by project root and, per
+the singleplayer-only section above, is written only when `ExplorerSessionGate.isSingleplayer()`
+holds. Dock visibility is neither: it is not root-keyed, and it must also restore on a remote
+Garnet server, so folding it into the root-keyed, singleplayer-gated file would silently inherit
+both restrictions.
+
+It is also written at a different point in the session than `garnet-explorer.json`. Rather than
+reading `DockState` in the `DISCONNECT` handler, `DockLayoutStore.save(...)` is called directly in
+`registerDockKeybinds()` on the Shift+1 / Alt+1 keypresses that change LEFT visibility. A
+disconnect-time read would race handler ordering: `DockState.closeAll()` (also run on
+`DISCONNECT`, see [ui/dock-framework.md#world-session-lifecycle](../ui/dock-framework.md#world-session-lifecycle))
+sets `leftVisible = false` on that same event, so a save at that point could easily persist the
+programmatic close instead of the player's last real choice.

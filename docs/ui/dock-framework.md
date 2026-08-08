@@ -1,7 +1,7 @@
 ---
 title: GarnetDock — full-window Compose dock over the world composite
-tags: [compose, dock, layout, panels, input, rendering]
-summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real framebuffer pixels via ComposeSceneHost, why the center is transparent by omission, and two Compose API gotchas (verified against 1.11.0, formerly 1.12.0-beta02).
+tags: [compose, dock, layout, panels, input, rendering, lifecycle]
+summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real framebuffer pixels via ComposeSceneHost, why the center is transparent by omission, how joining a Garnet-capable world auto-opens LEFT via applyDockAutoOpen() and garnet-dock.json, and two Compose API gotchas (verified against 1.11.0, formerly 1.12.0-beta02).
 ---
 
 # GarnetDock — full-window Compose dock
@@ -50,11 +50,25 @@ was removed once it became clear only one panel is ever registered per region. `
 on `DockState` and `RegionColumn` still reads it via `activeTabFor`, so a future multi-panel region only
 needs a new way to *write* that index (the old `setActiveTab` was deleted with the strip since nothing
 else called it) — switching UI is a separate concern from which panel is "active". LEFT/RIGHT/
-BOTTOM are hidden by default (`DockState.leftVisible` etc. all start `false`); CENTER's visibility is
-derived (`centerPanels.isNotEmpty()`) rather than an independent flag, since an empty CENTER must stay
-transparent. Seeding a panel into a region (e.g. `explorerPanel()` into `leftPanels` at client init)
-does not make the region visible — only `setVisible`/`toggleVisible` (driven by the Alt+1/Shift+1
-keybinds, see `dock-input-routing.md`) does that, so the dock is off-by-default even once panels exist.
+BOTTOM start hidden at client init (`DockState.leftVisible` etc. all start `false`); CENTER's
+visibility is derived (`centerPanels.isNotEmpty()`) rather than an independent flag, since an empty
+CENTER must stay transparent. Seeding a panel into a region (e.g. `explorerPanel()` into `leftPanels`
+at client init) does not make the region visible — only `setVisible`/`toggleVisible` does that, driven
+by the Alt+1/Shift+1 keybinds (see `dock-input-routing.md`) or, on joining a world, by auto-open below.
+
+### LEFT auto-opens on joining a Garnet-capable world
+
+A JOIN handler in `registerDockWorldLifecycle()` (`viewport/DockKeybinds.kt`) calls
+`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`), which reveals LEFT — and only LEFT — when three
+things all hold: the peer speaks Garnet (`DockAutoOpenGate.isGarnetServer()`, defaulting to
+`ClientPlayNetworking.canSend(ListEditorTreeC2S.TYPE)` — a swappable `var` that is the seam unit
+tests use to drive both branches without a server), the boolean remembered in `config/garnet-dock.json`
+(`DockLayoutStore`, see
+[persistence/explorer-session-state.md](../persistence/explorer-session-state.md#sibling-store-configgarnet-dockjson))
+is `true`, and LEFT is not already visible. A vanilla server never gets a dock: an empty Explorer that
+shrinks the viewport is strictly worse than no dock at all. `applyDockAutoOpen()` only changes
+visibility — it never calls `DockInputRouter.focus(...)`, so `DockState.focusedRegion` stays `null` and
+the game keeps input (see [dock-input-routing.md](dock-input-routing.md)).
 
 Default region sizes live on `DockState` (`DEFAULT_LEFT` = **280**, `DEFAULT_RIGHT`, `DEFAULT_BOTTOM`).
 `DEFAULT_LEFT` is 280 rather than a rounder 260 for historical reasons only: it was originally sized
@@ -98,7 +112,10 @@ stale menu is still painting.
 `registerDockWorldLifecycle()` (`viewport/DockKeybinds.kt`) hooks
 `ClientPlayConnectionEvents.DISCONNECT` and calls `DockState.closeAll()`, then `syncDockViewport()`
 and `garnet$updateScaledFramebuffer(true)`. Without it the dock keeps painting over the title screen,
-the viewport stays shrunk, and a focused region keeps eating GLFW input through the mixins.
+the viewport stays shrunk, and a focused region keeps eating GLFW input through the mixins. The same
+function also hooks `ClientPlayConnectionEvents.JOIN`, calling `applyDockAutoOpen()` and, only when it
+returns `true`, the same `syncDockViewport()` / `garnet$updateScaledFramebuffer(true)` pair — see
+"LEFT auto-opens on joining a Garnet-capable world" above.
 
 The whole callback runs inside `mc.execute { ... }`. `fabric-networking-api-v1` fires `DISCONNECT`
 from two sites in `ClientConnectionMixin` — `handleDisconnection` on the main thread, or
@@ -176,8 +193,9 @@ rows. The pattern:
   NUL-suffixed placeholder id it injects for a pending create. Keep both state objects separate
   from the `Panel` so packet handlers never touch Compose internals.
 - **`explorerPanel(): Panel`** returns the tab (`Panel("garnet.explorer", "Explorer") { … }`);
-  it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT stays
-  hidden by default (Shift+1 reveals it).
+  it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT starts hidden
+  at that point; Shift+1/Alt+1 reveal it manually, and joining a Garnet-capable world auto-opens it
+  (see "LEFT auto-opens on joining a Garnet-capable world" above).
 - **The tree renders via Jewel's `LazyTree`**, not a hand-written recursive composable.
   `val tree = remember(snap.root, edit) { ExplorerTreeState.buildTreeFrom(snap.root, edit) }` builds
   the `Tree<FileTreeNode>` — **`remember` it**: the enclosing scope also reads `ProjectTreeState.status`,
