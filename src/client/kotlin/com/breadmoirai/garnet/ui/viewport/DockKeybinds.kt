@@ -45,6 +45,10 @@ fun registerDockKeybinds() {
                     // save would race Fabric's handler ordering and persist the programmatic close
                     // instead of what the player chose. Writing on the keypress also means no
                     // CLIENT_STOPPING backstop is needed for the close-the-window-in-world path.
+                    // This keybind is not gated on DockAutoOpenGate.isGarnetServer(), unlike
+                    // applyDockAutoOpen() — deliberately: toggling on a vanilla server still
+                    // persists "what the player last chose" for the next Garnet join, which is
+                    // the one place this keybind's scope and the auto-open gate's scope diverge.
                     DockLayoutStore.save(DockState.isVisible(DockRegion.LEFT))
                     syncDockViewport()
                     (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)

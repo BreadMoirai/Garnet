@@ -139,13 +139,14 @@ reproduced on the pre-existing `DockLifecycleTest`, so it is not specific to any
 class or to newly added ones — it reproduces across the `test` source set generally, which
 runs Kotest specs (`io.kotest:kotest-runner-junit5`) rather than plain JUnit Jupiter classes.
 
-Gradle's `--tests` filtering has to pre-select candidate test classes before running them,
-which relies on the test framework exposing a conventional class/method shape (JUnit
-Jupiter's `@Test`-annotated methods, or JUnit4-style classes). Kotest specs don't have that
-shape — a spec's individual tests are registered dynamically by the Kotest JUnit Platform
-`TestEngine` at discovery time, not declared as annotated methods Gradle can see up front —
-so Gradle's pattern matcher finds nothing to select and reports the suite as empty, even
-though the same spec runs and passes as part of the unfiltered task. This matches the same
+Most likely cause, not verified against Kotest's engine: Gradle's `--tests` filtering has to
+pre-select candidate test classes before running them, which relies on the test framework
+exposing a conventional class/method shape (JUnit Jupiter's `@Test`-annotated methods, or
+JUnit4-style classes). Kotest specs don't have that shape — a spec's individual tests are
+registered dynamically by the Kotest JUnit Platform `TestEngine` at discovery time, not
+declared as annotated methods Gradle can see up front — so Gradle's pattern matcher finds
+nothing to select and reports the suite as empty, even though the same spec runs and passes
+as part of the unfiltered task. This matches the same
 symptom recorded independently across several `docs/superpowers/plans/*.md` snapshots in this
 repo, so it is a known, repeatable interop gap rather than a one-off fluke.
 
