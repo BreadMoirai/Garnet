@@ -1,0 +1,105 @@
+package com.breadmoirai.garnet.client.ui.dock
+
+import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.Panel
+import com.breadmoirai.garnet.ui.dock.regionAt
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
+
+/**
+ * The dock's pointer hit test: which region (if any) owns a window coordinate. `null` means the bare
+ * world viewport, which is what `DockInputRouter` keys click-to-return-to-game off.
+ *
+ * Pure arithmetic over [DockState], so it needs no client — the routing of a real click through this
+ * decision is `DockInputSpec` in `src/clientTest`. Geometry here must stay in lockstep with
+ * `GarnetDock`'s layout; every case below names the `GarnetDock` rule it pins.
+ */
+class DockHitTestTest : FunSpec({
+
+    val w = 1920
+    val h = 1080
+
+    afterTest { DockState.reset() }
+
+    test("with nothing visible the whole window is the world") {
+        DockState.reset()
+        DockState.regionAt(0, 0, w, h) shouldBe null
+        DockState.regionAt(w / 2, h / 2, w, h) shouldBe null
+        DockState.regionAt(w - 1, h - 1, w, h) shouldBe null
+    }
+
+    test("a visible LEFT region claims its strip and nothing beyond it") {
+        DockState.reset()
+        DockState.setVisible(DockRegion.LEFT, true)
+        DockState.setSize(DockRegion.LEFT, 280)
+
+        DockState.regionAt(0, 0, w, h) shouldBe DockRegion.LEFT
+        DockState.regionAt(279, h / 2, w, h) shouldBe DockRegion.LEFT
+        // The first pixel past the strip is world, not LEFT.
+        DockState.regionAt(280, h / 2, w, h) shouldBe null
+    }
+
+    test("a visible RIGHT region claims the strip measured from the right window edge") {
+        DockState.reset()
+        DockState.setVisible(DockRegion.RIGHT, true)
+        DockState.setSize(DockRegion.RIGHT, 220)
+
+        DockState.regionAt(w - 1, h / 2, w, h) shouldBe DockRegion.RIGHT
+        DockState.regionAt(w - 220, h / 2, w, h) shouldBe DockRegion.RIGHT
+        DockState.regionAt(w - 221, h / 2, w, h) shouldBe null
+    }
+
+    test("a visible BOTTOM region claims the full-width band and wins the corner overlap") {
+        DockState.reset()
+        DockState.setVisible(DockRegion.BOTTOM, true)
+        DockState.setSize(DockRegion.BOTTOM, 160)
+        DockState.setVisible(DockRegion.LEFT, true)
+        DockState.setSize(DockRegion.LEFT, 280)
+        DockState.setVisible(DockRegion.RIGHT, true)
+        DockState.setSize(DockRegion.RIGHT, 220)
+
+        DockState.regionAt(w / 2, h - 1, w, h) shouldBe DockRegion.BOTTOM
+        DockState.regionAt(w / 2, h - 160, w, h) shouldBe DockRegion.BOTTOM
+        DockState.regionAt(w / 2, h - 161, w, h) shouldBe null
+        // GarnetDock draws BOTTOM full-width over the LEFT/RIGHT columns (which stop at realH-bottom),
+        // so both bottom corners belong to BOTTOM.
+        DockState.regionAt(10, h - 1, w, h) shouldBe DockRegion.BOTTOM
+        DockState.regionAt(w - 10, h - 1, w, h) shouldBe DockRegion.BOTTOM
+        // Above the band the columns still own their strips.
+        DockState.regionAt(10, h - 161, w, h) shouldBe DockRegion.LEFT
+        DockState.regionAt(w - 10, h - 161, w, h) shouldBe DockRegion.RIGHT
+    }
+
+    test("a hidden region claims nothing regardless of its stored size") {
+        DockState.reset()
+        DockState.setSize(DockRegion.LEFT, 400)
+        DockState.setSize(DockRegion.BOTTOM, 300)
+        // Never made visible: sizes are remembered but reserve no space.
+        DockState.regionAt(10, 10, w, h) shouldBe null
+        DockState.regionAt(10, h - 1, w, h) shouldBe null
+    }
+
+    test("CENTER owns the middle only while it holds a panel") {
+        DockState.reset()
+        DockState.setVisible(DockRegion.LEFT, true)
+        DockState.setSize(DockRegion.LEFT, 280)
+
+        // Empty CENTER is transparent by omission: the middle IS the world.
+        DockState.regionAt(w / 2, h / 2, w, h) shouldBe null
+
+        DockState.centerPanels.add(Panel("garnet.test.center", "CenterProbe") {})
+        DockState.regionAt(w / 2, h / 2, w, h) shouldBe DockRegion.CENTER
+        // An occupying CENTER does not steal the edge strips.
+        DockState.regionAt(10, h / 2, w, h) shouldBe DockRegion.LEFT
+    }
+
+    test("coordinates outside the window belong to no region") {
+        DockState.reset()
+        DockState.setVisible(DockRegion.LEFT, true)
+        DockState.regionAt(-1, 10, w, h) shouldBe null
+        DockState.regionAt(10, -1, w, h) shouldBe null
+        DockState.regionAt(w, 10, w, h) shouldBe null
+        DockState.regionAt(10, h, w, h) shouldBe null
+    }
+})

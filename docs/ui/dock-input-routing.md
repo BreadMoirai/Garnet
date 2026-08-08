@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
-tags: [compose, dock, input, mixin, glfw, keybind]
-summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds, and ESC-drops-focus.
+tags: [compose, dock, input, mixin, glfw, keybind, hit-test]
+summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds, ESC-drops-focus, and the DockState.regionAt hit test behind click-to-focus in both directions.
 ---
 
 # Dock input routing
@@ -15,6 +15,46 @@ This article covers routing into the *Compose* dock. Vanilla `Screen`s (pause me
 opened while the viewport is shrunk are a separate concern: their cursor coordinates are re-mapped
 through the content-rect offset by `MouseHandlerViewportMixin` — see
 [architecture/shrink-viewport-compose-model.md#cursor-input-maps-through-the-shrink-offset](../architecture/shrink-viewport-compose-model.md#cursor-input-maps-through-the-shrink-offset).
+
+## Click-to-focus, both directions
+
+Focus is not keyboard-only. `DockState.regionAt(x, y, realW, realH)` (`ui/dock/DockHitTest.kt`)
+answers "who owns this window pixel", returning `null` for the **bare world viewport**. It is the
+pointer-side mirror of `insets()` and reproduces `GarnetDock`'s draw order — BOTTOM's full-width band
+first (so it wins both corners, exactly as it is drawn over where the LEFT/RIGHT columns stop), then
+LEFT, then RIGHT, then CENTER *only when `centerPanels` is non-empty*. An empty CENTER is transparent
+by omission and **is** the world, which is the whole point of the `null` case. Hidden regions and
+splitters need no special case: a hidden region reserves nothing, and splitters are drawn inside the
+reserved strips. It takes no `Minecraft`/GLFW dependency, so it is unit-tested in `DockHitTestTest`
+(`src/test/.../ui/dock/`) the same way `syncDockViewport` was split out for testability.
+
+Both gestures skip themselves when `ViewportState.realWidth/realHeight` are still `0` — before
+`WindowMixin` has cached a real framebuffer size the layout is unknowable, and guessing it from a
+zero-sized window would drop focus on the first click after a startup/resize race.
+
+- **World → game.** In `onGlfwPress`, a press while captured whose cursor is over the bare world
+  calls `clearFocus()` and delivers *nothing* to Compose. The press is still **consumed** (the mixin
+  cancels it regardless): leaving a panel is click-to-focus, never click-through, so a stray world
+  click cannot mine a block or swing at a mob. With a vanilla `Screen` open the same gesture drops
+  dock focus and `clearFocus()` already skips `grabMouse()`, so the cursor stays free for the screen.
+  Because that press drops capture, the matching **release** would arrive uncaptured and reach
+  vanilla as an unmatched button-up — so the press records the button in a one-shot `swallowRelease`,
+  which the mixin's release branch consumes.
+- **Game → dock.** `onGlfwPressUncaptured(button)` is called from the mixin's *uncaptured* branch and
+  returns `true` (mixin cancels) only when `DockState.anyActive()`, a vanilla `Screen` is open, and
+  the cursor is over a region. It then calls `focus(region)` **and** forwards the press into Compose,
+  so the click lands on the widget it was aimed at instead of costing a click. Without it that click
+  reaches the `Screen` instead — and since `MouseHandlerViewportMixin` remaps `Screen` cursor
+  coordinates through the content-rect offset, a dock-strip click landed on a bogus screen
+  coordinate rather than being ignored. The "a `Screen` must be open" gate is deliberate: with the
+  cursor grabbed for play GLFW reports an accumulating raw delta, not a pointer position, so that
+  state stays keybind-only.
+
+The asymmetry (leaving consumes, entering delivers) is intentional: acting on the world you clicked
+*past* is destructive, acting on the widget you clicked *at* is what you wanted.
+
+`anyActive()` is the guard that keeps the OFF-by-default invariant intact — with the dock closed the
+uncaptured branch is a plain field read that allocates nothing and touches no GLFW/AWT.
 
 ## The capture gate
 
@@ -49,13 +89,17 @@ The historical GLFW-callback signatures changed in 26.1.2; the injections target
     the key callback above only ever carries key codes, never characters.
 
 A wrong `@Inject` target here fails silently (mixin doesn't apply) or crashes at class-load, so these
-descriptors are load-bearing. All are HEAD, `cancellable = true`, and cancel vanilla **only when
-`captured`** — otherwise they return without touching `ci`.
+descriptors are load-bearing. All are HEAD and `cancellable = true`. `onMove`/`onScroll` cancel
+vanilla **only when `captured`**, otherwise returning without touching `ci`. `onButton` is the one
+exception: its uncaptured branch consults `onGlfwPressUncaptured` / `consumeSwallowedRelease` (see
+"Click-to-focus, both directions" above), which decline unless the dock is on screen with a `Screen`
+open — so with the dock closed it is still byte-for-byte vanilla.
 
 ## What is and isn't forwarded
 
 - Pointer move/press/release/scroll are forwarded into `ComposeInput.sendPointer*/sendScroll`
-  (guarded — a `disabled` Compose surface no-ops). This is the load-bearing dispatch the Explorer
+  (guarded — a `disabled` Compose surface no-ops) — except a press over the bare world viewport,
+  which is the click-to-focus gesture described above and reaches neither Compose nor the game. This is the load-bearing dispatch the Explorer
   relies on (pointer-driven interactions). **The GLFW button index is threaded all the way
   through as of the context-menu work**: `onGlfwPress(button: Int)`/`onGlfwRelease(button: Int)`
   map the raw index via `glfwMouseButtonToPointerButton` (file-scope function in
@@ -164,7 +208,7 @@ unaffected by `syncDockViewport()`.
 `DockState.reset()` + a LEFT panel append (necessary because `DockState.leftPanels` already holds
 the production Explorer panel at tab index 0, and a panel appended without a reset would land on a
 non-active tab whose `content()` is never composed, since `RegionColumn` only invokes
-`panels[active].content(panels[active])`) — exercised through six numbered steps, all through the
+`panels[active].content(panels[active])`) — exercised through eight numbered steps, all through the
 **real** router→`ComposeInput`→scene path:
 
 1. A raw secondary press (`onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`) is collected by a
@@ -180,6 +224,17 @@ non-active tab whose `content()` is never composed, since `RegionColumn` only in
    `DockState.focusedRegion` to `null`, while a non-ESC key while captured is delivered but reported
    `false` (not consumed) — the ESC-only-consumed contract.
 6. An uncaptured ESC (focus already `null`) reports `false` and drops nothing.
+7. Click-to-return-to-game: with LEFT focused, a press at `x=600` (well past the 300 px LEFT strip,
+   no other region visible) drops `focusedRegion` to `null` **and** leaves the probe's click counter
+   untouched — the consumed-not-passed-through contract — after which
+   `consumeSwallowedRelease(LEFT_BUTTON)` reports `true` exactly once.
+8. Click-to-focus-the-dock: uncaptured with no `Screen` open, `onGlfwPressUncaptured` declines and
+   focus stays `null`; open a bare probe `Screen` and the same press at the panel's coordinates
+   reports `true`, focuses LEFT, and increments the probe's click counter.
+
+Steps 7–8 first assert `ViewportState.realWidth/realHeight` are non-zero. Both gestures hit-test
+against that cached size and *skip themselves* when it is unknown, so without that assertion a client
+that never populated it would make both steps vacuously pass.
 
 `DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
 
@@ -190,3 +245,9 @@ to `Primary`/`Secondary`/`Tertiary` and an unmapped index (`7`) to `null`) and t
 reverts to `false` once hidden again, and also flips to `true` when only `focusedRegion` is set)
 don't need a client at all, so they live in `DockViewportSyncTest`
 (`src/test/kotlin/com/breadmoirai/garnet/client/ui/dock/`) instead of `DockInputSpec`.
+
+`DockHitTestTest`, in the same package, is client-free for the same reason: it pins
+`DockState.regionAt`'s geometry against `GarnetDock`'s layout (bare world, each visible edge, hidden
+edges claiming nothing, BOTTOM winning both bottom corners, CENTER only while it holds a panel,
+out-of-window coordinates). Those two files must stay in lockstep — a `GarnetDock` layout change that
+`DockHitTestTest` doesn't follow silently misroutes clicks.

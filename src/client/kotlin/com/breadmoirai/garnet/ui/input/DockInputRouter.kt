@@ -9,6 +9,8 @@ import androidx.compose.ui.input.pointer.PointerButton
 import com.breadmoirai.garnet.ui.compose.ComposeInput
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.regionAt
+import com.breadmoirai.garnet.ui.viewport.ViewportState
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import java.awt.Canvas
@@ -50,8 +52,45 @@ object DockInputRouter {
         if (captured) ComposeInput.sendPointerMove(Offset(x.toFloat(), y.toFloat()))
     }
 
+    /**
+     * Which dock region the cursor is currently over, or `null` for the bare world viewport —
+     * **and also `null` when the answer is unknowable**, i.e. before `WindowMixin` has cached a real
+     * framebuffer size. Callers must therefore not treat a `null` as "definitely the world" without
+     * first checking [geometryKnown]; guessing the layout from a zero-sized window would drop dock
+     * focus on the very first click after a resize/startup race.
+     */
+    private fun regionUnderCursor(): DockRegion? =
+        DockState.regionAt(lastX.toInt(), lastY.toInt(), ViewportState.realWidth, ViewportState.realHeight)
+
+    /** True once `WindowMixin` has cached a real framebuffer size, so [regionUnderCursor] means something. */
+    private val geometryKnown: Boolean
+        get() = ViewportState.realWidth > 0 && ViewportState.realHeight > 0
+
+    /**
+     * A GLFW button whose **press** was handled as a focus gesture rather than delivered anywhere,
+     * recorded so the matching release can be swallowed too (see [consumeSwallowedRelease]).
+     */
+    @Volatile private var swallowRelease: Int? = null
+
+    /**
+     * Press while a panel is focused.
+     *
+     * A press over the **bare world viewport** is click-to-return-to-game: it drops dock focus (which
+     * re-grabs the cursor when no [net.minecraft.client.gui.screens.Screen] is open) and delivers
+     * nothing to Compose. The press is still *consumed* — `MouseHandlerMixin` cancels it regardless —
+     * so leaving a panel never mines a block or swings at a mob. Contrast [onGlfwPressUncaptured],
+     * which deliberately *does* deliver the click that enters a panel: acting on the widget you aimed
+     * at is what you wanted, acting on the world you clicked past is not.
+     *
+     * Everything else routes into the scene as before.
+     */
     fun onGlfwPress(button: Int) {
         if (!captured) return
+        if (geometryKnown && regionUnderCursor() == null) {
+            swallowRelease = button
+            clearFocus()
+            return
+        }
         val composeButton = glfwMouseButtonToPointerButton(button) ?: return
         ComposeInput.sendPointerPress(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
     }
@@ -60,6 +99,57 @@ object DockInputRouter {
         if (!captured) return
         val composeButton = glfwMouseButtonToPointerButton(button) ?: return
         ComposeInput.sendPointerRelease(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
+    }
+
+    /**
+     * Press while the dock is **not** captured, called from `MouseHandlerMixin`'s uncaptured branch.
+     * Returns `true` when the press was handled here and the mixin should cancel vanilla.
+     *
+     * This is the inbound half of click-to-focus: with a vanilla [net.minecraft.client.gui.screens.Screen]
+     * open the cursor is free, so a click on a dock region is a real gesture — it focuses that region
+     * *and* is delivered into the scene, so the click lands on the widget it was aimed at instead of
+     * costing the user a click. Without this the click reaches the `Screen` instead, and
+     * `MouseHandlerViewportMixin` remaps `Screen` cursor coordinates through the content-rect offset,
+     * so a click on the dock strip lands on a bogus screen coordinate rather than being ignored.
+     *
+     * Gated so ordinary play is untouched:
+     * - `DockState.anyActive()` — nothing on screen, nothing to click. This guard is what keeps the
+     *   dock's OFF-by-default invariant: with the dock closed this returns on a plain field read,
+     *   allocating nothing and touching no GLFW/AWT.
+     * - a `Screen` must be open. With the cursor **grabbed** for play there is no meaningful cursor
+     *   position (GLFW reports an ever-accumulating raw delta, not a pointer), so that state is
+     *   deliberately left alone — the keybinds remain the way in.
+     * - the cursor must be over a region, not the world.
+     *
+     * [focus] only calls `releaseMouse()` when no `Screen` is open, so nothing here changes the
+     * cursor. The matching release arrives *captured* and routes through [onGlfwRelease] normally.
+     */
+    fun onGlfwPressUncaptured(button: Int): Boolean {
+        if (captured) return false
+        if (!DockState.anyActive()) return false
+        if (!geometryKnown) return false
+        val mc = Minecraft.getInstance()
+        if (mc.gui.screen() == null) return false
+        val region = regionUnderCursor() ?: return false
+        val composeButton = glfwMouseButtonToPointerButton(button) ?: return false
+        focus(region)
+        ComposeInput.sendPointerPress(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
+        return true
+    }
+
+    /**
+     * One-shot: reports whether this release completes a press that [onGlfwPress] consumed as a
+     * focus gesture, so `MouseHandlerMixin` can cancel it too.
+     *
+     * Needed because that press *drops* capture: the release then arrives with `captured == false`
+     * and would fall through to vanilla, which would see a button-up with no matching button-down.
+     * Clearing on any release (not just a matching one) keeps a stale button from outliving the
+     * gesture that armed it.
+     */
+    fun consumeSwallowedRelease(button: Int): Boolean {
+        val pending = swallowRelease ?: return false
+        swallowRelease = null
+        return pending == button
     }
 
     fun onGlfwScroll(dx: Double, dy: Double) {

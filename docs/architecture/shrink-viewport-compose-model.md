@@ -96,3 +96,10 @@ camera-turn accumulation) that must not be offset. When the shrink is off both o
 the injections fall through, leaving vanilla coordinate mapping byte-for-byte. `contentOffsetX/Y`
 read the same `ViewportState.contentRect` the composite blit uses, so hitbox and paint stay in
 lockstep. Covered by `ViewportSpec` (clientTest).
+
+The remap only makes sense for a cursor *inside* the content rect. A click on a dock strip is outside
+it and would be remapped to a coordinate off the screen's left/bottom edge — a click aimed at the dock
+silently landing somewhere in the vanilla `Screen`. That case is now intercepted before it gets here:
+`DockInputRouter.onGlfwPressUncaptured` claims presses over a dock region while a `Screen` is open,
+focusing the panel and delivering the click to Compose instead. See
+[ui/dock-input-routing.md#click-to-focus-both-directions](../ui/dock-input-routing.md#click-to-focus-both-directions).
