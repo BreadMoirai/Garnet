@@ -27,6 +27,22 @@ data class EditorSession(
          * Keep a loaded project reachable after one of its ancestors is renamed: an activeSubpath
          * equal to [oldSubpath], or nested under it, is rewritten onto [newSubpath].
          */
+        /**
+         * Drop an active folder that no longer exists: an activeSubpath equal to [deletedSubpath],
+         * or nested under it, becomes null. The delete counterpart to [repointSession], which has a
+         * new path to rewrite onto where a delete has none.
+         *
+         * The boundary is a full path segment, matching [repointSession] and
+         * `EditorDimRegistry.rekeyForRename`: deleting "redstone" must clear a session in
+         * "redstone/clocks" but never one in the sibling "redstoneworks".
+         */
+        fun clearSessionUnder(playerId: UUID, deletedSubpath: String) {
+            val active = get(playerId)?.activeSubpath ?: return
+            if (active == deletedSubpath || active.startsWith("$deletedSubpath/")) {
+                setActive(playerId, null)
+            }
+        }
+
         fun repointSession(player: ServerPlayer, oldSubpath: String, newSubpath: String) {
             val active = get(player.uuid)?.activeSubpath ?: return
             when {
