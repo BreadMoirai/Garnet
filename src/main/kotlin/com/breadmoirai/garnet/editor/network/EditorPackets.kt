@@ -259,6 +259,18 @@ data class DuplicatePathC2S(val subpath: String) : CustomPacketPayload {
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
+/** Delete the file, or the whole folder subtree, at [subpath]. */
+data class DeletePathC2S(val subpath: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<DeletePathC2S>(id("delete_path"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, DeletePathC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, DeletePathC2S::subpath,
+            ::DeletePathC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 // === Structure S2C ===
 
 /**

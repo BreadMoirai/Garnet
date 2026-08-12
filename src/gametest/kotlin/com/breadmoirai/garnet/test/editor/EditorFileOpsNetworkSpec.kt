@@ -2,6 +2,7 @@ package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
+import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
@@ -590,6 +591,191 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
 
             LocalHistoryStore.revisions(root.resolve("clock copy.nbt")).shouldBeEmpty()
             LocalHistoryStore.revisions(root.resolve("clock.nbt")).shouldNotBeEmpty()
+        }
+    }
+
+    test("handleDelete removes a structure file") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.nbt"))
+            root.resolve("clock.nbt").exists().shouldBeFalse()
+        }
+    }
+
+    test("handleDelete removes a folder subtree") {
+        withServer { server, player, root ->
+            root.resolve("redstone/clocks").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone/clocks"), "tick")
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("redstone"))
+
+            root.resolve("redstone").exists().shouldBeFalse()
+        }
+    }
+
+    test("handleDelete refuses the project root") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S(""))
+            root.resolve("clock.nbt").exists().shouldBeTrue()
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+        }
+    }
+
+    test("handleDelete rejects a subpath that escapes the root") {
+        withServer { server, player, root ->
+            val evil = root.resolveSibling("evil").also { it.createDirectories() }
+            evil.resolve("secret.nbt").writeBytes(ByteArray(4))
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("../evil/secret.nbt"))
+
+            evil.resolve("secret.nbt").exists().shouldBeTrue()
+        }
+    }
+
+    test("deleting a placed structure unplaces it and drops its region assignment") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            val registry = EditorDimRegistry.of(server)
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.nbt"))
+
+            registry.placedBoxOf("clock.nbt").shouldBeNull()
+            registry.structureRegionOriginOf("clock.nbt").shouldBeNull()
+        }
+    }
+
+    test("deleting a dirty structure clears its dirty state so tick cannot recreate the file") {
+        // The core hazard: a subpath left in StructureAutoSave after its file is gone makes
+        // StructureCommit.tick retry on EVERY tick forever -- either failing repeatedly or writing
+        // the .nbt back out, resurrecting the file the player just deleted.
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.nbt"))
+
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeFalse()
+            StructureAutoSave.of(server).dirtySubpaths().contains("clock.nbt").shouldBeFalse()
+
+            // commitAll is what BEFORE_SAVE / SERVER_STOPPING run; it must not resurrect the file.
+            StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+            root.resolve("clock.nbt").exists().shouldBeFalse()
+        }
+    }
+
+    test("deleting a folder clears dirty state for a structure nested inside it") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone"), "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("redstone/clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("redstone"))
+
+            StructureAutoSave.of(server).isDirty("redstone/clock.nbt").shouldBeFalse()
+            registry.placedBoxOf("redstone/clock.nbt").shouldBeNull()
+        }
+    }
+
+    test("deleting a structure keeps its local history") {
+        // History is the recovery route for a delete, so it deliberately outlives the file.
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            val file = root.resolve("clock.nbt")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            LocalHistoryStore.revisions(file).shouldNotBeEmpty()
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.nbt"))
+
+            file.exists().shouldBeFalse()
+            LocalHistoryStore.revisions(file).shouldNotBeEmpty()
+        }
+    }
+
+    test("a delete proceeds even when the pre-delete commit fails") {
+        // Delete deliberately DIVERGES from rename here. Quiescing banks a final recovery revision,
+        // but blocking the delete when that fails would make a structure with a broken history dir
+        // undeletable from the editor -- for a node the player is explicitly destroying.
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+
+            // Booby-trap the history write exactly as the rename-abort test does: occupy
+            // index.json's path with a directory so the commit fails deterministically.
+            val file = root.resolve("clock.nbt")
+            val historyDir = LocalHistoryStore.dirFor(file)
+            historyDir.resolve("index.json").deleteIfExists()
+            historyDir.resolve("index.json").createDirectory()
+
+            try {
+                EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.nbt"))
+
+                file.exists().shouldBeFalse()                                   // deleted anyway
+                StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeFalse()
+                registry.placedBoxOf("clock.nbt").shouldBeNull()
+            } finally {
+                StructureAutoSave.of(server).clear("clock.nbt")
+                StructureCommit.clearBackoff(server, "clock.nbt")
+                historyDir.resolve("index.json").toFile().delete()
+            }
+        }
+    }
+
+    test("a failed delete leaves the world and registry intact") {
+        // Mirrors "a failed rename leaves a placed structure's registry state and blocks intact",
+        // and shares its platform assumption: RandomAccessFile on Windows does not request
+        // share-delete, so the unlink genuinely fails while the handle is held.
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            val registry = EditorDimRegistry.of(server)
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+
+            val lock = java.io.RandomAccessFile(root.resolve("clock.nbt").toFile(), "rw")
+            try {
+                EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.nbt"))
+            } finally {
+                lock.close()
+            }
+
+            root.resolve("clock.nbt").exists().shouldBeTrue()
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+            registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+        }
+    }
+
+    test("deleting an ancestor folder clears the active session") {
+        withServer { server, player, root ->
+            root.resolve("redstone/clocks").createDirectories()
+            EditorSession.setActive(player.uuid, "redstone/clocks")
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("redstone"))
+
+            EditorSession.get(player.uuid)!!.activeSubpath shouldBe null
         }
     }
 })

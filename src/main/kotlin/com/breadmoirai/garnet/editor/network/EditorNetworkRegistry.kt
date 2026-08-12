@@ -19,6 +19,7 @@ object EditorNetworkRegistry {
         PayloadTypeRegistry.serverboundPlay().register(CreateFolderC2S.TYPE, CreateFolderC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(RenamePathC2S.TYPE, RenamePathC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(DuplicatePathC2S.TYPE, DuplicatePathC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(DeletePathC2S.TYPE, DeletePathC2S.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorTreeSnapshotS2C.TYPE, EditorTreeSnapshotS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorFolderLoadedS2C.TYPE, EditorFolderLoadedS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorSaveReportS2C.TYPE, EditorSaveReportS2C.STREAM_CODEC)
@@ -61,6 +62,9 @@ object EditorNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(DuplicatePathC2S.TYPE) { payload, ctx ->
             ctx.server().execute { EditorFileOpsHandlers.handleDuplicate(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(DeletePathC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { EditorFileOpsHandlers.handleDelete(ctx.server(), ctx.player(), payload) }
         }
     }
 }

@@ -6,6 +6,8 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
+import com.breadmoirai.garnet.editor.structure.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
@@ -14,6 +16,7 @@ import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectory
+import kotlin.io.path.deleteExisting
 import kotlin.io.path.isDirectory
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
@@ -172,6 +175,90 @@ object EditorFileOpsHandlers {
             LOGGER.error("[project/duplicate] {} -> {}: {}", payload.subpath, newName, e.message, e)
             fail(player, "duplicate failed: ${e.message}"); return
         }
+
+        sendTree(server, player)
+    }
+
+    /**
+     * Delete the node at [payload].subpath, recursively for a folder.
+     *
+     * Order is fallible-IO-first, teardown-second, matching [handleRename]: if the unlink fails,
+     * nothing has been unplaced and the world is untouched, so the error the player sees is the
+     * whole story.
+     *
+     * The real hazard here is NOT the unlink — it is the leftover dirty entry. A subpath still in
+     * `StructureAutoSave` after its file is gone makes `StructureCommit.tick` retry on every tick
+     * forever, either failing repeatedly or writing the `.nbt` back out and resurrecting the file
+     * the player just deleted. Clearing the subtree's dirty state is the correctness step, not
+     * cleanup. This handler and `tick` both run on the server thread, so the window between the
+     * unlink and that clear cannot be observed.
+     *
+     * `LocalHistoryStore` revisions are deliberately RETAINED — they are the recovery route for a
+     * delete. The consequence: a file later created at the same path inherits them.
+     */
+    fun handleDelete(server: MinecraftServer, player: ServerPlayer, payload: DeletePathC2S) {
+        if (payload.subpath.isEmpty()) {
+            fail(player, "cannot delete the project root"); return
+        }
+        val root = EditorRootResolver.rootFor(server) ?: run {
+            fail(player, "project-root not configured"); return
+        }
+        val target = root.resolveSubpath(payload.subpath) ?: run {
+            fail(player, "path not found or escapes root: ${payload.subpath}"); return
+        }
+
+        // Best-effort quiesce: this banks a final recovery revision into the history that outlives
+        // the file. Unlike every other caller, a FAILURE here does not abort — blocking a delete
+        // because history could not be banked would make a structure with a broken history dir
+        // undeletable from the editor, for a node the player is explicitly destroying. Logged, not
+        // reported: the delete below succeeds, so an error packet would contradict what happened.
+        commitDirtyUnder(server, payload.subpath)?.let {
+            LOGGER.warn("[project/delete] proceeding despite failed pre-delete commit for {}: {}", payload.subpath, it)
+        }
+
+        try {
+            if (target.isDirectory()) {
+                // copyRecursively's counterpart returns false rather than throwing on a partial
+                // failure, so an unchecked call would silently report success for a subtree that is
+                // still half on disk.
+                if (!target.toFile().deleteRecursively()) {
+                    error("could not delete every entry under ${payload.subpath}")
+                }
+            } else {
+                target.deleteExisting()
+            }
+        } catch (e: Exception) {
+            LOGGER.error("[project/delete] {}: {}", payload.subpath, e.message, e)
+            fail(player, "delete failed: ${e.message}"); return
+        }
+
+        // structureSubpaths(), not placedStructureSubpaths(): a place that errored partway leaves a
+        // region assignment with no placed box, and that entry must go too.
+        val registry = EditorDimRegistry.of(server)
+        val doomed = registry.structureSubpaths().filter {
+            it == payload.subpath || it.startsWith("${payload.subpath}/")
+        }
+        for (subpath in doomed) {
+            // unplaceStructure BEFORE clearBounds, never after: clearBounds writes AIR through the
+            // 3-arg level.setBlock, which the setBlock mixin hooks unconditionally, so a
+            // still-registered subpath would have those very writes re-marked dirty by the mixin.
+            val box = registry.unplaceStructure(subpath)
+            if (box != null) {
+                StructurePersistence.clearBounds(registry.projectLevel(), box.origin, box.size)
+            }
+        }
+
+        val autoSave = StructureAutoSave.of(server)
+        for (subpath in autoSave.dirtySubpaths().filter {
+            it == payload.subpath || it.startsWith("${payload.subpath}/")
+        }) {
+            autoSave.clear(subpath)
+            // The backoff map is keyed by subpath too; leaving an entry behind leaks one per delete
+            // for the life of the server.
+            StructureCommit.clearBackoff(server, subpath)
+        }
+
+        EditorSession.clearSessionUnder(player.uuid, payload.subpath)
 
         sendTree(server, player)
     }
