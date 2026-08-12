@@ -271,6 +271,22 @@ data class DeletePathC2S(val subpath: String) : CustomPacketPayload {
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
+/**
+ * Move the file or folder at [subpath] into [destFolderSubpath] (`""` = the project root), keeping
+ * its name.
+ */
+data class MovePathC2S(val subpath: String, val destFolderSubpath: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<MovePathC2S>(id("move_path"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, MovePathC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, MovePathC2S::subpath,
+            ByteBufCodecs.STRING_UTF8, MovePathC2S::destFolderSubpath,
+            ::MovePathC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 // === Structure S2C ===
 
 /**

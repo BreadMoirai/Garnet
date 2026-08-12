@@ -14,6 +14,7 @@ import com.breadmoirai.garnet.structure.StructurePersistence
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteExisting
@@ -61,43 +62,76 @@ object EditorFileOpsHandlers {
         val parentSubpath = payload.subpath.substringBeforeLast('/', "")
         val newSubpath = if (parentSubpath.isEmpty()) newName else "$parentSubpath/$newName"
 
-        // A placed structure is keyed by subpath in EditorDimRegistry, so renaming under it would
+        relocate(
+            server, player,
+            oldSubpath = payload.subpath,
+            source = source,
+            target = parent.resolve(newName),
+            newSubpath = newSubpath,
+            operation = "rename",
+            placedMessage = "renamed to $newSubpath",
+        )
+    }
+
+    /**
+     * Move the node at [oldSubpath] from [source] to [target], where [target]'s subpath is
+     * [newSubpath]. Shared by [handleRename] and [handleMove]: a rename IS a move that happens to
+     * keep the same parent, and every step below is already expressed in `oldSubpath → newSubpath`
+     * terms.
+     *
+     * [operation] names the caller in error messages ("rename failed: ..."); [placedMessage] is the
+     * status line a re-placed structure reports, which each caller phrases for itself — a rename
+     * that announced "moved to ..." would be simply wrong.
+     *
+     * Each caller does its own resolution and validation first; by the time this runs, the move is
+     * known to be legal and only the ordering hazards remain.
+     */
+    private fun relocate(
+        server: MinecraftServer,
+        player: ServerPlayer,
+        oldSubpath: String,
+        source: Path,
+        target: Path,
+        newSubpath: String,
+        operation: String,
+        placedMessage: String,
+    ) {
+        // A placed structure is keyed by subpath in EditorDimRegistry, so relocating under it would
         // strand both the placed box and the region assignment if we don't unload/reload it. But the
         // move (an IO op — can fail on a lock, permission problem, etc.) must succeed FIRST: tearing
         // down the placed-structure state (clearing its blocks, dropping its registry keys) before
         // the move is confirmed would leave the structure's blocks erased and its registry entry gone
-        // while the player is told the rename failed and the (untouched, still-old-named) file sits
-        // there unrecoverably out of sync with the world. Only touch that state once the move is
-        // confirmed.
+        // while the player is told the operation failed and the (untouched, still-old-named) file
+        // sits there unrecoverably out of sync with the world. Only touch that state once the move
+        // is confirmed.
         val registry = EditorDimRegistry.of(server)
-        val wasPlaced = registry.placedBoxOf(payload.subpath)
+        val wasPlaced = registry.placedBoxOf(oldSubpath)
 
         // Quiesce before the move: see EditorHandlerSupport.commitDirtyUnder for why a relocation
-        // that skips this strands every pending edit beneath the renamed path.
-        commitDirtyUnder(server, payload.subpath)?.let {
-            fail(player, "rename failed: $it"); return
+        // that skips this strands every pending edit beneath the moved path.
+        commitDirtyUnder(server, oldSubpath)?.let {
+            fail(player, "$operation failed: $it"); return
         }
 
-        val target = parent.resolve(newName)
         try {
             source.moveTo(target)
         } catch (e: Exception) {
-            LOGGER.error("[project/rename] {} -> {}: {}", payload.subpath, newSubpath, e.message, e)
-            fail(player, "rename failed: ${e.message}"); return
+            LOGGER.error("[project/{}] {} -> {}: {}", operation, oldSubpath, newSubpath, e.message, e)
+            fail(player, "$operation failed: ${e.message}"); return
         }
 
-        // History is keyed by each file's own absolute path, so every moved .nbt (the renamed file
-        // itself, or every descendant .nbt when a whole FOLDER was renamed) must carry its history
-        // across, or it silently loses every revision it has accumulated (Finding 3). This cannot
-        // itself fail the rename from the player's perspective — the file(s) already moved — so a
-        // problem here is logged, not reported as a rename failure (Finding 6): sharing one `try`
-        // with the file move above would have let a hypothetical history-move exception report
-        // "rename failed" after the file had already relocated.
+        // History is keyed by each file's own absolute path, so every moved .nbt (the node itself,
+        // or every descendant .nbt when a whole FOLDER moved) must carry its history across, or it
+        // silently loses every revision it has accumulated (Finding 3). This cannot itself fail the
+        // operation from the player's perspective — the file(s) already moved — so a problem here is
+        // logged, not reported as a failure (Finding 6): sharing one `try` with the file move above
+        // would have let a hypothetical history-move exception report a failure after the file had
+        // already relocated.
         try {
             LocalHistoryStore.moveDescendantHistories(source, target)
         } catch (e: Exception) {
             LOGGER.error(
-                "[project/rename] history move for {} -> {}: {}", payload.subpath, newSubpath, e.message, e,
+                "[project/{}] history move for {} -> {}: {}", operation, oldSubpath, newSubpath, e.message, e,
             )
         }
 
@@ -107,30 +141,85 @@ object EditorFileOpsHandlers {
             // which the setBlock mixin hooks unconditionally for any successful server write; if
             // the OLD subpath were still registered at that instant, EditorDimRegistry.structureSubpathAt
             // would still attribute those positions to it, and the watcher would re-mark the OLD
-            // subpath dirty immediately after the commit loop above just cleared it. Since
+            // subpath dirty immediately after the commit above just cleared it. Since
             // `wasPlaced.origin`/`wasPlaced.size` were already captured into a local before any
             // registry mutation, clearBounds needs nothing further from the registry, so dropping
             // the entry first is safe: with structureBySubpath no longer mapping the old subpath at
             // all (and its freed region never recycled — nextStructureIndex is monotonic), those
             // positions attribute to no subpath, and clearBounds's own writes cannot re-dirty
             // anything.
-            registry.unplaceStructure(payload.subpath)
+            registry.unplaceStructure(oldSubpath)
             StructurePersistence.clearBounds(registry.projectLevel(), wasPlaced.origin, wasPlaced.size)
+            EditorStructureHandlers.placeStructureFrom(server, player, newSubpath, target, placedMessage)
         }
 
-        if (wasPlaced != null) {
-            EditorStructureHandlers.placeStructureFrom(server, player, newSubpath, target, "renamed to $newSubpath")
-        }
-
-        // Rekey every OTHER registry entry nested under the renamed path (e.g. structures placed
-        // inside a renamed folder). The renamed node's own entry, if any, was already handled above by
-        // the wasPlaced block, so by this point rekeyForRename's exact-match branch is a no-op for it —
+        // Rekey every OTHER registry entry nested under the moved path (e.g. structures placed
+        // inside a moved folder). The node's own entry, if any, was already handled above by the
+        // wasPlaced block, so by this point rekeyForRename's exact-match branch is a no-op for it —
         // only descendants still keyed under the old subpath remain to be moved.
-        registry.rekeyForRename(payload.subpath, newSubpath)
+        registry.rekeyForRename(oldSubpath, newSubpath)
 
-        EditorSession.repointSession(player, payload.subpath, newSubpath)
+        EditorSession.repointSession(player, oldSubpath, newSubpath)
 
         sendTree(server, player)
+    }
+
+    /**
+     * Move the node at [payload].subpath into [payload].destFolderSubpath, keeping its name.
+     *
+     * Shares [relocate] with [handleRename] — a rename is a move that keeps its parent — so only the
+     * validation differs. Three of the four checks below have no rename counterpart, because a
+     * rename cannot change which folder a node lives in.
+     */
+    fun handleMove(server: MinecraftServer, player: ServerPlayer, payload: MovePathC2S) {
+        if (payload.subpath.isEmpty()) {
+            fail(player, "cannot move the project root"); return
+        }
+        val root = EditorRootResolver.rootFor(server) ?: run {
+            fail(player, "project-root not configured"); return
+        }
+        val source = root.resolveSubpath(payload.subpath) ?: run {
+            fail(player, "path not found or escapes root: ${payload.subpath}"); return
+        }
+        // resolveParentFolder handles root resolution, containment, and the not-a-folder case, and
+        // reports each itself.
+        val destFolder = resolveParentFolder(server, player, payload.destFolderSubpath) ?: return
+
+        // Moving a folder into its own subtree would either throw or nest the folder inside itself,
+        // depending on the filesystem. The boundary is a full path SEGMENT, matching
+        // EditorDimRegistry.rekeyForRename and EditorSession.repointSession: moving "redstone" into
+        // the sibling "redstoneworks" is perfectly legal and a plain startsWith would wrongly
+        // reject it.
+        if (payload.destFolderSubpath == payload.subpath ||
+            payload.destFolderSubpath.startsWith("${payload.subpath}/")
+        ) {
+            fail(player, "cannot move '${payload.subpath}' into itself"); return
+        }
+
+        val name = source.name
+        val currentParentSubpath = payload.subpath.substringBeforeLast('/', "")
+        if (currentParentSubpath == payload.destFolderSubpath) {
+            // Already there. Not an error — resend the tree so a client acting on a stale snapshot
+            // still converges — but nothing to move.
+            sendTree(server, player); return
+        }
+
+        EditorNames.validate(name, siblingNames(destFolder))?.let {
+            fail(player, "move failed: $it"); return
+        }
+
+        val newSubpath = if (payload.destFolderSubpath.isEmpty()) name
+        else "${payload.destFolderSubpath}/$name"
+
+        relocate(
+            server, player,
+            oldSubpath = payload.subpath,
+            source = source,
+            target = destFolder.resolve(name),
+            newSubpath = newSubpath,
+            operation = "move",
+            placedMessage = "moved to $newSubpath",
+        )
     }
 
     /**

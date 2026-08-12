@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
+import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
@@ -776,6 +777,229 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("redstone"))
 
             EditorSession.get(player.uuid)!!.activeSubpath shouldBe null
+        }
+    }
+
+    test("handleMove relocates a structure into another folder") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root, "clock")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("clock.nbt", "redstone"))
+
+            root.resolve("redstone/clock.nbt").exists().shouldBeTrue()
+            root.resolve("clock.nbt").exists().shouldBeFalse()
+        }
+    }
+
+    test("handleMove relocates a folder into another folder") {
+        withServer { server, player, root ->
+            root.resolve("redstone/clocks").createDirectories()
+            root.resolve("archive").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone/clocks"), "tick")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone/clocks", "archive"))
+
+            root.resolve("archive/clocks/tick.nbt").exists().shouldBeTrue()
+            root.resolve("redstone/clocks").exists().shouldBeFalse()
+        }
+    }
+
+    test("handleMove to the project root uses an empty destination") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone"), "clock")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone/clock.nbt", ""))
+
+            root.resolve("clock.nbt").exists().shouldBeTrue()
+            root.resolve("redstone/clock.nbt").exists().shouldBeFalse()
+        }
+    }
+
+    test("handleMove rejects a destination inside the moved folder's own subtree") {
+        // The one invariant rename never had to express: moveTo would either throw or nest the
+        // folder inside itself, depending on the filesystem.
+        withServer { server, player, root ->
+            root.resolve("redstone/clocks").createDirectories()
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone", "redstone/clocks"))
+
+            root.resolve("redstone/clocks").isDirectory().shouldBeTrue()
+            root.resolve("redstone/clocks/redstone").exists().shouldBeFalse()
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+        }
+    }
+
+    test("handleMove rejects a folder into itself") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone", "redstone"))
+            root.resolve("redstone").isDirectory().shouldBeTrue()
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+        }
+    }
+
+    test("handleMove matches the subtree on a full path segment, not a string prefix") {
+        // Moving "redstone" INTO the sibling "redstoneworks" is legal and must not be caught by the
+        // descendant check.
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            root.resolve("redstoneworks").createDirectories()
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone", "redstoneworks"))
+
+            root.resolve("redstoneworks/redstone").isDirectory().shouldBeTrue()
+        }
+    }
+
+    test("handleMove rejects a name that already exists in the destination") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root, "clock")
+            EditorNewStructure.create(root.resolve("redstone"), "clock")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("clock.nbt", "redstone"))
+
+            root.resolve("clock.nbt").exists().shouldBeTrue()   // source untouched
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+        }
+    }
+
+    test("handleMove rejects a file as the destination") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorNewStructure.create(root, "ring")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("clock.nbt", "ring.nbt"))
+
+            root.resolve("clock.nbt").exists().shouldBeTrue()
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+        }
+    }
+
+    test("handleMove treats the current parent as a no-op") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone"), "clock")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone/clock.nbt", "redstone"))
+
+            root.resolve("redstone/clock.nbt").exists().shouldBeTrue()
+        }
+    }
+
+    test("handleMove rejects a destination that escapes the root") {
+        withServer { server, player, root ->
+            val evil = root.resolveSibling("evil").also { it.createDirectories() }
+            EditorNewStructure.create(root, "clock")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("clock.nbt", "../evil"))
+
+            evil.resolve("clock.nbt").exists().shouldBeFalse()
+            root.resolve("clock.nbt").exists().shouldBeTrue()
+        }
+    }
+
+    test("moving a placed structure unloads it and reloads it under the new subpath") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            val registry = EditorDimRegistry.of(server)
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("clock.nbt", "redstone"))
+
+            registry.placedBoxOf("clock.nbt").shouldBeNull()
+            registry.placedBoxOf("redstone/clock.nbt").shouldNotBeNull()
+            registry.structureRegionOriginOf("clock.nbt").shouldBeNull()
+        }
+    }
+
+    test("moving a folder rekeys every structure placed beneath it and carries their history") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            root.resolve("archive").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone"), "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("redstone/clock.nbt"))
+            LocalHistoryStore.revisions(root.resolve("redstone/clock.nbt")).shouldNotBeEmpty()
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone", "archive"))
+
+            val registry = EditorDimRegistry.of(server)
+            registry.placedBoxOf("archive/redstone/clock.nbt").shouldNotBeNull()
+            registry.placedBoxOf("redstone/clock.nbt").shouldBeNull()
+            LocalHistoryStore.revisions(root.resolve("archive/redstone/clock.nbt")).shouldNotBeEmpty()
+        }
+    }
+
+    test("moving a dirty structure commits first, so no edits are lost") {
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("clock.nbt", "redstone"))
+
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeFalse()
+            root.resolve("redstone/clock.nbt").exists().shouldBeTrue()
+        }
+    }
+
+    test("a failed commit during move aborts the move entirely and reports an error") {
+        // Same contract as rename's abort, reached through the shared relocate: a move that
+        // proceeded would invalidate the old subpath and strand those edits permanently.
+        withServer { server, player, root ->
+            root.resolve("redstone").createDirectories()
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+
+            val file = root.resolve("clock.nbt")
+            val historyDir = LocalHistoryStore.dirFor(file)
+            historyDir.resolve("index.json").deleteIfExists()
+            historyDir.resolve("index.json").createDirectory()
+
+            try {
+                EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("clock.nbt", "redstone"))
+
+                root.resolve("clock.nbt").exists().shouldBeTrue()
+                root.resolve("redstone/clock.nbt").exists().shouldBeFalse()
+                StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+                registry.placedBoxOf("clock.nbt").shouldNotBeNull()
+                drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+            } finally {
+                StructureAutoSave.of(server).clear("clock.nbt")
+                StructureCommit.clearBackoff(server, "clock.nbt")
+                historyDir.resolve("index.json").toFile().delete()
+            }
+        }
+    }
+
+    test("moving an ancestor folder repoints the active session") {
+        withServer { server, player, root ->
+            root.resolve("redstone/clocks").createDirectories()
+            root.resolve("archive").createDirectories()
+            EditorSession.setActive(player.uuid, "redstone/clocks")
+
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("redstone", "archive"))
+
+            EditorSession.get(player.uuid)!!.activeSubpath shouldBe "archive/redstone/clocks"
         }
     }
 })
