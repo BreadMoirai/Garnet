@@ -11,6 +11,7 @@ import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.withEditorServer
 import io.kotest.matchers.booleans.shouldBeFalse
+import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
@@ -25,8 +26,11 @@ import net.minecraft.server.level.ServerPlayer
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
+import kotlin.io.path.deleteExisting
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
+import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 
 /** This spec's alias for the shared harness — see `com.breadmoirai.garnet.test.withEditorServer`. */
@@ -184,6 +188,67 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             EditorUndoStack.clear(player.uuid)
             EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("does-not-exist"))
             EditorUndoStack.peekUndo(player.uuid).shouldBeNull()
+        }
+    }
+
+    test("restoreSubtree brings back folders, a .spec.kts and a .nbt") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("redstone/clocks").createDirectories()
+            root.resolve("redstone/clocks/a.spec.kts").writeBytes("contents-a".toByteArray())
+            val nbtBytes = root.resolve("redstone/g.nbt").let { p ->
+                p.writeBytes(byteArrayOf(1, 2, 3, 4)); p.readBytes()
+            }
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("redstone"))
+            root.resolve("redstone").exists().shouldBeFalse()
+
+            val command = EditorUndoStack.peekUndo(player.uuid) as EditorUndoCommand.Delete
+            val report = EditorFileOpsHandlers.restoreSubtree(server, player, command)
+
+            report.failures.shouldBeEmpty()
+            report.restored shouldBe report.total
+            root.resolve("redstone/clocks").isDirectory().shouldBeTrue()
+            root.resolve("redstone/clocks/a.spec.kts").readBytes() shouldBe "contents-a".toByteArray()
+            root.resolve("redstone/g.nbt").readBytes() shouldBe nbtBytes
+        }
+    }
+
+    test("restoreSubtree recreates an empty folder") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("empty/inner").createDirectories()
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("empty"))
+            val command = EditorUndoStack.peekUndo(player.uuid) as EditorUndoCommand.Delete
+            EditorFileOpsHandlers.restoreSubtree(server, player, command)
+
+            // A folder with no files has nothing banked — the manifest is the only record it
+            // existed, which is why the manifest carries folders separately from banked files.
+            root.resolve("empty/inner").isDirectory().shouldBeTrue()
+        }
+    }
+
+    test("restoreSubtree reports a partial restore when a blob is gone") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("part").createDirectories()
+            root.resolve("part/a.spec.kts").writeBytes("a".toByteArray())
+            root.resolve("part/b.spec.kts").writeBytes("b".toByteArray())
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("part"))
+            val command = EditorUndoStack.peekUndo(player.uuid) as EditorUndoCommand.Delete
+
+            // Destroy one banked blob behind the store's back, simulating a prune or a wiped
+            // history directory between the delete and the undo.
+            val victim = command.banked.first()
+            LocalHistoryStore.dirFor(victim.absolutePath).resolve(victim.revision.file).deleteExisting()
+
+            val report = EditorFileOpsHandlers.restoreSubtree(server, player, command)
+
+            report.restored shouldBe 1
+            report.total shouldBe 2
+            report.failures shouldHaveSize 1
         }
     }
 })

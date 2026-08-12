@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.PathWalkOption
 import kotlin.io.path.copyTo
+import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteExisting
 import kotlin.io.path.isDirectory
@@ -35,6 +36,7 @@ import kotlin.io.path.moveTo
 import kotlin.io.path.name
 import kotlin.io.path.readBytes
 import kotlin.io.path.walk
+import kotlin.io.path.writeBytes
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
 
@@ -63,6 +65,9 @@ sealed interface DeleteOutcome {
      */
     data object DeletedHistoryDisabled : DeleteOutcome
 }
+
+/** Outcome of [EditorFileOpsHandlers.restoreSubtree]. [failures] are already phrased for a player. */
+data class RestoreReport(val restored: Int, val total: Int, val failures: List<String>)
 
 object EditorFileOpsHandlers {
 
@@ -506,6 +511,76 @@ object EditorFileOpsHandlers {
 
         EditorSession.clearSessionUnder(player.uuid, subpath)
         return null
+    }
+
+    /**
+     * Recreate a subtree deleted by [deleteSubtree], from its manifest and banked revisions.
+     *
+     * Folders come from the manifest, files from `LocalHistoryStore`. Both are needed: a folder with
+     * no files banks nothing, so the manifest is the only evidence it ever existed.
+     *
+     * Paths are resolved against the CURRENT project root via `BankedFile.relPath`, not against
+     * `BankedFile.absolutePath` — the root is swappable, so the path a file had at delete time is
+     * not necessarily where it belongs now. `absolutePath` is used only as the history key, which
+     * is exactly what it is.
+     *
+     * There is no rollback. A partial restore is reported honestly rather than undone: the
+     * alternative is deleting files the player just got back.
+     *
+     * Restored structures come back UNPLACED — this touches no `EditorDimRegistry` state. Placing an
+     * arbitrary restored subtree would need a region assignment per `.nbt`, and navigating to a
+     * structure costs the same either way.
+     */
+    fun restoreSubtree(
+        server: MinecraftServer,
+        player: ServerPlayer,
+        command: EditorUndoCommand.Delete,
+    ): RestoreReport {
+        val root = EditorRootResolver.rootFor(server)
+            ?: return RestoreReport(0, command.banked.size, listOf("project-root not configured"))
+        // resolveSubpath refuses a path that does not exist, and the whole point here is that it
+        // does not — so resolve the PARENT (which does exist) and rebuild beneath it.
+        val parentSubpath = command.rootSubpath.substringBeforeLast('/', "")
+        val parent = root.resolveSubpath(parentSubpath)
+            ?: return RestoreReport(0, command.banked.size, listOf("parent folder is gone: $parentSubpath"))
+        val base = parent.resolve(command.rootSubpath.substringAfterLast('/'))
+
+        val failures = mutableListOf<String>()
+
+        // Shortest relPath first, so a parent directory always exists before its children.
+        for (entry in command.manifest.filter { it.isFolder }.sortedBy { it.relPath.length }) {
+            val dir = if (entry.relPath.isEmpty()) base else base.resolve(entry.relPath)
+            try {
+                dir.createDirectories()
+            } catch (e: Exception) {
+                LOGGER.error("[project/undo] recreate folder '{}': {}", dir, e.message, e)
+                failures.add("could not recreate folder '${entry.relPath}'")
+            }
+        }
+
+        var restored = 0
+        for (file in command.banked) {
+            val destination = if (file.relPath.isEmpty()) base else base.resolve(file.relPath)
+            val raw = LocalHistoryStore.readRawBytes(file.absolutePath, file.revision)
+            try {
+                destination.parent?.createDirectories()
+                if (raw != null) {
+                    destination.writeBytes(raw)
+                } else {
+                    // Not a raw revision, so it is a typed structure revision — write it back as
+                    // compressed NBT. Writing the wrapper tag here instead would corrupt the .nbt.
+                    val tag = LocalHistoryStore.readTag(file.absolutePath, file.revision)
+                        ?: error("revision blob is missing")
+                    NbtIo.writeCompressed(tag, destination)
+                }
+                restored++
+            } catch (e: Exception) {
+                LOGGER.error("[project/undo] restore '{}': {}", destination, e.message, e)
+                failures.add("could not restore '${file.relPath.ifEmpty { command.rootSubpath }}'")
+            }
+        }
+
+        return RestoreReport(restored, command.banked.size, failures)
     }
 
     /**
