@@ -41,7 +41,8 @@ Inside a structure's directory, each revision is one compressed-NBT blob named
 millisecond) plus one shared `index.json` listing every revision's filename, timestamp, size
 (`sizeX`/`sizeY`/`sizeZ`), `blockCount`, and a `reason` tag (`"placed"`, `"autosave"`, `"manual"`,
 or `"external"` — content found on disk that didn't match the newest banked revision, i.e. edited
-outside the editor between sessions; see "Out-of-band edits are banked too" below). `index.json`
+outside the editor between sessions; see "Out-of-band edits are banked too" below).
+
 `index.json` is rewritten crash-safely — to a same-directory temp file, then an atomic move over
 the target, the same pattern `StructurePersistence.writeStructureAtomic` uses for the `.nbt` itself.
 A plain truncate-in-place write would let a crash, power loss, or full disk leave a half-written

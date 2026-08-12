@@ -15,8 +15,8 @@ capture, place, dirty-state tracking, explicit save, and revert. Two code paths 
 | **Spec-cell sidecar** | fixed origin + fixed `bounds` (`fillFromWorld`/`placeInWorld` 1:1) | `StructurePersistence.save` | `StructurePersistence.load` | UC-PER-06, UC-PER-07 |
 | **Standalone Explorer file** | tight box over `union(placedBox, dirtyBox)`, entities included, re-centered on place | `StructureCommit.commit` (via `StructurePersistence.captureAutoFitIn` + `writeStructureAtomic`) | `StructurePersistence.placeStructureCentered` | UC-MAN-10 |
 
-`StructurePersistence.captureAutoFitIn` is the only capture path. The region-wide
-`saveAutoFitToFile`/`captureAutoFit` pair (a full ~144-wide, full-world-height scan, ~8M block
+`StructurePersistence.captureAutoFitIn` is the only capture path.
+
 **Standalone captures include entities** (`fillFromWorld(..., withEntities = true)`), because
 `placeStructureCentered` places them — a default `StructurePlaceSettings` has
 `ignoreEntities = false`, so placing a structure spawns its item frames, armour stands and

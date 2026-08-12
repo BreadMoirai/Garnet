@@ -10,5 +10,7 @@ The `testBridge` source set was dissolved in Plan A (2026-05-07). Testing infras
 (Kotest runner, assertions, coroutines) is now declared in `main` directly; the separate
 source set and its `afterEvaluate` wiring no longer exist.
 
-See [docs/superpowers/plans/2026-05-07-plan-a-promote-testing-to-main.md](../superpowers/plans/2026-05-07-plan-a-promote-testing-to-main.md)
-for the change that removed it.
+The plan that removed it (`docs/superpowers/plans/2026-05-07-plan-a-promote-testing-to-main.md`)
+was itself deleted in a later docs cleanup, so there is no article to link to; `git log -- docs/superpowers/plans/`
+still has it if the original reasoning is ever needed. The current source-set layout is described in
+[local-verification-commands.md](local-verification-commands.md#why-five-source-sets).
