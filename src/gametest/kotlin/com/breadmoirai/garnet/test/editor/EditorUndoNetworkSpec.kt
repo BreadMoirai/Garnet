@@ -1,11 +1,14 @@
 package com.breadmoirai.garnet.test.editor
 
+import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
+import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.withEditorServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -75,6 +78,32 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             // Both folders (redstone itself and clocks) and both files.
             command.manifest.filter { it.isFolder }.map { it.relPath } shouldContainExactlyInAnyOrder listOf("", "clocks")
             command.banked.map { it.relPath } shouldContainExactlyInAnyOrder listOf("clocks/a.spec.kts", "b.spec.kts")
+        }
+    }
+
+    test("with local history disabled a delete succeeds silently and pushes nothing") {
+        // REGRESSION: with history off, LocalHistoryStore returns null for EVERY write, so a
+        // bankFile-returns-null check alone would take the DeletedUnbankable branch on every single
+        // delete and fire an EditorErrorS2C at a player whose delete actually succeeded. Undo being
+        // unavailable is a standing property of the player's own setting, not news per operation.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val spec = root.resolve("clock.spec.kts")
+            spec.writeBytes("spec { }".toByteArray())
+            drainPayloads(player)
+
+            val prevEnabled = SharedSettings.localHistoryEnabled
+            SharedSettings.localHistoryEnabled = false
+            try {
+                EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.spec.kts"))
+            } finally {
+                SharedSettings.localHistoryEnabled = prevEnabled
+            }
+
+            spec.exists().shouldBeFalse()
+            EditorUndoStack.peekUndo(player.uuid).shouldBeNull()
+            // The whole point of the fix: no error packet for a delete that worked.
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>().shouldBeEmpty()
         }
     }
 

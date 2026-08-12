@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.network
 
+import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.*
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.commitDirtyUnder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
@@ -49,6 +50,18 @@ sealed interface DeleteOutcome {
      * success while silently losing files.
      */
     data class DeletedUnbankable(val reason: String) : DeleteOutcome
+    /**
+     * Deleted, not undoable, and NOT worth telling the player about: local history is switched off,
+     * so `LocalHistoryStore` returns null for every write and nothing can be banked by definition.
+     *
+     * A separate variant rather than a flag on [DeletedUnbankable] because the two differ in what
+     * the caller must DO, not merely in wording: an unexpected banking failure earns an error
+     * packet, while this one must stay silent. Folding them together would leave the silence
+     * depending on a boolean every future caller has to remember to read — and the failure mode of
+     * forgetting is an error packet on every successful delete in a supported configuration, which
+     * is exactly the bug this variant exists to prevent.
+     */
+    data object DeletedHistoryDisabled : DeleteOutcome
 }
 
 object EditorFileOpsHandlers {
@@ -338,6 +351,10 @@ object EditorFileOpsHandlers {
         when (val outcome = deleteSubtree(server, player, payload.subpath, target)) {
             is DeleteOutcome.Failed -> { fail(player, outcome.reason); return }
             is DeleteOutcome.Deleted -> EditorUndoStack.push(player.uuid, outcome.command)
+            // Deleted and not undoable, but deliberately SILENT: the player switched local history
+            // off, so undo being unavailable is a standing property of their own configuration, not
+            // news about this delete. An error packet here would fire on every successful delete.
+            is DeleteOutcome.DeletedHistoryDisabled -> Unit
             is DeleteOutcome.DeletedUnbankable -> {
                 // Deleted, but not undoable. Say so rather than leaving an Undo button that would
                 // silently restore an incomplete subtree.
@@ -370,6 +387,16 @@ object EditorFileOpsHandlers {
         subpath: String,
         target: Path,
     ): DeleteOutcome {
+        // Checked once, up front, rather than inferred from bankFile returning null: with history
+        // off EVERY file "fails" to bank, and reporting that per delete would turn a supported
+        // configuration into one that errors on every successful operation. Skipping the walk
+        // entirely also spares the reads whose results could not be stored anyway.
+        if (!SharedSettings.localHistoryEnabled) {
+            LOGGER.debug("[project/delete] {} is not undoable: local history is disabled", subpath)
+            deleteAndTearDown(server, player, subpath, target)?.let { return it }
+            return DeleteOutcome.DeletedHistoryDisabled
+        }
+
         val manifest = mutableListOf<ManifestEntry>()
         val banked = mutableListOf<BankedFile>()
         var bankFailure: String? = null
@@ -397,6 +424,27 @@ object EditorFileOpsHandlers {
             }
         }
 
+        deleteAndTearDown(server, player, subpath, target)?.let { return it }
+
+        bankFailure?.let { return DeleteOutcome.DeletedUnbankable(it) }
+        return DeleteOutcome.Deleted(EditorUndoCommand.Delete(subpath, manifest, banked))
+    }
+
+    /**
+     * Unlink [target] and tear down everything keyed to [subpath]. Returns [DeleteOutcome.Failed]
+     * when the unlink itself failed — in which case NOTHING has been unplaced and the world is
+     * untouched, so the error the player sees is the whole story — and null on success.
+     *
+     * Split out of [deleteSubtree] only so the history-disabled path can reuse it without walking
+     * and reading a subtree whose bytes could not be stored anyway. The ordering below is the whole
+     * reason this is one function: every step depends on the unlink having already succeeded.
+     */
+    private fun deleteAndTearDown(
+        server: MinecraftServer,
+        player: ServerPlayer,
+        subpath: String,
+        target: Path,
+    ): DeleteOutcome.Failed? {
         try {
             if (target.isDirectory()) {
                 // copyRecursively's counterpart returns false rather than throwing on a partial
@@ -436,9 +484,7 @@ object EditorFileOpsHandlers {
         }
 
         EditorSession.clearSessionUnder(player.uuid, subpath)
-
-        bankFailure?.let { return DeleteOutcome.DeletedUnbankable(it) }
-        return DeleteOutcome.Deleted(EditorUndoCommand.Delete(subpath, manifest, banked))
+        return null
     }
 
     /**
