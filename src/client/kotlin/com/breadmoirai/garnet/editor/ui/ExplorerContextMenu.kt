@@ -40,11 +40,15 @@ class ExplorerMenuState {
 }
 
 /**
- * The `New Folder` / `New Structure` / `Rename` menu, anchored at the click point.
+ * The `New Folder` / `New Structure` / `Rename` / `Duplicate` / `Move to…` / `Delete` menu, anchored
+ * at the click point.
  *
  * The `New` actions target the clicked folder, or a clicked file's parent folder — the IDE
- * convention. `Rename` targets the clicked node itself and is disabled on the project root, which has
- * no parent to be renamed within.
+ * convention. Every other action targets the clicked node itself and is disabled on the project
+ * root, which has no parent to be renamed, duplicated, moved, or deleted within.
+ *
+ * `Delete` and `Move to…` open a dialog rather than acting immediately; both do so only after this
+ * menu has closed, keeping each dialog a single popup layer. See [ExplorerDialogs].
  *
  * **The two `New` actions are deliberately flat, not a `New ▸ (Folder | Structure)` submenu.** Jewel's
  * `submenu { }` opens its flyout as a second, `focusable = true` popup layer, and the dock composes
@@ -63,6 +67,9 @@ fun ExplorerContextMenu(
     state: ExplorerMenuState,
     onNew: (parentPath: String, kind: NewNodeKind) -> Unit,
     onRename: (path: String) -> Unit,
+    onDuplicate: (path: String) -> Unit,
+    onDelete: (path: String) -> Unit,
+    onMove: (path: String) -> Unit,
 ) {
     val target = state.target ?: return
     val parent = newTargetFolderFor(target)
@@ -84,6 +91,28 @@ fun ExplorerContextMenu(
         ) {
             Text("Rename")
         }
+        selectableItem(
+            selected = false,
+            enabled = target != ExplorerTreeState.ROOT_PATH,
+            onClick = { state.close(); onDuplicate(target) },
+        ) {
+            Text("Duplicate")
+        }
+        selectableItem(
+            selected = false,
+            enabled = target != ExplorerTreeState.ROOT_PATH,
+            onClick = { state.close(); onMove(target) },
+        ) {
+            Text("Move to…")
+        }
+        separator()
+        selectableItem(
+            selected = false,
+            enabled = target != ExplorerTreeState.ROOT_PATH,
+            onClick = { state.close(); onDelete(target) },
+        ) {
+            Text("Delete")
+        }
     }
 }
 
@@ -99,8 +128,13 @@ private fun newTargetFolderFor(target: String): String {
     else target.substringBeforeLast('/', ExplorerTreeState.ROOT_PATH)
 }
 
-/** Places the popup's top-left at a fixed window offset — the recorded right-click point. */
-private class FixedOffsetPositionProvider(private val offset: IntOffset) : PopupPositionProvider {
+/**
+ * Places the popup's top-left at a fixed window offset — the recorded right-click point.
+ *
+ * `internal` rather than private because [ExplorerDialogs] positions its dialogs at the same anchor
+ * the menu used, so a dialog opens exactly where the item that triggered it was.
+ */
+internal class FixedOffsetPositionProvider(private val offset: IntOffset) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,

@@ -77,6 +77,7 @@ private fun ProjectExplorer() {
             var edit by remember { mutableStateOf<ExplorerEdit?>(null) }
             var editError by remember { mutableStateOf<String?>(null) }
             val menu = remember { ExplorerMenuState() }
+            val dialogs = remember { ExplorerDialogState() }
             val snap = ProjectTreeState.snapshot
             if (snap == null) {
                 Text("(no project loaded — Refresh)", Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
@@ -158,6 +159,16 @@ private fun ProjectExplorer() {
                     onRename = { path ->
                         edit = ExplorerEdit.Renaming(path, path.substringAfterLast('/'))
                     },
+                    onDuplicate = { path -> editError = ExplorerActions.commitDuplicate(path) },
+                    // menu.anchor survives close() (only `target` is nulled), so each dialog opens
+                    // exactly where the menu item that triggered it was.
+                    onDelete = { path -> dialogs.openDelete(path, menu.anchor) },
+                    onMove = { path -> dialogs.openMove(path, menu.anchor) },
+                )
+                ExplorerDialogs(
+                    state = dialogs,
+                    onConfirmDelete = { path -> editError = ExplorerActions.commitDelete(path) },
+                    onConfirmMove = { path, dest -> editError = ExplorerActions.commitMove(path, dest) },
                 )
             }
             val message = editError ?: ProjectTreeState.status

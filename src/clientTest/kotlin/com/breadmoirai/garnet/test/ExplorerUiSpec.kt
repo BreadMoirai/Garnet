@@ -12,7 +12,10 @@ import com.breadmoirai.garnet.ui.input.DockInputRouter
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
+import com.breadmoirai.garnet.editor.network.DeletePathC2S
+import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
@@ -115,6 +118,67 @@ class ExplorerUiSpec : ClientSpec({
         rightClick(x, y)
         click(x + 20.0, y + 12.0)
     }
+
+    /**
+     * Like [mountForContextMenu], but with "redstone" expanded so its "clock.nbt" child is a
+     * clickable row.
+     *
+     * The duplicate/delete/move tests need a FILE target, not the folder: in this one-folder tree,
+     * moving "redstone" itself would have no legal destination at all (its only candidate, the
+     * project root, is excluded as its current parent), so the move dialog would come up empty.
+     */
+    fun mountWithRedstoneExpanded() {
+        mountForContextMenu()
+        runOnClient { ExplorerTreeState.treeState.openNodes += "redstone" }
+        waitClientTicks(10)
+    }
+
+    /**
+     * Menu-row geometry, measured from the hover probes in the nested-folder test above:
+     * "New Folder" (row 0) sits at +19 from the click point and "Rename" (row 2, one separator
+     * above it) at +76 — i.e. 19 + 2*[ROW_PITCH] + 1*[SEPARATOR_H].
+     */
+    val ROW_0_DY = 19.0
+    val ROW_PITCH = 24.0
+    val SEPARATOR_H = 9.0
+
+    /** Click the menu row at [index], counting only selectable rows, with [separatorsAbove] above it. */
+    fun clickMenuRow(x: Double, y: Double, index: Int, separatorsAbove: Int) {
+        click(x + 20.0, y + ROW_0_DY + index * ROW_PITCH + separatorsAbove * SEPARATOR_H)
+    }
+
+    // Menu order: New Folder(0), New Structure(1), --, Rename(2), Duplicate(3), Move to…(4), --, Delete(5).
+    fun rightClickThenDuplicate(x: Double, y: Double) {
+        rightClick(x, y); clickMenuRow(x, y, index = 3, separatorsAbove = 1)
+    }
+
+    fun rightClickThenMove(x: Double, y: Double) {
+        rightClick(x, y); clickMenuRow(x, y, index = 4, separatorsAbove = 1)
+    }
+
+    fun rightClickThenDelete(x: Double, y: Double) {
+        rightClick(x, y); clickMenuRow(x, y, index = 5, separatorsAbove = 2)
+    }
+
+    /**
+     * Both dialogs open at the SAME anchor the context menu used, so their rows sit at the same
+     * offsets from the original right-click point.
+     *
+     * Delete dialog rows: the prompt/confirm row(0), Cancel(1).
+     * Move dialog rows: one per destination in tree order, then Cancel. With "redstone/clock.nbt"
+     * as the moved node, "redstone" is its current parent and is excluded, leaving the project root
+     * alone at index 0.
+     */
+    fun clickDialogConfirm(x: Double, y: Double) = clickMenuRow(x, y, index = 0, separatorsAbove = 0)
+    fun clickDialogCancel(x: Double, y: Double) = clickMenuRow(x, y, index = 1, separatorsAbove = 0)
+    fun clickMoveDestinationRoot(x: Double, y: Double) = clickMenuRow(x, y, index = 0, separatorsAbove = 0)
+
+    /**
+     * The "clock.nbt" row, one tree row below "redstone" (which the nested-folder test above
+     * right-clicks at 90/68). Tree rows are 28px apart, measured from the root row at y=40.
+     */
+    val CLOCK_X = 90.0
+    val CLOCK_Y = 96.0
 
     fun type(text: String) {
         runOnClient { text.forEach { c -> DockInputRouter.onGlfwChar(c.code) } }
@@ -221,5 +285,58 @@ class ExplorerUiSpec : ClientSpec({
         sent shouldBe listOf(RenamePathC2S("redstone", "redstone2"), CreateFolderC2S("redstone", "clocks"))
 
         unmountFromContextMenu()
+    }
+
+    test("delete asks for confirmation first, and cancelling sends nothing") {
+        val sent = captureSends()
+        mountWithRedstoneExpanded()
+        try {
+            // Right-click "clock.nbt", choose Delete: the confirmation must appear and, until it is
+            // confirmed, nothing may reach the wire.
+            rightClickThenDelete(CLOCK_X, CLOCK_Y)
+            sent.shouldBeEmpty()
+
+            clickDialogCancel(CLOCK_X, CLOCK_Y)
+            sent.shouldBeEmpty()
+        } finally {
+            unmountFromContextMenu()
+        }
+    }
+
+    test("confirming the delete dialog sends DeletePathC2S for the clicked node") {
+        val sent = captureSends()
+        mountWithRedstoneExpanded()
+        try {
+            rightClickThenDelete(CLOCK_X, CLOCK_Y)
+            clickDialogConfirm(CLOCK_X, CLOCK_Y)
+            sent shouldBe listOf(DeletePathC2S("redstone/clock.nbt"))
+        } finally {
+            unmountFromContextMenu()
+        }
+    }
+
+    test("duplicate sends immediately, with no dialog") {
+        val sent = captureSends()
+        mountWithRedstoneExpanded()
+        try {
+            rightClickThenDuplicate(CLOCK_X, CLOCK_Y)
+            sent shouldBe listOf(DuplicatePathC2S("redstone/clock.nbt"))
+        } finally {
+            unmountFromContextMenu()
+        }
+    }
+
+    test("the move dialog sends MovePathC2S for the chosen destination") {
+        val sent = captureSends()
+        mountWithRedstoneExpanded()
+        try {
+            rightClickThenMove(CLOCK_X, CLOCK_Y)
+            sent.shouldBeEmpty()                          // the dialog is open; nothing sent yet
+
+            clickMoveDestinationRoot(CLOCK_X, CLOCK_Y)    // choose the project root
+            sent shouldBe listOf(MovePathC2S("redstone/clock.nbt", ""))
+        } finally {
+            unmountFromContextMenu()
+        }
     }
 })
