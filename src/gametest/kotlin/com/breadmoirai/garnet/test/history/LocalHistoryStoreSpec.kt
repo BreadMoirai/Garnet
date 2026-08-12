@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -47,6 +48,23 @@ class LocalHistoryStoreSpec : GarnetTestSpec({
         val tag = CompoundTag()
         tag.putString("garnetTestMarker", marker)
         return tag
+    }
+
+    /**
+     * Like [withStore], but also hands the block a scratch project directory to resolve test files
+     * in — the history root and the "project" a structure file lives under must be separate
+     * directories, same as every other test in this file (`withStore` + a sibling `createTempDirectory`
+     * call), so a raw-revision test can just do `dir.resolve("clock.spec.kts")`.
+     */
+    fun withHistoryDir(block: (java.nio.file.Path) -> Unit) {
+        withStore { _ ->
+            val proj = createTempDirectory("proj-raw")
+            try {
+                block(proj)
+            } finally {
+                proj.toFile().deleteRecursively()
+            }
+        }
     }
 
     test("a revision is written, indexed, and reads back byte-identical") {
@@ -318,6 +336,51 @@ class LocalHistoryStoreSpec : GarnetTestSpec({
             dir.listDirectoryEntries("*.nbt") shouldHaveSize 0
 
             proj.toFile().deleteRecursively()
+        }
+    }
+
+    test("writeRawRevision round-trips arbitrary bytes") {
+        withHistoryDir { dir ->
+            val file = dir.resolve("clock.spec.kts")
+            val bytes = "spec { name = \"clock\" }".toByteArray()
+            val rev = LocalHistoryStore.writeRawRevision(file, bytes, LocalHistoryStore.REASON_PRE_DELETE)
+            rev.shouldNotBeNull()
+            rev.reason shouldBe "pre-delete"
+            LocalHistoryStore.readRawBytes(file, rev) shouldBe bytes
+        }
+    }
+
+    test("readRawBytes returns null for a typed structure revision") {
+        withHistoryDir { dir ->
+            val file = dir.resolve("gadget.nbt")
+            val tag = CompoundTag().also { it.putString("garnetTestMarker", "typed") }
+            val rev = LocalHistoryStore.writeRevision(file, tag, 1, 2, 3, blockCount = 4, reason = LocalHistoryStore.REASON_MANUAL)
+            rev.shouldNotBeNull()
+            // A typed revision must not be mistaken for a raw one — restore picks its write path
+            // off exactly this distinction, and a wrong answer writes a wrapper tag over a .nbt.
+            LocalHistoryStore.readRawBytes(file, rev).shouldBeNull()
+        }
+    }
+
+    test("raw and typed revisions coexist in one index") {
+        withHistoryDir { dir ->
+            val file = dir.resolve("mixed.nbt")
+            val tag = CompoundTag().also { it.putString("garnetTestMarker", "typed") }
+            LocalHistoryStore.writeRevision(file, tag, 1, 1, 1, blockCount = 1, reason = LocalHistoryStore.REASON_MANUAL)
+            LocalHistoryStore.writeRawRevision(file, byteArrayOf(1, 2, 3), LocalHistoryStore.REASON_PRE_DELETE)
+            LocalHistoryStore.revisions(file) shouldHaveSize 2
+        }
+    }
+
+    test("a raw revision records zero size and zero block count") {
+        withHistoryDir { dir ->
+            val file = dir.resolve("notes.txt")
+            val rev = LocalHistoryStore.writeRawRevision(file, byteArrayOf(7), LocalHistoryStore.REASON_PRE_DELETE)
+            rev.shouldNotBeNull()
+            rev.sizeX shouldBe 0
+            rev.sizeY shouldBe 0
+            rev.sizeZ shouldBe 0
+            rev.blockCount shouldBe 0
         }
     }
 })

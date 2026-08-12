@@ -55,6 +55,10 @@ object LocalHistoryStore {
      *  editor (external NBT tool, git checkout, restore-from-backup) between sessions. Banked so a
      *  commit that's about to overwrite it doesn't destroy the only copy (F4). */
     const val REASON_EXTERNAL = "external"
+    /** A snapshot banked immediately before a delete unlinks the file, so the delete is undoable.
+     *  Unlike every other reason, this one is written for ANY file type — `.spec.kts` included —
+     *  via [writeRawRevision]. See docs/persistence/editor-undo-stack.md. */
+    const val REASON_PRE_DELETE = "pre-delete"
 
     /** `<instance>/.garnet/local-history`, or [SharedSettings.localHistoryDir] when set. */
     fun historyRoot(): Path {
@@ -104,6 +108,44 @@ object LocalHistoryStore {
             LOGGER.error("[LocalHistoryStore] read revision '{}': {}", blob, e.message)
             null
         }
+    }
+
+    // A raw revision is a normal revision whose blob is a wrapper CompoundTag holding the file's
+    // bytes verbatim. Wrapping rather than forking the blob format is what keeps index.json,
+    // prune, moveHistory and moveDescendantHistories working unchanged for both kinds.
+    private const val RAW_MARKER_KEY = "garnetRaw"
+    private const val RAW_BYTES_KEY = "garnetBytes"
+
+    /**
+     * Banks [bytes] as a revision of [file] for a file that is not a structure. Size and block-count
+     * metadata are zero, because there is no structure to describe — a consumer must read a
+     * zero-size revision as "not a structure snapshot", never as "an empty structure".
+     */
+    fun writeRawRevision(
+        file: Path,
+        bytes: ByteArray,
+        reason: String,
+        nowMillis: Long = System.currentTimeMillis(),
+        prune: Boolean = true,
+    ): Revision? {
+        val tag = CompoundTag()
+        tag.putBoolean(RAW_MARKER_KEY, true)
+        tag.putByteArray(RAW_BYTES_KEY, bytes)
+        return writeRevision(
+            file, tag, sizeX = 0, sizeY = 0, sizeZ = 0, blockCount = 0,
+            reason = reason, nowMillis = nowMillis, prune = prune,
+        )
+    }
+
+    /**
+     * The bytes banked by [writeRawRevision], or null when [revision] is a typed structure revision
+     * (or unreadable). Callers restoring a file use the null to choose the `NbtIo` write path
+     * instead — mixing them up would write a wrapper tag over a real `.nbt`.
+     */
+    fun readRawBytes(file: Path, revision: Revision): ByteArray? {
+        val tag = readTag(file, revision) ?: return null
+        if (!tag.getBooleanOr(RAW_MARKER_KEY, false)) return null
+        return tag.getByteArray(RAW_BYTES_KEY).orElse(null)
     }
 
     /**
