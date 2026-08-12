@@ -379,6 +379,17 @@ object EditorFileOpsHandlers {
      * stale: an equality check would be a guess about content, and unconditional banking is what
      * closes the two real gaps — `.spec.kts` files were never in the store at all, and a freshly
      * duplicated `.nbt` has no history by design.
+     *
+     * **Manifest order is an invariant, not an accident.** `Path.walk` with `INCLUDE_DIRECTORIES`
+     * and WITHOUT `BREADTH_FIRST` is depth-first pre-order, so a directory is always emitted before
+     * anything inside it. The restore side relies on exactly that to `createDirectories` in
+     * manifest order without sorting or re-deriving parents. Adding `PathWalkOption.BREADTH_FIRST`
+     * would still be parents-first, but any change that emits children before their parent — or any
+     * caller that reorders the manifest — silently breaks restore, so preserve it.
+     *
+     * A single-file target gets a one-entry manifest whose `relPath` is `""`, the same sentinel the
+     * directory branch uses for the deleted root itself: in both cases it means "the deleted node",
+     * resolved by the restore against the target path rather than beneath it.
      */
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     internal fun deleteSubtree(
@@ -403,18 +414,28 @@ object EditorFileOpsHandlers {
 
         if (target.isDirectory()) {
             manifest.add(ManifestEntry("", isFolder = true))
-            target.walk(PathWalkOption.INCLUDE_DIRECTORIES).forEach { entry ->
-                if (entry == target) return@forEach
-                val rel = target.relativize(entry).joinToString("/")
-                if (entry.isDirectory()) {
-                    manifest.add(ManifestEntry(rel, isFolder = true))
-                } else {
-                    manifest.add(ManifestEntry(rel, isFolder = false))
-                    when (val revision = bankFile(server, entry)) {
-                        null -> bankFailure = bankFailure ?: "could not bank '$rel'"
-                        else -> banked.add(BankedFile(rel, entry.toAbsolutePath(), revision))
+            // walk() has no error-tolerant mode, so an unreadable subdirectory throws out of the
+            // sequence. Left unguarded that would propagate through handleDelete into
+            // MinecraftServer.execute, which logs and swallows it -- the player would get neither a
+            // delete nor an error. Nothing has been unlinked at this point, so reporting a plain
+            // failure here is honest, and matches every other fallible IO in this file.
+            runCatching {
+                target.walk(PathWalkOption.INCLUDE_DIRECTORIES).forEach { entry ->
+                    if (entry == target) return@forEach
+                    val rel = target.relativize(entry).joinToString("/")
+                    if (entry.isDirectory()) {
+                        manifest.add(ManifestEntry(rel, isFolder = true))
+                    } else {
+                        manifest.add(ManifestEntry(rel, isFolder = false))
+                        when (val revision = bankFile(server, entry)) {
+                            null -> bankFailure = bankFailure ?: "could not bank '$rel'"
+                            else -> banked.add(BankedFile(rel, entry.toAbsolutePath(), revision))
+                        }
                     }
                 }
+            }.exceptionOrNull()?.let { e ->
+                LOGGER.error("[project/delete] walk of {}: {}", subpath, e.message, e)
+                return DeleteOutcome.Failed("delete failed: ${e.message}")
             }
         } else {
             manifest.add(ManifestEntry("", isFolder = false))
