@@ -696,7 +696,18 @@ git commit -m "feat(editor): undo/redo payloads and per-player state push"
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `src/gametest/kotlin/com/breadmoirai/garnet/test/editor/EditorUndoNetworkSpec.kt`. **Copy the `withServer` helper from `EditorFileOpsNetworkSpec.kt` verbatim** (including its `SharedSettings.localHistoryDir` redirect and its `finally` cleanup of `StructureAutoSave`/`StructureCommit` backoff), renaming the temp-dir prefixes from `"fileops-net"` to `"undo-net"`. That helper exists because the gametest harness reuses one `MinecraftServer` across tests, and a leaked dirty subpath resolves against a later test's root.
+First, **extract** `EditorFileOpsNetworkSpec.kt`'s private `withServer` helper into the shared gametest support file that already holds `withTempRoot`, `makeMockServerPlayer`, and `drainPayloads` (`com.breadmoirai.garnet.test`), giving it a `prefix: String` parameter in place of the hardcoded `"fileops-net"` temp-dir names:
+
+```kotlin
+suspend fun withEditorServer(
+    prefix: String,
+    block: suspend (server: MinecraftServer, player: ServerPlayer, root: Path) -> Unit,
+)
+```
+
+Keep its body — the `SharedSettings.localHistoryDir` redirect and the `finally` block clearing `StructureAutoSave` dirty state and `StructureCommit` backoff — byte-for-byte, including its comments. That helper exists because the gametest harness reuses one `MinecraftServer` across tests, so a dirty subpath leaked by one test resolves against a later test's root; the comments explaining that must travel with it.
+
+Then have `EditorFileOpsNetworkSpec` call `withEditorServer("fileops-net") { … }` (its own tests are the regression guard for the extraction) and create `src/gametest/kotlin/com/breadmoirai/garnet/test/editor/EditorUndoNetworkSpec.kt` calling `withEditorServer("undo-net") { … }`. Tests below are written against a local `withServer` alias — define one private to the new spec if you prefer, or call `withEditorServer` directly.
 
 ```kotlin
 package com.breadmoirai.garnet.test.editor
@@ -959,7 +970,7 @@ Expected: PASS for `EditorUndoNetworkSpec`, and **`EditorFileOpsNetworkSpec` sti
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/garnet/editor/network/EditorFileOpsHandlers.kt src/gametest/kotlin/com/breadmoirai/garnet/test/editor/EditorUndoNetworkSpec.kt
+git add src/main/kotlin/com/breadmoirai/garnet/editor/network/EditorFileOpsHandlers.kt src/gametest/kotlin/com/breadmoirai/garnet/test/
 git commit -m "feat(editor): bank every deleted file so a delete can be undone"
 ```
 
@@ -1148,7 +1159,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/com/breadmoirai/garnet/editor/network/EditorFileOpsHandlers.kt src/gametest/kotlin/com/breadmoirai/garnet/test/editor/EditorUndoNetworkSpec.kt
+git add src/main/kotlin/com/breadmoirai/garnet/editor/network/EditorFileOpsHandlers.kt src/gametest/kotlin/com/breadmoirai/garnet/test/
 git commit -m "feat(editor): restore a deleted subtree from its manifest and revisions"
 ```
 
