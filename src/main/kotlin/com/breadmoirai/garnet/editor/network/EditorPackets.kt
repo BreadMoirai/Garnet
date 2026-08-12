@@ -243,6 +243,22 @@ data class RenamePathC2S(val subpath: String, val newName: String) : CustomPacke
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
 
+/**
+ * Duplicate the file or folder at [subpath] beside itself. Carries no name: only the server sees the
+ * real filesystem, so it derives the deduplicated name itself rather than trusting a client whose
+ * tree snapshot may be stale.
+ */
+data class DuplicatePathC2S(val subpath: String) : CustomPacketPayload {
+    companion object {
+        val TYPE = CustomPacketPayload.Type<DuplicatePathC2S>(id("duplicate_path"))
+        val STREAM_CODEC: StreamCodec<ByteBuf, DuplicatePathC2S> = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, DuplicatePathC2S::subpath,
+            ::DuplicatePathC2S,
+        )
+    }
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+}
+
 // === Structure S2C ===
 
 /**

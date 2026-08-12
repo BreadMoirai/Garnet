@@ -2,6 +2,7 @@ package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
+import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
@@ -26,7 +27,9 @@ import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -40,6 +43,8 @@ import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
+import kotlin.io.path.readBytes
+import kotlin.io.path.writeBytes
 
 /**
  * Model of `EditorStructureNetworkSpec`'s harness: temp project root + a mock server player,
@@ -443,6 +448,148 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
 
             EditorSession.get(player.uuid)!!.activeSubpath shouldBe "logic/clocks"
+        }
+    }
+
+    test("handleDuplicate copies a structure to a ' copy' sibling") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("clock.nbt"))
+
+            root.resolve("clock.nbt").exists().shouldBeTrue()
+            root.resolve("clock copy.nbt").exists().shouldBeTrue()
+            root.resolve("clock copy.nbt").readBytes() shouldBe root.resolve("clock.nbt").readBytes()
+        }
+    }
+
+    test("handleDuplicate counts up when the copy name is taken") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("clock.nbt"))
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("clock.nbt"))
+
+            root.resolve("clock copy.nbt").exists().shouldBeTrue()
+            root.resolve("clock copy 2.nbt").exists().shouldBeTrue()
+        }
+    }
+
+    test("handleDuplicate copies a folder subtree") {
+        withServer { server, player, root ->
+            root.resolve("redstone/clocks").createDirectories()
+            EditorNewStructure.create(root.resolve("redstone/clocks"), "tick")
+
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("redstone"))
+
+            root.resolve("redstone copy").isDirectory().shouldBeTrue()
+            root.resolve("redstone copy/clocks/tick.nbt").exists().shouldBeTrue()
+            root.resolve("redstone/clocks/tick.nbt").exists().shouldBeTrue()   // source untouched
+        }
+    }
+
+    test("handleDuplicate refuses the project root") {
+        withServer { server, player, root ->
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S(""))
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+        }
+    }
+
+    test("handleDuplicate rejects a subpath that escapes the root") {
+        withServer { server, player, root ->
+            // The escape target must genuinely EXIST — resolveSubpath checks exists() before
+            // containment, so a non-existent target would pass this test even with containment
+            // deleted outright. Same reasoning as the handleCreateFolder escape test above.
+            val evil = root.resolveSibling("evil").also { it.createDirectories() }
+            evil.resolve("secret.nbt").writeBytes(ByteArray(4))
+
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("../evil/secret.nbt"))
+
+            evil.resolve("secret copy.nbt").exists().shouldBeFalse()
+            root.resolve("secret copy.nbt").exists().shouldBeFalse()
+        }
+    }
+
+    test("duplicating a dirty placed structure captures its in-world edits, not stale disk content") {
+        // The whole reason handleDuplicate quiesces first. Without the commit, the copy is made from
+        // the .nbt as it sat before the edit, and the player gets a silently stale duplicate.
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("clock.nbt"))
+
+            // The commit ran, so the source is clean and both files now hold the edited structure.
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeFalse()
+            root.resolve("clock copy.nbt").readBytes() shouldBe root.resolve("clock.nbt").readBytes()
+        }
+    }
+
+    test("handleDuplicate neither places the copy nor assigns it a region") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("clock.nbt"))
+
+            val registry = EditorDimRegistry.of(server)
+            registry.placedBoxOf("clock copy.nbt").shouldBeNull()
+            registry.structureRegionOriginOf("clock copy.nbt").shouldBeNull()
+            registry.placedBoxOf("clock.nbt").shouldNotBeNull()   // the source is still placed
+        }
+    }
+
+    test("a failed commit aborts the duplicate rather than copying stale content") {
+        // The counterpart to the delete case, and the opposite call: a duplicate made from a .nbt
+        // that does not match the world is a silently wrong answer the player has no way to spot,
+        // so duplicate ABORTS where delete proceeds.
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            StructureEditWatcher.onBlockChanged(level, origin)
+
+            val file = root.resolve("clock.nbt")
+            val historyDir = LocalHistoryStore.dirFor(file)
+            historyDir.resolve("index.json").deleteIfExists()
+            historyDir.resolve("index.json").createDirectory()
+
+            try {
+                EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("clock.nbt"))
+
+                root.resolve("clock copy.nbt").exists().shouldBeFalse()
+                drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+            } finally {
+                StructureAutoSave.of(server).clear("clock.nbt")
+                StructureCommit.clearBackoff(server, "clock.nbt")
+                historyDir.resolve("index.json").toFile().delete()
+            }
+        }
+    }
+
+    test("a duplicate starts with no local history and leaves the source's alone") {
+        withServer { server, player, root ->
+            EditorNewStructure.create(root, "clock")
+            // Placing seeds a REASON_PLACED baseline revision on the source.
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            LocalHistoryStore.revisions(root.resolve("clock.nbt")).shouldNotBeEmpty()
+
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("clock.nbt"))
+
+            LocalHistoryStore.revisions(root.resolve("clock copy.nbt")).shouldBeEmpty()
+            LocalHistoryStore.revisions(root.resolve("clock.nbt")).shouldNotBeEmpty()
         }
     }
 })

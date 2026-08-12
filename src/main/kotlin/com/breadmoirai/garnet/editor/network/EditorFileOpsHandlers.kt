@@ -12,7 +12,9 @@ import com.breadmoirai.garnet.structure.StructurePersistence
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
+import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectory
+import kotlin.io.path.isDirectory
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
 
@@ -124,6 +126,52 @@ object EditorFileOpsHandlers {
         registry.rekeyForRename(payload.subpath, newSubpath)
 
         EditorSession.repointSession(player, payload.subpath, newSubpath)
+
+        sendTree(server, player)
+    }
+
+    /**
+     * Copy the node at [payload].subpath beside itself under a deduplicated name.
+     *
+     * Much simpler than [handleRename] because nothing in the world is keyed to a path that did not
+     * exist a moment ago: no registry entry to rekey, no placed box to tear down, no session to
+     * repoint. The copy is NOT placed and starts with no local history — `LocalHistoryStore` keys
+     * revisions by absolute path, so it inherits nothing, and cloning the source's revisions would
+     * claim an edit history the copy never had.
+     */
+    fun handleDuplicate(server: MinecraftServer, player: ServerPlayer, payload: DuplicatePathC2S) {
+        if (payload.subpath.isEmpty()) {
+            fail(player, "cannot duplicate the project root"); return
+        }
+        val root = EditorRootResolver.rootFor(server) ?: run {
+            fail(player, "project-root not configured"); return
+        }
+        val source = root.resolveSubpath(payload.subpath) ?: run {
+            fail(player, "path not found or escapes root: ${payload.subpath}"); return
+        }
+
+        // Quiesce BEFORE reading the bytes, so the copy reflects the structure as it stands in the
+        // world rather than the .nbt as it sat before the current edit. A failed commit aborts:
+        // producing a silently stale duplicate is worse than producing none.
+        commitDirtyUnder(server, payload.subpath)?.let {
+            fail(player, "duplicate failed: $it"); return
+        }
+
+        val parent = source.parent
+        val newName = EditorNames.duplicateName(
+            sourceName = source.name,
+            siblings = siblingNames(parent),
+            isFolder = source.isDirectory(),
+        )
+        val target = parent.resolve(newName)
+
+        try {
+            if (source.isDirectory()) source.toFile().copyRecursively(target.toFile(), overwrite = false)
+            else source.copyTo(target)
+        } catch (e: Exception) {
+            LOGGER.error("[project/duplicate] {} -> {}: {}", payload.subpath, newName, e.message, e)
+            fail(player, "duplicate failed: ${e.message}"); return
+        }
 
         sendTree(server, player)
     }
