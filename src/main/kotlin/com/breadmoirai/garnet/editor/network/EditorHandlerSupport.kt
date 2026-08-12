@@ -5,6 +5,7 @@ import com.breadmoirai.garnet.editor.data.scanFolder
 import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
@@ -91,6 +92,17 @@ object EditorHandlerSupport {
         ServerPlayNetworking.send(player, EditorTreeSnapshotS2C(
             root = scanFolder(root.path),
             currentSubpath = current,
+        ))
+    }
+
+    /**
+     * Push the player's current undo/redo availability. Called after every mutating operation and
+     * after every undo/redo — the toolbar renders availability rather than guessing at it.
+     */
+    fun sendUndoState(player: ServerPlayer) {
+        ServerPlayNetworking.send(player, UndoStateS2C(
+            undoLabel = EditorUndoStack.peekUndo(player.uuid)?.label,
+            redoLabel = EditorUndoStack.peekRedo(player.uuid)?.label,
         ))
     }
 }

@@ -14,6 +14,7 @@ import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.playback.recorder.StateRecorder
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
@@ -71,6 +72,7 @@ class Garnet : ModInitializer {
         }
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
             EditorSession.clear(handler.player.uuid)
+            EditorUndoStack.clear(handler.player.uuid)
         }
         LOGGER.debug("[Garnet#onInitialize] initialization complete")
     }
