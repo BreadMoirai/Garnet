@@ -53,4 +53,39 @@ class EditorNamesTest : FunSpec({
         val final = EditorNames.resolveFinalName("gadget", NewNodeKind.STRUCTURE)
         EditorNames.validate(final, listOf("gadget.nbt")).shouldNotBeNull()
     }
+
+    test("duplicateName appends ' copy' before the extension") {
+        EditorNames.duplicateName("house.nbt", listOf("house.nbt"), isFolder = false) shouldBe "house copy.nbt"
+    }
+
+    test("duplicateName counts up from 2 once ' copy' is taken") {
+        EditorNames.duplicateName(
+            "house.nbt", listOf("house.nbt", "house copy.nbt"), isFolder = false,
+        ) shouldBe "house copy 2.nbt"
+        EditorNames.duplicateName(
+            "house.nbt", listOf("house.nbt", "house copy.nbt", "house copy 2.nbt"), isFolder = false,
+        ) shouldBe "house copy 3.nbt"
+    }
+
+    test("duplicateName matches siblings case-insensitively, like validate") {
+        // A copy that only differs from an existing sibling by case would be rejected by validate()
+        // a moment later on the very filesystems (NTFS, APFS) this project runs on.
+        EditorNames.duplicateName(
+            "house.nbt", listOf("house.nbt", "HOUSE COPY.NBT"), isFolder = false,
+        ) shouldBe "house copy 2.nbt"
+    }
+
+    test("duplicateName treats a folder's dots as part of its name, not an extension") {
+        EditorNames.duplicateName("redstone", listOf("redstone"), isFolder = true) shouldBe "redstone copy"
+        EditorNames.duplicateName("my.stuff", listOf("my.stuff"), isFolder = true) shouldBe "my.stuff copy"
+    }
+
+    test("duplicateName treats a leading dot as part of the name, not an extension") {
+        EditorNames.duplicateName(".gitignore", listOf(".gitignore"), isFolder = false) shouldBe ".gitignore copy"
+    }
+
+    test("duplicateName produces a name validate accepts") {
+        val name = EditorNames.duplicateName("house.nbt", listOf("house.nbt"), isFolder = false)
+        EditorNames.validate(name, listOf("house.nbt")) shouldBe null
+    }
 })
