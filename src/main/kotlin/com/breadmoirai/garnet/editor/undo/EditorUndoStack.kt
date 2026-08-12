@@ -14,8 +14,16 @@ import java.util.concurrent.ConcurrentHashMap
  * Unlike `EditorSession`, which replaces immutable values wholesale, this class mutates a shared
  * mutable `PlayerUndo` per player in place — that is why every accessor synchronizes on the
  * `PlayerUndo` instance before touching its deques. Invariant a future reader needs: no deque of a
- * given player is ever read or written outside that instance's monitor, including removal of the map
- * entry itself in [clear].
+ * given player is ever read or written outside that instance's monitor.
+ *
+ * Unlike `EditorSession.clear`, [clear] does NOT remove the player's map entry — it only empties the
+ * two deques under the instance's monitor. This is deliberate, not an oversight: removing the entry
+ * would let a `push`/`pushRedo` that already obtained the (soon-to-be-orphaned) `PlayerUndo` reference
+ * — and is merely waiting on the monitor `clear` is about to release — land its mutation on an object
+ * the map no longer points to, silently discarding it. Leaving the mapping in place means `of()` and
+ * every accessor agree on exactly one instance per player for the process lifetime, so no such
+ * interleaving exists to reason about. The cost is one lingering `PlayerUndo` (two empty deques) per
+ * player UUID ever seen — negligible next to the risk of a re-lost write.
  *
  * Per-player stacks sit over shared server state, so an entry can go stale while it waits. That is
  * handled by precondition checks at replay time in `EditorUndoOps`, not here — this class is a pure
@@ -73,12 +81,15 @@ object EditorUndoStack {
         byPlayer[playerId]?.let { synchronized(it) { it.undo.size } } ?: 0
 
     /**
-     * Synchronizes on the existing [PlayerUndo] (if any) before removing it, so a mutation racing
-     * with `clear` under a reference it obtained beforehand cannot land on an orphaned object after
-     * the map entry is gone — its deques are emptied under the same monitor first.
+     * Empties both deques under the existing [PlayerUndo]'s monitor. Deliberately does not remove the
+     * map entry — see the class doc for why: doing so would race a concurrent `push`/`pushRedo` that
+     * already holds this instance, discarding its write once the entry is gone.
      */
     fun clear(playerId: UUID) {
-        byPlayer[playerId]?.let { synchronized(it) { it.undo.clear(); it.redo.clear() } }
-        byPlayer.remove(playerId)
+        val state = byPlayer[playerId] ?: return
+        synchronized(state) {
+            state.undo.clear()
+            state.redo.clear()
+        }
     }
 }
