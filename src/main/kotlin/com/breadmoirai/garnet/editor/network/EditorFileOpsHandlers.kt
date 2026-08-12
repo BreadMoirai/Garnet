@@ -1,13 +1,11 @@
 package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.editor.data.*
+import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.commitDirtyUnder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
-import com.breadmoirai.garnet.editor.structure.CommitOutcome
-import com.breadmoirai.garnet.editor.structure.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
@@ -69,39 +67,10 @@ object EditorFileOpsHandlers {
         val registry = EditorDimRegistry.of(server)
         val wasPlaced = registry.placedBoxOf(payload.subpath)
 
-        // Commit every dirty structure under the renamed path BEFORE the move — the renamed node
-        // itself (subpath == payload.subpath) AND every descendant placed inside a renamed folder
-        // (subpath starting with "payload.subpath/"). Dirty state is keyed by subpath, so moving
-        // first would strand it under a name StructureCommit will never resolve again: a folder
-        // rename rekeys EditorDimRegistry's entries (see rekeyForRename below) but StructureAutoSave
-        // has no such rekey, so a descendant's dirty entry would otherwise sit under its OLD subpath
-        // forever — dirtySubpaths() never empties, defeating tick()'s idle fast path permanently,
-        // and worse, commitAll (BEFORE_SAVE/SERVER_STOPPED) can't resolve the old subpath either
-        // once the folder has moved, so the edits would never reach the .nbt at all
-        // (Task 7 fix round 1 / Finding 1). If any of these commits genuinely fails — not "nothing
-        // to write", but a real history/.nbt write failure — abort the whole rename without moving
-        // anything: proceeding anyway would let the move invalidate the old subpath and permanently
-        // strand those edits (Finding 2).
-        val autoSave = StructureAutoSave.of(server)
-        val dirtyUnderRename = autoSave.dirtySubpaths().filter {
-            it == payload.subpath || it.startsWith("${payload.subpath}/")
-        }
-        for (dirtySubpath in dirtyUnderRename) {
-            val outcome = StructureCommit.commit(server, dirtySubpath, LocalHistoryStore.REASON_AUTOSAVE)
-            // NotApplicable here (F5) means the subpath was dirty but its root/file was momentarily
-            // unresolvable — commit correctly leaves the dirty flag SET rather than clearing it (see
-            // StructureCommit.commit's KDoc, case 2). But proceeding with the rename anyway would
-            // rekey the registry to a NEW subpath while that dirty entry stays keyed under the OLD
-            // one, and nothing ever resolves the old key again — the edit is stranded exactly like
-            // the Failed case this already guards against. Abort the same way.
-            if (outcome is CommitOutcome.Failed) {
-                fail(player, "rename failed: could not save pending edits for '$dirtySubpath': ${outcome.reason}")
-                return
-            }
-            if (outcome is CommitOutcome.NotApplicable && autoSave.dirtySubpaths().contains(dirtySubpath)) {
-                fail(player, "rename failed: pending edits for '$dirtySubpath' are not resolvable right now")
-                return
-            }
+        // Quiesce before the move: see EditorHandlerSupport.commitDirtyUnder for why a relocation
+        // that skips this strands every pending edit beneath the renamed path.
+        commitDirtyUnder(server, payload.subpath)?.let {
+            fail(player, "rename failed: $it"); return
         }
 
         val target = parent.resolve(newName)
