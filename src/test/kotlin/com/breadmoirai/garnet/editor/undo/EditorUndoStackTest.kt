@@ -25,6 +25,14 @@ class EditorUndoStackTest : FunSpec({
         EditorUndoStack.peekUndo(id).shouldBeNull()
     }
 
+    test("popRedo removes the command it returns") {
+        val id = UUID.randomUUID()
+        EditorUndoStack.clear(id)
+        EditorUndoStack.pushRedo(id, cmd("a"))
+        EditorUndoStack.popRedo(id) shouldBe cmd("a")
+        EditorUndoStack.peekRedo(id).shouldBeNull()
+    }
+
     test("push clears the redo deque") {
         val id = UUID.randomUUID()
         EditorUndoStack.clear(id)

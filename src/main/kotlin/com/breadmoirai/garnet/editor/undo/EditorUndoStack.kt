@@ -6,10 +6,16 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Per-player undo/redo history over Explorer file operations.
  *
- * Shape and lifetime mirror `EditorSession`: a `ConcurrentHashMap` keyed by player UUID, in memory
- * only, cleared by the same `ServerPlayConnectionEvents.DISCONNECT` registration. Nothing is
- * persisted — a stack restored after a restart would be almost entirely stale, and the content a
- * delete needs to be reversible lives in `LocalHistoryStore`, which does survive.
+ * The map shape mirrors `EditorSession`: a `ConcurrentHashMap` keyed by player UUID, in memory only,
+ * cleared by the same `ServerPlayConnectionEvents.DISCONNECT` registration. Nothing is persisted — a
+ * stack restored after a restart would be almost entirely stale, and the content a delete needs to be
+ * reversible lives in `LocalHistoryStore`, which does survive.
+ *
+ * Unlike `EditorSession`, which replaces immutable values wholesale, this class mutates a shared
+ * mutable `PlayerUndo` per player in place — that is why every accessor synchronizes on the
+ * `PlayerUndo` instance before touching its deques. Invariant a future reader needs: no deque of a
+ * given player is ever read or written outside that instance's monitor, including removal of the map
+ * entry itself in [clear].
  *
  * Per-player stacks sit over shared server state, so an entry can go stale while it waits. That is
  * handled by precondition checks at replay time in `EditorUndoOps`, not here — this class is a pure
@@ -66,5 +72,13 @@ object EditorUndoStack {
     fun undoDepth(playerId: UUID): Int =
         byPlayer[playerId]?.let { synchronized(it) { it.undo.size } } ?: 0
 
-    fun clear(playerId: UUID) { byPlayer.remove(playerId) }
+    /**
+     * Synchronizes on the existing [PlayerUndo] (if any) before removing it, so a mutation racing
+     * with `clear` under a reference it obtained beforehand cannot land on an orphaned object after
+     * the map entry is gone — its deques are emptied under the same monitor first.
+     */
+    fun clear(playerId: UUID) {
+        byPlayer[playerId]?.let { synchronized(it) { it.undo.clear(); it.redo.clear() } }
+        byPlayer.remove(playerId)
+    }
 }
