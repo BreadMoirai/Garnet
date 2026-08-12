@@ -1,5 +1,12 @@
 package com.breadmoirai.garnet.test
 
+import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.async.onServer
+import com.breadmoirai.garnet.editor.data.EditorRoot
+import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.editor.structure.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.mixin.ConnectionAccessor
 import com.breadmoirai.garnet.mixin.ServerCommonPacketListenerImplAccessor
 import com.mojang.authlib.GameProfile
@@ -15,6 +22,7 @@ import net.minecraft.world.level.GameType
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.exists
 
 /**
@@ -51,6 +59,57 @@ inline fun withTempRoot(prefix: String, block: (Path) -> Unit) {
         block(tmp)
     } finally {
         deleteRecursively(tmp)
+    }
+}
+
+/**
+ * Model of `EditorStructureNetworkSpec`'s harness: temp project root + a mock server player,
+ * wired through `EditorServerContext` so the handlers resolve the temp root.
+ *
+ * Also redirects [SharedSettings.localHistoryDir] to a per-call temp directory for every test in
+ * this file (Task 7 fix round 2, minor): several of these tests place and/or commit structures,
+ * which writes real `LocalHistoryStore` revisions, and without this every one of them would litter
+ * the real `<gameDir>/.garnet/local-history` instead of a disposable temp dir. No test's assertions
+ * depend on the exact path (keys hash from each test's own unique temp root), so this is purely
+ * about not leaving blobs behind on the machine actually running the suite.
+ *
+ * [prefix] names both temp directories, so each calling spec gets its own recognisable pair.
+ */
+suspend fun withEditorServer(
+    prefix: String,
+    block: suspend (server: MinecraftServer, player: ServerPlayer, root: Path) -> Unit,
+) {
+    val prevHistDir = SharedSettings.localHistoryDir
+    val histDir = createTempDirectory("$prefix-hist")
+    SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+    try {
+        withTempRoot(prefix) { tmp ->
+            onServer {
+                EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                val player = makeMockServerPlayer(this)
+                drainPayloads(player)
+                try {
+                    block(this, player, tmp)
+                } finally {
+                    // StructureAutoSave/StructureCommit backoff are keyed per-MinecraftServer and
+                    // survive across tests (the gametest harness reuses one server), but every test
+                    // gets a fresh withTempRoot. A dirty/backoff entry a test leaves behind (e.g. an
+                    // assertion failing before that test's own cleanup runs) would otherwise be
+                    // resolved against a LATER test's root, where the subpath no longer exists --
+                    // observed as handleRename's commit-before-move loop aborting on a stale,
+                    // unresolvable subpath. Clear all of it unconditionally so no subpath ever
+                    // leaks from one test's root into another's.
+                    for (subpath in StructureAutoSave.of(this).dirtySubpaths()) {
+                        StructureAutoSave.of(this).clear(subpath)
+                        StructureCommit.clearBackoff(this, subpath)
+                    }
+                    EditorSession.clear(player.uuid)
+                }
+            }
+        }
+    } finally {
+        SharedSettings.localHistoryDir = prevHistDir
+        histDir.toFile().deleteRecursively()
     }
 }
 

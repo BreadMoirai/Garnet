@@ -14,8 +14,6 @@ import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
-import com.breadmoirai.garnet.editor.data.EditorRoot
-import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
@@ -23,10 +21,8 @@ import com.breadmoirai.garnet.editor.data.EditorSession
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.test.drainPayloads
-import com.breadmoirai.garnet.test.makeMockServerPlayer
-import com.breadmoirai.garnet.test.withTempRoot
+import com.breadmoirai.garnet.test.withEditorServer
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.core.async.onServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -41,58 +37,15 @@ import net.minecraft.world.level.block.Blocks
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
-import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 
-/**
- * Model of `EditorStructureNetworkSpec`'s harness: temp project root + a mock server player,
- * wired through `EditorServerContext` so the handlers resolve the temp root.
- *
- * Also redirects [SharedSettings.localHistoryDir] to a per-call temp directory for every test in
- * this file (Task 7 fix round 2, minor): several of these tests place and/or commit structures,
- * which writes real `LocalHistoryStore` revisions, and without this every one of them would litter
- * the real `<gameDir>/.garnet/local-history` instead of a disposable temp dir. No test's assertions
- * depend on the exact path (keys hash from each test's own unique temp root), so this is purely
- * about not leaving blobs behind on the machine actually running the suite.
- */
-private suspend fun withServer(block: suspend (server: MinecraftServer, player: ServerPlayer, root: Path) -> Unit) {
-    val prevHistDir = SharedSettings.localHistoryDir
-    val histDir = createTempDirectory("fileops-net-hist")
-    SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
-    try {
-        withTempRoot("fileops-net") { tmp ->
-            onServer {
-                EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
-                val player = makeMockServerPlayer(this)
-                drainPayloads(player)
-                try {
-                    block(this, player, tmp)
-                } finally {
-                    // StructureAutoSave/StructureCommit backoff are keyed per-MinecraftServer and
-                    // survive across tests (the gametest harness reuses one server), but every test
-                    // gets a fresh withTempRoot. A dirty/backoff entry a test leaves behind (e.g. an
-                    // assertion failing before that test's own cleanup runs) would otherwise be
-                    // resolved against a LATER test's root, where the subpath no longer exists --
-                    // observed as handleRename's commit-before-move loop aborting on a stale,
-                    // unresolvable subpath. Clear all of it unconditionally so no subpath ever
-                    // leaks from one test's root into another's.
-                    for (subpath in StructureAutoSave.of(this).dirtySubpaths()) {
-                        StructureAutoSave.of(this).clear(subpath)
-                        StructureCommit.clearBackoff(this, subpath)
-                    }
-                    EditorSession.clear(player.uuid)
-                }
-            }
-        }
-    } finally {
-        SharedSettings.localHistoryDir = prevHistDir
-        histDir.toFile().deleteRecursively()
-    }
-}
+/** This spec's alias for the shared harness — see `com.breadmoirai.garnet.test.withEditorServer`. */
+private suspend fun withServer(block: suspend (server: MinecraftServer, player: ServerPlayer, root: Path) -> Unit) =
+    withEditorServer("fileops-net", block)
 
 class EditorFileOpsNetworkSpec : GarnetTestSpec({
 

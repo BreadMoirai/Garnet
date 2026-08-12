@@ -5,24 +5,51 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.commitDirtyUnd
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
+import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.undo.BankedFile
+import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.ManifestEntry
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.history.Revision
 import com.breadmoirai.garnet.structure.StructurePersistence
+import net.minecraft.core.registries.Registries
+import net.minecraft.nbt.NbtAccounter
+import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.io.path.PathWalkOption
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteExisting
 import kotlin.io.path.isDirectory
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
+import kotlin.io.path.readBytes
+import kotlin.io.path.walk
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
+
+/** The result of [EditorFileOpsHandlers.deleteSubtree]. */
+sealed interface DeleteOutcome {
+    /** Nothing was deleted; [reason] is already phrased for the player. */
+    data class Failed(val reason: String) : DeleteOutcome
+    /** Deleted, and fully restorable — push [command]. */
+    data class Deleted(val command: EditorUndoCommand.Delete) : DeleteOutcome
+    /**
+     * Deleted, but at least one file could not be banked, so the operation is NOT undoable and the
+     * caller must push nothing. A partially restorable entry is worse than none: undo would report
+     * success while silently losing files.
+     */
+    data class DeletedUnbankable(val reason: String) : DeleteOutcome
+}
 
 object EditorFileOpsHandlers {
 
@@ -284,6 +311,9 @@ object EditorFileOpsHandlers {
      *
      * `LocalHistoryStore` revisions are deliberately RETAINED — they are the recovery route for a
      * delete. The consequence: a file later created at the same path inherits them.
+     *
+     * Everything after the resolution/validation and the best-effort quiesce below lives in
+     * [deleteSubtree], which the undo/redo ops reuse; this handler only adds the undo bookkeeping.
      */
     fun handleDelete(server: MinecraftServer, player: ServerPlayer, payload: DeletePathC2S) {
         if (payload.subpath.isEmpty()) {
@@ -305,50 +335,137 @@ object EditorFileOpsHandlers {
             LOGGER.warn("[project/delete] proceeding despite failed pre-delete commit for {}: {}", payload.subpath, it)
         }
 
+        when (val outcome = deleteSubtree(server, player, payload.subpath, target)) {
+            is DeleteOutcome.Failed -> { fail(player, outcome.reason); return }
+            is DeleteOutcome.Deleted -> EditorUndoStack.push(player.uuid, outcome.command)
+            is DeleteOutcome.DeletedUnbankable -> {
+                // Deleted, but not undoable. Say so rather than leaving an Undo button that would
+                // silently restore an incomplete subtree.
+                LOGGER.warn("[project/delete] {} is not undoable: {}", payload.subpath, outcome.reason)
+                fail(player, "deleted '${payload.subpath}', but it cannot be undone: ${outcome.reason}")
+            }
+        }
+
+        sendTree(server, player)
+        sendUndoState(player)
+    }
+
+    /**
+     * Walk [target]'s subtree, bank every file into `LocalHistoryStore`, then unlink and tear down.
+     *
+     * Order is bank → unlink → teardown. Banking BEFORE the unlink is the only ordering that works:
+     * once the bytes are gone there is nothing left to read. The pre-existing best-effort
+     * `commitDirtyUnder` still runs before this (in the caller), so a dirty structure's pending
+     * world edits are already in the file by the time it is read here.
+     *
+     * Every file is banked unconditionally rather than only those whose newest revision looks
+     * stale: an equality check would be a guess about content, and unconditional banking is what
+     * closes the two real gaps — `.spec.kts` files were never in the store at all, and a freshly
+     * duplicated `.nbt` has no history by design.
+     */
+    @OptIn(kotlin.io.path.ExperimentalPathApi::class)
+    internal fun deleteSubtree(
+        server: MinecraftServer,
+        player: ServerPlayer,
+        subpath: String,
+        target: Path,
+    ): DeleteOutcome {
+        val manifest = mutableListOf<ManifestEntry>()
+        val banked = mutableListOf<BankedFile>()
+        var bankFailure: String? = null
+
+        if (target.isDirectory()) {
+            manifest.add(ManifestEntry("", isFolder = true))
+            target.walk(PathWalkOption.INCLUDE_DIRECTORIES).forEach { entry ->
+                if (entry == target) return@forEach
+                val rel = target.relativize(entry).joinToString("/")
+                if (entry.isDirectory()) {
+                    manifest.add(ManifestEntry(rel, isFolder = true))
+                } else {
+                    manifest.add(ManifestEntry(rel, isFolder = false))
+                    when (val revision = bankFile(server, entry)) {
+                        null -> bankFailure = bankFailure ?: "could not bank '$rel'"
+                        else -> banked.add(BankedFile(rel, entry.toAbsolutePath(), revision))
+                    }
+                }
+            }
+        } else {
+            manifest.add(ManifestEntry("", isFolder = false))
+            when (val revision = bankFile(server, target)) {
+                null -> bankFailure = "could not bank '$subpath'"
+                else -> banked.add(BankedFile("", target.toAbsolutePath(), revision))
+            }
+        }
+
         try {
             if (target.isDirectory()) {
                 // copyRecursively's counterpart returns false rather than throwing on a partial
                 // failure, so an unchecked call would silently report success for a subtree that is
                 // still half on disk.
                 if (!target.toFile().deleteRecursively()) {
-                    error("could not delete every entry under ${payload.subpath}")
+                    error("could not delete every entry under $subpath")
                 }
             } else {
                 target.deleteExisting()
             }
         } catch (e: Exception) {
-            LOGGER.error("[project/delete] {}: {}", payload.subpath, e.message, e)
-            fail(player, "delete failed: ${e.message}"); return
+            LOGGER.error("[project/delete] {}: {}", subpath, e.message, e)
+            return DeleteOutcome.Failed("delete failed: ${e.message}")
         }
 
         // structureSubpaths(), not placedStructureSubpaths(): a place that errored partway leaves a
         // region assignment with no placed box, and that entry must go too.
         val registry = EditorDimRegistry.of(server)
-        val doomed = registry.structureSubpaths().filter {
-            it == payload.subpath || it.startsWith("${payload.subpath}/")
-        }
-        for (subpath in doomed) {
+        val doomed = registry.structureSubpaths().filter { it == subpath || it.startsWith("$subpath/") }
+        for (doomedSubpath in doomed) {
             // unplaceStructure BEFORE clearBounds, never after: clearBounds writes AIR through the
             // 3-arg level.setBlock, which the setBlock mixin hooks unconditionally, so a
             // still-registered subpath would have those very writes re-marked dirty by the mixin.
-            val box = registry.unplaceStructure(subpath)
+            val box = registry.unplaceStructure(doomedSubpath)
             if (box != null) {
                 StructurePersistence.clearBounds(registry.projectLevel(), box.origin, box.size)
             }
         }
 
         val autoSave = StructureAutoSave.of(server)
-        for (subpath in autoSave.dirtySubpaths().filter {
-            it == payload.subpath || it.startsWith("${payload.subpath}/")
-        }) {
-            autoSave.clear(subpath)
+        for (dirty in autoSave.dirtySubpaths().filter { it == subpath || it.startsWith("$subpath/") }) {
+            autoSave.clear(dirty)
             // The backoff map is keyed by subpath too; leaving an entry behind leaks one per delete
             // for the life of the server.
-            StructureCommit.clearBackoff(server, subpath)
+            StructureCommit.clearBackoff(server, dirty)
         }
 
-        EditorSession.clearSessionUnder(player.uuid, payload.subpath)
+        EditorSession.clearSessionUnder(player.uuid, subpath)
 
-        sendTree(server, player)
+        bankFailure?.let { return DeleteOutcome.DeletedUnbankable(it) }
+        return DeleteOutcome.Deleted(EditorUndoCommand.Delete(subpath, manifest, banked))
+    }
+
+    /**
+     * Bank one file's current bytes, returning the revision or null on any failure.
+     *
+     * A `.nbt` goes through the typed path so its revision carries real size metadata (matching
+     * what `handlePlaceStructure` banks); anything else goes through `writeRawRevision`. A `.nbt`
+     * that fails to parse as NBT falls back to raw bytes rather than being lost — the goal is
+     * restorability, not a well-formed structure record.
+     */
+    private fun bankFile(server: MinecraftServer, file: Path): Revision? {
+        val bytes = try { file.readBytes() } catch (e: Exception) {
+            LOGGER.error("[project/delete] read for banking '{}': {}", file, e.message, e)
+            return null
+        }
+        if (file.name.endsWith(".nbt", ignoreCase = true)) {
+            val tag = runCatching { NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()) }.getOrNull()
+            if (tag != null) {
+                val template = StructureTemplate()
+                template.load(server.registryAccess().lookupOrThrow(Registries.BLOCK), tag)
+                val size = template.size
+                return LocalHistoryStore.writeRevision(
+                    file, tag, size.x, size.y, size.z,
+                    blockCount = 0, reason = LocalHistoryStore.REASON_PRE_DELETE,
+                )
+            }
+        }
+        return LocalHistoryStore.writeRawRevision(file, bytes, LocalHistoryStore.REASON_PRE_DELETE)
     }
 }
