@@ -51,33 +51,35 @@ create-a-file operations share another.
 
 ## Design
 
-### 1. `EditorCommand` — what actually happened
+### 1. `EditorUndoCommand` — what actually happened
 
 A sealed interface in a new `editor/undo/` package. One subtype per operation, each a plain data
 record of the *executed* operation, plus a `label` used for the toolbar tooltip.
 
 ```kotlin
-sealed interface EditorCommand {
+sealed interface EditorUndoCommand {
     val label: String
 
-    data class CreateFolder(val subpath: String) : EditorCommand
-    data class CreateFile(val subpath: String, val kind: FileKind) : EditorCommand
-    data class Duplicate(val createdSubpath: String) : EditorCommand
-    data class Relocate(val oldSubpath: String, val newSubpath: String, val op: RelocateKind) : EditorCommand
+    data class CreateFolder(val subpath: String) : EditorUndoCommand
+    data class CreateFile(val subpath: String, val kind: FileKind) : EditorUndoCommand
+    data class Duplicate(val createdSubpath: String) : EditorUndoCommand
+    data class Relocate(val oldSubpath: String, val newSubpath: String, val op: RelocateKind) : EditorUndoCommand
     data class Delete(
         val rootSubpath: String,
         val manifest: List<ManifestEntry>,
         val banked: List<BankedFile>,
-    ) : EditorCommand
+    ) : EditorUndoCommand
 }
 
 data class ManifestEntry(val relPath: String, val isFolder: Boolean)
-data class BankedFile(val absolutePath: Path, val revision: LocalHistoryStore.Revision)
+data class BankedFile(val absolutePath: Path, val revision: Revision)
 ```
 
 `Duplicate` stores the server-derived created name, not the source — that is the whole point.
 `Relocate` covers both rename and move, mirroring the fact that `EditorFileOpsHandlers.relocate`
 already covers both; `op` exists only so error and status messages say "rename" or "move" correctly.
+
+`Revision` is the existing top-level `com.breadmoirai.garnet.history.Revision`, not a nested type.
 
 `BankedFile.absolutePath` is absolute, not root-relative, because that is what `LocalHistoryStore`
 actually keys on (`keyOf` hashes the normalized absolute path), and because a deleted file's history
@@ -91,17 +93,17 @@ Mirrors `EditorSession`'s shape and lifetime exactly:
 object EditorUndoStack {
     private val byPlayer = ConcurrentHashMap<UUID, PlayerUndo>()
 
-    fun push(uuid: UUID, command: EditorCommand)   // clears the redo deque
-    fun peekUndo(uuid: UUID): EditorCommand?
-    fun peekRedo(uuid: UUID): EditorCommand?
-    fun popUndo(uuid: UUID): EditorCommand?
-    fun popRedo(uuid: UUID): EditorCommand?
-    fun pushRedo(uuid: UUID, command: EditorCommand)
+    fun push(uuid: UUID, command: EditorUndoCommand)   // clears the redo deque
+    fun peekUndo(uuid: UUID): EditorUndoCommand?
+    fun peekRedo(uuid: UUID): EditorUndoCommand?
+    fun popUndo(uuid: UUID): EditorUndoCommand?
+    fun popRedo(uuid: UUID): EditorUndoCommand?
+    fun pushRedo(uuid: UUID, command: EditorUndoCommand)
     fun clear(uuid: UUID)
 }
 ```
 
-`PlayerUndo` holds two `ArrayDeque<EditorCommand>`. The undo deque is capped at 50, oldest evicted.
+`PlayerUndo` holds two `ArrayDeque<EditorUndoCommand>`. The undo deque is capped at 50, oldest evicted.
 `clear` is called from the same `ServerPlayConnectionEvents.DISCONNECT` registration in
 `Garnet.onInitialize` that already clears `EditorSession`.
 
