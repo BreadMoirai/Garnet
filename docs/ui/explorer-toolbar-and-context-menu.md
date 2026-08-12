@@ -1,24 +1,25 @@
 ---
 title: Explorer toolbar and context menu
 tags: [explorer, toolbar, context-menu, inline-edit, jewel, packets, keyboard]
-summary: The Project Explorer's kebab/Refresh/Collapse-All toolbar, its right-click New/Rename menu, the inline name field that commits through ExplorerActions, and why the LazyTree's preview key handler had to stop eating that field's caret/selection keys.
+summary: The Project Explorer's kebab/Refresh/Collapse-All toolbar, its right-click New/Rename/Duplicate/Move/Delete menu and the two dialogs it opens, the inline name field that commits through ExplorerActions, and why the LazyTree's preview key handler had to stop eating that field's caret/selection keys.
 ---
 
 # Explorer toolbar and context menu
 
 `ExplorerToolbar.kt` (the panel's single top row: kebab overflow, Refresh, Collapse All) and
-`ExplorerContextMenu.kt` (the right-click `New Folder` / `New Structure` / `Rename` menu) together
+`ExplorerContextMenu.kt` (the right-click `New Folder` / `New Structure` / `Rename` / `Duplicate` /
+`Move to…` / `Delete` menu) together
 replaced the old root-name `Dropdown` header and the `+ New`/`Save`/`Discard` structure-action row.
 See [dock-framework.md](dock-framework.md#first-real-panel-the-project-explorer-live-data-pattern-now-on-jewel)
 for the panel walkthrough and [jewel-widget-layer.md](jewel-widget-layer.md) for the Jewel
 mechanics (`PopupMenu` overloads, the NUL-suffixed placeholder id, the `BasicLazyTree` prune). This
-article covers the *why* behind five decisions that aren't visible just from reading the code.
+article covers the *why* behind the decisions that aren't visible just from reading the code.
 
 ## Why validation runs on both client and server
 
-`ExplorerActions.commitCreate`/`commitRename` re-run `EditorNames.validate` against the client's
-own tree snapshot before sending `CreateFolderC2S`/`NewStructureC2S`/`RenamePathC2S`. This looks
-redundant next to `EditorFileOpsHandlers.handleCreateFolder`/`EditorStructureHandlers.handleNewStructure`/`EditorFileOpsHandlers.handleRename`,
+`ExplorerActions.commitCreate`/`commitRename`/`commitMove` re-run `EditorNames.validate` against the
+client's own tree snapshot before sending `CreateFolderC2S`/`NewStructureC2S`/`RenamePathC2S`/
+`MovePathC2S`. This looks redundant next to `EditorFileOpsHandlers.handleCreateFolder`/`EditorStructureHandlers.handleNewStructure`/`EditorFileOpsHandlers.handleRename`/`EditorFileOpsHandlers.handleMove`,
 which validate the *same* name again server-side. It isn't: the two checks run against different
 data with different trust levels.
 
@@ -66,7 +67,7 @@ current right-click behind it, anchored at a coordinate from a previous session.
 to the composable that owns it means a re-mount gets a fresh `ExplorerMenuState` with `target =
 null`, for free, instead of needing an explicit reset call site to remember.
 
-## Why renaming a placed structure unloads and reloads it — and why renaming a folder rekeys instead
+## Why relocating a placed structure unloads and reloads it — and why relocating a folder rekeys instead
 
 `EditorDimRegistry` tracks placed structures in three maps keyed by subpath: `bySubpath` (a
 loaded folder's own region), `structureBySubpath` (a standalone structure's assigned region), and
@@ -77,13 +78,18 @@ entry under the OLD subpath: the structure's placed blocks become unreachable by
 return null` and silently skips it forever), and a fresh `PlaceStructureC2S(newSubpath)` finds no
 registry entry and re-places a second copy in a brand-new region, orphaning the first in the world.
 
-`handleRename` handles two distinct shapes of this problem differently:
+A rename IS a move that happens to keep its parent, so `handleRename` and `handleMove` share a
+private `relocate(oldSubpath, source, target, newSubpath, operation, placedMessage)` in
+`EditorFileOpsHandlers` holding everything below; each caller only computes its own target and runs
+its own validation first. Everything here was already written in `oldSubpath → newSubpath` terms,
+which is why it generalized to a parent change without modification. `relocate` handles two distinct
+shapes of this problem differently:
 
 - **The renamed node itself is a placed structure** (`registry.placedBoxOf(payload.subpath) !=
-  null`): an unload/reload, not a rekey. `handleRename` first commits any pending auto-save edits
-  for the OLD subpath through `StructureCommit.commit` — BEFORE the file move, since the dirty
-  state is keyed by subpath and moving first would strand it under a name nothing will ever commit
-  again — then calls `EditorDimRegistry.unplaceStructure(oldSubpath)` (clearing
+  null`): an unload/reload, not a rekey. `relocate` first commits any pending auto-save edits for
+  the OLD subpath through `EditorHandlerSupport.commitDirtyUnder` — BEFORE the file move, since the
+  dirty state is keyed by subpath and moving first would strand it under a name nothing will ever
+  commit again — then calls `EditorDimRegistry.unplaceStructure(oldSubpath)` (clearing
   `structureBySubpath` and `placedBoxes`), then re-places it under the new subpath via
   `EditorStructureHandlers.placeStructureFrom`. This lands the structure in a freshly-assigned region
   (`nextStructureIndex` is monotonic and never recycled) rather than reusing the old one —
@@ -99,7 +105,11 @@ registry entry and re-places a second copy in a brand-new region, orphaning the 
   it after the file move and after the "renamed node itself" handling above, so by the time it
   runs, that case's exact-match key is already gone and only descendants remain to rekey.
 
-**The teardown must run only after the file move succeeds, never before.** `handleRename` moves the
+`handleDelete` reuses neither branch — it has no destination to rekey onto — but it does repeat the
+same `unplaceStructure`-before-`clearBounds` ordering, and for the same reason. See
+[use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md) UC-MAN-10.j.
+
+**The teardown must run only after the file move succeeds, never before.** `relocate` moves the
 `.nbt` first, inside a `try` — carrying its `LocalHistoryStore` revisions across via
 `LocalHistoryStore.moveDescendantHistories` (which walks the moved subtree and calls the
 single-file `moveHistory` primitive for each `.nbt` under it) — and only calls
@@ -111,6 +121,28 @@ dropping the registry keys before the move was confirmed — a failed move would
 still-old-named) file sits on disk unrecoverably out of sync with what the player just saw. Ordering
 the teardown strictly after a successful move means a failed rename is a true no-op: the file didn't
 move, so the registry and the world are left exactly as they were.
+
+## Why the two dialogs are one popup layer, opened after the menu closes
+
+`Delete` and `Move to…` need a second surface — a confirmation and a destination picker — and the
+obvious way to build that in Jewel, a submenu, is exactly what the nested-popup defect below
+forbids. `ExplorerDialogs.kt` sidesteps it rather than fighting it: every menu item calls
+`state.close()` *before* invoking its callback, so the menu's popup layer is already gone by the time
+`ExplorerDialogState` flips to a pending dialog. At no point are two layers alive at once, so the
+`isInteractive(owner)` blocking never comes into play.
+
+Both dialogs reuse `FixedOffsetPositionProvider` and the anchor the menu recorded (`menu.anchor`
+survives `close()`, which nulls only `target`), so a dialog opens exactly where the item that
+triggered it was rather than jumping to a corner. `ExplorerDialogState` is `remember`-ed in the panel
+for the same reason `ExplorerMenuState` is — see the section above; a top-level object would survive
+a panel re-mount and repaint over the next one.
+
+**Illegal move destinations are never offered, rather than offered and then refused.**
+`moveDestinationsFor` walks the snapshot for folders and drops both the moved node's own subtree and
+the folder it already lives in — the same two rules `ExplorerActions.commitMove` enforces and
+`handleMove` re-checks server-side. The delete prompt counts `.nbt` files beneath a folder rather
+than all nodes, because intermediate folders are not what anyone is afraid of losing; a file or an
+empty folder is named without a count.
 
 ## The `BasicLazyTree` first-composition prune
 

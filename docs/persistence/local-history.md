@@ -1,7 +1,7 @@
 ---
 title: Local history for standalone structures
 tags: [storage, history, autosave, structures, persistence]
-summary: How auto-saved .nbt structures record revisions under <instance>/.garnet/local-history, why the key is the file's absolute path, and how pruning works.
+summary: How auto-saved .nbt structures record revisions under <instance>/.garnet/local-history, why the key is the file's absolute path, how pruning works, and why a deleted structure keeps its history (so a file recreated at the same path inherits it).
 ---
 
 # Local history for standalone structures
@@ -132,7 +132,7 @@ revision count was already at the cap — the failed attempt's own revision does
 way, but a real, unrelated older revision would be destroyed for no reason. Deferring `prune` to
 after a confirmed-successful rewrite avoids that.
 
-## History outlives the structure
+## A delete keeps its history
 
 Deleting a `.nbt` file does not touch its history directory. This is intentional: recovering a
 structure a user deleted (accidentally or not) is exactly what local history exists for, and
@@ -142,6 +142,19 @@ revision under the destination path's hash, merging into whatever history the de
 had rather than overwriting it, and if any individual revision fails to move, that revision (and
 only that one) is left behind at the source rather than the whole move being treated as
 all-or-nothing.
+
+The Explorer's `Delete` action (`EditorFileOpsHandlers.handleDelete`, UC-MAN-10.j) makes this
+reachable from the UI, and leans on it: **history is the only recovery route for a delete** — there
+is no trash folder and nothing to undo in the tree. That is also why `handleDelete` quiesces before
+unlinking, banking a final revision of whatever was still only in the world. That commit is
+best-effort, though: if it fails, the delete proceeds anyway rather than leaving a structure with a
+broken history directory undeletable.
+
+**Consequence: a file later created at the same path inherits the deleted file's revisions.** Keys
+are a hash of the absolute path, and nothing ties a revision to the file's identity beyond that. A
+new `redstone/clock.nbt` created where an old one was deleted opens with the old one's history. That
+is a usable undelete affordance — recreate the name, roll back — but it is surprising if you expect
+a new file to start clean, and it is the reason a "delete" here is not the same as "unrecoverable".
 
 ## `blockCount` is `0` on `placed` and `external` revisions
 

@@ -214,10 +214,18 @@ button at the (14, 12) hit point `JewelExplorerSpec` clicks.
 ## Right-click context menu drives the inline field
 
 `ExplorerContextMenu` (in `ExplorerContextMenu.kt`) is a Jewel `PopupMenu` with `New Folder`, `New
-Structure` and `Rename` items, opened by a right-click on a `TreeRow`. It sets
-`edit` on `ProjectExplorerPanel`'s hoisted `ExplorerEdit?` state — the same state the previous
-section describes — so the menu and the inline field are two faces of one mechanism: the menu
-picks *what* to edit, the field does the actual typing.
+Structure`, `Rename`, `Duplicate`, `Move to…` and `Delete` items, opened by a right-click on a
+`TreeRow`. `New`/`Rename` set `edit` on `ProjectExplorerPanel`'s hoisted `ExplorerEdit?` state — the
+same state the previous section describes — so the menu and the inline field are two faces of one
+mechanism: the menu picks *what* to edit, the field does the actual typing.
+
+`Duplicate` sends immediately. `Delete` and `Move to…` instead open a dialog through
+`ExplorerDialogState` (in `ExplorerDialogs.kt`), which is `remember`-ed in the panel for the same
+mount-epoch reason as `ExplorerMenuState`. Each menu item calls `state.close()` *before* its
+callback, so the menu layer is gone before any dialog opens — which is what keeps the dialogs a
+single popup layer and clear of the nested-popup defect described next. Both dialogs reuse the
+menu's `FixedOffsetPositionProvider` and its recorded anchor, so a dialog appears exactly where the
+item that triggered it was.
 
 - **Nested popups do not work in this scene: keep every menu one level deep.** The menu's two `New`
   actions are flat rather than a `New ▸ (Folder | Structure)` submenu, and that is forced, not a

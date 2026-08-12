@@ -127,12 +127,19 @@ Client:
   folder that was right-clicked instead of the session's active folder; `handleNewStructure` now
   resolves `folder` strictly via `EditorRoot.resolveSubpath(payload.parentSubpath)` and no longer
   reads `EditorSession.activeSubpath` or `EditorWorld.folderAbsoluteByPath` at all.
-  `CreateFolderC2S(parentSubpath, name)` and `RenamePathC2S(subpath, newName)` are new payloads
-  registered alongside it (`PayloadTypeRegistry.serverboundPlay()`); both now have server receivers:
-  `handleCreateFolder` (same folder-resolution path) and `handleRename`. `handleNewStructure`,
-  `handleCreateFolder`, and `handleRename` all re-validate the final name server-side through
+  `CreateFolderC2S(parentSubpath, name)`, `RenamePathC2S(subpath, newName)`,
+  `DuplicatePathC2S(subpath)`, `DeletePathC2S(subpath)` and
+  `MovePathC2S(subpath, destFolderSubpath)` are payloads registered alongside it
+  (`PayloadTypeRegistry.serverboundPlay()`), each with a server receiver in
+  `EditorFileOpsHandlers`: `handleCreateFolder` (same folder-resolution path), `handleRename`,
+  `handleDuplicate`, `handleDelete` and `handleMove`. `handleNewStructure`, `handleCreateFolder`,
+  `handleRename` and `handleMove` all re-validate the final name server-side through
   `EditorNames.validate` against the destination folder's real directory listing, since the
-  client's tree snapshot can be stale. `handleRename` additionally: refuses `subpath == ""` (the
+  client's tree snapshot can be stale; `handleDuplicate` derives its name instead, via
+  `EditorNames.duplicateName`. Every one of these operations that relocates or destroys a path first
+  quiesces pending edits through `EditorHandlerSupport.commitDirtyUnder` — see
+  [use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md) UC-MAN-10.i–k for the
+  per-operation contracts, including why delete alone proceeds when that commit fails. `handleRename` additionally: refuses `subpath == ""` (the
   client already disables the menu item for the root, but the server does not trust that), commits
   a placed-and-dirty structure's pending edits through `StructureCommit.commit` BEFORE the file
   move (so the dirty state, keyed by subpath, is never stranded under a name nothing will commit
