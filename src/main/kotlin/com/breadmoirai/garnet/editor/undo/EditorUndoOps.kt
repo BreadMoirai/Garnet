@@ -25,12 +25,24 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
  * A stale entry is REFUSED and left on the stack. Per-player stacks sit over shared server state,
  * so an entry can be invalidated by anyone; refusing lets the player retry after resolving the
  * conflict, where discarding would silently skip to an older action.
+ *
+ * The invariant that follows from that, and which every branch here upholds: **an entry is popped
+ * only when the inverse actually happened.** Every refusal — whether it came from a precondition
+ * here or from a primitive that failed mid-flight — leaves both deques untouched. A stack that
+ * moved an entry for an operation the filesystem refused would claim an undo that never occurred
+ * and destroy the player's only handle on retrying it.
  */
 object EditorUndoOps {
 
     /** What an inverse produced: a failure reason, or the command to seat on the redo deque. */
     private sealed interface Inverted {
-        data class Refused(val reason: String) : Inverted
+        /**
+         * [alreadyReported] means the primitive that refused has ALREADY sent the player an
+         * `EditorErrorS2C` of its own (`relocate` reports its own failures), so [undo]/[redo] must
+         * not send a second packet for the same failure. Do not "simplify" this flag away: without
+         * it a failed relocate produces two error toasts for one event.
+         */
+        data class Refused(val reason: String, val alreadyReported: Boolean = false) : Inverted
 
         /** [redoable] is usually the original command; creates return a copy carrying their bank. */
         data class Applied(val redoable: EditorUndoCommand) : Inverted
@@ -43,7 +55,7 @@ object EditorUndoOps {
         when (val result = applyInverse(server, player, command)) {
             is Inverted.Refused -> {
                 // The entry stays put — see this object's KDoc.
-                fail(player, "can't undo ${command.label} — ${result.reason}")
+                if (!result.alreadyReported) fail(player, "can't undo ${command.label} — ${result.reason}")
                 return
             }
 
@@ -62,7 +74,9 @@ object EditorUndoOps {
         }
         val problem = reapply(server, player, command)
         if (problem != null) {
-            fail(player, "can't redo ${command.label} — $problem")
+            // Same rule as undo(): the redo entry stays put, and a primitive that already reported
+            // its own failure is not reported twice.
+            if (!problem.alreadyReported) fail(player, "can't redo ${command.label} — ${problem.reason}")
             return
         }
         EditorUndoStack.popRedo(player.uuid)
@@ -109,12 +123,15 @@ object EditorUndoOps {
         is EditorUndoCommand.Delete -> restore(server, player, command)
     }
 
-    /** Null on success, else the reason phrased as a clause following "can't redo X — ". */
+    /**
+     * Null on success, else the refusal — whose `reason` reads as a clause following
+     * "can't redo X — ", and whose `alreadyReported` says whether the player has already heard it.
+     */
     private fun reapply(
         server: MinecraftServer,
         player: ServerPlayer,
         command: EditorUndoCommand,
-    ): String? = when (command) {
+    ): Inverted.Refused? = when (command) {
         // A create cannot be replayed as a create — the content came from a create handler, not
         // from anything this command recorded. It is replayed as a RESTORE of the bank the undo
         // took on its way out, which is exactly what `banked` is for.
@@ -132,16 +149,16 @@ object EditorUndoOps {
 
         is EditorUndoCommand.Relocate ->
             when (val result = moveBack(server, player, from = command.oldSubpath, to = command.newSubpath, command = command)) {
-                is Inverted.Refused -> result.reason
+                is Inverted.Refused -> result
                 is Inverted.Applied -> null
             }
 
         is EditorUndoCommand.Delete -> {
             val root = EditorRootResolver.rootFor(server)
             val target = root?.resolveSubpath(command.rootSubpath)
-            if (target == null) "'${command.rootSubpath}' is already gone"
+            if (target == null) Inverted.Refused("'${command.rootSubpath}' is already gone")
             else when (val outcome = EditorFileOpsHandlers.deleteSubtree(server, player, command.rootSubpath, target)) {
-                is DeleteOutcome.Failed -> outcome.reason
+                is DeleteOutcome.Failed -> Inverted.Refused(outcome.reason)
                 else -> null
             }
         }
@@ -151,10 +168,10 @@ object EditorUndoOps {
         server: MinecraftServer,
         player: ServerPlayer,
         banked: EditorUndoCommand.Delete?,
-    ): String? {
-        if (banked == null) return "the removal could not be banked, so it cannot be redone"
+    ): Inverted.Refused? {
+        if (banked == null) return Inverted.Refused("the removal could not be banked, so it cannot be redone")
         return when (val result = restore(server, player, banked)) {
-            is Inverted.Refused -> result.reason
+            is Inverted.Refused -> result
             is Inverted.Applied -> null
         }
     }
@@ -211,7 +228,7 @@ object EditorUndoOps {
         val target = parent.resolve(to.substringAfterLast('/'))
         if (target.exists()) return Inverted.Refused("'$to' is occupied again")
 
-        EditorFileOpsHandlers.relocate(
+        val moved = EditorFileOpsHandlers.relocate(
             server, player,
             oldSubpath = from,
             source = source,
@@ -224,6 +241,11 @@ object EditorUndoOps {
             // entry for a move the player did not perform.
             record = false,
         )
+        // The preconditions above cover staleness, not IO: a lock, a permission problem, or a
+        // destination whose parent stopped being a folder all fail inside `relocate`, after every
+        // check here has passed. Without this branch the entry would be popped for a move that
+        // never happened. `relocate` has already told the player why, hence alreadyReported.
+        if (!moved) return Inverted.Refused("the move could not be completed", alreadyReported = true)
         return Inverted.Applied(command)
     }
 

@@ -136,6 +136,12 @@ object EditorFileOpsHandlers {
      *
      * Each caller does its own resolution and validation first; by the time this runs, the move is
      * known to be legal and only the ordering hazards remain.
+     *
+     * Returns true if the node actually moved (and the tree was sent), false if the operation was
+     * abandoned — in which case the player has ALREADY been told why via [fail], and the caller
+     * must not report it a second time. The two handler callers ignore the value, because a handler
+     * has nothing left to do either way. `EditorUndoOps` does not: it must leave the undo entry on
+     * the stack when the inverse did not happen, or the stack silently diverges from the filesystem.
      */
     internal fun relocate(
         server: MinecraftServer,
@@ -148,7 +154,7 @@ object EditorFileOpsHandlers {
         placedMessage: String,
         kind: RelocateKind,
         record: Boolean = true,
-    ) {
+    ): Boolean {
         // A placed structure is keyed by subpath in EditorDimRegistry, so relocating under it would
         // strand both the placed box and the region assignment if we don't unload/reload it. But the
         // move (an IO op — can fail on a lock, permission problem, etc.) must succeed FIRST: tearing
@@ -163,14 +169,14 @@ object EditorFileOpsHandlers {
         // Quiesce before the move: see EditorHandlerSupport.commitDirtyUnder for why a relocation
         // that skips this strands every pending edit beneath the moved path.
         commitDirtyUnder(server, oldSubpath)?.let {
-            fail(player, "$operation failed: $it"); return
+            fail(player, "$operation failed: $it"); return false
         }
 
         try {
             source.moveTo(target)
         } catch (e: Exception) {
             LOGGER.error("[project/{}] {} -> {}: {}", operation, oldSubpath, newSubpath, e.message, e)
-            fail(player, "$operation failed: ${e.message}"); return
+            fail(player, "$operation failed: ${e.message}"); return false
         }
 
         // History is keyed by each file's own absolute path, so every moved .nbt (the node itself,
@@ -219,6 +225,7 @@ object EditorFileOpsHandlers {
         }
         sendTree(server, player)
         sendUndoState(player)
+        return true
     }
 
     /**

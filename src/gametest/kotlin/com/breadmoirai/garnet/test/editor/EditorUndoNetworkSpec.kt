@@ -566,6 +566,40 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
         }
     }
 
+    test("undo keeps the entry when the relocate itself fails") {
+        // The one failure mode the stack must not have: `relocate` reports its own failures and used
+        // to return Unit, so a move that threw INSIDE it still popped the entry and seated it on
+        // redo -- the stack claiming an undo that never happened, and the player losing the entry
+        // that would have let them retry. moveBack's preconditions cover staleness, not IO.
+        //
+        // The lever: resolveSubpath only checks that the destination's parent EXISTS, not that it is
+        // a folder. Replacing the original parent folder with a regular file therefore passes every
+        // precondition and makes `moveTo` throw deterministically on every platform -- unlike
+        // occupying the target itself, which the `target.exists()` precondition refuses first.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("parent/a").createDirectories()
+            root.resolve("dest").createDirectories()
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("parent/a", "dest"))
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.Relocate("parent/a", "dest/a", RelocateKind.MOVE)
+
+            root.resolve("parent").deleteExisting()
+            root.resolve("parent").writeBytes(byteArrayOf(0))
+            drainPayloads(player)
+
+            EditorUndoOps.undo(server, player)
+
+            root.resolve("dest/a").isDirectory().shouldBeTrue()      // nothing moved
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.Relocate("parent/a", "dest/a", RelocateKind.MOVE)
+            EditorUndoStack.peekRedo(player.uuid).shouldBeNull()
+            // relocate reports its own failure; undo must not send a second packet for the same
+            // event, which is what Inverted.Refused.alreadyReported exists to prevent.
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>() shouldHaveSize 1
+        }
+    }
+
     test("a rename of a placed structure survives undo still placed") {
         withServer { server, player, _ ->
             EditorUndoStack.clear(player.uuid)
