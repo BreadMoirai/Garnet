@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.network
 
+import com.breadmoirai.garnet.editor.undo.EditorUndoOps
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 
@@ -72,6 +73,12 @@ object EditorNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(MovePathC2S.TYPE) { payload, ctx ->
             ctx.server().execute { EditorFileOpsHandlers.handleMove(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(UndoC2S.TYPE) { _, ctx ->
+            ctx.server().execute { EditorUndoOps.undo(ctx.server(), ctx.player()) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(RedoC2S.TYPE) { _, ctx ->
+            ctx.server().execute { EditorUndoOps.redo(ctx.server(), ctx.player()) }
         }
     }
 }

@@ -56,6 +56,19 @@ object EditorUndoStack {
         }
     }
 
+    /**
+     * Re-seat a redone command on the undo deque WITHOUT clearing redo. [push] clears it, which is
+     * right for a new action and wrong for a replay — clearing here would discard every redo entry
+     * above the one just consumed.
+     */
+    fun pushUndoWithoutClearingRedo(playerId: UUID, command: EditorUndoCommand) {
+        val state = of(playerId)
+        synchronized(state) {
+            state.undo.addLast(command)
+            while (state.undo.size > MAX_DEPTH) state.undo.removeFirst()
+        }
+    }
+
     /** Record an undone operation as redoable. Unlike [push], leaves the redo deque intact. */
     fun pushRedo(playerId: UUID, command: EditorUndoCommand) {
         val state = of(playerId)

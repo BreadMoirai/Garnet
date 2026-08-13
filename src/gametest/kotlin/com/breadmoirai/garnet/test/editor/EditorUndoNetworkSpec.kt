@@ -13,12 +13,15 @@ import com.breadmoirai.garnet.editor.network.EditorTreeHandlers
 import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.undo.CreatedFileKind
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.EditorUndoOps
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.undo.RelocateKind
+import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
@@ -51,6 +54,7 @@ import kotlin.io.path.deleteExisting
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
+import kotlin.io.path.moveTo
 import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 
@@ -447,6 +451,135 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             root.resolve("dest/a").createDirectories()
             EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("dest/a", "dest"))
             EditorUndoStack.peekUndo(player.uuid).shouldBeNull()
+        }
+    }
+
+    test("undo of a create folder removes it; redo puts it back") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("", "toplevel"))
+
+            EditorUndoOps.undo(server, player)
+            root.resolve("toplevel").exists().shouldBeFalse()
+
+            EditorUndoOps.redo(server, player)
+            root.resolve("toplevel").isDirectory().shouldBeTrue()
+        }
+    }
+
+    test("undo of a rename moves it back") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("redstone").createDirectories()
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+
+            EditorUndoOps.undo(server, player)
+
+            root.resolve("redstone").isDirectory().shouldBeTrue()
+            root.resolve("logic").exists().shouldBeFalse()
+        }
+    }
+
+    test("undo of a move restores the original parent") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("a").createDirectories()
+            root.resolve("dest").createDirectories()
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("a", "dest"))
+
+            EditorUndoOps.undo(server, player)
+
+            root.resolve("a").isDirectory().shouldBeTrue()
+            root.resolve("dest/a").exists().shouldBeFalse()
+        }
+    }
+
+    test("undo of a duplicate removes the copy, not the original") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("gadget.nbt").writeBytes(byteArrayOf(1))
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("gadget.nbt"))
+            val copy = (EditorUndoStack.peekUndo(player.uuid) as EditorUndoCommand.Duplicate).createdSubpath
+
+            EditorUndoOps.undo(server, player)
+
+            root.resolve(copy).exists().shouldBeFalse()
+            root.resolve("gadget.nbt").exists().shouldBeTrue()
+        }
+    }
+
+    test("undo of a delete restores the whole subtree") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("redstone/clocks").createDirectories()
+            root.resolve("redstone/clocks/a.spec.kts").writeBytes("a".toByteArray())
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("redstone"))
+
+            EditorUndoOps.undo(server, player)
+
+            root.resolve("redstone/clocks/a.spec.kts").readBytes() shouldBe "a".toByteArray()
+        }
+    }
+
+    test("undo refuses and keeps the entry when the node moved underneath it") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("redstone").createDirectories()
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            drainPayloads(player)
+
+            // Someone else moves it out from under the pending undo.
+            root.resolve("logic").moveTo(root.resolve("elsewhere"))
+
+            EditorUndoOps.undo(server, player)
+
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>().shouldNotBeEmpty()
+            // The entry SURVIVES: the player can retry once the conflict is resolved, rather than
+            // silently skipping to an older action they did not ask to undo.
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.Relocate("redstone", "logic", RelocateKind.RENAME)
+        }
+    }
+
+    test("undo refuses when the delete's path is occupied again") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("gone.spec.kts").writeBytes("x".toByteArray())
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("gone.spec.kts"))
+            root.resolve("gone.spec.kts").writeBytes("something else".toByteArray())
+            drainPayloads(player)
+
+            EditorUndoOps.undo(server, player)
+
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>().shouldNotBeEmpty()
+            // Never clobber content that arrived after the delete.
+            root.resolve("gone.spec.kts").readBytes() shouldBe "something else".toByteArray()
+        }
+    }
+
+    test("undo with an empty stack reports an error and does nothing") {
+        withServer { server, player, _ ->
+            EditorUndoStack.clear(player.uuid)
+            drainPayloads(player)
+            EditorUndoOps.undo(server, player)
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>().shouldNotBeEmpty()
+        }
+    }
+
+    test("a rename of a placed structure survives undo still placed") {
+        withServer { server, player, _ ->
+            EditorUndoStack.clear(player.uuid)
+            EditorStructureHandlers.handleNewStructure(server, player, NewStructureC2S("", "gadget"))
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("gadget.nbt"))
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("gadget.nbt", "widget.nbt"))
+            EditorDimRegistry.of(server).placedBoxOf("widget.nbt").shouldNotBeNull()
+
+            EditorUndoOps.undo(server, player)
+
+            // relocate re-places and re-keys; undo goes through the same function, so this is the
+            // guard that undo did not take a shortcut around it.
+            EditorDimRegistry.of(server).placedBoxOf("gadget.nbt").shouldNotBeNull()
+            EditorDimRegistry.of(server).placedBoxOf("widget.nbt").shouldBeNull()
         }
     }
 })
