@@ -14,6 +14,7 @@ import com.breadmoirai.garnet.editor.undo.BankedFile
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.undo.ManifestEntry
+import com.breadmoirai.garnet.editor.undo.RelocateKind
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.history.Revision
@@ -83,7 +84,11 @@ object EditorFileOpsHandlers {
             LOGGER.error("[project/create-folder] {}/{}: {}", payload.parentSubpath, name, e.message, e)
             fail(player, "create-folder failed: ${e.message}"); return
         }
+        EditorUndoStack.push(player.uuid, EditorUndoCommand.CreateFolder(
+            if (payload.parentSubpath.isEmpty()) name else "${payload.parentSubpath}/$name",
+        ))
         sendTree(server, player)
+        sendUndoState(player)
     }
 
     fun handleRename(server: MinecraftServer, player: ServerPlayer, payload: RenamePathC2S) {
@@ -115,6 +120,7 @@ object EditorFileOpsHandlers {
             newSubpath = newSubpath,
             operation = "rename",
             placedMessage = "renamed to $newSubpath",
+            kind = RelocateKind.RENAME,
         )
     }
 
@@ -131,7 +137,7 @@ object EditorFileOpsHandlers {
      * Each caller does its own resolution and validation first; by the time this runs, the move is
      * known to be legal and only the ordering hazards remain.
      */
-    private fun relocate(
+    internal fun relocate(
         server: MinecraftServer,
         player: ServerPlayer,
         oldSubpath: String,
@@ -140,6 +146,8 @@ object EditorFileOpsHandlers {
         newSubpath: String,
         operation: String,
         placedMessage: String,
+        kind: RelocateKind,
+        record: Boolean = true,
     ) {
         // A placed structure is keyed by subpath in EditorDimRegistry, so relocating under it would
         // strand both the placed box and the region assignment if we don't unload/reload it. But the
@@ -206,7 +214,11 @@ object EditorFileOpsHandlers {
 
         EditorSession.repointSession(player, oldSubpath, newSubpath)
 
+        if (record) {
+            EditorUndoStack.push(player.uuid, EditorUndoCommand.Relocate(oldSubpath, newSubpath, kind))
+        }
         sendTree(server, player)
+        sendUndoState(player)
     }
 
     /**
@@ -264,6 +276,7 @@ object EditorFileOpsHandlers {
             newSubpath = newSubpath,
             operation = "move",
             placedMessage = "moved to $newSubpath",
+            kind = RelocateKind.MOVE,
         )
     }
 
@@ -310,7 +323,12 @@ object EditorFileOpsHandlers {
             fail(player, "duplicate failed: ${e.message}"); return
         }
 
+        val createdSubpath = if (payload.subpath.contains('/')) {
+            "${payload.subpath.substringBeforeLast('/')}/$newName"
+        } else newName
+        EditorUndoStack.push(player.uuid, EditorUndoCommand.Duplicate(createdSubpath))
         sendTree(server, player)
+        sendUndoState(player)
     }
 
     /**

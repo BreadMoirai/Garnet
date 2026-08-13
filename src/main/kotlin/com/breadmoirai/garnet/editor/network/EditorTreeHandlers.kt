@@ -4,9 +4,13 @@ import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.*
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
+import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.ops.EditorNewSpec
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.undo.CreatedFileKind
+import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
@@ -16,6 +20,7 @@ import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
+import kotlin.io.path.name
 
 private val LOGGER = LoggerFactory.getLogger("Garnet")
 
@@ -69,8 +74,8 @@ object EditorTreeHandlers {
             ?: run {
                 fail(player, "active folder not resolvable: $activeSubpath"); return
             }
-        try {
-            EditorNewSpec.create(folderAbsolute, payload.name)
+        val createdFileName = try {
+            EditorNewSpec.create(folderAbsolute, payload.name).name
         } catch (e: Exception) {
             LOGGER.error("[project/new-spec] create {}/{}: {}", activeSubpath, payload.name, e.message, e)
             fail(player, "new-spec failed: ${e.message}"); return
@@ -81,6 +86,11 @@ object EditorTreeHandlers {
             LOGGER.error("[project/new-spec] re-place {}: {}", activeSubpath, e.message, e)
             fail(player, "re-place failed: ${e.message}"); return
         }
+        EditorUndoStack.push(player.uuid, EditorUndoCommand.CreateFile(
+            if (activeSubpath.isEmpty()) createdFileName else "$activeSubpath/$createdFileName",
+            CreatedFileKind.SPEC,
+        ))
+        sendUndoState(player)
         ServerPlayNetworking.send(player, EditorFolderLoadedS2C(
             subpath = report.subpath,
             loadedSpecIds = report.loaded,

@@ -5,10 +5,14 @@ import com.breadmoirai.garnet.editor.data.*
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
+import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.undo.CreatedFileKind
+import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.structure.StructurePersistence
@@ -146,6 +150,11 @@ object EditorStructureHandlers {
             LOGGER.error("[project/new-structure] create {}/{}: {}", payload.parentSubpath, finalName, e.message, e)
             fail(player, "new-structure failed: ${e.message}"); return
         }
+        EditorUndoStack.push(player.uuid, EditorUndoCommand.CreateFile(
+            if (payload.parentSubpath.isEmpty()) finalName else "${payload.parentSubpath}/$finalName",
+            CreatedFileKind.STRUCTURE,
+        ))
         sendTree(server, player)
+        sendUndoState(player)
     }
 }

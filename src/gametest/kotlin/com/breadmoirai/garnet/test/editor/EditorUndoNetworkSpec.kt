@@ -2,12 +2,20 @@ package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.EditorRoot
+import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
+import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
+import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
+import com.breadmoirai.garnet.editor.network.MovePathC2S
+import com.breadmoirai.garnet.editor.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
+import com.breadmoirai.garnet.editor.undo.CreatedFileKind
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.RelocateKind
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
@@ -24,6 +32,7 @@ import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.NbtAccounter
@@ -329,6 +338,72 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             val restoredTemplate = StructureTemplate()
             restoredTemplate.load(server.registryAccess().lookupOrThrow(Registries.BLOCK), restoredTag)
             restoredTemplate.size shouldBe originalSize
+        }
+    }
+
+    test("handleCreateFolder records a CreateFolder command") {
+        withServer { server, player, _ ->
+            EditorUndoStack.clear(player.uuid)
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("", "toplevel"))
+            EditorUndoStack.peekUndo(player.uuid) shouldBe EditorUndoCommand.CreateFolder("toplevel")
+        }
+    }
+
+    test("handleNewStructure records a CreateFile command with the resolved name") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("redstone").createDirectories()
+            EditorStructureHandlers.handleNewStructure(server, player, NewStructureC2S("redstone", "gadget"))
+            // The handler appends ".nbt" itself, so the command must record the RESOLVED name —
+            // recording the requested one would make undo look for a file that does not exist.
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.CreateFile("redstone/gadget.nbt", CreatedFileKind.STRUCTURE)
+        }
+    }
+
+    test("handleDuplicate records the server-derived copy name") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("gadget.nbt").writeBytes(byteArrayOf(1))
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("gadget.nbt"))
+
+            val command = EditorUndoStack.peekUndo(player.uuid)
+            command.shouldBeInstanceOf<EditorUndoCommand.Duplicate>()
+            // Whatever EditorNames.duplicateName chose, the command must name the file that now
+            // exists — this is the case the store-the-packet approach could not express.
+            root.resolve(command.createdSubpath).exists().shouldBeTrue()
+            command.createdSubpath shouldNotBe "gadget.nbt"
+        }
+    }
+
+    test("handleRename records a RENAME relocate") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("redstone").createDirectories()
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("redstone", "logic"))
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.Relocate("redstone", "logic", RelocateKind.RENAME)
+        }
+    }
+
+    test("handleMove records a MOVE relocate") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("a").createDirectories()
+            root.resolve("dest").createDirectories()
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("a", "dest"))
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.Relocate("a", "dest/a", RelocateKind.MOVE)
+        }
+    }
+
+    test("a rejected rename records nothing") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("a").createDirectories()
+            root.resolve("b").createDirectories()
+            EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("a", "b"))
+            EditorUndoStack.peekUndo(player.uuid).shouldBeNull()
         }
     }
 })
