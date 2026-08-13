@@ -2,6 +2,7 @@ package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.editor.ui.ProjectTreeState
 import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.ui.UndoState
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
@@ -35,6 +36,9 @@ object EditorClientNetworking {
         }
         ClientPlayNetworking.registerGlobalReceiver(StructureAutoSavedS2C.TYPE) { payload, ctx ->
             ctx.client().execute { ProjectTreeState.onAutoSaved(payload) }
+        }
+        ClientPlayNetworking.registerGlobalReceiver(UndoStateS2C.TYPE) { payload, ctx ->
+            ctx.client().execute { UndoState.onUndoState(payload) }
         }
     }
 }

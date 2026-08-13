@@ -17,14 +17,17 @@ import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
+import com.breadmoirai.garnet.editor.network.UndoStateS2C
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.ui.UndoState
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThan
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.lwjgl.glfw.GLFW
@@ -338,5 +341,21 @@ class ExplorerUiSpec : ClientSpec({
         } finally {
             unmountFromContextMenu()
         }
+    }
+
+    test("UndoState mirrors the server's labels") {
+        UndoState.reset()
+        UndoState.onUndoState(UndoStateS2C("delete 'a.nbt'", null))
+        UndoState.undoLabel shouldBe "delete 'a.nbt'"
+        UndoState.redoLabel.shouldBeNull()
+    }
+
+    test("UndoState.reset clears both labels") {
+        UndoState.onUndoState(UndoStateS2C("x", "y"))
+        UndoState.reset()
+        // Cleared on disconnect so a rejoin never shows an enabled button backed by a server
+        // stack that was dropped with the connection.
+        UndoState.undoLabel.shouldBeNull()
+        UndoState.redoLabel.shouldBeNull()
     }
 })

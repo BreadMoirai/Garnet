@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
+import com.breadmoirai.garnet.editor.network.RedoC2S
+import com.breadmoirai.garnet.editor.network.UndoC2S
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
@@ -36,6 +38,24 @@ fun ExplorerToolbar() {
     ) {
         KebabMenu()
         Spacer(Modifier.weight(1f))
+        IconButton(
+            onClick = { ClientPlayNetworking.send(UndoC2S.INSTANCE) },
+            enabled = UndoState.undoLabel != null,
+        ) {
+            Icon(
+                AllIconsKeys.Actions.Undo,
+                contentDescription = UndoState.undoLabel?.let { "Undo $it" } ?: "Undo",
+            )
+        }
+        IconButton(
+            onClick = { ClientPlayNetworking.send(RedoC2S.INSTANCE) },
+            enabled = UndoState.redoLabel != null,
+        ) {
+            Icon(
+                AllIconsKeys.Actions.Redo,
+                contentDescription = UndoState.redoLabel?.let { "Redo $it" } ?: "Redo",
+            )
+        }
         IconButton(onClick = { ClientPlayNetworking.send(ListEditorTreeC2S.INSTANCE) }) {
             Icon(AllIconsKeys.Actions.Refresh, contentDescription = "Refresh")
         }

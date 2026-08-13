@@ -68,6 +68,7 @@ fun registerExplorerLifecycle() {
             // stays free of IDE-state and Minecraft dependencies.
             ProjectTreeState.reset()
             ExplorerTreeState.reset()
+            UndoState.reset()
         }
     }
 
