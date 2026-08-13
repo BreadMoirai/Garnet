@@ -113,8 +113,11 @@ Client:
   a leading `● ` marker when the row is `currentSubpath`).
   Paths are `/`-joined relative to root, matching the server's `FolderNode.walk()` keys and
   `currentSubpath`. `ExplorerToolbar()` is the panel's single top row: a kebab `IconButton` opening
-  a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Refresh
-  (sends `ListEditorTreeC2S`) and Collapse All (`ExplorerTreeState.collapseAll()`) icon buttons.
+  a Jewel `PopupMenu` with "Open Folder…" (`RootPickerController.openFolder()`), plus Undo
+  (`UndoC2S`), Redo (`RedoC2S`), Refresh (sends `ListEditorTreeC2S`) and Collapse All
+  (`ExplorerTreeState.collapseAll()`) icon buttons. The Undo/Redo pair is enabled purely from the
+  server's `UndoStateS2C` labels — see
+  [persistence/editor-undo-stack.md](../persistence/editor-undo-stack.md).
   This replaced the previous root-name `Dropdown` and the "+ New"/"Save"/"Discard" structure-action
   row. `New`/`Rename` now have a client UI trigger again — the right-click `ExplorerContextMenu` (see
   [ui/explorer-toolbar-and-context-menu.md](../ui/explorer-toolbar-and-context-menu.md)) — while

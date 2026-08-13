@@ -1,7 +1,7 @@
 ---
 title: Local history for standalone structures
 tags: [storage, history, autosave, structures, persistence]
-summary: How auto-saved .nbt structures record revisions under <instance>/.garnet/local-history, why the key is the file's absolute path, how pruning works, and why a deleted structure keeps its history (so a file recreated at the same path inherits it).
+summary: How auto-saved .nbt structures record revisions under <instance>/.garnet/local-history, why the key is the file's absolute path, how pruning works, how a delete banks a pre-delete revision of every file type, and why a deleted structure keeps its history (so a file recreated at the same path inherits it).
 ---
 
 # Local history for standalone structures
@@ -39,9 +39,15 @@ differ.
 Inside a structure's directory, each revision is one compressed-NBT blob named
 `<epochMillis>-<seq>.nbt` (the `-<seq>` suffix only appears when two writes land in the same
 millisecond) plus one shared `index.json` listing every revision's filename, timestamp, size
-(`sizeX`/`sizeY`/`sizeZ`), `blockCount`, and a `reason` tag (`"placed"`, `"autosave"`, `"manual"`,
-or `"external"` — content found on disk that didn't match the newest banked revision, i.e. edited
-outside the editor between sessions; see "Out-of-band edits are banked too" below).
+(`sizeX`/`sizeY`/`sizeZ`), `blockCount`, and a `reason` tag — one of:
+
+| `reason` | Written by | Meaning |
+|---|---|---|
+| `"placed"` | `EditorStructureHandlers` | The baseline banked the first time a structure is placed |
+| `"autosave"` | `StructureCommit` | A debounced commit's newly captured content |
+| `"manual"` | `StructureCommit` | A forced `SaveStructureC2S` commit's newly captured content |
+| `"external"` | `StructureCommit` | Content found on disk that didn't match the newest banked revision — edited outside the editor between sessions; see "Out-of-band edits are banked too" below |
+| `"pre-delete"` | `EditorFileOpsHandlers.deleteSubtree` | A snapshot taken immediately before a delete unlinks the file, so the delete is undoable; see "A delete adds to history" below |
 
 `index.json` is rewritten crash-safely — to a same-directory temp file, then an atomic move over
 the target, the same pattern `StructurePersistence.writeStructureAtomic` uses for the `.nbt` itself.
@@ -133,23 +139,65 @@ revision count was already at the cap — the failed attempt's own revision does
 way, but a real, unrelated older revision would be destroyed for no reason. Deferring `prune` to
 after a confirmed-successful rewrite avoids that.
 
-## A delete keeps its history
+## Raw revisions: banking a file that is not a structure
 
-Deleting a `.nbt` file does not touch its history directory. This is intentional: recovering a
-structure a user deleted (accidentally or not) is exactly what local history exists for, and
-disappearing history the moment the file disappears would defeat that. Renaming or moving a
+`writeRawRevision(file, bytes, reason)` banks a file whose content is not a structure at all — a
+`.spec.kts`, or a `.nbt` that fails to parse as NBT. `readRawBytes(file, revision)` reads one back.
+Both exist for the delete path (see below), which must be able to restore *every* file type, not
+just structures.
+
+**A raw revision is a normal revision whose blob is a wrapper `CompoundTag`** carrying two keys: a
+`garnetRaw` boolean marker and a `garnetBytes` byte array holding the file's bytes verbatim. It goes
+through `writeRevision` like any other, so `index.json`, `prune`, `moveHistory` and
+`moveDescendantHistories` all keep working unchanged for both kinds — that is the whole reason for
+wrapping rather than forking the blob format.
+
+**The zero-size caveat.** A raw revision records `sizeX`/`sizeY`/`sizeZ` and `blockCount` as `0`,
+because there is no structure to describe. A consumer must read a zero-size revision as **"not a
+structure snapshot"**, never as "an empty structure". Worse, **size alone cannot tell the two apart**:
+a gzipped `.nbt` that parses as NBT but is not a structure template is banked through the *typed*
+path with `StructureTemplate` sizes of `0` as well. **Only the marker distinguishes them** — which
+is what `readRawBytes` returning `null` means, and why `restoreSubtree` uses that null (not the
+size) to choose between `writeBytes` and `NbtIo.writeCompressed`. Writing a wrapper tag over a real
+`.nbt`, or NBT-writing a wrapper as if it were a template, would corrupt the restored file.
+
+## A delete adds to history
+
+Deleting a file does not touch its history directory — and, since the Explorer's undo feature, a
+delete also **writes to it**: `EditorFileOpsHandlers.deleteSubtree` walks the doomed subtree and
+banks *every* file in it, unconditionally, as a `REASON_PRE_DELETE` revision, before anything is
+unlinked. This is what makes an Explorer delete undoable; see
+[editor-undo-stack.md](editor-undo-stack.md).
+
+Three consequences worth knowing:
+
+- **Every file type is banked, not just `.nbt`.** A `.spec.kts` was never in this store at all
+  before; it is banked via `writeRawRevision`. A `.nbt` that parses goes through the typed
+  `writeRevision` path so its revision carries real size metadata; one that does not parse falls
+  back to raw bytes rather than being lost — the goal here is restorability, not a well-formed
+  structure record.
+- **Banking is unconditional, not "only if it looks stale".** An equality check would be a guess
+  about content, and unconditional banking is what closes the two real gaps: `.spec.kts` files were
+  never banked, and a freshly duplicated `.nbt` has no history by design.
+- **Banking happens before the unlink**, which is the only ordering that works: once the bytes are
+  gone there is nothing left to read. If any file cannot be banked, the delete still proceeds, but
+  it is reported as not undoable — a partially restorable entry is worse than none.
+
+Retaining the history is intentional for the same reason: recovering a structure a user deleted
+(accidentally or not) is exactly what local history exists for, and disappearing history the moment
+the file disappears would defeat that. Renaming or moving a
 structure, by contrast, does move its history — `LocalHistoryStore.moveHistory` re-keys every
 revision under the destination path's hash, merging into whatever history the destination already
 had rather than overwriting it, and if any individual revision fails to move, that revision (and
 only that one) is left behind at the source rather than the whole move being treated as
 all-or-nothing.
 
-The Explorer's `Delete` action (`EditorFileOpsHandlers.handleDelete`, UC-MAN-10.j) makes this
-reachable from the UI, and leans on it: **history is the only recovery route for a delete** — there
-is no trash folder and nothing to undo in the tree. That is also why `handleDelete` quiesces before
-unlinking, banking a final revision of whatever was still only in the world. That commit is
-best-effort, though: if it fails, the delete proceeds anyway rather than leaving a structure with a
-broken history directory undeletable.
+The Explorer's `Delete` action (`EditorFileOpsHandlers.handleDelete`, UC-MAN-10.j) leans on this
+entirely: **history is the only recovery route for a delete** — there is no trash folder, and the
+Explorer's Undo restores from exactly these revisions. That is also why `handleDelete` quiesces
+before unlinking, committing whatever was still only in the world so the pre-delete bank captures
+it. That commit is best-effort, though: if it fails, the delete proceeds anyway rather than leaving
+a structure with a broken history directory undeletable.
 
 **Consequence: a file later created at the same path inherits the deleted file's revisions.** Keys
 are a hash of the absolute path, and nothing ties a revision to the file's identity beyond that. A
@@ -157,7 +205,7 @@ new `redstone/clock.nbt` created where an old one was deleted opens with the old
 is a usable undelete affordance — recreate the name, roll back — but it is surprising if you expect
 a new file to start clean, and it is the reason a "delete" here is not the same as "unrecoverable".
 
-## `blockCount` is `0` on `placed` and `external` revisions
+## `blockCount` is `0` on every revision except `autosave` and `manual`
 
 When a structure is placed into the world, `EditorStructureHandlers` writes an initial revision tagged
 `REASON_PLACED` with `blockCount = 0`. This isn't a bug: block count is only knowable by scanning
@@ -165,16 +213,32 @@ the placed volume, and at the moment of placement nothing has been scanned yet �
 being written *into* the world from its `.nbt`, not captured *out of* it. `StructureCommit` writes
 `blockCount = 0` for the same reason on a `REASON_EXTERNAL` revision (see "Out-of-band edits are
 banked too" above): that content comes from reading the on-disk `.nbt` tag directly, not from
-scanning a placed volume, so no block count is available either. Only `REASON_AUTOSAVE` and
-`REASON_MANUAL` revisions — also written by `StructureCommit` — carry a real `blockCount`, because
-those are written from a `CapturedStructure` produced by scanning the world.
+scanning a placed volume, so no block count is available either. `REASON_PRE_DELETE` revisions are
+`blockCount = 0` too, for both of their paths: the raw one has no structure at all, and even the
+typed one is built by `StructureTemplate.load`ing the on-disk tag rather than scanning the world.
+Only `REASON_AUTOSAVE` and `REASON_MANUAL` revisions — both written by `StructureCommit` — carry a
+real `blockCount`, because those are written from a `CapturedStructure` produced by scanning the
+world.
 
-## The only writer
+Note the asymmetry with `sizeX`/`sizeY`/`sizeZ`: a *typed* `pre-delete` revision does carry real
+sizes (they come from the loaded template), while a *raw* one is zero on all four fields. See
+"Raw revisions" above for why size cannot be used to tell those two apart.
 
-`com.breadmoirai.garnet.editor.structure.StructureCommit` is the only caller that writes autosave,
-manual, or external revisions; `EditorStructureHandlers` writes the one `placed` baseline revision at
-place time. No other code path calls `LocalHistoryStore.writeRevision` — there is no separate
-"manual snapshot" feature. See `docs/architecture/redstone-project.md#standalone-structure-files`
+## The writers
+
+Three, and only three:
+
+- `com.breadmoirai.garnet.editor.structure.StructureCommit` writes every `autosave`, `manual`, and
+  `external` revision. There is no separate "manual snapshot" feature — a `manual` revision is a
+  forced commit, not a distinct action.
+- `EditorStructureHandlers` writes the one `placed` baseline revision at place time.
+- `EditorFileOpsHandlers.deleteSubtree` writes a `pre-delete` revision for every file in a subtree
+  being deleted — through `writeRevision` for a parseable `.nbt`, and through `writeRawRevision`
+  (which itself calls `writeRevision` with a wrapper tag) for everything else. This is the only
+  writer that is not structure-specific, and the only one reached from the undo feature.
+
+Nothing else calls `LocalHistoryStore.writeRevision`. See
+`docs/architecture/redstone-project.md#standalone-structure-files`
 for how `StructureCommit` decides *when* to commit (debounce ticks, max-dirty cap, and the
 `BEFORE_SAVE`/`SERVER_STOPPING` backstops).
 
@@ -184,6 +248,10 @@ for how `StructureCommit` decides *when* to commit (debounce ticks, max-dirty ca
 the store directly against a temp directory, filesystem-level and without a running world: writing
 and reading a revision byte-for-byte, same-millisecond sequence numbers, chronological ordering
 regardless of write order, age- and count-based pruning, and `localHistoryEnabled = false` writing
-nothing. `StructureAutoSaveSpec` and `EditorStructureNetworkSpec` cover how `StructureCommit`
+nothing. Raw revisions have their own cases there: a byte round-trip, `readRawBytes` returning
+`null` for a typed revision, raw and typed revisions coexisting in one index, and the zero
+size/`blockCount` a raw revision records. `EditorUndoNetworkSpec` covers the `pre-delete` banking
+end-to-end (a `.spec.kts`, a freshly duplicated `.nbt` with no history, and the unbankable and
+history-disabled paths). `StructureAutoSaveSpec` and `EditorStructureNetworkSpec` cover how `StructureCommit`
 drives this store end-to-end (see the `UC-MAN-10` coverage matrix in
 [use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md#coverage-matrix)).

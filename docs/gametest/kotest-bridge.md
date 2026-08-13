@@ -135,9 +135,13 @@ manager processes the addition, so `awaitTicks(1)` between the spawn and the ass
 **Server-scoped editor state outlives a test — clear `EditorWorld`, or a deleted temp root leaks
 into every later spec.** The whole `gametest` suite shares ONE `MinecraftServer`, while each
 `withEditorServer` call gets its own `withTempRoot` directory that is deleted when the test ends. Any
-handler that reaches `EditorDimLifecycle.placeFolder`/`placeAll` — `handleNewSpec`, `handleSetRoot`, a
-relocate that re-places — installs a server-scoped `EditorWorld` pinned to that test's temp root, and
-nothing removes it on its own. The trap is `EditorRootResolver.rootFor`, which consults the
+handler that reaches `EditorDimLifecycle.placeFolder`/`placeAll` — `handleNewSpec`, `handleSetRoot`,
+and an undo or redo of a **spec** create, which re-places the parent folder through
+`EditorUndoOps.replaceFolderOf` — installs a server-scoped `EditorWorld` pinned to that test's temp
+root, and nothing removes it on its own. Those two lifecycle functions are the *only* callers of
+`EditorWorld.set`, so this list is exhaustive: a `relocate` that re-places a structure does **not**
+belong on it — it goes through `EditorStructureHandlers.placeStructureFrom`, which touches only
+`EditorDimRegistry` and installs no world. The trap is `EditorRootResolver.rootFor`, which consults the
 `EditorWorld` **first** and the per-test `EditorServerContext` only as a fallback: a leaked world
 therefore overrides the root every later test just configured, pointing it at a directory that no
 longer exists. `EditorRoot.resolveSubpath` then returns null for everything, and handlers exit through

@@ -240,9 +240,12 @@ rows. The pattern:
   header plus a separate `StructureActions()` "+ New"/"Save"/"Discard" row): a kebab `IconButton`
   (`AllIconsKeys.Actions.More` — the *vertical* three-dot kebab; `Actions.MoreHorizontal` is a
   different icon) opens a Jewel `PopupMenu` with a single "Open Folder…" item
-  (`RootPickerController.openFolder()`), and a right-aligned pair of icon buttons: Refresh
+  (`RootPickerController.openFolder()`), and a right-aligned group of icon buttons: Undo
+  (`UndoC2S.INSTANCE`) and Redo (`RedoC2S.INSTANCE`), each enabled only while the server's last
+  `UndoStateS2C` carried a label for it, then Refresh
   (`ListEditorTreeC2S.INSTANCE` — send the `INSTANCE`, never a fresh unit payload, see
-  `EditorPackets`) and Collapse All (`ExplorerTreeState.collapseAll()`, which clears
+  `EditorPackets`; the same rule applies to the two undo singletons) and Collapse All
+  (`ExplorerTreeState.collapseAll()`, which clears
   `treeState.openNodes` and leaves selection untouched). `PopupMenu`'s `onDismissRequest` takes an
   `(InputMode) -> Boolean` in this Jewel version, not a no-arg lambda.
   **`New`/`Rename` now have a client UI trigger: the right-click context menu**, not a toolbar

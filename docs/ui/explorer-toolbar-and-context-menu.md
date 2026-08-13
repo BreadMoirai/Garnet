@@ -1,12 +1,12 @@
 ---
 title: Explorer toolbar and context menu
 tags: [explorer, toolbar, context-menu, inline-edit, jewel, packets, keyboard]
-summary: The Project Explorer's kebab/Refresh/Collapse-All toolbar, its right-click New/Rename/Duplicate/Move/Delete menu and the two dialogs it opens, the inline name field that commits through ExplorerActions, and why the LazyTree's preview key handler had to stop eating that field's caret/selection keys.
+summary: The Project Explorer's kebab/Undo/Redo/Refresh/Collapse-All toolbar, its right-click New/Rename/Duplicate/Move/Delete menu and the two dialogs it opens, the inline name field that commits through ExplorerActions, and why the LazyTree's preview key handler had to stop eating that field's caret/selection keys.
 ---
 
 # Explorer toolbar and context menu
 
-`ExplorerToolbar.kt` (the panel's single top row: kebab overflow, Refresh, Collapse All) and
+`ExplorerToolbar.kt` (the panel's single top row: kebab overflow, Undo, Redo, Refresh, Collapse All) and
 `ExplorerContextMenu.kt` (the right-click `New Folder` / `New Structure` / `Rename` / `Duplicate` /
 `Move to…` / `Delete` menu) together
 replaced the old root-name `Dropdown` header and the `+ New`/`Save`/`Discard` structure-action row.
@@ -14,6 +14,24 @@ See [dock-framework.md](dock-framework.md#first-real-panel-the-project-explorer-
 for the panel walkthrough and [jewel-widget-layer.md](jewel-widget-layer.md) for the Jewel
 mechanics (`PopupMenu` overloads, the NUL-suffixed placeholder id, the `BasicLazyTree` prune). This
 article covers the *why* behind the decisions that aren't visible just from reading the code.
+
+## The Undo and Redo buttons hold no client state
+
+The toolbar row is, left to right: the kebab overflow, a weight spacer, **Undo**, **Redo**, Refresh,
+Collapse All. The two new buttons are the thinnest possible clients of a server-side feature — each
+sends a **bare singleton** (`UndoC2S.INSTANCE` / `RedoC2S.INSTANCE`, which `StreamCodec.unit`
+requires be the registered instance and not a fresh construction) and names nothing. The client has
+no stack and derives nothing: `UndoState` is a pure mirror of the last `UndoStateS2C`, whose two
+nullable labels drive both `enabled` and the `contentDescription` ("Undo delete 'redstone/clock.nbt'"
+when a label is present, a bare "Undo" when it is not). A null label means "that button is
+disabled".
+
+This is not just economy — it is required. Undo is **per player over shared server state**, so only
+the server can know what the next undo means or whether it is still valid, and a client-side guess
+would go stale the moment another player touched the tree. `ExplorerLifecycle` calls
+`UndoState.reset()` on `ClientPlayConnectionEvents.DISCONNECT`, alongside the tree and expansion
+resets, so the buttons do not carry a previous session's labels into the next one. The stack itself
+is documented in [persistence/editor-undo-stack.md](../persistence/editor-undo-stack.md).
 
 ## Why validation runs on both client and server
 
@@ -78,10 +96,18 @@ entry under the OLD subpath: the structure's placed blocks become unreachable by
 return null` and silently skips it forever), and a fresh `PlaceStructureC2S(newSubpath)` finds no
 registry entry and re-places a second copy in a brand-new region, orphaning the first in the world.
 
-A rename IS a move that happens to keep its parent, so `handleRename` and `handleMove` share a
-private `relocate(oldSubpath, source, target, newSubpath, operation, placedMessage)` in
+A rename IS a move that happens to keep its parent, so `handleRename` and `handleMove` share an
+`internal relocate(oldSubpath, source, target, newSubpath, operation, placedMessage, kind,
+record = true): Boolean` in
 `EditorFileOpsHandlers` holding everything below; each caller only computes its own target and runs
-its own validation first. Everything here was already written in `oldSubpath → newSubpath` terms,
+its own validation first. It is `internal` rather than `private` because `EditorUndoOps` reuses it
+to move a node back: `kind` (`RelocateKind.RENAME`/`MOVE`) only picks the wording of the undo
+label, and `record = false` suppresses the undo-stack push so an inverse move does not record a
+second entry for a move the player never performed. The `Boolean` return says whether the node
+actually moved — false means the operation was abandoned and the player has ALREADY been told why,
+so the caller must not report it twice. Both handlers ignore it (a handler has nothing left to do
+either way); the undo path does not, since it must keep its stack entry when the inverse never
+happened. Everything here was already written in `oldSubpath → newSubpath` terms,
 which is why it generalized to a parent change without modification. `relocate` handles two distinct
 shapes of this problem differently:
 
