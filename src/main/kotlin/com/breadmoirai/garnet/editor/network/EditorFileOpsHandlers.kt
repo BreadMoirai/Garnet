@@ -35,6 +35,7 @@ import kotlin.io.path.deleteExisting
 import kotlin.io.path.isDirectory
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
+import kotlin.io.path.notExists
 import kotlin.io.path.readBytes
 import kotlin.io.path.walk
 import kotlin.io.path.writeBytes
@@ -67,8 +68,21 @@ sealed interface DeleteOutcome {
     data object DeletedHistoryDisabled : DeleteOutcome
 }
 
-/** Outcome of [EditorFileOpsHandlers.restoreSubtree]. [failures] are already phrased for a player. */
-data class RestoreReport(val restored: Int, val total: Int, val failures: List<String>)
+/**
+ * Outcome of [EditorFileOpsHandlers.restoreSubtree]. [failures] are already phrased for a player.
+ *
+ * [restored] and [total] count FILES; [foldersCreated] counts directories that did not exist before
+ * the restore and do now. The folder counter exists so a caller can tell a TOTAL failure (nothing
+ * whatsoever landed on disk) from a partial one: an empty-folder subtree legitimately restores zero
+ * files, so `restored == 0` alone cannot mean "nothing happened". Total failure is
+ * `restored == 0 && foldersCreated == 0` with [failures] non-empty.
+ */
+data class RestoreReport(
+    val restored: Int,
+    val total: Int,
+    val failures: List<String>,
+    val foldersCreated: Int = 0,
+)
 
 object EditorFileOpsHandlers {
 
@@ -564,6 +578,10 @@ object EditorFileOpsHandlers {
      * `restored == total` does NOT mean "clean": a folder that failed to recreate still leaves
      * `failures` non-empty while every file restore succeeds. Callers (Task 7's undo executor) must
      * check `failures.isEmpty()`, not `restored == total`, to decide whether the restore was clean.
+     *
+     * [RestoreReport.foldersCreated] counts the directories this call actually created, which is what
+     * lets `EditorUndoOps` tell "nothing landed at all" (refuse, keep the undo entry) from a partial
+     * restore (accept, report honestly) — see that class for why the difference matters.
      */
     fun restoreSubtree(
         server: MinecraftServer,
@@ -581,11 +599,17 @@ object EditorFileOpsHandlers {
 
         val failures = mutableListOf<String>()
 
+        var foldersCreated = 0
         // Shortest relPath first, so a parent directory always exists before its children.
         for (entry in command.manifest.filter { it.isFolder }.sortedBy { it.relPath.length }) {
             val dir = if (entry.relPath.isEmpty()) base else base.resolve(entry.relPath)
             try {
+                // Count only directories this call actually brought into existence: createDirectories
+                // succeeds silently on one that is already there, and a caller distinguishing total
+                // failure from a partial restore needs "something landed", not "nothing threw".
+                val isNew = dir.notExists()
                 dir.createDirectories()
+                if (isNew) foldersCreated++
             } catch (e: Exception) {
                 LOGGER.error("[project/undo] recreate folder '{}': {}", dir, e.message, e)
                 failures.add("could not recreate folder '${entry.relPath}'")
@@ -614,7 +638,7 @@ object EditorFileOpsHandlers {
             }
         }
 
-        return RestoreReport(restored, command.banked.size, failures)
+        return RestoreReport(restored, command.banked.size, failures, foldersCreated)
     }
 
     /**

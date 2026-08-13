@@ -538,6 +538,9 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             // silently skipping to an older action they did not ask to undo.
             EditorUndoStack.peekUndo(player.uuid) shouldBe
                 EditorUndoCommand.Relocate("redstone", "logic", RelocateKind.RENAME)
+            // A refusal touches NEITHER deque -- asserting only the undo side would miss an
+            // implementation that seated a redo entry for an inverse that never ran.
+            EditorUndoStack.peekRedo(player.uuid).shouldBeNull()
         }
     }
 
@@ -554,6 +557,81 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             drainPayloads(player).filterIsInstance<EditorErrorS2C>().shouldNotBeEmpty()
             // Never clobber content that arrived after the delete.
             root.resolve("gone.spec.kts").readBytes() shouldBe "something else".toByteArray()
+            EditorUndoStack.peekUndo(player.uuid).shouldBeInstanceOf<EditorUndoCommand.Delete>()
+            EditorUndoStack.peekRedo(player.uuid).shouldBeNull()
+        }
+    }
+
+    test("undo refuses and keeps the entry when NOTHING could be restored") {
+        // Fix round 1 / Important 1: restoreSubtree signals total failure as a report, not a throw.
+        // Treating that as success popped the Delete entry with the filesystem untouched, and seated
+        // a redo entry that could never fire ("already gone"). A partial restore still succeeds --
+        // that is the case the "reports a partial restore" test above pins -- so the two must be
+        // distinguished, which is what RestoreReport.foldersCreated is for.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("holder").createDirectories()
+            root.resolve("holder/a.spec.kts").writeBytes("a".toByteArray())
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("holder/a.spec.kts"))
+
+            // The parent the restore would rebuild beneath is now gone, so not one byte can land.
+            root.resolve("holder").deleteExisting()
+            drainPayloads(player)
+
+            EditorUndoOps.undo(server, player)
+
+            root.resolve("holder").exists().shouldBeFalse()
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>().shouldNotBeEmpty()
+            EditorUndoStack.peekUndo(player.uuid).shouldBeInstanceOf<EditorUndoCommand.Delete>()
+            EditorUndoStack.peekRedo(player.uuid).shouldBeNull()
+        }
+    }
+
+    test("redo of a duplicate brings the copy back WITH its bytes") {
+        // The create round-trip test above uses an empty folder, so it proves only that a bank was
+        // stapled on -- not that the bank carries content. This is the failure the brief warned
+        // about: a redo that recreates an empty shell where the file had contents.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("gadget.spec.kts").writeBytes("payload-bytes".toByteArray())
+            EditorFileOpsHandlers.handleDuplicate(server, player, DuplicatePathC2S("gadget.spec.kts"))
+            val copy = (EditorUndoStack.peekUndo(player.uuid) as EditorUndoCommand.Duplicate).createdSubpath
+            root.resolve(copy).readBytes() shouldBe "payload-bytes".toByteArray()
+
+            EditorUndoOps.undo(server, player)
+            root.resolve(copy).exists().shouldBeFalse()
+
+            EditorUndoOps.redo(server, player)
+
+            root.resolve(copy).exists().shouldBeTrue()
+            root.resolve(copy).readBytes() shouldBe "payload-bytes".toByteArray()
+            // The original is untouched throughout.
+            root.resolve("gadget.spec.kts").readBytes() shouldBe "payload-bytes".toByteArray()
+        }
+    }
+
+    test("a redo does not discard the redo entries above it") {
+        // The entire reason EditorUndoStack.pushUndoWithoutClearingRedo exists. Swap it for push()
+        // and every other test in this file still passes, while the redo branch is silently thrown
+        // away on the first redo.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("", "one"))
+            EditorFileOpsHandlers.handleCreateFolder(server, player, CreateFolderC2S("", "two"))
+
+            EditorUndoOps.undo(server, player)   // removes "two"; redo = [two]
+            EditorUndoOps.undo(server, player)   // removes "one"; redo = [two, one]
+            EditorUndoOps.redo(server, player)   // replays "one"; redo must still hold [two]
+
+            root.resolve("one").isDirectory().shouldBeTrue()
+            root.resolve("two").exists().shouldBeFalse()
+            val remaining = EditorUndoStack.peekRedo(player.uuid)
+            remaining.shouldBeInstanceOf<EditorUndoCommand.CreateFolder>()
+            remaining.subpath shouldBe "two"
+
+            // And it is genuinely still redoable, not just present.
+            EditorUndoOps.redo(server, player)
+            root.resolve("two").isDirectory().shouldBeTrue()
         }
     }
 

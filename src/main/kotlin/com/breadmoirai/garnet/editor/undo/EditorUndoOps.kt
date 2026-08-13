@@ -44,8 +44,16 @@ object EditorUndoOps {
          */
         data class Refused(val reason: String, val alreadyReported: Boolean = false) : Inverted
 
-        /** [redoable] is usually the original command; creates return a copy carrying their bank. */
-        data class Applied(val redoable: EditorUndoCommand) : Inverted
+        /**
+         * [redoable] is usually the original command; creates return a copy carrying their bank.
+         *
+         * Null means "the inverse happened, but it cannot be redone" — an undone create whose
+         * removal could not be banked (local history off, or a banking failure). Seating such an
+         * entry on the redo deque would light the Redo button on something that refuses on every
+         * press, and since refusals never pop, that entry would permanently mask every redo beneath
+         * it.
+         */
+        data class Applied(val redoable: EditorUndoCommand?) : Inverted
     }
 
     fun undo(server: MinecraftServer, player: ServerPlayer) {
@@ -61,7 +69,7 @@ object EditorUndoOps {
 
             is Inverted.Applied -> {
                 EditorUndoStack.popUndo(player.uuid)
-                EditorUndoStack.pushRedo(player.uuid, result.redoable)
+                result.redoable?.let { EditorUndoStack.pushRedo(player.uuid, it) }
             }
         }
         sendTree(server, player)
@@ -95,7 +103,8 @@ object EditorUndoOps {
         is EditorUndoCommand.CreateFolder ->
             when (val removed = removeCreated(server, player, command.subpath)) {
                 is Removed.Refused -> Inverted.Refused(removed.reason)
-                is Removed.Gone -> Inverted.Applied(command.copy(banked = removed.banked))
+                // No bank, no redo — see Inverted.Applied's KDoc.
+                is Removed.Gone -> Inverted.Applied(removed.banked?.let { command.copy(banked = it) })
             }
 
         is EditorUndoCommand.CreateFile ->
@@ -107,14 +116,14 @@ object EditorUndoOps {
                     // file no longer exists. Structures are not placed by their create handler and
                     // need nothing here.
                     if (command.kind == CreatedFileKind.SPEC) replaceFolderOf(server, command.subpath)
-                    Inverted.Applied(command.copy(banked = removed.banked))
+                    Inverted.Applied(removed.banked?.let { command.copy(banked = it) })
                 }
             }
 
         is EditorUndoCommand.Duplicate ->
             when (val removed = removeCreated(server, player, command.createdSubpath)) {
                 is Removed.Refused -> Inverted.Refused(removed.reason)
-                is Removed.Gone -> Inverted.Applied(command.copy(banked = removed.banked))
+                is Removed.Gone -> Inverted.Applied(removed.banked?.let { command.copy(banked = it) })
             }
 
         is EditorUndoCommand.Relocate ->
@@ -201,8 +210,12 @@ object EditorUndoOps {
 
     /**
      * Re-place the folder containing [subpath], so the world matches the files again after a spec
-     * appears or disappears. Failures are logged by `placeFolder` itself and must not fail the
-     * undo: the file operation already happened.
+     * appears or disappears.
+     *
+     * `placeFolder` THROWS on failure, which is what the `runCatching` below is for: a re-place that
+     * blew up is logged here and swallowed. It must never fail the undo — the file operation it
+     * follows has already happened, so reporting failure would tell the player nothing changed when
+     * the tree in fact did.
      */
     private fun replaceFolderOf(server: MinecraftServer, subpath: String) {
         val root = EditorRootResolver.rootFor(server) ?: return
@@ -263,8 +276,16 @@ object EditorUndoOps {
         }
         val report = EditorFileOpsHandlers.restoreSubtree(server, player, command)
         if (report.failures.isNotEmpty()) {
-            // Partial restores are NOT rolled back — deleting what was just recovered would be
-            // worse. Report honestly and let the entry be consumed, since the tree has changed.
+            // TOTAL failure — the parent folder is gone, or every blob has been pruned — leaves the
+            // filesystem exactly as it was, so consuming the entry would claim an undo that never
+            // happened and strand a redo entry that can never fire (`reapply` would answer "already
+            // gone"). Refuse, and let the player retry once they have fixed the cause.
+            if (report.restored == 0 && report.foldersCreated == 0) {
+                return Inverted.Refused("nothing could be restored: ${report.failures.joinToString("; ")}")
+            }
+            // A PARTIAL restore is different, and is NOT rolled back — deleting what was just
+            // recovered would be worse. Report honestly and let the entry be consumed, since the
+            // tree really has changed.
             fail(player, "restored ${report.restored} of ${report.total} files: ${report.failures.joinToString("; ")}")
         }
         return Inverted.Applied(command)
