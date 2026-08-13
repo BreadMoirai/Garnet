@@ -107,8 +107,11 @@ suspend fun withEditorServer(
                     EditorSession.clear(player.uuid)
                     // Drop the EditorWorld this test may have created, for the same
                     // one-server-many-roots reason (fix round 1). Anything that reaches
-                    // `EditorDimLifecycle.placeFolder`/`placeAll` — `handleNewSpec`, `handleSetRoot`,
-                    // a relocate that re-places — installs a server-scoped `EditorWorld` pinned to
+                    // `EditorDimLifecycle.placeFolder`/`placeAll` (the only two callers of
+                    // `EditorWorld.set`) — `handleNewSpec`, `handleSetRoot`, and an undo/redo of a
+                    // SPEC create via `EditorUndoOps.replaceFolderOf`; NOT a relocate, which
+                    // re-places through `EditorStructureHandlers.placeStructureFrom` and touches
+                    // only `EditorDimRegistry` — installs a server-scoped `EditorWorld` pinned to
                     // THIS test's temp root, and nothing ever removes it. That matters because
                     // `EditorRootResolver.rootFor` consults the world FIRST and only then the
                     // `EditorServerContext` each test sets: a leaked world silently overrides the
