@@ -7,6 +7,7 @@ import com.breadmoirai.garnet.editor.data.EditorSession
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.world.EditorWorld
 import com.breadmoirai.garnet.mixin.ConnectionAccessor
 import com.breadmoirai.garnet.mixin.ServerCommonPacketListenerImplAccessor
 import com.mojang.authlib.GameProfile
@@ -104,6 +105,22 @@ suspend fun withEditorServer(
                         StructureCommit.clearBackoff(this, subpath)
                     }
                     EditorSession.clear(player.uuid)
+                    // Drop the EditorWorld this test may have created, for the same
+                    // one-server-many-roots reason (fix round 1). Anything that reaches
+                    // `EditorDimLifecycle.placeFolder`/`placeAll` — `handleNewSpec`, `handleSetRoot`,
+                    // a relocate that re-places — installs a server-scoped `EditorWorld` pinned to
+                    // THIS test's temp root, and nothing ever removes it. That matters because
+                    // `EditorRootResolver.rootFor` consults the world FIRST and only then the
+                    // `EditorServerContext` each test sets: a leaked world silently overrides the
+                    // next test's root with a directory `withTempRoot` has already deleted, so every
+                    // later `resolveSubpath` returns null. Symptoms are remote from the cause —
+                    // handlers bailing out through their "not found" branches without logging, and
+                    // `StructureCommit` reporting NotApplicable with no revision written, in specs
+                    // that run much later in the suite. The specs that drive the lifecycle directly
+                    // (EditorDimSpec, EditorCellSaverSpec, EditorNetworkRegistrySpec, ...) each call
+                    // `EditorWorld.clear` by hand for this reason; doing it here covers every spec
+                    // built on this harness, including the ones that create a world only indirectly.
+                    EditorWorld.clear(this)
                 }
             }
         }

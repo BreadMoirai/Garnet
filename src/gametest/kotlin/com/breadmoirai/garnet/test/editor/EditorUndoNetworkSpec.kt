@@ -2,13 +2,16 @@ package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.EditorRoot
+import com.breadmoirai.garnet.editor.data.EditorSession
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
 import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
+import com.breadmoirai.garnet.editor.network.EditorTreeHandlers
 import com.breadmoirai.garnet.editor.network.MovePathC2S
+import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
@@ -403,6 +406,46 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             root.resolve("a").createDirectories()
             root.resolve("b").createDirectories()
             EditorFileOpsHandlers.handleRename(server, player, RenamePathC2S("a", "b"))
+            EditorUndoStack.peekUndo(player.uuid).shouldBeNull()
+        }
+    }
+
+    // Fix round 1: handleNewSpec was the one wired operation with zero recording coverage.
+    // EditorNewSpec.create only validates `name` (regex) and appends ".spec.kts" -- it never
+    // transforms the stem itself, so there is no input for which the resolved filename differs
+    // from `payload.name` beyond that suffix. A naive implementation that recorded `payload.name`
+    // directly (no suffix, and for the empty-activeSubpath case no folder prefix) would still
+    // diverge visibly from what these two tests assert, which is what pins the real behaviour:
+    // the RESOLVED filename via `Path.name`, and correct subpath composition at both the project
+    // root and a nested active folder.
+    test("handleNewSpec records a CreateFile command at the project root") {
+        withServer { server, player, _ ->
+            EditorUndoStack.clear(player.uuid)
+            EditorSession.setActive(player.uuid, "")
+            EditorTreeHandlers.handleNewSpec(server, player, NewEditorSpecC2S("fresh"))
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.CreateFile("fresh.spec.kts", CreatedFileKind.SPEC)
+        }
+    }
+
+    test("handleNewSpec records a CreateFile command in a nested active folder") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("parent/leaf").createDirectories()
+            EditorSession.setActive(player.uuid, "parent/leaf")
+            EditorTreeHandlers.handleNewSpec(server, player, NewEditorSpecC2S("fresh"))
+            EditorUndoStack.peekUndo(player.uuid) shouldBe
+                EditorUndoCommand.CreateFile("parent/leaf/fresh.spec.kts", CreatedFileKind.SPEC)
+        }
+    }
+
+    // Fix round 1: this branch was audited but never asserted -- moving a node into the folder it
+    // already lives in must resend the tree but push nothing, since nothing moved.
+    test("handleMove into the folder it already lives in pushes nothing") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            root.resolve("dest/a").createDirectories()
+            EditorFileOpsHandlers.handleMove(server, player, MovePathC2S("dest/a", "dest"))
             EditorUndoStack.peekUndo(player.uuid).shouldBeNull()
         }
     }

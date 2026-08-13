@@ -132,6 +132,28 @@ whole suite by an order of magnitude and survived into later runs — don't.
 Separately, a freshly spawned entity is not visible to `getEntitiesOfClass` until the level's entity
 manager processes the addition, so `awaitTicks(1)` between the spawn and the assertion is required.
 
+**Server-scoped editor state outlives a test — clear `EditorWorld`, or a deleted temp root leaks
+into every later spec.** The whole `gametest` suite shares ONE `MinecraftServer`, while each
+`withEditorServer` call gets its own `withTempRoot` directory that is deleted when the test ends. Any
+handler that reaches `EditorDimLifecycle.placeFolder`/`placeAll` — `handleNewSpec`, `handleSetRoot`, a
+relocate that re-places — installs a server-scoped `EditorWorld` pinned to that test's temp root, and
+nothing removes it on its own. The trap is `EditorRootResolver.rootFor`, which consults the
+`EditorWorld` **first** and the per-test `EditorServerContext` only as a fallback: a leaked world
+therefore overrides the root every later test just configured, pointing it at a directory that no
+longer exists. `EditorRoot.resolveSubpath` then returns null for everything, and handlers exit through
+their "not found" branches — which report to the player over the network and **log nothing**. The
+symptom shows up nowhere near the cause: `StructureCommit` outcomes flipping to `NotApplicable`,
+`LocalHistoryStore` recording zero revisions, in specs that run several positions later in
+`GametestSentinel.runAll`'s `specs` list.
+
+`withEditorServer` now clears the world in its `finally`, so specs built on that harness are covered.
+Specs that drive the lifecycle directly and do **not** use the harness (`EditorDimSpec`,
+`EditorCellSaverSpec`, `EditorNetworkRegistrySpec`, `EditorTeleportSpec`) must keep calling
+`EditorWorld.clear(server)` themselves. The same reasoning is why the harness also clears
+`StructureAutoSave` dirty subpaths, `StructureCommit` backoff, and the `EditorSession`: every piece of
+server-keyed state a test touches has to be released against the root it was keyed to, because the
+next test's root is a different directory with the same subpath names.
+
 ## Spec style
 
 The project standard is Kotest's `FunSpec`. `GarnetTestSpec` extends `FunSpec`; unit tests in `src/test/` extend `FunSpec` directly. Use `context("group") { test("case") { ... } }` nesting when a logical group of cases shares setup or wants to be documented together. Other Kotest styles (`DescribeSpec`, `BehaviorSpec`, `StringSpec`) are not used to keep specs uniform across the codebase.
