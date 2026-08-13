@@ -1,13 +1,17 @@
 package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
+import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
+import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.test.deleteRecursively
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.withEditorServer
 import io.kotest.matchers.booleans.shouldBeFalse
@@ -21,11 +25,16 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import net.minecraft.core.registries.Registries
+import net.minecraft.nbt.NbtAccounter
+import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteExisting
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
@@ -93,9 +102,10 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
                 listOf("", "clocks", "empty")
             command.banked.map { it.relPath } shouldContainExactlyInAnyOrder listOf("clocks/a.spec.kts", "b.spec.kts")
 
-            // Parents before children, which is what lets a restore createDirectories in manifest
-            // order without sorting. Depth-first pre-order is a property of Path.walk without
-            // BREADTH_FIRST, so this pins an invariant the restore side depends on.
+            // Parents before children -- a property of Path.walk without BREADTH_FIRST. restoreSubtree
+            // additionally sorts by relPath length before createDirectories, so it does not strictly
+            // depend on this order, but the manifest reading naturally parents-first is still worth
+            // pinning here.
             val order = command.manifest.map { it.relPath }
             order.indexOf("") shouldBeLessThan order.indexOf("clocks")
             order.indexOf("clocks") shouldBeLessThan order.indexOf("clocks/a.spec.kts")
@@ -249,6 +259,76 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             report.restored shouldBe 1
             report.total shouldBe 2
             report.failures shouldHaveSize 1
+            // The report alone doesn't prove anything landed on disk -- confirm the surviving file
+            // (banked[1], since banked[0] was the victim) actually came back with its content.
+            val survivor = command.banked[1]
+            val survivorPath = root.resolve("part").resolve(survivor.relPath)
+            survivorPath.exists().shouldBeTrue()
+            survivorPath.readBytes() shouldBe "b".toByteArray()
+        }
+    }
+
+    test("restoreSubtree writes files under the CURRENT root, not the absolutePath they had at delete time") {
+        // BankedFile carries both relPath and absolutePath precisely because the project root is
+        // swappable ("Open Folder..."); an implementation that wrote to absolutePath instead of
+        // resolving relPath against the current root would pass every other test in this file (they
+        // never repoint the root) and still be wrong.
+        withServer { server, player, rootA ->
+            EditorUndoStack.clear(player.uuid)
+            rootA.resolve("gadget.spec.kts").writeBytes("from-root-a".toByteArray())
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("gadget.spec.kts"))
+            val command = EditorUndoStack.peekUndo(player.uuid) as EditorUndoCommand.Delete
+            command.banked.single().absolutePath shouldBe rootA.resolve("gadget.spec.kts").toAbsolutePath()
+
+            val rootB = createTempDirectory("undo-net-root-b")
+            val prevContext = EditorServerContext.get(server)
+            try {
+                EditorServerContext.set(server, EditorServerContext(EditorRoot(rootB)))
+
+                val report = EditorFileOpsHandlers.restoreSubtree(server, player, command)
+
+                report.failures.shouldBeEmpty()
+                rootB.resolve("gadget.spec.kts").exists().shouldBeTrue()
+                rootB.resolve("gadget.spec.kts").readBytes() shouldBe "from-root-a".toByteArray()
+                // Never written back under the old root -- it no longer exists there to write to.
+                rootA.resolve("gadget.spec.kts").exists().shouldBeFalse()
+            } finally {
+                if (prevContext != null) EditorServerContext.set(server, prevContext)
+                deleteRecursively(rootB)
+            }
+        }
+    }
+
+    test("restoreSubtree round-trips a genuine structure .nbt through the typed history path") {
+        // The earlier "brings back folders, a .spec.kts and a .nbt" test's .nbt is 4 garbage bytes,
+        // which fails NbtIo.readCompressed and so banks RAW -- it never touches the typed
+        // (NbtIo.writeCompressed) branch. This test uses a real structure so the typed path -- the
+        // feature's primary use case -- gets genuine coverage instead of only being reached by the
+        // "blob is gone" failure test, where it throws.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val file = EditorNewStructure.create(root, "widget")
+            val originalTag = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap())
+            val originalTemplate = StructureTemplate()
+            originalTemplate.load(server.registryAccess().lookupOrThrow(Registries.BLOCK), originalTag)
+            val originalSize = originalTemplate.size
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("widget.nbt"))
+            root.resolve("widget.nbt").exists().shouldBeFalse()
+
+            val command = EditorUndoStack.peekUndo(player.uuid) as EditorUndoCommand.Delete
+            val report = EditorFileOpsHandlers.restoreSubtree(server, player, command)
+
+            report.failures.shouldBeEmpty()
+            // Gzip re-compression is not byte-deterministic, so compare through a genuine NBT/
+            // structure load rather than raw bytes.
+            val restoredTag = NbtIo.readCompressed(
+                root.resolve("widget.nbt"), NbtAccounter.unlimitedHeap(),
+            )
+            val restoredTemplate = StructureTemplate()
+            restoredTemplate.load(server.registryAccess().lookupOrThrow(Registries.BLOCK), restoredTag)
+            restoredTemplate.size shouldBe originalSize
         }
     }
 })

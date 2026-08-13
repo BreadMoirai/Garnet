@@ -385,12 +385,15 @@ object EditorFileOpsHandlers {
      * closes the two real gaps — `.spec.kts` files were never in the store at all, and a freshly
      * duplicated `.nbt` has no history by design.
      *
-     * **Manifest order is an invariant, not an accident.** `Path.walk` with `INCLUDE_DIRECTORIES`
-     * and WITHOUT `BREADTH_FIRST` is depth-first pre-order, so a directory is always emitted before
-     * anything inside it. The restore side relies on exactly that to `createDirectories` in
-     * manifest order without sorting or re-deriving parents. Adding `PathWalkOption.BREADTH_FIRST`
-     * would still be parents-first, but any change that emits children before their parent — or any
-     * caller that reorders the manifest — silently breaks restore, so preserve it.
+     * **Manifest order is depth-first pre-order, not an accident.** `Path.walk` with
+     * `INCLUDE_DIRECTORIES` and WITHOUT `BREADTH_FIRST` guarantees a directory is emitted before
+     * anything inside it. `restoreSubtree` does NOT rely on this order for correctness — it
+     * additionally sorts folder entries by `relPath.length` before calling `createDirectories`,
+     * which is itself parent-creating, so parents-before-children holds even if the manifest were
+     * reordered. Preserve the walk order anyway: it is what makes the manifest read naturally
+     * (parents before their children) for anyone inspecting or logging it, and removing it would
+     * leave the sort in `restoreSubtree` as the only thing standing between this file and a subtly
+     * wrong manifest.
      *
      * A single-file target gets a one-entry manifest whose `relPath` is `""`, the same sentinel the
      * directory branch uses for the deleted root itself: in both cases it means "the deleted node",
@@ -530,6 +533,12 @@ object EditorFileOpsHandlers {
      * Restored structures come back UNPLACED — this touches no `EditorDimRegistry` state. Placing an
      * arbitrary restored subtree would need a region assignment per `.nbt`, and navigating to a
      * structure costs the same either way.
+     *
+     * [RestoreReport.restored] and [RestoreReport.total] count FILES only — folder recreation
+     * failures are appended to [RestoreReport.failures] without moving either counter. So
+     * `restored == total` does NOT mean "clean": a folder that failed to recreate still leaves
+     * `failures` non-empty while every file restore succeeds. Callers (Task 7's undo executor) must
+     * check `failures.isEmpty()`, not `restored == total`, to decide whether the restore was clean.
      */
     fun restoreSubtree(
         server: MinecraftServer,
