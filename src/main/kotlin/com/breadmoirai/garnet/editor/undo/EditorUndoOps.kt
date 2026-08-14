@@ -2,11 +2,13 @@ package com.breadmoirai.garnet.editor.undo
 
 import com.breadmoirai.garnet.editor.network.DeleteOutcome
 import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
+import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
@@ -34,7 +36,11 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
  */
 object EditorUndoOps {
 
-    /** What an inverse produced: a failure reason, or the command to seat on the redo deque. */
+    /**
+     * What a replay produced — in EITHER direction: a failure reason, or the command to seat on the
+     * opposite deque. `reapply` returns this too, not a nullable refusal, because a re-delete has to
+     * hand back a REPLACEMENT command rather than letting `redo()` re-seat the stale original.
+     */
     private sealed interface Inverted {
         /**
          * [alreadyReported] means the primitive that refused has ALREADY sent the player an
@@ -45,13 +51,18 @@ object EditorUndoOps {
         data class Refused(val reason: String, val alreadyReported: Boolean = false) : Inverted
 
         /**
-         * [redoable] is usually the original command; creates return a copy carrying their bank.
+         * [redoable] is the command to seat on the OPPOSITE deque — the redo deque for [undo], the
+         * undo deque for [redo]. Usually the original command; creates return a copy carrying their
+         * bank, and a re-delete on the redo path returns the FRESH `Delete` its own
+         * `deleteSubtree` produced. Seating the original there instead would re-seat a bank of the
+         * bytes as they stood before the FIRST delete, so any edit made between the undo and the
+         * redo would be silently reverted by a later undo.
          *
-         * Null means "the inverse happened, but it cannot be redone" — an undone create whose
-         * removal could not be banked (local history off, or a banking failure). Seating such an
-         * entry on the redo deque would light the Redo button on something that refuses on every
-         * press, and since refusals never pop, that entry would permanently mask every redo beneath
-         * it.
+         * Null means "the operation happened, but it cannot be replayed in the other direction" —
+         * an undone create whose removal could not be banked, or a re-delete that could not be
+         * banked (local history off, or a banking failure). Seating such an entry would light the
+         * opposite button on something that refuses on every press, and since refusals never pop,
+         * that entry would permanently mask every entry beneath it.
          */
         data class Applied(val redoable: EditorUndoCommand?) : Inverted
     }
@@ -80,17 +91,25 @@ object EditorUndoOps {
         val command = EditorUndoStack.peekRedo(player.uuid) ?: run {
             fail(player, "nothing to redo"); return
         }
-        val problem = reapply(server, player, command)
-        if (problem != null) {
-            // Same rule as undo(): the redo entry stays put, and a primitive that already reported
-            // its own failure is not reported twice.
-            if (!problem.alreadyReported) fail(player, "can't redo ${command.label} — ${problem.reason}")
-            return
+        when (val result = reapply(server, player, command)) {
+            is Inverted.Refused -> {
+                // Same rule as undo(): the redo entry stays put, and a primitive that already
+                // reported its own failure is not reported twice.
+                if (!result.alreadyReported) fail(player, "can't redo ${command.label} — ${result.reason}")
+                return
+            }
+
+            is Inverted.Applied -> {
+                EditorUndoStack.popRedo(player.uuid)
+                // push() would clear the redo deque, discarding every entry above this one. This is
+                // a replay, not a new action, so the redo branch must survive.
+                //
+                // What gets seated is `result.redoable`, NOT `command`: a re-delete banks its own
+                // fresh copy of what was on disk, and null means the replay cannot be undone again
+                // (see Inverted.Applied's KDoc).
+                result.redoable?.let { EditorUndoStack.pushUndoWithoutClearingRedo(player.uuid, it) }
+            }
         }
-        EditorUndoStack.popRedo(player.uuid)
-        // push() would clear the redo deque, discarding every entry above this one. This is a
-        // replay, not a new action, so the redo branch must survive.
-        EditorUndoStack.pushUndoWithoutClearingRedo(player.uuid, command)
         sendTree(server, player)
         sendUndoState(player)
     }
@@ -115,7 +134,7 @@ object EditorUndoOps {
                     // spec must re-place it again — otherwise the folder keeps showing a spec whose
                     // file no longer exists. Structures are not placed by their create handler and
                     // need nothing here.
-                    if (command.kind == CreatedFileKind.SPEC) replaceFolderOf(server, command.subpath)
+                    if (command.kind == CreatedFileKind.SPEC) replaceFolderOf(server, player, command.subpath)
                     Inverted.Applied(removed.banked?.let { command.copy(banked = it) })
                 }
             }
@@ -133,42 +152,63 @@ object EditorUndoOps {
     }
 
     /**
-     * Null on success, else the refusal — whose `reason` reads as a clause following
-     * "can't redo X — ", and whose `alreadyReported` says whether the player has already heard it.
+     * Replays [command] itself. The refusal's `reason` reads as a clause following "can't redo X — ",
+     * and its `alreadyReported` says whether the player has already heard it.
+     *
+     * On success, [Inverted.Applied.redoable] is what `redo()` seats on the UNDO deque — which is
+     * not always [command]: see that property's KDoc.
      */
     private fun reapply(
         server: MinecraftServer,
         player: ServerPlayer,
         command: EditorUndoCommand,
-    ): Inverted.Refused? = when (command) {
+    ): Inverted = when (command) {
         // A create cannot be replayed as a create — the content came from a create handler, not
         // from anything this command recorded. It is replayed as a RESTORE of the bank the undo
         // took on its way out, which is exactly what `banked` is for.
-        is EditorUndoCommand.CreateFolder -> restoreBanked(server, player, command.banked)
-        is EditorUndoCommand.CreateFile -> restoreBanked(server, player, command.banked).also { problem ->
-            // On SUCCESS only (problem == null): the spec file is back, so the folder must be
-            // re-placed to show it again. `?.also` here would be exactly backwards — it fires on
-            // failure.
-            if (problem == null && command.kind == CreatedFileKind.SPEC) {
-                replaceFolderOf(server, command.subpath)
+        is EditorUndoCommand.CreateFolder ->
+            restoreBanked(server, player, command.banked) ?: Inverted.Applied(command)
+
+        is EditorUndoCommand.CreateFile -> {
+            val problem = restoreBanked(server, player, command.banked)
+            if (problem != null) problem
+            else {
+                // On SUCCESS only: the spec file is back, so the folder must be re-placed to show
+                // it again.
+                if (command.kind == CreatedFileKind.SPEC) replaceFolderOf(server, player, command.subpath)
+                Inverted.Applied(command)
             }
         }
 
-        is EditorUndoCommand.Duplicate -> restoreBanked(server, player, command.banked)
+        is EditorUndoCommand.Duplicate ->
+            restoreBanked(server, player, command.banked) ?: Inverted.Applied(command)
 
         is EditorUndoCommand.Relocate ->
-            when (val result = moveBack(server, player, from = command.oldSubpath, to = command.newSubpath, command = command)) {
-                is Inverted.Refused -> result
-                is Inverted.Applied -> null
-            }
+            moveBack(server, player, from = command.oldSubpath, to = command.newSubpath, command = command)
 
         is EditorUndoCommand.Delete -> {
             val root = EditorRootResolver.rootFor(server)
-            val target = root?.resolveSubpath(command.rootSubpath)
-            if (target == null) Inverted.Refused("'${command.rootSubpath}' is already gone")
-            else when (val outcome = EditorFileOpsHandlers.deleteSubtree(server, player, command.rootSubpath, target)) {
-                is DeleteOutcome.Failed -> Inverted.Refused(outcome.reason)
-                else -> null
+            // A missing root and a path that is no longer there are different problems and must not
+            // collapse into one message: "'X' is already gone" is flatly wrong when the truth is
+            // that no project is open.
+            if (root == null) Inverted.Refused("project-root not configured")
+            else {
+                val target = root.resolveSubpath(command.rootSubpath)
+                if (target == null) Inverted.Refused("'${command.rootSubpath}' is already gone")
+                else when (val outcome =
+                    EditorFileOpsHandlers.deleteSubtree(server, player, command.rootSubpath, target)) {
+                    is DeleteOutcome.Failed -> Inverted.Refused(outcome.reason)
+                    // The FRESH bank, not `command`: whatever was on disk at this instant is what a
+                    // later undo must bring back. Re-seating the original would revert every edit
+                    // made between the undo and this redo, silently.
+                    is DeleteOutcome.Deleted -> Inverted.Applied(outcome.command)
+                    // Re-deleted, but this replay cannot be undone again. Not a refusal — the files
+                    // really are gone — so seat nothing, exactly as undo() does for a create whose
+                    // removal could not be banked. An entry that refuses on every press would mask
+                    // every entry beneath it forever.
+                    is DeleteOutcome.DeletedUnbankable -> Inverted.Applied(null)
+                    is DeleteOutcome.DeletedHistoryDisabled -> Inverted.Applied(null)
+                }
             }
         }
     }
@@ -210,18 +250,32 @@ object EditorUndoOps {
 
     /**
      * Re-place the folder containing [subpath], so the world matches the files again after a spec
-     * appears or disappears.
+     * appears or disappears, and tell the client what that folder now holds.
+     *
+     * The `EditorFolderLoadedS2C` is not optional bookkeeping: `sendTree` refreshes the TREE, not
+     * the client's `loadedSpecIds` for a folder, so an undo that only re-placed server-side would
+     * leave the client listing a spec whose file is gone, with no error and no self-correction.
+     * `handleNewSpec` sends exactly this packet from the same `placeFolder` report; its inverse must
+     * too.
      *
      * `placeFolder` THROWS on failure, which is what the `runCatching` below is for: a re-place that
-     * blew up is logged here and swallowed. It must never fail the undo — the file operation it
-     * follows has already happened, so reporting failure would tell the player nothing changed when
-     * the tree in fact did.
+     * blew up is logged here and swallowed (and no packet is sent — there is no report to send). It
+     * must never fail the undo — the file operation it follows has already happened, so reporting
+     * failure would tell the player nothing changed when the tree in fact did.
      */
-    private fun replaceFolderOf(server: MinecraftServer, subpath: String) {
+    private fun replaceFolderOf(server: MinecraftServer, player: ServerPlayer, subpath: String) {
         val root = EditorRootResolver.rootFor(server) ?: return
         val folderSubpath = subpath.substringBeforeLast('/', "")
         runCatching { EditorDimLifecycle.placeFolder(server, root, folderSubpath) }
             .onFailure { LOGGER.error("[project/undo] re-place '{}': {}", folderSubpath, it.message, it) }
+            .onSuccess { report ->
+                ServerPlayNetworking.send(player, EditorFolderLoadedS2C(
+                    subpath = report.subpath,
+                    loadedSpecIds = report.loaded,
+                    parseErrors = report.parseErrors.map { "${it.filename}: ${it.message}" },
+                    layoutErrors = report.errors.map { "${it.specId} (${it.filename}): ${it.reason}" },
+                ))
+            }
     }
 
     private fun moveBack(

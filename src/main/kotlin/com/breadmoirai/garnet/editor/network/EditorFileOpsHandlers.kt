@@ -369,8 +369,9 @@ object EditorFileOpsHandlers {
      * `LocalHistoryStore` revisions are deliberately RETAINED — they are the recovery route for a
      * delete. The consequence: a file later created at the same path inherits them.
      *
-     * Everything after the resolution/validation and the best-effort quiesce below lives in
-     * [deleteSubtree], which the undo/redo ops reuse; this handler only adds the undo bookkeeping.
+     * Everything after the resolution/validation lives in [deleteSubtree], which the undo/redo ops
+     * reuse — including the best-effort pre-delete quiesce; this handler only adds the undo
+     * bookkeeping.
      */
     fun handleDelete(server: MinecraftServer, player: ServerPlayer, payload: DeletePathC2S) {
         if (payload.subpath.isEmpty()) {
@@ -381,15 +382,6 @@ object EditorFileOpsHandlers {
         }
         val target = root.resolveSubpath(payload.subpath) ?: run {
             fail(player, "path not found or escapes root: ${payload.subpath}"); return
-        }
-
-        // Best-effort quiesce: this banks a final recovery revision into the history that outlives
-        // the file. Unlike every other caller, a FAILURE here does not abort — blocking a delete
-        // because history could not be banked would make a structure with a broken history dir
-        // undeletable from the editor, for a node the player is explicitly destroying. Logged, not
-        // reported: the delete below succeeds, so an error packet would contradict what happened.
-        commitDirtyUnder(server, payload.subpath)?.let {
-            LOGGER.warn("[project/delete] proceeding despite failed pre-delete commit for {}: {}", payload.subpath, it)
         }
 
         when (val outcome = deleteSubtree(server, player, payload.subpath, target)) {
@@ -414,10 +406,18 @@ object EditorFileOpsHandlers {
     /**
      * Walk [target]'s subtree, bank every file into `LocalHistoryStore`, then unlink and tear down.
      *
-     * Order is bank → unlink → teardown. Banking BEFORE the unlink is the only ordering that works:
-     * once the bytes are gone there is nothing left to read. The pre-existing best-effort
-     * `commitDirtyUnder` still runs before this (in the caller), so a dirty structure's pending
-     * world edits are already in the file by the time it is read here.
+     * Order is quiesce → bank → unlink → teardown. Banking BEFORE the unlink is the only ordering
+     * that works: once the bytes are gone there is nothing left to read.
+     *
+     * The quiesce lives HERE, not in a caller, so that it holds on EVERY path — `handleDelete`,
+     * `EditorUndoOps.removeCreated`, and the redo of a `Delete`. Once the bytes have been read, a
+     * dirty structure's pending world edits are invisible to the bank, and `deleteAndTearDown` then
+     * clears that dirty state — so a skipped quiesce means the pending edits are gone with no error
+     * and a later undo restores pre-edit bytes. It is best-effort: a FAILURE does not abort, unlike
+     * every other `commitDirtyUnder` caller, because blocking a delete on a broken history dir would
+     * make a structure undeletable from the editor, for a node the player is explicitly destroying.
+     * Logged, not reported: the delete below succeeds, so an error packet would contradict what
+     * happened.
      *
      * Every file is banked unconditionally rather than only those whose newest revision looks
      * stale: an equality check would be a guess about content, and unconditional banking is what
@@ -445,6 +445,12 @@ object EditorFileOpsHandlers {
         subpath: String,
         target: Path,
     ): DeleteOutcome {
+        // Best-effort quiesce, before anything reads bytes or clears dirty state — see this
+        // function's KDoc for why it must run on every path and why a failure does not abort.
+        commitDirtyUnder(server, subpath)?.let {
+            LOGGER.warn("[project/delete] proceeding despite failed pre-delete commit for {}: {}", subpath, it)
+        }
+
         // Checked once, up front, rather than inferred from bankFile returning null: with history
         // off EVERY file "fails" to bank, and reporting that per delete would turn a supported
         // configuration into one that errors on every successful operation. Skipping the walk

@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.editor.network
 
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.netty.buffer.Unpooled

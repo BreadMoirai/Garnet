@@ -16,6 +16,8 @@ import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
+import com.breadmoirai.garnet.editor.structure.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
 import com.breadmoirai.garnet.editor.undo.CreatedFileKind
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoOps
@@ -40,11 +42,13 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import net.minecraft.core.Vec3i
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -61,6 +65,19 @@ import kotlin.io.path.writeBytes
 /** This spec's alias for the shared harness — see `com.breadmoirai.garnet.test.withEditorServer`. */
 private suspend fun withServer(block: suspend (server: MinecraftServer, player: ServerPlayer, root: Path) -> Unit) =
     withEditorServer("undo-net", block)
+
+/**
+ * The bounding size of the structure stored in [file], loaded through a genuine [StructureTemplate]
+ * rather than compared as bytes: gzip re-compression is not byte-deterministic, so raw bytes cannot
+ * tell "same content" from "recompressed content", while a template's size changes the moment the
+ * captured block set does.
+ */
+private fun templateSizeOf(server: MinecraftServer, file: Path): Vec3i {
+    val tag = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap())
+    val template = StructureTemplate()
+    template.load(server.registryAccess().lookupOrThrow(Registries.BLOCK), tag)
+    return template.size
+}
 
 class EditorUndoNetworkSpec : GarnetTestSpec({
 
@@ -632,6 +649,74 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             // And it is genuinely still redoable, not just present.
             EditorUndoOps.redo(server, player)
             root.resolve("two").isDirectory().shouldBeTrue()
+        }
+    }
+
+    test("redo of a delete banks the CURRENT bytes, so a later undo does not revert an intervening edit") {
+        // Final review / MUST FIX 2. `deleteSubtree` hands back a Delete carrying a bank of exactly
+        // what was on disk at THAT moment. redo() used to discard it and re-seat the ORIGINAL
+        // command, whose bank predates the undo -- so any edit made between the undo and the redo
+        // was silently reverted by the next undo, with no error anywhere.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val spec = root.resolve("clock.spec.kts")
+            spec.writeBytes("original".toByteArray())
+
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.spec.kts"))
+            EditorUndoOps.undo(server, player)
+            spec.readBytes() shouldBe "original".toByteArray()
+
+            // The player edits the file the undo just gave back, then redoes the delete.
+            spec.writeBytes("edited-after-the-undo".toByteArray())
+
+            EditorUndoOps.redo(server, player)
+            spec.exists().shouldBeFalse()
+
+            EditorUndoOps.undo(server, player)
+
+            spec.readBytes() shouldBe "edited-after-the-undo".toByteArray()
+        }
+    }
+
+    test("redo of a delete quiesces first, so an in-world edit to the restored structure is not lost") {
+        // Final review / MUST FIX 1. The pre-delete `commitDirtyUnder` used to live in
+        // `handleDelete`, so the redo path reached `deleteSubtree` with none of it: bankFile read
+        // the stale .nbt while the edit was still only in the world, and `deleteAndTearDown` then
+        // cleared the dirty state -- destroying the edit with no error and no way back.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val file = root.resolve("clock.nbt")
+            EditorNewStructure.create(root, "clock")
+
+            // Get to a state where the pending undo entry is a Delete: delete, then undo.
+            EditorFileOpsHandlers.handleDelete(server, player, DeletePathC2S("clock.nbt"))
+            EditorUndoOps.undo(server, player)
+            file.exists().shouldBeTrue()
+
+            // restoreSubtree deliberately brings structures back UNPLACED, so the restored file has
+            // to be placed again before it can be edited in-world.
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("clock.nbt"))
+            drainPayloads(player)
+            val sizeBeforeEdit = templateSizeOf(server, file)
+
+            val registry = EditorDimRegistry.of(server)
+            val origin = registry.structureRegionOriginOf("clock.nbt").shouldNotBeNull()
+            val level = registry.projectLevel()
+            level.setBlock(origin, Blocks.STONE.defaultBlockState(), 3)
+            // Drive the watcher directly: the harness's setBlock mixin is flaky.
+            StructureEditWatcher.onBlockChanged(level, origin)
+            StructureAutoSave.of(server).isDirty("clock.nbt").shouldBeTrue()
+
+            EditorUndoOps.redo(server, player)
+            file.exists().shouldBeFalse()
+
+            EditorUndoOps.undo(server, player)
+
+            file.exists().shouldBeTrue()
+            // The bank the redo took must contain the block that was still only in the world when
+            // the redo started. Without the quiesce this comes back byte-identical to the pre-edit
+            // structure, and the size is unchanged.
+            templateSizeOf(server, file) shouldNotBe sizeBeforeEdit
         }
     }
 
