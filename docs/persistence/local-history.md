@@ -194,10 +194,13 @@ all-or-nothing.
 
 The Explorer's `Delete` action (`EditorFileOpsHandlers.handleDelete`, UC-MAN-10.j) leans on this
 entirely: **history is the only recovery route for a delete** — there is no trash folder, and the
-Explorer's Undo restores from exactly these revisions. That is also why `handleDelete` quiesces
-before unlinking, committing whatever was still only in the world so the pre-delete bank captures
-it. That commit is best-effort, though: if it fails, the delete proceeds anyway rather than leaving
-a structure with a broken history directory undeletable.
+Explorer's Undo restores from exactly these revisions. That is also why a delete quiesces before
+unlinking, committing whatever was still only in the world so the pre-delete bank captures it. That
+quiesce lives inside `deleteSubtree` rather than in `handleDelete`, so it holds on the undo/redo
+paths that reuse the primitive too — a redo of a delete reaches it with no handler above it, and
+skipping it there would bank stale bytes and then clear the dirty state that was the only record of
+the difference. That commit is best-effort, though: if it fails, the delete proceeds anyway rather
+than leaving a structure with a broken history directory undeletable.
 
 **Consequence: a file later created at the same path inherits the deleted file's revisions.** Keys
 are a hash of the absolute path, and nothing ties a revision to the file's identity beyond that. A

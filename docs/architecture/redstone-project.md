@@ -140,7 +140,8 @@ Client:
   `EditorNames.validate` against the destination folder's real directory listing, since the
   client's tree snapshot can be stale; `handleDuplicate` derives its name instead, via
   `EditorNames.duplicateName`. Every one of these operations that relocates or destroys a path first
-  quiesces pending edits through `EditorHandlerSupport.commitDirtyUnder` — see
+  quiesces pending edits through `EditorHandlerSupport.commitDirtyUnder` (for delete that call sits
+inside the `deleteSubtree` primitive, not the handler, so the undo/redo replays inherit it) — see
   [use-cases/structure-lifecycle.md](../use-cases/structure-lifecycle.md) UC-MAN-10.i–k for the
   per-operation contracts, including why delete alone proceeds when that commit fails. `handleRename` additionally: refuses `subpath == ""` (the
   client already disables the menu item for the root, but the server does not trust that), commits

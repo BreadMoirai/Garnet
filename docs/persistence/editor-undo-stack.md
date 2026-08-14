@@ -182,6 +182,11 @@ Otherwise the folder in the world would keep showing a spec whose file no longer
 re-place is best-effort and swallowed on failure — the file operation it follows has already
 happened, so reporting failure would tell the player nothing changed when the tree in fact did.
 
+`replaceFolderOf` also sends the resulting `EditorFolderLoadedS2C`, exactly as `handleNewSpec` does
+from the same report. That packet is not bookkeeping: `sendTree` refreshes the *tree*, not the
+client's `loadedSpecIds` for a folder, so an inverse that only re-placed server-side left the client
+listing a spec whose file was gone, with no error and no self-correction.
+
 ## Test coverage
 
 `EditorUndoNetworkSpec` (`src/gametest/.../editor/`) covers the whole feature end to end: what each
@@ -189,22 +194,45 @@ handler records, the pre-delete banking of `.spec.kts` and of a freshly duplicat
 history, the manifest shape (including the empty-string `relPath` for a single deleted file), the
 unbankable and history-disabled delete paths, each command's undo and redo, the refusal cases
 (moved underneath, path occupied again, nothing restorable, a relocate that fails mid-flight), and
-that a redo does not discard the redo entries above it. `EditorUndoStackTest` and
+that a redo does not discard the redo entries above it. Two tests pin the re-bank and the quiesce
+specifically: a redo of a delete must bank the file as the player edited it *after* the undo (so the
+next undo does not revert that edit), and a redo whose structure is dirty in `StructureAutoSave` must
+commit before banking (so an in-world edit survives the round trip). `EditorUndoStackTest` and
 `EditorUndoPacketsTest` (`src/test/`) cover the deque semantics and the payload codecs;
 `ExplorerUiSpec` (`src/clientTest/`) covers the toolbar buttons' enablement from `UndoStateS2C`.
 
+## A replay re-banks; it never re-seats a stale bank
+
+Redoing a `Delete` calls `deleteSubtree` again, and that call produces its **own** `Delete` command
+banking exactly what was on disk at that instant. That fresh command — not the original — is what
+`redo()` seats on the undo deque. The original's bank predates the undo, so re-seating it would make
+the next undo restore pre-undo bytes and silently revert anything the player changed in between.
+
+This is why `reapply` returns an `Inverted` rather than a nullable refusal: it needs a success
+channel that can carry a replacement command. `Inverted.Applied.redoable` therefore means "the
+command to seat on the *opposite* deque" in both directions, and `null` there means "this happened
+but cannot be replayed back" — an undone create whose removal could not be banked, or a re-delete
+that could not be banked (`DeletedUnbankable` / `DeletedHistoryDisabled`). In both cases nothing is
+seated, for the same reason: an entry that refuses on every press would, since refusals never pop,
+permanently mask every entry beneath it.
+
+## The pre-delete quiesce lives in `deleteSubtree`, not in a caller
+
+`deleteSubtree` runs the best-effort `commitDirtyUnder` itself, before the banking walk. It has three
+callers — `handleDelete`, `EditorUndoOps.removeCreated`, and the redo of a `Delete` — and the two
+undo-side ones once reached it with no quiesce at all. The failure that made this a correctness rule
+rather than tidiness: once the bytes have been read, a dirty structure's pending world edits are
+invisible to the bank, and `deleteAndTearDown` then clears that dirty state — so the edits are gone
+with no error, and a later undo restores pre-edit bytes.
+
+The quiesce is best-effort *here specifically* (every other `commitDirtyUnder` caller aborts on
+failure): blocking a delete because history could not be banked would make a structure with a broken
+history directory undeletable from the editor, for a node the player is explicitly destroying.
+
 ## Known gaps
 
-None of these are believed to lose data silently, but they are real and undocumented anywhere else:
+Neither of these loses data; both are client-side staleness or redundancy:
 
-- **Redo of a `Delete` discards its own fresh bank.** `reapply` calls `deleteSubtree` again and
-  throws away the `Delete` command that call produced, then re-seats the *original* command on the
-  undo deque. If the player edited the restored files between the undo and the redo, a later undo
-  restores the *pre-original-delete* bytes and that edit is lost.
-- **Undo/redo of a spec create never sends `EditorFolderLoadedS2C`.** `replaceFolderOf` re-places
-  the folder in the world but sends no packet, so the client's loaded-spec-ids view for that folder
-  goes stale until something else refreshes it. `handleNewSpec` sends the packet; its inverse does
-  not.
 - **Refusals do not re-send the tree.** Both `undo` and `redo` return before `sendTree`, yet the
   commonest cause of a refusal is a client tree that disagrees with disk — exactly the case a
   re-send would fix. Conversely, a *successful* `Relocate` undo sends the tree and undo state
