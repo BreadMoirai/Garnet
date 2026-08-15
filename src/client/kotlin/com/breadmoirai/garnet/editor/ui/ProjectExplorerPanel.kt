@@ -173,8 +173,6 @@ private fun ProjectExplorer() {
                     onConfirmMove = { path, dest -> editError = ExplorerActions.commitMove(path, dest) },
                 )
             }
-            val message = editError
-            if (!message.isNullOrEmpty()) Text(message, Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp))
         }
     }
 }
@@ -318,6 +316,10 @@ private fun TreeRow(
  *
  * [GarnetTextField] rather than Jewel's `TextField` because in this scene only the wrapper's bridged
  * focus makes the caret and the focused border appear at all — see that component for why.
+ *
+ * [error] renders beneath the field rather than in a panel-wide status line: the panel that now owns
+ * status (Structure Info) may be closed, and a rename that failed would otherwise leave the user with
+ * a red border and no reason for it anywhere on screen.
  */
 @Composable
 private fun RowScope.InlineNameField(
@@ -334,34 +336,40 @@ private fun RowScope.InlineNameField(
         state.setTextAndSelectAll(initial)
         focusRequester.requestFocus()
     }
-    GarnetTextField(
-        state = state,
-        outline = if (error != null) Outline.Error else Outline.None,
-        modifier = Modifier
-            .weight(1f)
-            .focusRequester(focusRequester)
-            // Cancel only on a focused -> unfocused TRANSITION, never on the first event.
-            //
-            // Compose's FocusChangedNode starts with null stored state, so the very first focus event
-            // a freshly attached node sees (Inactive) counts as a "change" and fires this callback
-            // with isFocused == false. That dispatch happens in onEndApplyChanges, synchronously after
-            // the composition's changes are applied — strictly BEFORE the LaunchedEffect above gets a
-            // chance to run requestFocus(), because a LaunchedEffect body is only *scheduled* on the
-            // frame dispatcher during applyChanges. A naive `if (!it.isFocused) onCancel()` therefore
-            // tears the field down on the frame it appears, killing both New and Rename outright.
-            // Gating on everFocused keeps the intended behaviour — an abandoned field still cancels
-            // when the user clicks away — while ignoring that synthetic initial Inactive.
-            .onFocusChanged {
-                if (it.isFocused) everFocused = true
-                else if (everFocused) onCancel()
-            }
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.Enter, Key.NumPadEnter -> { onCommit(state.text.toString()); true }
-                    Key.Escape -> { onCancel(); true }
-                    else -> false
+    Column(Modifier.weight(1f)) {
+        GarnetTextField(
+            state = state,
+            outline = if (error != null) Outline.Error else Outline.None,
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester)
+                // Cancel only on a focused -> unfocused TRANSITION, never on the first event.
+                //
+                // Compose's FocusChangedNode starts with null stored state, so the very first focus event
+                // a freshly attached node sees (Inactive) counts as a "change" and fires this callback
+                // with isFocused == false. That dispatch happens in onEndApplyChanges, synchronously after
+                // the composition's changes are applied — strictly BEFORE the LaunchedEffect above gets a
+                // chance to run requestFocus(), because a LaunchedEffect body is only *scheduled* on the
+                // frame dispatcher during applyChanges. A naive `if (!it.isFocused) onCancel()` therefore
+                // tears the field down on the frame it appears, killing both New and Rename outright.
+                // Gating on everFocused keeps the intended behaviour — an abandoned field still cancels
+                // when the user clicks away — while ignoring that synthetic initial Inactive.
+                .onFocusChanged {
+                    if (it.isFocused) everFocused = true
+                    else if (everFocused) onCancel()
                 }
-            },
-    )
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Enter, Key.NumPadEnter -> { onCommit(state.text.toString()); true }
+                        Key.Escape -> { onCancel(); true }
+                        else -> false
+                    }
+                },
+        )
+        // The message lives at the field, not in a panel-wide status line, because the panel that
+        // now owns status (Structure Info) may be closed — a rename that failed would otherwise
+        // leave the user with a red border and no reason for it anywhere on screen.
+        if (error != null) Text(error, Modifier.padding(start = 2.dp, top = 1.dp))
+    }
 }

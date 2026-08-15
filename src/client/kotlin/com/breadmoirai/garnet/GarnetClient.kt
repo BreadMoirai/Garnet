@@ -5,6 +5,7 @@ import com.breadmoirai.garnet.editor.network.EditorClientNetworking
 import com.breadmoirai.garnet.editor.ui.explorerPanel
 import com.breadmoirai.garnet.editor.ui.localHistoryPanel
 import com.breadmoirai.garnet.editor.ui.registerExplorerLifecycle
+import com.breadmoirai.garnet.editor.ui.structureInfoPanel
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.viewport.registerCursorFocusToggle
 import com.breadmoirai.garnet.ui.viewport.registerDockKeybinds
@@ -31,6 +32,7 @@ class GarnetClient : ClientModInitializer {
         // toggles the Explorer by hand.
         DockState.panels += explorerPanel()
         DockState.panels += localHistoryPanel()
+        DockState.panels += structureInfoPanel()
         LOGGER.debug("[GarnetClient#onInitializeClient] client initialization complete")
     }
 }

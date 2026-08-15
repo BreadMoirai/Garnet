@@ -27,9 +27,6 @@ import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /** Matches the Explorer panel's background. */
 private val PANEL_BG = Color(0xFF1E1F22)
@@ -136,7 +133,7 @@ private fun RevisionRow(revision: RevisionEntry) {
             } else it
         }
     Row(rowModifier) {
-        Text(formatTime(revision.timestampMillis), Modifier.weight(1f), color = fg(restorable))
+        Text(formatClock(revision.timestampMillis), Modifier.weight(1f), color = fg(restorable))
         // Plain ASCII "x" between the dimensions, not U+00D7: see the panel doc on glyph coverage.
         Text("${revision.sizeX}x${revision.sizeY}x${revision.sizeZ}", Modifier.weight(1f), color = fg(restorable))
         Text(revision.reason, Modifier.weight(1f), color = muted(restorable))
@@ -145,6 +142,3 @@ private fun RevisionRow(revision: RevisionEntry) {
 
 private fun fg(restorable: Boolean) = if (restorable) Color(0xFFDFE1E5) else Color(0xFF6F737A)
 private fun muted(restorable: Boolean) = if (restorable) Color(0xFF8B8F96) else Color(0xFF6F737A)
-
-private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss", Locale.ROOT)
-private fun formatTime(millis: Long): String = TIME_FORMAT.format(Date(millis))
