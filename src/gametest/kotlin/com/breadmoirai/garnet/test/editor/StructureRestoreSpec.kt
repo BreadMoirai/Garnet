@@ -7,6 +7,7 @@ import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
+import com.breadmoirai.garnet.editor.network.RevisionEntry
 import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
 import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
@@ -26,6 +27,7 @@ import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.withEditorServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldBeNull
@@ -301,7 +303,13 @@ class StructureRestoreSpec : GarnetTestSpec({
         withEditorServer("watch-reply") { server, player, root ->
             grantChannel(player, StructureHistoryS2C.TYPE)
             val (subpath, first) = placeAndEdit(server, player, root)
-            editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
+            // Grow the 3x1x3 platform along X only, so the newest revision's dimensions are three
+            // DISTINCT numbers (5x1x3). Asserting against 3x1x3 would let an X/Z transposition in
+            // `pushTo`'s RevisionEntry mapping pass unnoticed.
+            val box = EditorDimRegistry.of(server).placedBoxOf(subpath).shouldNotBeNull()
+            val far = box.origin.offset(4, 0, 0)
+            server.overworld().setBlockAndUpdate(far, Blocks.GOLD_BLOCK.defaultBlockState())
+            StructureAutoSave.of(server).onEdit(subpath, far, server.overworld().gameTime)
             StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL)
             drainPayloads(player)
 
@@ -319,6 +327,35 @@ class StructureRestoreSpec : GarnetTestSpec({
             sent.revisions.any { it.timestampMillis == first.timestampMillis }.shouldBeTrue()
             // Oldest first, as the store returns them.
             sent.revisions.zipWithNext().all { (a, b) -> a.timestampMillis <= b.timestampMillis }.shouldBeTrue()
+            // Every FIELD of an entry, against literals where a literal is knowable: comparing the
+            // wire list only to the store list would pass with any two size fields swapped, since
+            // both sides would then be read through the same mapping.
+            val newest = LocalHistoryStore.revisions(root.resolve(subpath)).last()
+            newest.blockCount shouldBeGreaterThan 0
+            sent.revisions.last() shouldBe RevisionEntry(
+                newest.timestampMillis, 5, 1, 3, newest.blockCount, LocalHistoryStore.REASON_MANUAL,
+            )
+        }
+    }
+
+    test("an unsolicited push is dropped for a client that never registered the channel") {
+        // The complement of `grantChannel`: without it, `canSend` is false and the guard in
+        // `HistoryWatchers.pushTo` must swallow the fan-out. Deleting that guard turns this test
+        // red -- verified by doing exactly that (fix round 1, Important). It is what stands between
+        // a vanilla client on a dedicated server and a disconnect for an unknown play-phase payload.
+        withEditorServer("watch-unregistered") { server, player, root ->
+            val (subpath, _) = placeAndEdit(server, player, root)
+            EditorStructureHandlers.handleWatchHistory(server, player, WatchStructureHistoryC2S(subpath))
+            // The watch is recorded regardless -- it is the SEND that is guarded, not the bookkeeping.
+            HistoryWatchers.watchedBy(player.uuid) shouldBe subpath
+            drainPayloads(player)
+
+            editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
+            StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL).let {
+                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).payload)
+            }
+
+            drainPayloads(player).filterIsInstance<StructureHistoryS2C>().shouldBeEmpty()
         }
     }
 
@@ -349,7 +386,6 @@ class StructureRestoreSpec : GarnetTestSpec({
 
             val after = drainPayloads(player).filterIsInstance<StructureHistoryS2C>().last()
             after.revisions.size shouldBe before + 1
-            HistoryWatchers.clear(player.uuid)
         }
     }
 
@@ -370,7 +406,6 @@ class StructureRestoreSpec : GarnetTestSpec({
             EditorUndoStack.peekUndo(player.uuid)
                 .shouldBeInstanceOf<EditorUndoCommand.RestoreRevision>()
             drainPayloads(player).filterIsInstance<StructureHistoryS2C>().shouldNotBeEmpty()
-            HistoryWatchers.clear(player.uuid)
         }
     }
 

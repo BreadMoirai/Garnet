@@ -24,17 +24,17 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object HistoryWatchers {
 
-    private val bySubpath = ConcurrentHashMap<UUID, String>()
+    private val subpathByPlayer = ConcurrentHashMap<UUID, String>()
 
     /** [subpath] `""` clears the watch. */
     fun watch(playerId: UUID, subpath: String) {
-        if (subpath.isEmpty()) bySubpath.remove(playerId) else bySubpath[playerId] = subpath
+        if (subpath.isEmpty()) subpathByPlayer.remove(playerId) else subpathByPlayer[playerId] = subpath
     }
 
-    fun watchedBy(playerId: UUID): String? = bySubpath[playerId]
+    fun watchedBy(playerId: UUID): String? = subpathByPlayer[playerId]
 
     fun clear(playerId: UUID) {
-        bySubpath.remove(playerId)
+        subpathByPlayer.remove(playerId)
     }
 
     /**
@@ -63,7 +63,7 @@ object HistoryWatchers {
     /** Push [subpath]'s list to every player watching it. */
     fun pushAll(server: MinecraftServer, subpath: String) {
         for (player in server.playerList.players) {
-            if (bySubpath[player.uuid] == subpath) pushTo(server, player, subpath)
+            if (subpathByPlayer[player.uuid] == subpath) pushTo(server, player, subpath)
         }
     }
 }
