@@ -27,13 +27,14 @@ private val SPLITTER_COLOR = Color(0xFF10161F)
 @Composable
 fun GarnetDock(realW: Int, realH: Int) {
     Box(Modifier.fillMaxSize()) {
+        val stripe = if (DockState.anyActive()) STRIPE_WIDTH else 0
         val left = if (DockState.isVisible(DockRegion.LEFT)) DockState.leftWidth else 0
         val right = if (DockState.isVisible(DockRegion.RIGHT)) DockState.rightWidth else 0
         val bottom = if (DockState.isVisible(DockRegion.BOTTOM)) DockState.bottomHeight else 0
 
         if (DockState.isVisible(DockRegion.LEFT)) {
-            RegionColumn(DockRegion.LEFT, Modifier.offset(0.dp, 0.dp).width(left.dp).height((realH - bottom).dp))
-            SplitterX(Modifier.offset((left - SPLITTER).dp, 0.dp).width(SPLITTER.dp).height((realH - bottom).dp)) { dx ->
+            RegionColumn(DockRegion.LEFT, Modifier.offset(stripe.dp, 0.dp).width(left.dp).height((realH - bottom).dp))
+            SplitterX(Modifier.offset((stripe + left - SPLITTER).dp, 0.dp).width(SPLITTER.dp).height((realH - bottom).dp)) { dx ->
                 DockState.setSize(DockRegion.LEFT, DockState.leftWidth + dx)
             }
         }
@@ -51,7 +52,13 @@ fun GarnetDock(realW: Int, realH: Int) {
         }
         // CENTER: only render a panel if one exists (else transparent → world shows).
         if (DockState.isVisible(DockRegion.CENTER)) {
-            RegionColumn(DockRegion.CENTER, Modifier.offset(left.dp, 0.dp).width((realW - left - right).dp).height((realH - bottom).dp))
+            RegionColumn(
+                DockRegion.CENTER,
+                Modifier.offset((stripe + left).dp, 0.dp).width((realW - stripe - left - right).dp).height((realH - bottom).dp),
+            )
+        }
+        if (stripe > 0) {
+            DockStripe(DockRegion.LEFT, Modifier.offset(0.dp, 0.dp).width(stripe.dp).height(realH.dp))
         }
     }
 }

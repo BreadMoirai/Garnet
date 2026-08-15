@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.ui.dock.DockInsets
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.Panel
+import com.breadmoirai.garnet.ui.dock.STRIPE_WIDTH
 import com.breadmoirai.garnet.ui.dock.insets
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import io.kotest.core.spec.style.StringSpec
@@ -33,7 +34,7 @@ class DockInsetsTest : StringSpec({
         DockState.reset()
         open(DockRegion.LEFT)
         DockState.setSize(DockRegion.LEFT, 260)
-        DockState.insets() shouldBe DockInsets(260, 0, 0, 0)
+        DockState.insets() shouldBe DockInsets(STRIPE_WIDTH + 260, 0, 0, 0)
     }
 
     "insets drive the content rect, clamped to the minimum" {
@@ -41,9 +42,9 @@ class DockInsetsTest : StringSpec({
         open(DockRegion.LEFT); DockState.setSize(DockRegion.LEFT, 260)
         open(DockRegion.BOTTOM); DockState.setSize(DockRegion.BOTTOM, 160)
         val rect = ViewportState.contentRect(1000, 600)
-        rect.frameX shouldBe 260
+        rect.frameX shouldBe STRIPE_WIDTH + 260
         rect.frameY shouldBe 0
-        rect.frameWidth shouldBe 740
+        rect.frameWidth shouldBe 1000 - STRIPE_WIDTH - 260
         rect.frameHeight shouldBe 440
     }
 

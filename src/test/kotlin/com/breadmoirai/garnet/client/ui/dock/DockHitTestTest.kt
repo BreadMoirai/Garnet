@@ -3,6 +3,7 @@ package com.breadmoirai.garnet.client.ui.dock
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.Panel
+import com.breadmoirai.garnet.ui.dock.STRIPE_WIDTH
 import com.breadmoirai.garnet.ui.dock.regionAt
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -44,9 +45,9 @@ class DockHitTestTest : FunSpec({
         DockState.setSize(DockRegion.LEFT, 280)
 
         DockState.regionAt(0, 0, w, h) shouldBe DockRegion.LEFT
-        DockState.regionAt(279, h / 2, w, h) shouldBe DockRegion.LEFT
+        DockState.regionAt(STRIPE_WIDTH + 279, h / 2, w, h) shouldBe DockRegion.LEFT
         // The first pixel past the strip is world, not LEFT.
-        DockState.regionAt(280, h / 2, w, h) shouldBe null
+        DockState.regionAt(STRIPE_WIDTH + 280, h / 2, w, h) shouldBe null
     }
 
     test("a visible RIGHT region claims the strip measured from the right window edge") {
@@ -72,11 +73,12 @@ class DockHitTestTest : FunSpec({
         DockState.regionAt(w / 2, h - 160, w, h) shouldBe DockRegion.BOTTOM
         DockState.regionAt(w / 2, h - 161, w, h) shouldBe null
         // GarnetDock draws BOTTOM full-width over the LEFT/RIGHT columns (which stop at realH-bottom),
-        // so both bottom corners belong to BOTTOM.
-        DockState.regionAt(10, h - 1, w, h) shouldBe DockRegion.BOTTOM
+        // so both bottom corners belong to BOTTOM -- except the stripe's own column, which is drawn
+        // over BOTTOM too and wins first.
+        DockState.regionAt(STRIPE_WIDTH + 10, h - 1, w, h) shouldBe DockRegion.BOTTOM
         DockState.regionAt(w - 10, h - 1, w, h) shouldBe DockRegion.BOTTOM
         // Above the band the columns still own their strips.
-        DockState.regionAt(10, h - 161, w, h) shouldBe DockRegion.LEFT
+        DockState.regionAt(STRIPE_WIDTH + 10, h - 161, w, h) shouldBe DockRegion.LEFT
         DockState.regionAt(w - 10, h - 161, w, h) shouldBe DockRegion.RIGHT
     }
 
