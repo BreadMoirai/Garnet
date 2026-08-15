@@ -75,7 +75,10 @@ Construction is via `garnetSpec(id) { … }`.
   auto-fit + re-center), and the crash-safe `writeStructureAtomic`. `captureAutoFitIn` is the
   bounded-volume capture `StructureCommit` uses for auto-save, and the only capture there is — the
   region-wide `captureAutoFit`/`saveAutoFitToFile` pair was deleted once nothing in production
-  called it.
+  called it. `placeStructureCentered(file, ...)` is a thin read-then-delegate wrapper over
+  `placeStructureTagCentered(nbt, ...)`, which holds the actual centering/placement logic; the
+  split exists so a `CompoundTag` read straight out of a Local History blob can be placed without
+  spooling it to a temp file first.
 - `StructureDiff.kt` — palette-order-insensitive NBT comparison (`structuresDiffer`) used to
   decide whether a commit's captured content actually changed vs. the committed `.nbt`.
 - `StructureRegionMath.kt` — `centeredStart`/`anchorY`/`autoFit`: pure geometry for centering and
