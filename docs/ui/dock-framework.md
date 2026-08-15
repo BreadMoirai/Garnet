@@ -45,8 +45,11 @@ Each of the four `DockRegion`s (LEFT/RIGHT/BOTTOM/CENTER) holds an independent
 `SnapshotStateList<Panel>` (`DockState.leftPanels`/`rightPanels`/`bottomPanels`/`centerPanels`) plus an
 `activeTab: Int` index (read via `DockState.activeTab(region)`, written via
 `DockState.setActiveTab(region, index)`, which clamps to the region's real panel indices so a stale
-index can never point past the end — an empty region clamps to 0). `Panel(id, title, content)` is a
-plain data holder. `RegionColumn` in `GarnetDock.kt` renders the active panel's `content`, filling the
+index can never point past the end — an empty region clamps to 0). `Panel(id, title, region, icon,
+content)` is a plain data holder — `region` and `icon` (a Jewel `IconKey`) are the panel's own
+declaration of where it lives and how a future icon stripe would offer it; nothing yet reads them
+back out of the panel to route it (`leftPanels`/`rightPanels`/etc. are still populated by hand at
+each call site). `RegionColumn` in `GarnetDock.kt` renders the active panel's `content`, filling the
 region, preceded by `DockTabStrip` (`DockTabStrip.kt`) — a hand-rolled `Row`+`BasicText` strip with its
 own tap-gesture handling and hardcoded colours, deliberately Jewel-free so a Jewel tab component's
 focus-and-popup behaviour doesn't get pulled into this scene's already-subtle layer routing (see
@@ -202,7 +205,8 @@ rows. The pattern:
   [jewel-widget-layer.md](jewel-widget-layer.md#tree-state-is-jewels-not-a-custom-model) for the
   NUL-suffixed placeholder id it injects for a pending create. Keep both state objects separate
   from the `Panel` so packet handlers never touch Compose internals.
-- **`explorerPanel(): Panel`** returns the tab (`Panel("garnet.explorer", "Explorer") { … }`);
+- **`explorerPanel(): Panel`** returns the tab (`Panel("garnet.explorer", "Explorer", DockRegion.LEFT,
+  AllIconsKeys.Toolwindows.ToolWindowProject) { … }`);
   it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT starts hidden
   at that point; Shift+1/Alt+1 reveal it manually, and joining a Garnet-capable world auto-opens it
   (see "LEFT auto-opens on joining a Garnet-capable world" above).
