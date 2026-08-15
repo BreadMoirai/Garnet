@@ -98,9 +98,8 @@ private fun ProjectExplorer() {
                 // a genuinely new project re-opens it, while a user who collapses it during a session
                 // keeps it collapsed (LazyTree's prune only runs once per (tree, treeState) identity).
                 // remember(snap.root, edit): buildTreeFrom walks the WHOLE project tree recursively
-                // and allocates a fresh Tree, which LazyTree then has to re-flatten. This scope also
-                // reads ProjectTreeState.status, which changes on every S2C packet, so an
-                // un-remembered call rebuilds the entire tree on each packet. Keyed on the root so a
+                // and allocates a fresh Tree, which LazyTree then has to re-flatten, so this is kept
+                // remembered rather than recomputed every recomposition. Keyed on the root so a
                 // genuinely new snapshot still rebuilds, and on the edit so a pending create's
                 // placeholder row appears and disappears.
                 val tree = remember(snap.root, edit) {
@@ -174,8 +173,8 @@ private fun ProjectExplorer() {
                     onConfirmMove = { path, dest -> editError = ExplorerActions.commitMove(path, dest) },
                 )
             }
-            val message = editError ?: ProjectTreeState.status
-            if (message.isNotEmpty()) Text(message, Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp))
+            val message = editError
+            if (!message.isNullOrEmpty()) Text(message, Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp))
         }
     }
 }

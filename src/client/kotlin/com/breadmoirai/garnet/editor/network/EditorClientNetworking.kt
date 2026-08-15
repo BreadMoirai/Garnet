@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.editor.ui.ProjectTreeState
 import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.ui.LocalHistoryState
 import com.breadmoirai.garnet.editor.ui.OpenStructureState
+import com.breadmoirai.garnet.editor.ui.StructureInfoState
 import com.breadmoirai.garnet.editor.ui.UndoState
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
@@ -26,22 +27,22 @@ object EditorClientNetworking {
             }
         }
         ClientPlayNetworking.registerGlobalReceiver(EditorFolderLoadedS2C.TYPE) { payload, ctx ->
-            ctx.client().execute { ProjectTreeState.onFolderLoaded(payload) }
+            ctx.client().execute { StructureInfoState.onFolderLoaded(payload) }
         }
         ClientPlayNetworking.registerGlobalReceiver(EditorSaveReportS2C.TYPE) { payload, ctx ->
-            ctx.client().execute { ProjectTreeState.onSaveReport(payload) }
+            ctx.client().execute { StructureInfoState.onSaveReport(payload) }
         }
         ClientPlayNetworking.registerGlobalReceiver(EditorErrorS2C.TYPE) { payload, ctx ->
-            ctx.client().execute { ProjectTreeState.onError(payload) }
+            ctx.client().execute { StructureInfoState.onError(payload) }
         }
         ClientPlayNetworking.registerGlobalReceiver(StructureResultS2C.TYPE) { payload, ctx ->
             ctx.client().execute {
-                ProjectTreeState.onStructureResult(payload)
+                StructureInfoState.onStructureResult(payload)
                 OpenStructureState.onStructureResult(payload)
             }
         }
         ClientPlayNetworking.registerGlobalReceiver(StructureAutoSavedS2C.TYPE) { payload, ctx ->
-            ctx.client().execute { ProjectTreeState.onAutoSaved(payload) }
+            ctx.client().execute { StructureInfoState.onAutoSaved(payload) }
         }
         ClientPlayNetworking.registerGlobalReceiver(UndoStateS2C.TYPE) { payload, ctx ->
             ctx.client().execute { UndoState.onUndoState(payload) }

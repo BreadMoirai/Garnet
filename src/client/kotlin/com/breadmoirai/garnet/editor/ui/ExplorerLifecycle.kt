@@ -67,6 +67,7 @@ fun registerExplorerLifecycle() {
             // the session that produced them ends. Reset here, not in DockState.closeAll(), which
             // stays free of IDE-state and Minecraft dependencies.
             ProjectTreeState.reset()
+            StructureInfoState.reset()
             ExplorerTreeState.reset()
             UndoState.reset()
             OpenStructureState.reset()
