@@ -188,24 +188,28 @@ registrations move with them.
 object StructureInfoState {
     var subpath: String?         // null = no structure open
     var sizeX: Int; var sizeY: Int; var sizeZ: Int
-    var blockCount: Int
+    var blockCount: Int          // -1 = not known yet (placed, no auto-save report yet)
     var lastSavedMillis: Long    // 0 = never saved this session
     var status: String           // the transient line, moved wholesale
     fun reset()
 }
 ```
 
-- `StructureAutoSavedS2C` fills `subpath`, the sizes, `blockCount`, and stamps `lastSavedMillis`.
-- `StructureResultS2C` fills `subpath` and `status` (its `message`), and clears the size/block
-  fields — a newly placed structure has no auto-save report yet, and showing the previous
-  structure's dimensions under the new one's name would be a lie.
-- The three feedback receivers write only `status`.
+- `StructureAutoSavedS2C(subpath, sizeX, sizeY, sizeZ, blockCount, savedAtMillis)` fills every
+  field: the sizes, `blockCount`, and `lastSavedMillis` from the payload's own `savedAtMillis`.
+- `StructureResultS2C(subpath, sizeX, sizeY, sizeZ, message)` fills `subpath`, the sizes, and
+  `status`, and sets `blockCount = -1` and `lastSavedMillis = 0`. It carries no block count, and a
+  freshly placed structure has not been auto-saved yet — carrying the *previous* structure's block
+  count or save time under the new one's name would be a lie.
+- The three feedback receivers (`onFolderLoaded`, `onSaveReport`, `onError`) write only `status`.
 - `reset()` is called from the same disconnect path that resets `OpenStructureState`.
 
-`lastSavedMillis` is stamped **client-side at packet receipt**, not carried in the payload. This
-keeps the change to zero protocol edits; the cost is that it is receipt time rather than server
-write time, which for a local integrated server is a sub-frame difference and for a remote one is
-one network hop. If that ever matters, `StructureAutoSavedS2C` grows a timestamp field then.
+The panel omits the `Blocks` and `Saved` rows entirely while their sentinels are set, rather than
+rendering `-1` or an epoch date.
+
+**No protocol change is needed for any of this.** Both payloads already carry the sizes, and
+`StructureAutoSavedS2C` already carries `savedAtMillis` — so `lastSavedMillis` is the server's own
+write time, not a client receipt stamp.
 
 Panel body, `IntUiTheme(isDark = true)` and the shared `PANEL_BG` like the other two:
 
@@ -312,9 +316,10 @@ itself.
   nothing open, present with only BOTTOM open, present and additive with LEFT open.
 - `DockLayoutStoreTest` — new-shape round trip, legacy `leftVisible` migration in both directions,
   unknown panel id, unknown region, malformed file.
-- `StructureInfoStateTest` — each of the five receivers lands the right fields; `StructureResultS2C`
-  clears the stale size/block fields. This supersedes `StructureExplorerStatusTest`, which asserts
-  on the deleted `ProjectTreeState.status`.
+- `StructureInfoStateTest` — each of the five receivers lands the right fields; a `StructureResultS2C`
+  arriving after an auto-save resets `blockCount` to `-1` and `lastSavedMillis` to `0` while keeping
+  the new sizes. This supersedes `StructureExplorerStatusTest`, which asserts on the deleted
+  `ProjectTreeState.status`.
 
 **Migrated off the deleted API.** These already exist and touch members this spec removes; each is
 updated in place rather than rewritten:
@@ -348,8 +353,9 @@ Per `CLAUDE.md`'s keep-docs-in-sync rule:
 - `docs/ui/dock-stripe.md` — the stripe, the per-panel visibility model that replaced per-region
   visibility, why the stripe is gated on `anyActive()` and the dead end that creates, and its
   contributions to `DockInsets` and `regionAt`.
-- `docs/ui/structure-info-panel.md` — the panel, the `ProjectTreeState.status` split, why
-  `lastSavedMillis` is a client stamp, and why `editError` stayed behind in the Explorer.
+- `docs/ui/structure-info-panel.md` — the panel, the `ProjectTreeState.status` split, why a
+  `StructureResultS2C` resets the block count and save time while keeping the sizes, and why
+  `editError` stayed behind in the Explorer.
 
 **Updated:**
 
