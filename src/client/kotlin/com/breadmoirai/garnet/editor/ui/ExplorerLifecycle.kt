@@ -69,6 +69,8 @@ fun registerExplorerLifecycle() {
             ProjectTreeState.reset()
             ExplorerTreeState.reset()
             UndoState.reset()
+            OpenStructureState.reset()
+            LocalHistoryState.reset()
         }
     }
 
