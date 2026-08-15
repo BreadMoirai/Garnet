@@ -38,6 +38,9 @@ class DockLifecycleTest : StringSpec({
         DockState.isVisible(DockRegion.RIGHT) shouldBe false
         DockState.isVisible(DockRegion.BOTTOM) shouldBe false
         DockState.isVisible(DockRegion.CENTER) shouldBe false
+        // Not just closed: CENTER's panels are per-world documents, so closeAll drops them from the
+        // registry entirely. isVisible alone would still pass if they were merely closed.
+        DockState.panelsFor(DockRegion.CENTER).isEmpty() shouldBe true
         DockState.focusedRegion shouldBe null
         DockState.anyActive() shouldBe false
     }

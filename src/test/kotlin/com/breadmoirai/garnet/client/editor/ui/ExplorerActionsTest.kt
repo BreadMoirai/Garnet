@@ -15,11 +15,15 @@ import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.data.NewNodeKind
+import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.Panel
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 
 /**
  * What the Explorer's create/rename actions put on the wire. Pure: `ExplorerActions.sender` is a
@@ -40,10 +44,16 @@ class ExplorerActionsTest : FunSpec({
         currentSubpath = null,
     )
 
+    /** Registers a LEFT dock panel under [id], as `GarnetClient` does at client init. */
+    fun registerLeftPanel(id: String) {
+        DockState.panels += Panel(id, id, DockRegion.LEFT, AllIconsKeys.General.Information) {}
+    }
+
     afterTest {
         ExplorerActions.resetForTest()
         ProjectTreeState.reset()
         OpenStructureState.reset()
+        DockState.reset()
     }
 
     test("creating a folder sends CreateFolderC2S with the target parent") {
@@ -171,6 +181,33 @@ class ExplorerActionsTest : FunSpec({
         ExplorerActions.openLocalHistory("clock.nbt") shouldBe null
 
         sent.filterIsInstance<PlaceStructureC2S>().shouldBeEmpty()
+    }
+
+    test("opening local history switches the LEFT region to the Local History panel") {
+        captureSends()
+        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+        registerLeftPanel("garnet.explorer")
+        registerLeftPanel("garnet.localHistory")
+        DockState.showPanel("garnet.explorer")
+
+        ExplorerActions.openLocalHistory("clock.nbt") shouldBe null
+
+        DockState.openPanelId(DockRegion.LEFT) shouldBe "garnet.localHistory"
+    }
+
+    test("opening local history with no Local History panel registered leaves LEFT closed") {
+        // Pins the showPanel() no-op on an unknown id. The former implementation passed
+        // leftPanels.indexOfFirst { ... } -- i.e. -1 -- into setActiveTab, whose clamp turned it
+        // into index 0, so an unregistered Local History silently selected the *Explorer* tab on an
+        // already-open LEFT. showPanel does nothing at all instead.
+        captureSends()
+        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+        registerLeftPanel("garnet.explorer")
+
+        ExplorerActions.openLocalHistory("clock.nbt") shouldBe null
+
+        DockState.openPanelId(DockRegion.LEFT) shouldBe null
+        DockState.isVisible(DockRegion.LEFT) shouldBe false
     }
 
     test("local history is refused for a non-structure path") {
