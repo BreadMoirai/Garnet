@@ -86,7 +86,7 @@ class DockInputSpec : ClientSpec({
 
         runOnClient { mc ->
             DockState.reset()
-            DockState.leftPanels.add(
+            DockState.panels += (
                 Panel(
                     "garnet.test.dockinput",
                     "DockInputProbe",
@@ -134,7 +134,7 @@ class DockInputSpec : ClientSpec({
                     )
                 }
             })
-            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.showPanel("garnet.test.dockinput")
             DockState.setSize(DockRegion.LEFT, 300)
             ViewportState.active = true
             ComposeOverlay.enabled = true

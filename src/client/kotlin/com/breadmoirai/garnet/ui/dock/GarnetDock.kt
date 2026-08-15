@@ -50,28 +50,25 @@ fun GarnetDock(realW: Int, realH: Int) {
             }
         }
         // CENTER: only render a panel if one exists (else transparent → world shows).
-        if (DockState.centerPanels.isNotEmpty()) {
+        if (DockState.isVisible(DockRegion.CENTER)) {
             RegionColumn(DockRegion.CENTER, Modifier.offset(left.dp, 0.dp).width((realW - left - right).dp).height((realH - bottom).dp))
         }
     }
 }
 
-/** A region = the active panel's body, filling the region. */
+/** A region = the open panel's body, filling the region. */
 @Composable
 private fun RegionColumn(region: DockRegion, modifier: Modifier) {
-    val panels = DockState.panelsFor(region)
-    if (panels.isEmpty()) return
-    val active = DockState.activeTab(region).coerceIn(0, panels.lastIndex)
+    val panel = DockState.openPanelOf(region) ?: return
     Column(modifier.background(PANEL_BG)) {
-        DockTabStrip(region, panels, active) { DockState.setActiveTab(region, it) }
         // key(): a panel body must not be able to outlive its mount. Panel content is invoked at a
         // fixed slot, and a re-mounted panel from the same factory has the same composable source
         // key, so without this Compose reuses the group and every `remember` inside survives — most
         // visibly a Jewel Dropdown's open menu and its Popup layer, which then paints over the next
         // mount. See DockState.mountEpoch for the full mechanism. Panel id is in the key too so
-        // swapping which panel occupies a tab index is likewise a fresh mount.
+        // swapping which panel occupies a region is likewise a fresh mount.
         Box(Modifier.fillMaxSize()) {
-            key(DockState.mountEpoch(region), panels[active].id) { panels[active].content(panels[active]) }
+            key(DockState.mountEpoch(region), panel.id) { panel.content(panel) }
         }
     }
 }

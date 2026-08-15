@@ -19,8 +19,8 @@ package com.breadmoirai.garnet.ui.dock
  * 1. BOTTOM is a full-width band, drawn over where the LEFT/RIGHT columns would reach (those stop
  *    at `realH - bottom`), so it wins both bottom corners.
  * 2. LEFT, then RIGHT, own their edge strips above that band.
- * 3. CENTER owns whatever is left — but **only when it actually holds a panel**. An empty CENTER is
- *    transparent by omission and *is* the world, which is the whole point of the `null` case.
+ * 3. CENTER owns whatever is left — but **only when it actually has an open panel**. A closed CENTER
+ *    is transparent by omission and *is* the world, which is the whole point of the `null` case.
  *
  * A hidden region reserves nothing even though its size is remembered, and splitters are drawn
  * inside the reserved strips, so neither needs a special case. Points outside the window belong to
@@ -36,6 +36,6 @@ fun DockState.regionAt(x: Int, y: Int, realW: Int, realH: Int): DockRegion? {
     if (bottom > 0 && y >= realH - bottom) return DockRegion.BOTTOM
     if (left > 0 && x < left) return DockRegion.LEFT
     if (right > 0 && x >= realW - right) return DockRegion.RIGHT
-    if (centerPanels.isNotEmpty()) return DockRegion.CENTER
+    if (isVisible(DockRegion.CENTER)) return DockRegion.CENTER
     return null
 }

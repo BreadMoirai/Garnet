@@ -4,13 +4,15 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 
 /**
- * Single source of truth for the dock layout: which edge regions are visible, how big they are
- * (splitter positions), which tab is active, and which region has input focus.
+ * Single source of truth for the dock layout: which panel is open in each region (and therefore
+ * which regions are visible), how big they are (splitter positions), and which region has input
+ * focus.
  *
  * Fields are Compose **snapshot state** so [GarnetDock] recomposes when they change, yet plain
  * reads (`.value` via the getters below) are cheap and thread-safe for [ViewportState]/`WindowMixin`
@@ -38,13 +40,6 @@ object DockState {
     const val MIN_EDGE = 120
     const val MAX_EDGE = 640
 
-    var leftVisible by mutableStateOf(false)
-        private set
-    var rightVisible by mutableStateOf(false)
-        private set
-    var bottomVisible by mutableStateOf(false)
-        private set
-
     var leftWidth by mutableIntStateOf(DEFAULT_LEFT)
         private set
     var rightWidth by mutableIntStateOf(DEFAULT_RIGHT)
@@ -52,23 +47,26 @@ object DockState {
     var bottomHeight by mutableIntStateOf(DEFAULT_BOTTOM)
         private set
 
-    val leftPanels: SnapshotStateList<Panel> = mutableStateListOf()
-    val rightPanels: SnapshotStateList<Panel> = mutableStateListOf()
-    val bottomPanels: SnapshotStateList<Panel> = mutableStateListOf()
-    val centerPanels: SnapshotStateList<Panel> = mutableStateListOf()
+    /**
+     * Every registered panel, in registration order. Flat rather than four per-region lists: a panel
+     * carries its own region (see [Panel]), so [panelsFor] derives the per-region view and there is
+     * one definition of "which panels does this region have" — the one `DockStripe` renders.
+     */
+    val panels: SnapshotStateList<Panel> = mutableStateListOf()
 
-    var leftActiveTab by mutableIntStateOf(0)
-    var rightActiveTab by mutableIntStateOf(0)
-    var bottomActiveTab by mutableIntStateOf(0)
-    var centerActiveTab by mutableIntStateOf(0)
+    /**
+     * Which panel is open in each region, by id. Absence means the region is closed, so this is the
+     * single source of visibility — there is no separate `leftVisible` to disagree with it.
+     */
+    private val openPanel = mutableStateMapOf<DockRegion, String>()
 
     /** Which region currently owns keyboard/pointer focus, or null when the game does. */
     var focusedRegion by mutableStateOf<DockRegion?>(null)
 
     /**
-     * Per-region "mount epoch": bumped whenever a region is hidden or [reset], and used by
-     * [GarnetDock] as the `key()` of that region's panel body so the whole subtree is torn down and
-     * rebuilt from scratch on the next mount.
+     * Per-region "mount epoch": bumped whenever a region's open panel changes, or on [reset], and
+     * used by [GarnetDock] as the `key()` of that region's panel body so the whole subtree is torn
+     * down and rebuilt from scratch on the next mount.
      *
      * ## Why this exists (do not remove)
      * Panel content is invoked at a fixed slot position, and a re-mounted panel built by the same
@@ -93,51 +91,56 @@ object DockState {
         mountEpochs.getValue(region).intValue++
     }
 
-    fun panelsFor(region: DockRegion): SnapshotStateList<Panel> = when (region) {
-        DockRegion.LEFT -> leftPanels
-        DockRegion.RIGHT -> rightPanels
-        DockRegion.BOTTOM -> bottomPanels
-        DockRegion.CENTER -> centerPanels
+    fun panelsFor(region: DockRegion): List<Panel> = panels.filter { it.region == region }
+
+    fun panelById(id: String): Panel? = panels.firstOrNull { it.id == id }
+
+    fun openPanelId(region: DockRegion): String? = openPanel[region]
+
+    /** The open panel's body, or null when the region is closed or its id no longer resolves. */
+    fun openPanelOf(region: DockRegion): Panel? = openPanel[region]?.let { panelById(it) }
+
+    fun isVisible(region: DockRegion): Boolean = openPanelOf(region) != null
+
+    /**
+     * Show [id]'s panel, evicting whatever its region had open. A no-op when it is already the open
+     * one, so repeated calls (auto-open on join, Alt+1 held down) cost no mount-epoch churn.
+     * Unknown ids are ignored: a panel can be removed between versions while its id survives in
+     * `garnet-dock.json`.
+     */
+    fun showPanel(id: String) {
+        val panel = panelById(id) ?: return
+        if (openPanel[panel.region] == id) return
+        openPanel[panel.region] = id
+        bumpMountEpoch(panel.region)
     }
 
-    fun activeTab(region: DockRegion): Int = when (region) {
-        DockRegion.LEFT -> leftActiveTab
-        DockRegion.RIGHT -> rightActiveTab
-        DockRegion.BOTTOM -> bottomActiveTab
-        DockRegion.CENTER -> centerActiveTab
+    /** Close [region], ending its open panel's mount. Idempotent. */
+    fun closeRegion(region: DockRegion) {
+        if (openPanel.remove(region) != null) bumpMountEpoch(region)
     }
 
     /**
-     * Select which panel a region shows. Clamped to the region's real indices, so a stale index from
-     * a caller that has not seen a panel list change can never point past the end — [GarnetDock]
-     * would otherwise index out of bounds mid-composition.
+     * The stripe's click, and the keybinds': show [id], or close its region when [id] is already the
+     * open panel there. This is the whole interaction model — "click the lit icon to close" is what
+     * makes a stripe a stripe rather than a row of radio buttons.
      */
-    fun setActiveTab(region: DockRegion, index: Int) {
-        val clamped = index.coerceIn(0, (panelsFor(region).size - 1).coerceAtLeast(0))
-        when (region) {
-            DockRegion.LEFT -> leftActiveTab = clamped
-            DockRegion.RIGHT -> rightActiveTab = clamped
-            DockRegion.BOTTOM -> bottomActiveTab = clamped
-            DockRegion.CENTER -> centerActiveTab = clamped
-        }
+    fun togglePanel(id: String) {
+        val panel = panelById(id) ?: return
+        if (openPanel[panel.region] == id) closeRegion(panel.region) else showPanel(id)
     }
 
-    fun isVisible(region: DockRegion): Boolean = when (region) {
-        DockRegion.LEFT -> leftVisible
-        DockRegion.RIGHT -> rightVisible
-        DockRegion.BOTTOM -> bottomVisible
-        DockRegion.CENTER -> centerPanels.isNotEmpty()
-    }
+    /** The persistable layout: which panel is open where. */
+    fun openMap(): Map<DockRegion, String> = openPanel.toMap()
 
-    fun setVisible(region: DockRegion, visible: Boolean) {
-        // Hiding a region ends its panels' mount: bump the epoch so the next show composes fresh
-        // (see [mountEpochs] for the ghost-popup failure mode this prevents).
-        if (!visible && isVisible(region)) bumpMountEpoch(region)
-        when (region) {
-            DockRegion.LEFT -> leftVisible = visible
-            DockRegion.RIGHT -> rightVisible = visible
-            DockRegion.BOTTOM -> bottomVisible = visible
-            DockRegion.CENTER -> {}
+    /**
+     * Restore [open], ignoring entries whose id is unknown or whose panel belongs to a different
+     * region than the entry claims. Both are what a stale `garnet-dock.json` looks like after a
+     * panel is removed or moved, and neither should wedge the dock.
+     */
+    fun applyOpenMap(open: Map<DockRegion, String>) {
+        open.forEach { (region, id) ->
+            if (panelById(id)?.region == region) showPanel(id)
         }
     }
 
@@ -152,22 +155,19 @@ object DockState {
         }
     }
 
-    fun toggleVisible(region: DockRegion) = setVisible(region, !isVisible(region))
-
     /**
-     * True when the dock has something to show: any edge region visible, a center panel present,
-     * or a region focused. Drives whether the viewport shrink + Compose overlay should render
-     * (see `syncDockViewport` in `DockViewportSync.kt`) — read-only, makes no state changes itself.
+     * True when the dock has something to show: any region open, or a region focused. Drives whether
+     * the viewport shrink + Compose overlay should render (see `syncDockViewport` in
+     * `DockViewportSync.kt`) and whether `DockStripe` is drawn at all — read-only, makes no state
+     * changes itself.
      */
-    fun anyActive(): Boolean =
-        leftVisible || rightVisible || bottomVisible || centerPanels.isNotEmpty() || focusedRegion != null
+    fun anyActive(): Boolean = openPanel.isNotEmpty() || focusedRegion != null
 
-    /** Test/reset hook: clears panels, hides all edges, restores default sizes and focus. */
+    /** Test/reset hook: clears panels, closes every region, restores default sizes and focus. */
     fun reset() {
-        leftVisible = false; rightVisible = false; bottomVisible = false
+        openPanel.clear()
         leftWidth = DEFAULT_LEFT; rightWidth = DEFAULT_RIGHT; bottomHeight = DEFAULT_BOTTOM
-        leftPanels.clear(); rightPanels.clear(); bottomPanels.clear(); centerPanels.clear()
-        leftActiveTab = 0; rightActiveTab = 0; bottomActiveTab = 0; centerActiveTab = 0
+        panels.clear()
         focusedRegion = null
         // Every region's panels are gone: force a fresh composition for whatever mounts next, so no
         // popup/widget state from the previous mount can bleed through (see [mountEpochs]).
@@ -175,16 +175,15 @@ object DockState {
     }
 
     /**
-     * Ends the dock's **world session**: hides every edge region, clears the CENTER documents, and
-     * drops input focus. Called when the client disconnects (see `registerDockWorldLifecycle` in
+     * Ends the dock's **world session**: closes every region, drops the CENTER documents, and drops
+     * input focus. Called when the client disconnects (see `registerDockWorldLifecycle` in
      * `viewport/DockKeybinds.kt`).
      *
-     * Deliberately narrower than [reset]. The panel lists and splitter sizes are user *layout*, not
-     * world state — and the Project Explorer is only ever added at `onInitializeClient`, so a full
-     * [reset] here would leave LEFT permanently empty for the rest of the process. CENTER *is*
-     * cleared: its panels are per-world documents that mean nothing without the session that opened
-     * them. [setVisible] already bumps a hidden region's mount epoch; CENTER never goes through it,
-     * so its epoch is bumped here (see [mountEpochs] for the ghost-popup failure mode).
+     * Deliberately narrower than [reset]. The panel registry and splitter sizes are user *layout*,
+     * not world state — and the Explorer is only ever registered at `onInitializeClient`, so a full
+     * [reset] here would leave LEFT permanently empty for the rest of the process. CENTER panels
+     * *are* removed from the registry: they are per-world documents that mean nothing without the
+     * session that opened them.
      *
      * [focusedRegion] is cleared directly instead of via `DockInputRouter.clearFocus()`: that helper
      * re-grabs the mouse when no [net.minecraft.client.gui.screens.Screen] is open, and at disconnect
@@ -195,18 +194,11 @@ object DockState {
      * Idempotent: calling it on an already-closed dock changes nothing.
      */
     fun closeAll() {
-        setVisible(DockRegion.LEFT, false)
-        setVisible(DockRegion.RIGHT, false)
-        setVisible(DockRegion.BOTTOM, false)
-        if (centerPanels.isNotEmpty()) {
-            centerPanels.clear()
+        DockRegion.entries.forEach { closeRegion(it) }
+        if (panels.any { it.region == DockRegion.CENTER }) {
+            panels.removeAll { it.region == DockRegion.CENTER }
             bumpMountEpoch(DockRegion.CENTER)
         }
-        // Only centerActiveTab is zeroed: CENTER's panels were just cleared above, so index 0 is the
-        // only sane value. left/right/bottomActiveTab are left alone on purpose — those regions' panel
-        // lists survive closeAll() (see the class doc above), so their active-tab index still points at
-        // a real panel and resetting it would just discard the user's edge-panel tab choice for nothing.
-        centerActiveTab = 0
         focusedRegion = null
     }
 }

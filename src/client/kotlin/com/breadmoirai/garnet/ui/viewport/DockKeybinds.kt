@@ -14,14 +14,18 @@ import org.lwjgl.glfw.GLFW
 
 private const val GLFW_KEY_1 = 49
 
+private const val EXPLORER_PANEL_ID = "garnet.explorer"
+
 private val keyExplorerFocus = KeyMappingHelper.registerKeyMapping(
     KeyMapping("key.garnet.dock_explorer_focus", GLFW_KEY_1, KeyMapping.Category.MISC)
 )
 
 /**
  * Alt+1 focuses the Explorer (releases the cursor, routes input to Compose); Shift+1 toggles the
- * LEFT region's visibility (freeing/reclaiming its inset, which resizes the world). Bound to a
- * single mapping on `1`; the Alt/Shift distinction is read from live GLFW modifier state on click.
+ * **Explorer panel** — opening it, or closing LEFT when the Explorer is already what LEFT shows, or
+ * switching LEFT to the Explorer when it is showing something else (freeing/reclaiming LEFT's inset,
+ * which resizes the world). Bound to a single mapping on `1`; the Alt/Shift distinction is read from
+ * live GLFW modifier state on click.
  */
 fun registerDockKeybinds() {
     ClientTickEvents.END_CLIENT_TICK.register { mc ->
@@ -36,7 +40,7 @@ fun registerDockKeybinds() {
                 // still consumed above so presses do not stack up and fire on the next world join.
                 mc.level == null -> {}
                 shift -> {
-                    DockState.toggleVisible(DockRegion.LEFT)
+                    DockState.togglePanel(EXPLORER_PANEL_ID)
                     if (!DockState.isVisible(DockRegion.LEFT) && DockState.focusedRegion == DockRegion.LEFT) {
                         DockInputRouter.clearFocus()
                     }
@@ -49,10 +53,7 @@ fun registerDockKeybinds() {
                     // applyDockAutoOpen() — deliberately: toggling on a vanilla server still
                     // persists "what the player last chose" for the next Garnet join, which is
                     // the one place this keybind's scope and the auto-open gate's scope diverge.
-                    DockLayoutStore.save(
-                        if (DockState.isVisible(DockRegion.LEFT)) mapOf(DockRegion.LEFT to "garnet.explorer")
-                        else emptyMap(),
-                    )
+                    DockLayoutStore.save(DockState.openMap())
                     syncDockViewport()
                     (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
                 }
@@ -61,8 +62,11 @@ fun registerDockKeybinds() {
                         // Focus-only change: visibility is untouched, so nothing to persist.
                         DockInputRouter.clearFocus()
                     } else {
-                        DockState.setVisible(DockRegion.LEFT, true)
-                        DockLayoutStore.save(mapOf(DockRegion.LEFT to "garnet.explorer"))
+                        // Focus needs something to focus: open the Explorer when LEFT is empty, but
+                        // leave an already-open Local History alone — Alt+1 is "give the dock the
+                        // keyboard", not "switch panels".
+                        if (!DockState.isVisible(DockRegion.LEFT)) DockState.showPanel(EXPLORER_PANEL_ID)
+                        DockLayoutStore.save(DockState.openMap())
                         DockInputRouter.focus(DockRegion.LEFT)
                     }
                     syncDockViewport()
@@ -77,7 +81,7 @@ fun registerDockKeybinds() {
 /**
  * Opens the dock on world join and closes it when the client leaves.
  *
- * JOIN restores the remembered LEFT visibility through [applyDockAutoOpen] — gated on the peer being
+ * JOIN restores the remembered open panels through [applyDockAutoOpen] — gated on the peer being
  * a Garnet server, and deliberately visibility-only, so the game keeps input and the cursor stays
  * grabbed. See `ui/dock/DockAutoOpen.kt` for both decisions.
  *
@@ -104,7 +108,8 @@ fun registerDockWorldLifecycle() {
     ClientPlayConnectionEvents.JOIN.register { _, _, mc ->
         mc.execute {
             // Only follow up when the dock actually opened: applyDockAutoOpen returns false on a
-            // vanilla server, on a remembered-hidden dock, and when LEFT is somehow already up, and
+            // vanilla server, on a remembered-closed dock, and when every remembered panel is
+            // already the open one, and
             // a framebuffer resize for a no-op change is pure churn.
             if (applyDockAutoOpen()) {
                 syncDockViewport()

@@ -63,7 +63,7 @@ import org.jetbrains.jewel.ui.icons.AllIconsKeys
 /** Panel background, matching the IntelliJ dark tool-window colour. */
 private val PANEL_BG = Color(0xFF1E1F22)
 
-/** The Explorer tab for DockState.leftPanels. */
+/** The Explorer panel, registered in DockState.panels for the LEFT region. */
 fun explorerPanel(): Panel = Panel(
     "garnet.explorer", "Explorer", DockRegion.LEFT, AllIconsKeys.Toolwindows.ToolWindowProject,
 ) { ProjectExplorer() }

@@ -23,7 +23,7 @@ object DockAutoOpenGate {
 }
 
 /**
- * Applies the remembered LEFT visibility on world join. Returns `true` when the dock actually
+ * Applies the remembered open-panel map on world join. Returns `true` when the dock actually
  * opened, so the caller can skip [com.breadmoirai.garnet.ui.viewport.syncDockViewport] and the
  * framebuffer resize when nothing changed.
  *
@@ -38,8 +38,11 @@ fun applyDockAutoOpen(): Boolean {
     // Ask the gate before the store: on a vanilla server the answer is "no" regardless of what was
     // remembered, and there is no reason to touch the filesystem to find that out.
     if (!DockAutoOpenGate.isGarnetServer()) return false
-    if (DockLayoutStore.load()[DockRegion.LEFT] == null) return false
-    if (DockState.isVisible(DockRegion.LEFT)) return false
-    DockState.setVisible(DockRegion.LEFT, true)
-    return true
+    val stored = DockLayoutStore.load()
+    if (stored.isEmpty()) return false
+    // Nothing to do when every stored panel is already the open one — the caller skips the
+    // framebuffer churn on that answer.
+    if (stored.all { (region, id) -> DockState.openPanelId(region) == id }) return false
+    DockState.applyOpenMap(stored)
+    return DockState.anyActive()
 }

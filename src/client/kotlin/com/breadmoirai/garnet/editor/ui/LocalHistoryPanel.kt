@@ -34,7 +34,7 @@ import java.util.Locale
 /** Matches the Explorer panel's background. */
 private val PANEL_BG = Color(0xFF1E1F22)
 
-/** The Local History tab for DockState.leftPanels. */
+/** The Local History panel, registered in DockState.panels for the LEFT region. */
 fun localHistoryPanel(): Panel = Panel(
     "garnet.localHistory", "Local History", DockRegion.LEFT, AllIconsKeys.Vcs.History,
 ) { LocalHistory() }

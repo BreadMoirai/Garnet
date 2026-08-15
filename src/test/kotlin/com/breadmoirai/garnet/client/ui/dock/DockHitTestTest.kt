@@ -23,6 +23,14 @@ class DockHitTestTest : FunSpec({
 
     afterTest { DockState.reset() }
 
+    fun open(region: DockRegion) {
+        val id = "probe.${region.name}"
+        if (DockState.panelById(id) == null) {
+            DockState.panels += Panel(id, region.name, region, AllIconsKeys.General.Information) {}
+        }
+        DockState.showPanel(id)
+    }
+
     test("with nothing visible the whole window is the world") {
         DockState.reset()
         DockState.regionAt(0, 0, w, h) shouldBe null
@@ -32,7 +40,7 @@ class DockHitTestTest : FunSpec({
 
     test("a visible LEFT region claims its strip and nothing beyond it") {
         DockState.reset()
-        DockState.setVisible(DockRegion.LEFT, true)
+        open(DockRegion.LEFT)
         DockState.setSize(DockRegion.LEFT, 280)
 
         DockState.regionAt(0, 0, w, h) shouldBe DockRegion.LEFT
@@ -43,7 +51,7 @@ class DockHitTestTest : FunSpec({
 
     test("a visible RIGHT region claims the strip measured from the right window edge") {
         DockState.reset()
-        DockState.setVisible(DockRegion.RIGHT, true)
+        open(DockRegion.RIGHT)
         DockState.setSize(DockRegion.RIGHT, 220)
 
         DockState.regionAt(w - 1, h / 2, w, h) shouldBe DockRegion.RIGHT
@@ -53,11 +61,11 @@ class DockHitTestTest : FunSpec({
 
     test("a visible BOTTOM region claims the full-width band and wins the corner overlap") {
         DockState.reset()
-        DockState.setVisible(DockRegion.BOTTOM, true)
+        open(DockRegion.BOTTOM)
         DockState.setSize(DockRegion.BOTTOM, 160)
-        DockState.setVisible(DockRegion.LEFT, true)
+        open(DockRegion.LEFT)
         DockState.setSize(DockRegion.LEFT, 280)
-        DockState.setVisible(DockRegion.RIGHT, true)
+        open(DockRegion.RIGHT)
         DockState.setSize(DockRegion.RIGHT, 220)
 
         DockState.regionAt(w / 2, h - 1, w, h) shouldBe DockRegion.BOTTOM
@@ -83,15 +91,13 @@ class DockHitTestTest : FunSpec({
 
     test("CENTER owns the middle only while it holds a panel") {
         DockState.reset()
-        DockState.setVisible(DockRegion.LEFT, true)
+        open(DockRegion.LEFT)
         DockState.setSize(DockRegion.LEFT, 280)
 
         // Empty CENTER is transparent by omission: the middle IS the world.
         DockState.regionAt(w / 2, h / 2, w, h) shouldBe null
 
-        DockState.centerPanels.add(
-            Panel("garnet.test.center", "CenterProbe", DockRegion.CENTER, AllIconsKeys.General.Information) {},
-        )
+        open(DockRegion.CENTER)
         DockState.regionAt(w / 2, h / 2, w, h) shouldBe DockRegion.CENTER
         // An occupying CENTER does not steal the edge strips.
         DockState.regionAt(10, h / 2, w, h) shouldBe DockRegion.LEFT
@@ -99,7 +105,7 @@ class DockHitTestTest : FunSpec({
 
     test("coordinates outside the window belong to no region") {
         DockState.reset()
-        DockState.setVisible(DockRegion.LEFT, true)
+        open(DockRegion.LEFT)
         DockState.regionAt(-1, 10, w, h) shouldBe null
         DockState.regionAt(10, -1, w, h) shouldBe null
         DockState.regionAt(w, 10, w, h) shouldBe null

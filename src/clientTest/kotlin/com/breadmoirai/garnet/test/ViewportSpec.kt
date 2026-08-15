@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.core.async.onServer
 import com.breadmoirai.garnet.harness.ClientSpec
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
 import io.kotest.matchers.booleans.shouldBeFalse
@@ -11,6 +12,7 @@ import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import net.minecraft.client.MouseHandler
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.Relative
@@ -155,7 +157,10 @@ class ViewportSpec : ClientSpec({
         // composite proof (needs a reserved edge).
         runOnClient { mc ->
             DockState.reset()
-            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.panels += Panel(
+                "garnet.test.viewport", "ViewportProbe", DockRegion.LEFT, AllIconsKeys.General.Information,
+            ) {}
+            DockState.showPanel("garnet.test.viewport")
             DockState.setSize(DockRegion.LEFT, 300)
             ViewportState.active = true
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)

@@ -11,7 +11,6 @@ import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.data.NewNodeKind
 import com.breadmoirai.garnet.editor.data.EditorNames
 import com.breadmoirai.garnet.editor.data.resolve
-import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -108,7 +107,7 @@ object ExplorerActions {
     fun openLocalHistory(path: String): String? {
         if (!path.endsWith(".nbt")) return "local history is only available for structures"
         if (OpenStructureState.subpath != path) sender(PlaceStructureC2S(path))
-        DockState.setActiveTab(DockRegion.LEFT, DockState.leftPanels.indexOfFirst { it.id == "garnet.localHistory" })
+        DockState.showPanel("garnet.localHistory")
         return null
     }
 

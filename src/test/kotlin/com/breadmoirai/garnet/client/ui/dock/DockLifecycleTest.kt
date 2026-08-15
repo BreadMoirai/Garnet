@@ -13,17 +13,20 @@ import org.jetbrains.jewel.ui.icons.AllIconsKeys
  */
 class DockLifecycleTest : StringSpec({
 
+    fun open(region: DockRegion) {
+        val id = "probe.${region.name}"
+        if (DockState.panelById(id) == null) {
+            DockState.panels += Panel(id, region.name, region, AllIconsKeys.General.Information) {}
+        }
+        DockState.showPanel(id)
+    }
+
     fun seedOpenDock() {
         DockState.reset()
-        DockState.leftPanels.add(
-            Panel("test.left", "Left", DockRegion.LEFT, AllIconsKeys.General.Information) {},
-        )
-        DockState.centerPanels.add(
-            Panel("test.center", "Center", DockRegion.CENTER, AllIconsKeys.General.Information) {},
-        )
-        DockState.setVisible(DockRegion.LEFT, true)
-        DockState.setVisible(DockRegion.RIGHT, true)
-        DockState.setVisible(DockRegion.BOTTOM, true)
+        open(DockRegion.LEFT)
+        open(DockRegion.RIGHT)
+        open(DockRegion.BOTTOM)
+        open(DockRegion.CENTER)
         DockState.setSize(DockRegion.LEFT, 320)
         DockState.focusedRegion = DockRegion.LEFT
     }
@@ -34,8 +37,7 @@ class DockLifecycleTest : StringSpec({
         DockState.isVisible(DockRegion.LEFT) shouldBe false
         DockState.isVisible(DockRegion.RIGHT) shouldBe false
         DockState.isVisible(DockRegion.BOTTOM) shouldBe false
-        DockState.centerPanels.isEmpty() shouldBe true
-        DockState.centerActiveTab shouldBe 0
+        DockState.isVisible(DockRegion.CENTER) shouldBe false
         DockState.focusedRegion shouldBe null
         DockState.anyActive() shouldBe false
     }
@@ -44,8 +46,8 @@ class DockLifecycleTest : StringSpec({
         seedOpenDock()
         DockState.closeAll()
         DockState.leftWidth shouldBe 320
-        DockState.leftPanels.size shouldBe 1
-        DockState.leftPanels[0].id shouldBe "test.left"
+        DockState.panelsFor(DockRegion.LEFT).size shouldBe 1
+        DockState.panelsFor(DockRegion.LEFT)[0].id shouldBe "probe.LEFT"
     }
 
     "closeAll bumps the mount epoch of every region it tore down" {

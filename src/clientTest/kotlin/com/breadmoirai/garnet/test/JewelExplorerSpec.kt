@@ -41,8 +41,8 @@ import kotlin.math.abs
  * (that spec is gone; its only remaining job was proving THIS panel's captures start out menu-free,
  * so it belongs here rather than in a standalone file). Steps 7 and 8 are two distinct teardown paths
  * for the same kebab-menu-survives-a-remount regression -- panel unmount/remount vs. LEFT region
- * hidden/shown -- and both stay, because DockState.reset() (used by unmount) and the setVisible(false)
- * epoch bump (used by hide/show) are different code paths that could each reintroduce the leak
+ * closed/reopened -- and both stay, because DockState.reset() (used by unmount) and the closeRegion()
+ * epoch bump (used by close/reopen) are different code paths that could each reintroduce the leak
  * independently.
  */
 class JewelExplorerSpec : ClientSpec({
@@ -93,8 +93,8 @@ class JewelExplorerSpec : ClientSpec({
             DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
             ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(root = tree, currentSubpath = "adders/full-adder"))
             ExplorerTreeState.toggleExpanded("adders")
-            DockState.leftPanels.add(explorerPanel())
-            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.panels += explorerPanel()
+            DockState.showPanel("garnet.explorer")
             DockState.setSize(DockRegion.LEFT, width)
             ViewportState.active = true
             ComposeOverlay.enabled = true
@@ -222,7 +222,7 @@ class JewelExplorerSpec : ClientSpec({
         // 8. reopen the kebab, then hide and re-show the LEFT region -- assert it did not survive.
         // The in-game path for the same defect: the keybind hides the region (it does NOT reset
         // DockState), syncDockViewport stops the overlay, and showing it again must not bring the menu
-        // back. Exercises the setVisible(false) epoch bump specifically, which DockState.reset() (used
+        // back. Exercises the closeRegion() epoch bump specifically, which DockState.reset() (used
         // by step 7) would otherwise mask -- a different code path that could reintroduce the leak on
         // its own. Focus is re-requested again: mountExplorer() reset DockState above.
         runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
@@ -232,13 +232,13 @@ class JewelExplorerSpec : ClientSpec({
 
         runOnClient { mc ->
             DockInputRouter.clearFocus()
-            DockState.setVisible(DockRegion.LEFT, false)
+            DockState.closeRegion(DockRegion.LEFT)
             ComposeOverlay.enabled = false; ViewportState.active = false
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
         waitClientTicks(6)
         runOnClient { mc ->
-            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.showPanel("garnet.explorer")
             ViewportState.active = true; ComposeOverlay.enabled = true
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
         }
@@ -256,22 +256,21 @@ class JewelExplorerSpec : ClientSpec({
         closeClientScreen(); waitClientTicks(2)
         runOnClient { OpenStructureState.reset(); LocalHistoryState.reset() }
         mountExplorer()
-        // A second LEFT panel: this is also what makes DockTabStrip render at all (it returns early
-        // below two panels), so the strip is part of what is being captured here.
+        // A second LEFT panel, so the region has something to switch to.
         runOnClient {
-            DockState.leftPanels.add(localHistoryPanel())
-            DockState.setActiveTab(DockRegion.LEFT, 0)
+            DockState.panels += localHistoryPanel()
+            DockState.showPanel("garnet.explorer")
         }
         waitClientTicks(12)
         val explorerShot = capture("local_history_tab_explorer.png")
         ComposeSurface.disabled.shouldBeFalse()
 
-        runOnClient { DockState.setActiveTab(DockRegion.LEFT, 1) }
+        runOnClient { DockState.showPanel("garnet.localHistory") }
         waitClientTicks(12)
         val historyShot = capture("local_history_tab_history.png")
-        onClient { DockState.activeTab(DockRegion.LEFT) } shouldBe 1
+        onClient { DockState.openPanelId(DockRegion.LEFT) } shouldBe "garnet.localHistory"
 
-        // Asserted by pixel diff, not by state flags: setActiveTab reads back cleanly the instant it
+        // Asserted by pixel diff, not by state flags: showPanel reads back cleanly the instant it
         // is called, while a stale composition can still be the thing on screen -- exactly the
         // ghost-panel failure DockState.mountEpoch exists to prevent. The Explorer's tree fills this
         // region with glyphs; Local History with no structure open paints a single line, so the two

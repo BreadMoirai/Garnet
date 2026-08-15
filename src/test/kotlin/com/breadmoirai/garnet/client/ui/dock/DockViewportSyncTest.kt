@@ -3,6 +3,7 @@ package com.breadmoirai.garnet.client.ui.dock
 import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.ui.input.glfwMouseButtonToPointerButton
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.syncDockViewport
@@ -11,6 +12,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.lwjgl.glfw.GLFW
 
 /**
@@ -50,13 +52,16 @@ class DockViewportSyncTest : FunSpec({
         ComposeOverlay.enabled.shouldBeFalse()
 
         // LEFT becomes visible: both flags flip on.
-        DockState.setVisible(DockRegion.LEFT, true)
+        DockState.panels += Panel(
+            "probe.LEFT", "LEFT", DockRegion.LEFT, AllIconsKeys.General.Information,
+        ) {}
+        DockState.showPanel("probe.LEFT")
         syncDockViewport()
         ViewportState.active.shouldBeTrue()
         ComposeOverlay.enabled.shouldBeTrue()
 
         // LEFT hidden again: both flags revert to vanilla.
-        DockState.setVisible(DockRegion.LEFT, false)
+        DockState.closeRegion(DockRegion.LEFT)
         syncDockViewport()
         ViewportState.active.shouldBeFalse()
         ComposeOverlay.enabled.shouldBeFalse()

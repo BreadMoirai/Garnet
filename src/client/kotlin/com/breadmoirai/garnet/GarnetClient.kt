@@ -2,7 +2,10 @@ package com.breadmoirai.garnet
 
 import com.breadmoirai.garnet.config.ModConfig
 import com.breadmoirai.garnet.editor.network.EditorClientNetworking
+import com.breadmoirai.garnet.editor.ui.explorerPanel
+import com.breadmoirai.garnet.editor.ui.localHistoryPanel
 import com.breadmoirai.garnet.editor.ui.registerExplorerLifecycle
+import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.viewport.registerCursorFocusToggle
 import com.breadmoirai.garnet.ui.viewport.registerDockKeybinds
 import com.breadmoirai.garnet.ui.viewport.registerDockWorldLifecycle
@@ -23,14 +26,11 @@ class GarnetClient : ClientModInitializer {
         registerDockKeybinds()
         registerDockWorldLifecycle()
         registerExplorerLifecycle()
-        // Seed the Project Explorer into the LEFT dock. The region starts hidden; joining a Garnet
-        // world reveals it (see applyDockAutoOpen), and Shift+1 toggles it by hand.
-        com.breadmoirai.garnet.ui.dock.DockState.leftPanels
-            .add(com.breadmoirai.garnet.editor.ui.explorerPanel())
-        // Local History sits beside it as a second LEFT tab; two panels is what makes DockTabStrip
-        // render at all, so this is also what surfaces the strip in-game.
-        com.breadmoirai.garnet.ui.dock.DockState.leftPanels
-            .add(com.breadmoirai.garnet.editor.ui.localHistoryPanel())
+        // Seed the LEFT dock panels. The region starts closed; joining a Garnet world opens the
+        // remembered one (see applyDockAutoOpen), the stripe icons switch between them, and Shift+1
+        // toggles the Explorer by hand.
+        DockState.panels += explorerPanel()
+        DockState.panels += localHistoryPanel()
         LOGGER.debug("[GarnetClient#onInitializeClient] client initialization complete")
     }
 }

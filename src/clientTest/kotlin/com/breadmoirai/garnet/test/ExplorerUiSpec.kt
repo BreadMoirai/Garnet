@@ -70,8 +70,8 @@ class ExplorerUiSpec : ClientSpec({
                 FolderNode("myproject", listOf(FolderNode("redstone", listOf(FileNode("clock.nbt", "nbt"))))),
                 null,
             ))
-            DockState.leftPanels.add(explorerPanel())
-            DockState.setVisible(DockRegion.LEFT, true)
+            DockState.panels += explorerPanel()
+            DockState.showPanel("garnet.explorer")
             DockState.setSize(DockRegion.LEFT, 320)
             ViewportState.active = true
             ComposeOverlay.enabled = true

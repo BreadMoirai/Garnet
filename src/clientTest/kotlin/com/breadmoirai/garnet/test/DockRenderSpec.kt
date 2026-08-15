@@ -37,22 +37,18 @@ class DockRenderSpec : ClientSpec({
 
         runOnClient { mc ->
             DockState.reset()
-            DockState.leftPanels.add(
-                Panel("demo.left", "Left", DockRegion.LEFT, AllIconsKeys.General.Information) { p ->
-                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF1B2433))) {
-                        BasicText("LEFT PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
-                    }
-                },
-            )
-            DockState.bottomPanels.add(
-                Panel("demo.bottom", "Bottom", DockRegion.BOTTOM, AllIconsKeys.General.Information) { p ->
-                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF243044))) {
-                        BasicText("BOTTOM PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
-                    }
-                },
-            )
-            DockState.setVisible(DockRegion.LEFT, true)
-            DockState.setVisible(DockRegion.BOTTOM, true)
+            DockState.panels += Panel("demo.left", "Left", DockRegion.LEFT, AllIconsKeys.General.Information) { p ->
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF1B2433))) {
+                    BasicText("LEFT PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
+                }
+            }
+            DockState.panels += Panel("demo.bottom", "Bottom", DockRegion.BOTTOM, AllIconsKeys.General.Information) { p ->
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF243044))) {
+                    BasicText("BOTTOM PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
+                }
+            }
+            DockState.showPanel("demo.left")
+            DockState.showPanel("demo.bottom")
             ViewportState.active = true
             ComposeOverlay.enabled = true
             (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
