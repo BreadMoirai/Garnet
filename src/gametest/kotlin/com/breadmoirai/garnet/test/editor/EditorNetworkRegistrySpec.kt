@@ -19,7 +19,11 @@ import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
+import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
+import com.breadmoirai.garnet.editor.network.RevisionEntry
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
+import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
+import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
@@ -550,5 +554,36 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                 histDir.toFile().deleteRecursively()
             }
         }
+    }
+
+    // Same probe as the init test above: PayloadTypeRegistry.register() throws
+    // IllegalArgumentException when the type id is already present, so a throw proves
+    // EditorNetworkRegistry.register() already claimed it at mod init. Calling
+    // EditorNetworkRegistry.register() outright instead would re-register EVERY payload and blow up
+    // on the first one it reaches, which says nothing about these three.
+    test("the local-history payloads are registered at init") {
+        shouldThrow<IllegalArgumentException> {
+            PayloadTypeRegistry.serverboundPlay()
+                .register(WatchStructureHistoryC2S.TYPE, WatchStructureHistoryC2S.STREAM_CODEC)
+        }
+        shouldThrow<IllegalArgumentException> {
+            PayloadTypeRegistry.serverboundPlay()
+                .register(RestoreRevisionC2S.TYPE, RestoreRevisionC2S.STREAM_CODEC)
+        }
+        shouldThrow<IllegalArgumentException> {
+            PayloadTypeRegistry.clientboundPlay()
+                .register(StructureHistoryS2C.TYPE, StructureHistoryS2C.STREAM_CODEC)
+        }
+    }
+
+    test("a StructureHistoryS2C round-trips its revision list") {
+        val payload = StructureHistoryS2C("clock.nbt", listOf(
+            RevisionEntry(1_000L, 1, 2, 3, 4, "autosave"),
+            RevisionEntry(2_000L, 5, 6, 7, 8, "restore"),
+        ))
+        val buf = io.netty.buffer.Unpooled.buffer()
+        StructureHistoryS2C.STREAM_CODEC.encode(buf, payload)
+
+        StructureHistoryS2C.STREAM_CODEC.decode(buf) shouldBe payload
     }
 })
