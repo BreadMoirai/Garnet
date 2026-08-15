@@ -65,7 +65,7 @@ private fun LocalHistory() {
             }
             when {
                 open == null ->
-                    Text("(no structure open — place one from the Explorer)")
+                    Text("(no structure open - place one from the Explorer)")
                 !SharedSettings.localHistoryEnabled ->
                     // Distinct from an empty list, which would claim this structure has no history.
                     Text("(local history is disabled in settings)")
