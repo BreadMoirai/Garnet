@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -36,16 +37,20 @@ class DockRenderSpec : ClientSpec({
 
         runOnClient { mc ->
             DockState.reset()
-            DockState.leftPanels.add(Panel("demo.left", "Left") { p ->
-                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF1B2433))) {
-                    BasicText("LEFT PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
-                }
-            })
-            DockState.bottomPanels.add(Panel("demo.bottom", "Bottom") { p ->
-                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF243044))) {
-                    BasicText("BOTTOM PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
-                }
-            })
+            DockState.leftPanels.add(
+                Panel("demo.left", "Left", DockRegion.LEFT, AllIconsKeys.General.Information) { p ->
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF1B2433))) {
+                        BasicText("LEFT PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
+                    }
+                },
+            )
+            DockState.bottomPanels.add(
+                Panel("demo.bottom", "Bottom", DockRegion.BOTTOM, AllIconsKeys.General.Information) { p ->
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Color(0xFF243044))) {
+                        BasicText("BOTTOM PANEL", style = androidx.compose.ui.text.TextStyle(color = Color(0xFFFFFFFF)))
+                    }
+                },
+            )
             DockState.setVisible(DockRegion.LEFT, true)
             DockState.setVisible(DockRegion.BOTTOM, true)
             ViewportState.active = true

@@ -6,6 +6,7 @@ import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.ui.dock.regionAt
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 
 /**
  * The dock's pointer hit test: which region (if any) owns a window coordinate. `null` means the bare
@@ -88,7 +89,9 @@ class DockHitTestTest : FunSpec({
         // Empty CENTER is transparent by omission: the middle IS the world.
         DockState.regionAt(w / 2, h / 2, w, h) shouldBe null
 
-        DockState.centerPanels.add(Panel("garnet.test.center", "CenterProbe") {})
+        DockState.centerPanels.add(
+            Panel("garnet.test.center", "CenterProbe", DockRegion.CENTER, AllIconsKeys.General.Information) {},
+        )
         DockState.regionAt(w / 2, h / 2, w, h) shouldBe DockRegion.CENTER
         // An occupying CENTER does not steal the edge strips.
         DockState.regionAt(10, h / 2, w, h) shouldBe DockRegion.LEFT

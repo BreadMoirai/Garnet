@@ -5,6 +5,7 @@ import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.Panel
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 
 /**
  * World-session teardown of the dock. `closeAll()` touches only snapshot state and never calls into
@@ -14,8 +15,12 @@ class DockLifecycleTest : StringSpec({
 
     fun seedOpenDock() {
         DockState.reset()
-        DockState.leftPanels.add(Panel("test.left", "Left") {})
-        DockState.centerPanels.add(Panel("test.center", "Center") {})
+        DockState.leftPanels.add(
+            Panel("test.left", "Left", DockRegion.LEFT, AllIconsKeys.General.Information) {},
+        )
+        DockState.centerPanels.add(
+            Panel("test.center", "Center", DockRegion.CENTER, AllIconsKeys.General.Information) {},
+        )
         DockState.setVisible(DockRegion.LEFT, true)
         DockState.setVisible(DockRegion.RIGHT, true)
         DockState.setVisible(DockRegion.BOTTOM, true)

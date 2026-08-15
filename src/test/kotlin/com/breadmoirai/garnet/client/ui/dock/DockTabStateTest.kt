@@ -5,14 +5,15 @@ import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.Panel
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 
 class DockTabStateTest : FunSpec({
 
     afterTest { DockState.reset() }
 
     fun seedTwoLeftPanels() {
-        DockState.leftPanels += Panel("a", "Explorer") { }
-        DockState.leftPanels += Panel("b", "Local History") { }
+        DockState.leftPanels += Panel("a", "Explorer", DockRegion.LEFT, AllIconsKeys.General.Information) { }
+        DockState.leftPanels += Panel("b", "Local History", DockRegion.LEFT, AllIconsKeys.General.Information) { }
     }
 
     test("setActiveTab selects a panel by index") {

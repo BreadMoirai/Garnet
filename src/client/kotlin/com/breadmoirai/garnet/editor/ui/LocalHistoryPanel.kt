@@ -20,11 +20,13 @@ import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
 import com.breadmoirai.garnet.editor.network.RevisionEntry
 import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
+import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.Panel
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,7 +35,9 @@ import java.util.Locale
 private val PANEL_BG = Color(0xFF1E1F22)
 
 /** The Local History tab for DockState.leftPanels. */
-fun localHistoryPanel(): Panel = Panel("garnet.localHistory", "Local History") { LocalHistory() }
+fun localHistoryPanel(): Panel = Panel(
+    "garnet.localHistory", "Local History", DockRegion.LEFT, AllIconsKeys.Vcs.History,
+) { LocalHistory() }
 
 /**
  * The Local History panel body.

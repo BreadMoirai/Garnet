@@ -40,6 +40,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.breadmoirai.garnet.ui.compose.GarnetTextField
+import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.editor.network.LoadEditorFolderC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
@@ -63,7 +64,9 @@ import org.jetbrains.jewel.ui.icons.AllIconsKeys
 private val PANEL_BG = Color(0xFF1E1F22)
 
 /** The Explorer tab for DockState.leftPanels. */
-fun explorerPanel(): Panel = Panel("garnet.explorer", "Explorer") { ProjectExplorer() }
+fun explorerPanel(): Panel = Panel(
+    "garnet.explorer", "Explorer", DockRegion.LEFT, AllIconsKeys.Toolwindows.ToolWindowProject,
+) { ProjectExplorer() }
 
 @Composable
 private fun ProjectExplorer() {

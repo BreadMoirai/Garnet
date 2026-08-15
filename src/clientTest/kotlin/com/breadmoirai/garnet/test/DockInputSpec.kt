@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import io.kotest.matchers.shouldBe
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.lwjgl.glfw.GLFW
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -85,7 +86,13 @@ class DockInputSpec : ClientSpec({
 
         runOnClient { mc ->
             DockState.reset()
-            DockState.leftPanels.add(Panel("garnet.test.dockinput", "DockInputProbe") {
+            DockState.leftPanels.add(
+                Panel(
+                    "garnet.test.dockinput",
+                    "DockInputProbe",
+                    DockRegion.LEFT,
+                    AllIconsKeys.General.Information,
+                ) {
                 var value by remember { mutableStateOf(TextFieldValue("")) }
                 Box(
                     Modifier.fillMaxSize()
