@@ -59,6 +59,10 @@ object LocalHistoryStore {
      *  Unlike every other reason, this one is written for ANY file type — `.spec.kts` included —
      *  via [writeRawRevision]. See docs/persistence/editor-undo-stack.md. */
     const val REASON_PRE_DELETE = "pre-delete"
+    /** The content re-placed by a Local History restore, banked by the commit that follows it.
+     *  Written through the normal [StructureCommit] path, so unlike [REASON_PLACED] it carries a
+     *  real block count. See docs/persistence/local-history.md. */
+    const val REASON_RESTORE = "restore"
 
     /** `<instance>/.garnet/local-history`, or [SharedSettings.localHistoryDir] when set. */
     fun historyRoot(): Path {

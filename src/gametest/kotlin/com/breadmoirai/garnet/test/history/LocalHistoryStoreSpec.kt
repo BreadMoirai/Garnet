@@ -383,4 +383,22 @@ class LocalHistoryStoreSpec : GarnetTestSpec({
             rev.blockCount shouldBe 0
         }
     }
+
+    test("a restore revision round-trips its reason") {
+        withHistoryDir { dir ->
+            val file = dir.resolve("clock.nbt")
+            val tag = CompoundTag()
+            tag.putString("marker", "restored")
+
+            LocalHistoryStore.writeRevision(
+                file, tag, 1, 2, 3, blockCount = 7, reason = LocalHistoryStore.REASON_RESTORE,
+            ).shouldNotBeNull()
+
+            val revisions = LocalHistoryStore.revisions(file)
+            revisions shouldHaveSize 1
+            revisions.last().reason shouldBe "restore"
+            revisions.last().blockCount shouldBe 7
+            LocalHistoryStore.readTag(file, revisions.last())!!.getStringOr("marker", "") shouldBe "restored"
+        }
+    }
 })
