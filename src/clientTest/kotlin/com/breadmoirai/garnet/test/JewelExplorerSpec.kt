@@ -1,8 +1,11 @@
 package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.ui.LocalHistoryState
+import com.breadmoirai.garnet.editor.ui.OpenStructureState
 import com.breadmoirai.garnet.editor.ui.ProjectTreeState
 import com.breadmoirai.garnet.editor.ui.explorerPanel
+import com.breadmoirai.garnet.editor.ui.localHistoryPanel
 import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.ui.dock.DockRegion
@@ -22,6 +25,8 @@ import io.kotest.matchers.shouldBe
 import org.lwjgl.glfw.GLFW
 import java.nio.file.Files
 import java.nio.file.Path
+import javax.imageio.ImageIO
+import kotlin.math.abs
 
 /**
  * Verification gate for the Jewel migration, consolidated into one continuous mount. The assertions
@@ -247,4 +252,62 @@ class JewelExplorerSpec : ClientSpec({
         ComposeSurface.disabled.shouldBeFalse()
     }
 
+    test("switching to the Local History tab actually swaps what the LEFT region paints") {
+        closeClientScreen(); waitClientTicks(2)
+        runOnClient { OpenStructureState.reset(); LocalHistoryState.reset() }
+        mountExplorer()
+        // A second LEFT panel: this is also what makes DockTabStrip render at all (it returns early
+        // below two panels), so the strip is part of what is being captured here.
+        runOnClient {
+            DockState.leftPanels.add(localHistoryPanel())
+            DockState.setActiveTab(DockRegion.LEFT, 0)
+        }
+        waitClientTicks(12)
+        val explorerShot = capture("local_history_tab_explorer.png")
+        ComposeSurface.disabled.shouldBeFalse()
+
+        runOnClient { DockState.setActiveTab(DockRegion.LEFT, 1) }
+        waitClientTicks(12)
+        val historyShot = capture("local_history_tab_history.png")
+        onClient { DockState.activeTab(DockRegion.LEFT) } shouldBe 1
+
+        // Asserted by pixel diff, not by state flags: setActiveTab reads back cleanly the instant it
+        // is called, while a stale composition can still be the thing on screen -- exactly the
+        // ghost-panel failure DockState.mountEpoch exists to prevent. The Explorer's tree fills this
+        // region with glyphs; Local History with no structure open paints a single line, so the two
+        // frames must differ across most of the body.
+        val changed = bodyDiffCount(explorerShot, historyShot)
+        println("[jewel] local-history tab probe: changed=$changed/${BODY_SAMPLES}")
+        changed shouldBeGreaterThan 50
+        ComposeSurface.disabled.shouldBeFalse()
+
+        unmount()
+        ComposeSurface.disabled.shouldBeFalse()
+    }
+
 })
+
+private val BODY_XS = 4..300 step 6
+private val BODY_YS = 30..200 step 6
+private val BODY_SAMPLES = BODY_XS.count() * BODY_YS.count()
+
+/**
+ * Samples differing between two captures over the LEFT panel body.
+ *
+ * Deliberately a capture-to-capture diff rather than PanelPixelProbe's diff-from-background count:
+ * "differs from the panel fill" is a property both tabs have (each paints text over the same fill),
+ * so only comparing the two frames to each other can show that the painted content CHANGED.
+ */
+private fun bodyDiffCount(a: Path, b: Path, tolerance: Int = 20): Int {
+    val ia = ImageIO.read(PanelPixelProbe.awaitDecodable(a).toFile())
+    val ib = ImageIO.read(PanelPixelProbe.awaitDecodable(b).toFile())
+    return BODY_YS.sumOf { y ->
+        BODY_XS.count { x ->
+            val pa = ia.getRGB(x, y)
+            val pb = ib.getRGB(x, y)
+            abs(((pa shr 16) and 0xFF) - ((pb shr 16) and 0xFF)) +
+                abs(((pa shr 8) and 0xFF) - ((pb shr 8) and 0xFF)) +
+                abs((pa and 0xFF) - (pb and 0xFF)) > tolerance
+        }
+    }
+}
