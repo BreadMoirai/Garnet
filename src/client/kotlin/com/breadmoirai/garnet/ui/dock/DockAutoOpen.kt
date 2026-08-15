@@ -38,7 +38,7 @@ fun applyDockAutoOpen(): Boolean {
     // Ask the gate before the store: on a vanilla server the answer is "no" regardless of what was
     // remembered, and there is no reason to touch the filesystem to find that out.
     if (!DockAutoOpenGate.isGarnetServer()) return false
-    if (!DockLayoutStore.load()) return false
+    if (DockLayoutStore.load()[DockRegion.LEFT] == null) return false
     if (DockState.isVisible(DockRegion.LEFT)) return false
     DockState.setVisible(DockRegion.LEFT, true)
     return true

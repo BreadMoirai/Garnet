@@ -49,7 +49,10 @@ fun registerDockKeybinds() {
                     // applyDockAutoOpen() — deliberately: toggling on a vanilla server still
                     // persists "what the player last chose" for the next Garnet join, which is
                     // the one place this keybind's scope and the auto-open gate's scope diverge.
-                    DockLayoutStore.save(DockState.isVisible(DockRegion.LEFT))
+                    DockLayoutStore.save(
+                        if (DockState.isVisible(DockRegion.LEFT)) mapOf(DockRegion.LEFT to "garnet.explorer")
+                        else emptyMap(),
+                    )
                     syncDockViewport()
                     (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
                 }
@@ -59,7 +62,7 @@ fun registerDockKeybinds() {
                         DockInputRouter.clearFocus()
                     } else {
                         DockState.setVisible(DockRegion.LEFT, true)
-                        DockLayoutStore.save(true)
+                        DockLayoutStore.save(mapOf(DockRegion.LEFT to "garnet.explorer"))
                         DockInputRouter.focus(DockRegion.LEFT)
                     }
                     syncDockViewport()
