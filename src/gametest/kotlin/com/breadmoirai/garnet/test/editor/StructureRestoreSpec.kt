@@ -1,12 +1,20 @@
 package com.breadmoirai.garnet.test.editor
 
+import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.history.RestoreOutcome
 import com.breadmoirai.garnet.editor.history.StructureRestoreOps
+import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
+import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
+import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
+import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
+import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
@@ -14,18 +22,24 @@ import com.breadmoirai.garnet.history.Revision
 import com.breadmoirai.garnet.structure.PlacedBox
 import com.breadmoirai.garnet.structure.StructurePersistence
 import com.breadmoirai.garnet.structure.structuresDiffer
+import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.withEditorServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import net.fabricmc.fabric.impl.networking.AbstractChanneledNetworkAddon
+import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.level.block.Block
@@ -45,6 +59,30 @@ class StructureRestoreSpec : GarnetTestSpec({
         // StructureAutoSave has no `markDirty(subpath, box)`; the watcher marks per-position via
         // `onEdit(subpath, pos, tick)`, which grows the dirty box itself.
         StructureAutoSave.of(server).onEdit(subpath, box.origin, server.overworld().gameTime)
+    }
+
+    /**
+     * Make [type] *sendable* to a mock player, i.e. make `ServerPlayNetworking.canSend` true for it.
+     *
+     * `HistoryWatchers.pushTo` guards its send with `canSend` because the commit fan-out is
+     * unsolicited (an unknown play-phase payload can disconnect a vanilla client on a dedicated
+     * server). A real client makes the server's `canSend` true by registering its channels during
+     * the CONFIGURATION phase; `makeMockServerPlayer` fabricates a play-phase connection directly
+     * and never goes through configuration, so its addon's sendable-channel set is EMPTY and every
+     * guarded send is silently dropped. Without this, the push tests below assert on packets that
+     * the guard — correctly, by production rules — never emitted.
+     *
+     * Fabric exposes no public "pretend this client registered X" hook, so this reaches the
+     * package-private `AbstractChanneledNetworkAddon.register`, which is exactly what the real
+     * `minecraft:register` path calls. Test-only, and deliberately here rather than in the shared
+     * harness: it is the one spec that exercises a `canSend`-guarded send.
+     */
+    fun grantChannel(player: ServerPlayer, type: CustomPacketPayload.Type<*>) {
+        val addon = ServerNetworkingImpl.getAddon(player.connection)
+        val register = AbstractChanneledNetworkAddon::class.java
+            .getDeclaredMethod("register", List::class.java)
+        register.isAccessible = true
+        register.invoke(addon, listOf(type.id()))
     }
 
     /**
@@ -256,6 +294,98 @@ class StructureRestoreSpec : GarnetTestSpec({
             outcome.reason shouldContain "subpath not found"
             val box = EditorDimRegistry.of(server).placedBoxOf(subpath).shouldNotBeNull()
             server.overworld().getBlockState(box.origin).block shouldBe Blocks.DIAMOND_BLOCK
+        }
+    }
+
+    test("watching a structure replies with its revisions oldest first") {
+        withEditorServer("watch-reply") { server, player, root ->
+            grantChannel(player, StructureHistoryS2C.TYPE)
+            val (subpath, first) = placeAndEdit(server, player, root)
+            editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
+            StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL)
+            drainPayloads(player)
+
+            EditorStructureHandlers.handleWatchHistory(server, player, WatchStructureHistoryC2S(subpath))
+
+            val sent = drainPayloads(player).filterIsInstance<StructureHistoryS2C>().last()
+            sent.subpath shouldBe subpath
+            sent.revisions.size shouldBeGreaterThan 1
+            // The wire list is exactly the store's list, in the store's order. The brief asserted
+            // `revisions.first().timestampMillis == first.timestampMillis`, which is wrong: opening
+            // a structure seeds a REASON_PLACED revision BEFORE the commit `placeAndEdit` returns,
+            // so `first` is the SECOND entry, not the oldest.
+            sent.revisions.map { it.timestampMillis } shouldBe
+                LocalHistoryStore.revisions(root.resolve(subpath)).map { it.timestampMillis }
+            sent.revisions.any { it.timestampMillis == first.timestampMillis }.shouldBeTrue()
+            // Oldest first, as the store returns them.
+            sent.revisions.zipWithNext().all { (a, b) -> a.timestampMillis <= b.timestampMillis }.shouldBeTrue()
+        }
+    }
+
+    test("an empty subpath stops the watch") {
+        withEditorServer("watch-clear") { server, player, root ->
+            val (subpath, _) = placeAndEdit(server, player, root)
+            EditorStructureHandlers.handleWatchHistory(server, player, WatchStructureHistoryC2S(subpath))
+            HistoryWatchers.watchedBy(player.uuid) shouldBe subpath
+
+            EditorStructureHandlers.handleWatchHistory(server, player, WatchStructureHistoryC2S(""))
+
+            HistoryWatchers.watchedBy(player.uuid).shouldBeNull()
+        }
+    }
+
+    test("a commit pushes a refreshed list to a watcher") {
+        withEditorServer("watch-push") { server, player, root ->
+            grantChannel(player, StructureHistoryS2C.TYPE)
+            val (subpath, _) = placeAndEdit(server, player, root)
+            EditorStructureHandlers.handleWatchHistory(server, player, WatchStructureHistoryC2S(subpath))
+            val before = drainPayloads(player).filterIsInstance<StructureHistoryS2C>().last().revisions.size
+
+            editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
+            StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL).let {
+                // The push rides on `broadcast`, which is what every unsolicited commit path calls.
+                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).payload)
+            }
+
+            val after = drainPayloads(player).filterIsInstance<StructureHistoryS2C>().last()
+            after.revisions.size shouldBe before + 1
+            HistoryWatchers.clear(player.uuid)
+        }
+    }
+
+    test("restoring through the handler pushes an undo entry and a refreshed list") {
+        withEditorServer("restore-handler") { server, player, root ->
+            grantChannel(player, StructureHistoryS2C.TYPE)
+            EditorUndoStack.clear(player.uuid)
+            val (subpath, first) = placeAndEdit(server, player, root)
+            editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
+            StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL)
+            EditorStructureHandlers.handleWatchHistory(server, player, WatchStructureHistoryC2S(subpath))
+            drainPayloads(player)
+
+            EditorStructureHandlers.handleRestoreRevision(
+                server, player, RestoreRevisionC2S(subpath, first.timestampMillis),
+            )
+
+            EditorUndoStack.peekUndo(player.uuid)
+                .shouldBeInstanceOf<EditorUndoCommand.RestoreRevision>()
+            drainPayloads(player).filterIsInstance<StructureHistoryS2C>().shouldNotBeEmpty()
+            HistoryWatchers.clear(player.uuid)
+        }
+    }
+
+    test("a refused restore reports the reason and pushes no undo entry") {
+        withEditorServer("restore-refused") { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val (subpath, _) = placeAndEdit(server, player, root)
+            drainPayloads(player)
+
+            EditorStructureHandlers.handleRestoreRevision(
+                server, player, RestoreRevisionC2S(subpath, 1L),
+            )
+
+            drainPayloads(player).filterIsInstance<EditorErrorS2C>().shouldNotBeEmpty()
+            EditorUndoStack.peekUndo(player.uuid).shouldBeNull()
         }
     }
 })

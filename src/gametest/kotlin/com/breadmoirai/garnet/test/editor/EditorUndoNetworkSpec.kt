@@ -3,8 +3,6 @@ package com.breadmoirai.garnet.test.editor
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.data.EditorSession
-import com.breadmoirai.garnet.editor.history.RestoreOutcome
-import com.breadmoirai.garnet.editor.history.StructureRestoreOps
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
@@ -17,6 +15,7 @@ import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
+import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
@@ -810,11 +809,11 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
      * Place `probe.nbt`, commit a redstone origin, commit a gold origin, restore the redstone
      * revision, and seat the entry that restore produced. Returns the subpath.
      *
-     * The restore is driven through `StructureRestoreOps` with a hand-rolled `EditorUndoStack.push`
-     * because neither `RestoreRevisionC2S` nor `EditorStructureHandlers.handleRestoreRevision`
-     * exists yet — they arrive in Tasks 5 and 6, and Task 6 replaces this whole block with the one
-     * handler call that does both. Nothing about the undo/redo behaviour under test depends on the
-     * difference: the handler seats exactly this command from exactly this outcome.
+     * Driven through the real `EditorStructureHandlers.handleRestoreRevision` (Task 6), which both
+     * performs the restore and seats the undo entry. It is the entry point the panel actually uses,
+     * so the undo/redo behaviour asserted below is the behaviour a player gets — in particular that
+     * the seated command carries the timestamps the RESTORE reported, not the one that was
+     * requested, and that it goes on via `EditorUndoStack.push` (clearing redo).
      */
     fun restoreProbeToRedstone(server: MinecraftServer, player: ServerPlayer, root: Path): String {
         val subpath = "probe.nbt"
@@ -825,14 +824,11 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
         val redstoneRevision = LocalHistoryStore.revisions(root.resolve(subpath)).last()
         editAndCommit(server, subpath, Blocks.GOLD_BLOCK)
 
-        val outcome = StructureRestoreOps.restore(server, subpath, redstoneRevision.timestampMillis)
-        outcome.shouldBeInstanceOf<RestoreOutcome.Restored>()
-        EditorUndoStack.push(
-            player.uuid,
-            EditorUndoCommand.RestoreRevision(
-                subpath, outcome.fromTimestampMillis, outcome.toTimestampMillis,
-            ),
+        EditorStructureHandlers.handleRestoreRevision(
+            server, player, RestoreRevisionC2S(subpath, redstoneRevision.timestampMillis),
         )
+        // A refusal would otherwise surface only as a confusing block-state mismatch further down.
+        EditorUndoStack.peekUndo(player.uuid).shouldBeInstanceOf<EditorUndoCommand.RestoreRevision>()
         return subpath
     }
 

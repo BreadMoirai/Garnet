@@ -2,6 +2,7 @@ package com.breadmoirai.garnet
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.core.events.SubTickPhaseEvents
+import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry
 import com.breadmoirai.garnet.editor.command.EditorCommand
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
@@ -73,6 +74,9 @@ class Garnet : ModInitializer {
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
             EditorSession.clear(handler.player.uuid)
             EditorUndoStack.clear(handler.player.uuid)
+            // Otherwise a player rejoining on the same UUID inherits a watch on whatever structure
+            // the last session had open, and starts receiving pushes for a panel that is not open.
+            HistoryWatchers.clear(handler.player.uuid)
         }
         LOGGER.debug("[Garnet#onInitialize] initialization complete")
     }

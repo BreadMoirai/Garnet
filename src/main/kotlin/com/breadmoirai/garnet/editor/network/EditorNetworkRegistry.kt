@@ -83,5 +83,11 @@ object EditorNetworkRegistry {
         ServerPlayNetworking.registerGlobalReceiver(RedoC2S.TYPE) { _, ctx ->
             ctx.server().execute { EditorUndoOps.redo(ctx.server(), ctx.player()) }
         }
+        ServerPlayNetworking.registerGlobalReceiver(WatchStructureHistoryC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { EditorStructureHandlers.handleWatchHistory(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(RestoreRevisionC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { EditorStructureHandlers.handleRestoreRevision(ctx.server(), ctx.player(), payload) }
+        }
     }
 }
