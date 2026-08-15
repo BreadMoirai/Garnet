@@ -1,6 +1,7 @@
 package com.breadmoirai.garnet.editor.structure
 
 import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
@@ -341,6 +342,11 @@ object StructureCommit {
                 ServerPlayNetworking.send(player, payload)
             }
         }
+        // Anyone with this structure's Local History panel open just gained a revision. Deliberately
+        // outside the `exclude` loop: `exclude` means "already replied to about the SAVE", and that
+        // reply carries no revision list — the player who triggered the commit needs this push as
+        // much as everyone else. `pushAll` applies the same `canSend` guard.
+        HistoryWatchers.pushAll(server, payload.subpath)
     }
 
     /**

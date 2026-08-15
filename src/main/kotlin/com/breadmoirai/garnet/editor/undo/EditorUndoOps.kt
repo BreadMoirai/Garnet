@@ -1,5 +1,7 @@
 package com.breadmoirai.garnet.editor.undo
 
+import com.breadmoirai.garnet.editor.history.RestoreOutcome
+import com.breadmoirai.garnet.editor.history.StructureRestoreOps
 import com.breadmoirai.garnet.editor.network.DeleteOutcome
 import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
 import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
@@ -149,6 +151,12 @@ object EditorUndoOps {
             moveBack(server, player, from = command.newSubpath, to = command.oldSubpath, command = command)
 
         is EditorUndoCommand.Delete -> restore(server, player, command)
+
+        // Undo = the SAME operation aimed at the other revision. The pre-restore content is a real
+        // banked revision (the restore's own quiesce guaranteed it), so no content rides on the
+        // command and there is nothing to reconstruct here.
+        is EditorUndoCommand.RestoreRevision ->
+            replayRestore(server, command, aimedAt = command.fromTimestampMillis)
     }
 
     /**
@@ -211,6 +219,37 @@ object EditorUndoOps {
                 }
             }
         }
+
+        is EditorUndoCommand.RestoreRevision ->
+            replayRestore(server, command, aimedAt = command.toTimestampMillis)
+    }
+
+    /**
+     * Both directions of a [EditorUndoCommand.RestoreRevision] are one function: a restore aimed at
+     * [aimedAt] — `fromTimestampMillis` to undo, `toTimestampMillis` to redo.
+     *
+     * The seated command is deliberately NOT `command`. Its `from` is `outcome.fromTimestampMillis`
+     * — the revision the restore's own quiesce just banked, i.e. where THIS replay came from — so a
+     * later reversal aims at a revision that actually exists and holds the content that was on disk
+     * a moment ago. Re-seating `command.fromTimestampMillis` would aim every subsequent undo at the
+     * one original revision, which is not what the intervening replays left on disk. `to` stays put:
+     * it names the revision this whole entry is *about*, and it does not move as the pair is
+     * replayed.
+     *
+     * Player-independent, unlike the other branches: `StructureRestoreOps` takes no `ServerPlayer`
+     * and reports through its outcome, so `undo`/`redo` phrase the failure.
+     */
+    private fun replayRestore(
+        server: MinecraftServer,
+        command: EditorUndoCommand.RestoreRevision,
+        aimedAt: Long,
+    ): Inverted = when (val outcome = StructureRestoreOps.restore(server, command.subpath, aimedAt)) {
+        // Refusals never pop — a pruned revision or an unplaced structure is a conflict the player
+        // can resolve and retry, exactly like a stale relocate.
+        is RestoreOutcome.Refused -> Inverted.Refused(outcome.reason)
+        is RestoreOutcome.Restored -> Inverted.Applied(
+            command.copy(fromTimestampMillis = outcome.fromTimestampMillis),
+        )
     }
 
     private fun restoreBanked(

@@ -43,13 +43,19 @@ these transparent pixels.)
 
 Each of the four `DockRegion`s (LEFT/RIGHT/BOTTOM/CENTER) holds an independent
 `SnapshotStateList<Panel>` (`DockState.leftPanels`/`rightPanels`/`bottomPanels`/`centerPanels`) plus an
-`activeTab: Int` index. `Panel(id, title, content)` is a plain data holder. `RegionColumn` in
-`GarnetDock.kt` renders only the active panel's `content`, filling the whole region — there is no tab
-strip; the hand-rolled `Box`+`BasicText` strip (with its own tap-gesture handling and hardcoded colours)
-was removed once it became clear only one panel is ever registered per region. `activeTab` still exists
-on `DockState` and `RegionColumn` still reads it via `activeTabFor`, so a future multi-panel region only
-needs a new way to *write* that index (the old `setActiveTab` was deleted with the strip since nothing
-else called it) — switching UI is a separate concern from which panel is "active". LEFT/RIGHT/
+`activeTab: Int` index (read via `DockState.activeTab(region)`, written via
+`DockState.setActiveTab(region, index)`, which clamps to the region's real panel indices so a stale
+index can never point past the end — an empty region clamps to 0). `Panel(id, title, content)` is a
+plain data holder. `RegionColumn` in `GarnetDock.kt` renders the active panel's `content`, filling the
+region, preceded by `DockTabStrip` (`DockTabStrip.kt`) — a hand-rolled `Row`+`BasicText` strip with its
+own tap-gesture handling and hardcoded colours, deliberately Jewel-free so a Jewel tab component's
+focus-and-popup behaviour doesn't get pulled into this scene's already-subtle layer routing (see
+`jewel-widget-layer.md`). The strip renders only when a region holds 2+ panels; a single-panel region
+still shows its body full-bleed. It came back because LEFT gained a second panel — the Local History
+panel, seeded beside the Explorer at client init and switched to from the Explorer's context menu
+via `setActiveTab`; see [local-history-panel.md](local-history-panel.md). The existing
+`key(mountEpoch, panels[active].id)` guard already makes swapping which panel occupies the slot a
+fresh composition, so tab switching inherits that protection for free. LEFT/RIGHT/
 BOTTOM start hidden at client init (`DockState.leftVisible` etc. all start `false`); CENTER's
 visibility is derived (`centerPanels.isNotEmpty()`) rather than an independent flag, since an empty
 CENTER must stay transparent. Seeding a panel into a region (e.g. `explorerPanel()` into `leftPanels`
@@ -58,7 +64,7 @@ by the Alt+1/Shift+1 keybinds (see `dock-input-routing.md`) or, on joining a wor
 
 ### LEFT auto-opens on joining a Garnet-capable world
 
-A JOIN handler in `registerDockWorldLifecycle()` (`viewport/DockKeybinds.kt`) calls
+A JOIN handler in `registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) calls
 `applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`), which reveals LEFT — and only LEFT — when three
 things all hold: the peer speaks Garnet (`DockAutoOpenGate.isGarnetServer()`, defaulting to
 `ClientPlayNetworking.canSend(ListEditorTreeC2S.TYPE)` — a swappable `var` that is the seam unit
@@ -109,7 +115,7 @@ stale menu is still painting.
 
 `DockState` is a client-lifetime singleton — the Project Explorer is seeded once in
 `GarnetClient.onInitializeClient` and never re-added — but its *visibility* is world-scoped.
-`registerDockWorldLifecycle()` (`viewport/DockKeybinds.kt`) hooks
+`registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) hooks
 `ClientPlayConnectionEvents.DISCONNECT` and calls `DockState.closeAll()`, then `syncDockViewport()`
 and `garnet$updateScaledFramebuffer(true)`. Without it the dock keeps painting over the title screen,
 the viewport stays shrunk, and a focused region keeps eating GLFW input through the mixins. The same
@@ -123,12 +129,16 @@ from two sites in `ClientConnectionMixin` — `handleDisconnection` on the main 
 assume it is already on the client thread; `garnet$updateScaledFramebuffer` reaches
 `eventHandler.resizeGui()`, which is unsafe to call concurrently with rendering.
 
-The same `mc.execute` block also resets the Project Explorer's per-world state:
-`ProjectTreeState.reset()` and `ExplorerTreeState.reset()` (`editor/ui/`), clearing the previous
-session's tree snapshot and its expansion/selection so a join into a different world or server does
-not show a stale tree or send packets built from the old root's paths. Both live in the disconnect
-handler rather than `DockState.closeAll()` — `closeAll()` stays free of IDE-state and `Minecraft`
-dependencies, which is what keeps it unit-testable.
+The Project Explorer's per-world state is reset from its **own** `DISCONNECT` registration in
+`editor/ui/ExplorerLifecycle.kt`, not from this one: `ProjectTreeState`, `ExplorerTreeState`,
+`UndoState`, `OpenStructureState` and `LocalHistoryState` are all reset there (after the session
+save — see
+[persistence/explorer-session-state.md](../persistence/explorer-session-state.md#save-trigger-points)),
+clearing the previous session's tree snapshot, its expansion/selection, the undo labels, and the
+placed structure plus its revision list, so a join into a different world or server does not show a
+stale tree or send packets built from the old root's paths. None of it lives in
+`DockState.closeAll()` — `closeAll()` stays free of IDE-state and `Minecraft` dependencies, which is
+what keeps it unit-testable.
 
 `closeAll()` is deliberately narrower than `reset()`:
 
@@ -220,11 +230,16 @@ rows. The pattern:
   `SelectionMode.Multiple`, which is *not* what a single-selection file tree wants).
   `Tree.Element.Node.children` is lazy (only materializes once `open()`/expand is called) while
   node `id`s are eager — this doesn't affect `LazyTree` itself, only direct `Tree` traversal.
-- **Clicks dispatch by node kind** (`onElementClick` in `ProjectExplorerPanel.kt`): a folder is a
-  "spec-folder" (directly contains a `FileNode` named `*.spec.kts`) iff `node.children.any { it is
-  FileNode && it.name.endsWith(".spec.kts") }`; clicking a spec-folder sends
-  `LoadEditorFolderC2S(path)`, other folders just expand/collapse (`LazyTree`'s own click-to-toggle
-  behavior). Clicking a file row is highlight-only, no packet sent — and `onElementClick` deliberately
+- **Clicks dispatch by node kind** (`onElementClick` in `ProjectExplorerPanel.kt`): **any** folder
+  toggles open/closed from anywhere on its row, and a "spec-folder" (directly contains a `FileNode`
+  named `*.spec.kts`, i.e. `node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }`)
+  *additionally* sends `LoadEditorFolderC2S(path)` on that same click. The row toggle is ours, not
+  Jewel's: `LazyTree` opens a node only from its chevron or a double-click, which leaves the folder
+  name — the largest target on the row — inert. Measured at `Density(1f)`, the chevron occupies
+  x≈18..26 and consumes its own press, so it never reaches `onElementClick` and a chevron click
+  toggles exactly once (pinned by `ExplorerRowClickSceneTest`). Sends go through
+  `ExplorerActions.sender`, not `ClientPlayNetworking` directly, so the click policy is testable off
+  a live connection. Clicking a file row is highlight-only, no packet sent — and `onElementClick` deliberately
   does **not** call `ExplorerTreeState.select(path)`: `LazyTree` has already written the clicked
   element's id into `TreeState.selectedKeys` before invoking the callback, and Jewel's `TreeState` is
   the declared single source of truth for selection, so a second writer here is at best redundant.

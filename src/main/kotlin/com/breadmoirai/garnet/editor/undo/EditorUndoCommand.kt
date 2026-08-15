@@ -89,4 +89,17 @@ sealed interface EditorUndoCommand {
     ) : EditorUndoCommand {
         override val label get() = "delete '$rootSubpath'"
     }
+
+    /**
+     * A Local History restore. Reversible without carrying any content: the pre-restore state was
+     * itself banked by the restore's own quiesce, so undo is just *the same operation aimed at
+     * [fromTimestampMillis]*, and redo aims back at [toTimestampMillis].
+     */
+    data class RestoreRevision(
+        val subpath: String,
+        val fromTimestampMillis: Long,
+        val toTimestampMillis: Long,
+    ) : EditorUndoCommand {
+        override val label get() = "restore '$subpath'"
+    }
 }

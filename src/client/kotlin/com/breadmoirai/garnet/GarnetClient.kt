@@ -27,6 +27,10 @@ class GarnetClient : ClientModInitializer {
         // world reveals it (see applyDockAutoOpen), and Shift+1 toggles it by hand.
         com.breadmoirai.garnet.ui.dock.DockState.leftPanels
             .add(com.breadmoirai.garnet.editor.ui.explorerPanel())
+        // Local History sits beside it as a second LEFT tab; two panels is what makes DockTabStrip
+        // render at all, so this is also what surfaces the strip in-game.
+        com.breadmoirai.garnet.ui.dock.DockState.leftPanels
+            .add(com.breadmoirai.garnet.editor.ui.localHistoryPanel())
         LOGGER.debug("[GarnetClient#onInitializeClient] client initialization complete")
     }
 }

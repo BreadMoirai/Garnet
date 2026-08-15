@@ -5,11 +5,14 @@ import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.data.NewNodeKind
 import com.breadmoirai.garnet.editor.data.EditorNames
 import com.breadmoirai.garnet.editor.data.resolve
+import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.ui.dock.DockState
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
@@ -44,10 +47,10 @@ object ExplorerActions {
 
     /** Null on success (packet sent), else the reason nothing was sent. */
     fun commitRename(path: String, typed: String): String? {
-        val finalName = typed.trim()
+        val currentName = path.substringAfterLast('/')
+        val finalName = EditorNames.resolveRenameName(typed, currentName, isFolder(path))
         // Exclude the node being renamed from its own sibling set, so re-committing an unchanged
         // name is a harmless no-op rather than a bogus "already exists".
-        val currentName = path.substringAfterLast('/')
         val siblings = siblingsOf(path.substringBeforeLast('/', "")).filterNot { it == currentName }
         EditorNames.validate(finalName, siblings)?.let { return it }
         sender(RenamePathC2S(path, finalName))
@@ -93,6 +96,23 @@ object ExplorerActions {
     }
 
     /**
+     * Show [path]'s revisions in the Local History panel, placing the structure first if it is not
+     * already placed.
+     *
+     * The panel only ever shows a PLACED structure — that invariant is what keeps the server's
+     * restore path single, with a footprint to clear and a commit to write through. So this is
+     * "place, then look at", never "look at without placing".
+     *
+     * Null on success, else the reason nothing happened.
+     */
+    fun openLocalHistory(path: String): String? {
+        if (!path.endsWith(".nbt")) return "local history is only available for structures"
+        if (OpenStructureState.subpath != path) sender(PlaceStructureC2S(path))
+        DockState.setActiveTab(DockRegion.LEFT, DockState.leftPanels.indexOfFirst { it.id == "garnet.localHistory" })
+        return null
+    }
+
+    /**
      * The names already present in [parentPath], for duplicate-name validation.
      *
      * Three distinct situations all degrade to "no known siblings" here: no snapshot loaded yet,
@@ -101,6 +121,17 @@ object ExplorerActions {
      * safe only because [commitCreate]/[commitRename] are a pre-check, not the source of truth — the
      * server re-validates against the real filesystem and rejects what this silently waved through.
      */
+    /**
+     * Whether [path] names a folder in the current snapshot.
+     *
+     * Defaults to `false` (treat as a file) when the snapshot cannot answer, matching [siblingsOf]:
+     * the worst case is that a dotted folder rename keeps a suffix the user dropped, which the user
+     * can see in the tree and redo, whereas guessing "folder" would silently strip a file's
+     * extension.
+     */
+    private fun isFolder(path: String): Boolean =
+        ProjectTreeState.snapshot?.root?.resolve(path) is FolderNode
+
     private fun siblingsOf(parentPath: String): List<String> {
         val root = ProjectTreeState.snapshot?.root ?: return emptyList()
         val node = root.resolve(parentPath) as? FolderNode ?: return emptyList()

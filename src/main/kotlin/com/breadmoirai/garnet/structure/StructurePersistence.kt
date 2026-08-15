@@ -188,9 +188,8 @@ object StructurePersistence {
     }
 
     /**
-     * Loads [file] and places it centered (X/Z) in the region, floored at [yBase] unless the
-     * structure is tall enough to require vertical centering (see [anchorY]). Returns the placed
-     * [PlacedBox], or null when [file] does not exist / fails to read.
+     * Place [file]'s structure centered in the region. Thin wrapper over
+     * [placeStructureTagCentered]: the only thing it adds is reading the tag off disk.
      */
     fun placeStructureCentered(
         file: Path, level: ServerLevel, regionOrigin: BlockPos,
@@ -200,8 +199,29 @@ object StructurePersistence {
             LOGGER.warn("[StructurePersistence#placeCentered] file '{}' not found", file)
             return null
         }
+        val nbt = try {
+            NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap())
+        } catch (e: Exception) {
+            LOGGER.error("[StructurePersistence#placeCentered] read '{}': {}", file, e.message)
+            return null
+        }
+        return placeStructureTagCentered(nbt, level, regionOrigin, regionSizeXZ, regionMinY, regionMaxY, yBase)
+    }
+
+    /**
+     * Place an already-read structure [nbt] centered (X/Z) in the region, floored at [yBase] unless
+     * the structure is tall enough to require vertical centering (see [anchorY]). Returns the placed
+     * [PlacedBox], or null when the tag fails to load.
+     *
+     * Split out of [placeStructureCentered] for the Local History restore, which holds a tag read
+     * from a history blob and has no file to point at. Spooling that tag to a temp file just to read
+     * it back would add an IO round trip and a failure mode for nothing.
+     */
+    fun placeStructureTagCentered(
+        nbt: CompoundTag, level: ServerLevel, regionOrigin: BlockPos,
+        regionSizeXZ: Int, regionMinY: Int, regionMaxY: Int, yBase: Int,
+    ): PlacedBox? {
         return try {
-            val nbt = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap())
             val blockGetter: HolderGetter<Block> = level.registryAccess().lookupOrThrow(Registries.BLOCK)
             val template = StructureTemplate()
             template.load(blockGetter, nbt)
@@ -213,10 +233,10 @@ object StructurePersistence {
                 centeredStart(regionOrigin.z, regionSizeXZ, size.z),
             )
             template.placeInWorld(level, origin, origin, StructurePlaceSettings(), level.random, 2)
-            LOGGER.debug("[StructurePersistence#placeCentered] placed {} ({}) at {}", file, size, origin)
+            LOGGER.debug("[StructurePersistence#placeTagCentered] placed ({}) at {}", size, origin)
             PlacedBox(origin, size)
         } catch (e: Exception) {
-            LOGGER.error("[StructurePersistence#placeCentered] read '{}': {}", file, e.message)
+            LOGGER.error("[StructurePersistence#placeTagCentered] load: {}", e.message)
             null
         }
     }

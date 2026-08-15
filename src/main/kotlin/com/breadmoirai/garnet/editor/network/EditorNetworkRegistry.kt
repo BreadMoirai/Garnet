@@ -24,6 +24,9 @@ object EditorNetworkRegistry {
         PayloadTypeRegistry.serverboundPlay().register(MovePathC2S.TYPE, MovePathC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(UndoC2S.TYPE, UndoC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(RedoC2S.TYPE, RedoC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(WatchStructureHistoryC2S.TYPE, WatchStructureHistoryC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(RestoreRevisionC2S.TYPE, RestoreRevisionC2S.STREAM_CODEC)
+        PayloadTypeRegistry.clientboundPlay().register(StructureHistoryS2C.TYPE, StructureHistoryS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(UndoStateS2C.TYPE, UndoStateS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorTreeSnapshotS2C.TYPE, EditorTreeSnapshotS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorFolderLoadedS2C.TYPE, EditorFolderLoadedS2C.STREAM_CODEC)
@@ -79,6 +82,12 @@ object EditorNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(RedoC2S.TYPE) { _, ctx ->
             ctx.server().execute { EditorUndoOps.redo(ctx.server(), ctx.player()) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(WatchStructureHistoryC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { EditorStructureHandlers.handleWatchHistory(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(RestoreRevisionC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { EditorStructureHandlers.handleRestoreRevision(ctx.server(), ctx.player(), payload) }
         }
     }
 }

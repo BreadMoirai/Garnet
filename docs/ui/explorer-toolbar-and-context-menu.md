@@ -1,14 +1,14 @@
 ---
 title: Explorer toolbar and context menu
 tags: [explorer, toolbar, context-menu, inline-edit, jewel, packets, keyboard]
-summary: The Project Explorer's kebab/Undo/Redo/Refresh/Collapse-All toolbar, its right-click New/Rename/Duplicate/Move/Delete menu and the two dialogs it opens, the inline name field that commits through ExplorerActions, and why the LazyTree's preview key handler had to stop eating that field's caret/selection keys.
+summary: The Project Explorer's kebab/Undo/Redo/Refresh/Collapse-All toolbar, its right-click New/Rename/Duplicate/Move/Local History/Delete menu and the two dialogs it opens, the inline name field that commits through ExplorerActions (opening fully selected and carrying a file's extension over when the typed name omits it), and why the LazyTree's preview key handler had to stop eating that field's caret/selection keys.
 ---
 
 # Explorer toolbar and context menu
 
 `ExplorerToolbar.kt` (the panel's single top row: kebab overflow, Undo, Redo, Refresh, Collapse All) and
 `ExplorerContextMenu.kt` (the right-click `New Folder` / `New Structure` / `Rename` / `Duplicate` /
-`Move to…` / `Delete` menu) together
+`Move to…` / `Local History` / `Delete` menu) together
 replaced the old root-name `Dropdown` header and the `+ New`/`Save`/`Discard` structure-action row.
 See [dock-framework.md](dock-framework.md#first-real-panel-the-project-explorer-live-data-pattern-now-on-jewel)
 for the panel walkthrough and [jewel-widget-layer.md](jewel-widget-layer.md) for the Jewel
@@ -32,6 +32,47 @@ would go stale the moment another player touched the tree. `ExplorerLifecycle` c
 `UndoState.reset()` on `ClientPlayConnectionEvents.DISCONNECT`, alongside the tree and expansion
 resets, so the buttons do not carry a previous session's labels into the next one. The stack itself
 is documented in [persistence/editor-undo-stack.md](../persistence/editor-undo-stack.md).
+
+## What the inline name field does with what you type
+
+The field opens with the current name **fully selected**: the common case is replacing the name
+outright, and tweaking it instead is one arrow key away. It is also the reason the field seeds with
+`setTextAndSelectAll` rather than `setTextAndPlaceCursorAtEnd`.
+
+A rename that omits the extension keeps the old one — `house.nbt` → typing `cottage` commits
+`cottage.nbt`. `EditorNames.resolveRenameName(typed, currentName, isFolder)` owns that rule, next to
+the create-side `resolveFinalName`, so both name-shaping decisions sit in one place. Three edges are
+deliberate: an explicitly typed extension always wins (including *changing* it, `cottage.txt`);
+folders are exempt, because a folder name may legitimately contain dots (`my.stuff`) and has no
+extension to preserve; and a leading dot names the file rather than introducing an extension
+(`.gitignore`), on both sides of the rule. `ExplorerActions.commitRename` decides `isFolder` from the
+tree snapshot, defaulting to "file" when the snapshot cannot answer — the worst case is a dotted
+folder keeping a suffix the user dropped, which is visible and redoable, whereas guessing "folder"
+would silently strip a real file's extension.
+
+The caret you type against is only visible because the field is a `GarnetTextField`, which bridges
+its focus into its own interaction source; see
+[text-field-caret-in-raster-scene.md](text-field-caret-in-raster-scene.md) for why the dock's scene
+needs that and what breaks without it.
+
+## Local History
+
+One flat `selectableItem`, between its own two `separator()`s, enabled **only when the target is a
+`.nbt` file node** (`target != ROOT_PATH && target.endsWith(".nbt")`). Folders, the project root and
+`.spec.kts` files have no structure to place, and the panel behind this item only ever shows a
+structure that is actually in the world.
+
+**Flat, not a submenu.** Jewel opens a flyout as a *second focusable popup layer*, and this scene's
+`isInteractive(owner)` check stops routing pointer events to every layer below the focused one — so
+nested menus are simply broken here. Anything that would want to be a submenu has to be a top-level
+item instead. See [jewel-widget-layer.md](jewel-widget-layer.md) for the layer routing itself.
+
+`ExplorerActions.openLocalHistory(path)` is the whole client action: refuse a non-`.nbt` path, send
+`PlaceStructureC2S(path)` unless `OpenStructureState.subpath` already names it, then
+`DockState.setActiveTab(DockRegion.LEFT, …)` onto the `"garnet.localHistory"` panel. It is
+"place, *then* look at", never "look at without placing" — that ordering is what upholds the
+server-side invariant the restore path depends on. See
+[local-history-panel.md](local-history-panel.md) for what that invariant buys.
 
 ## Why validation runs on both client and server
 

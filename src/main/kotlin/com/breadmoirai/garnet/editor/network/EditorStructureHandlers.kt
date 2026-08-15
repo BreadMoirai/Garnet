@@ -2,6 +2,9 @@ package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.*
+import com.breadmoirai.garnet.editor.history.HistoryWatchers
+import com.breadmoirai.garnet.editor.history.RestoreOutcome
+import com.breadmoirai.garnet.editor.history.StructureRestoreOps
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
@@ -156,5 +159,44 @@ object EditorStructureHandlers {
         ))
         sendTree(server, player)
         sendUndoState(player)
+    }
+
+    /**
+     * "I am looking at this structure's history" — record it and answer with the current list. An
+     * EMPTY subpath means "no longer looking" and gets no reply: there is nothing to show.
+     */
+    fun handleWatchHistory(server: MinecraftServer, player: ServerPlayer, payload: WatchStructureHistoryC2S) {
+        HistoryWatchers.watch(player.uuid, payload.subpath)
+        // A reply to a C2S this player just sent, so no canSend guard is needed here — but pushTo
+        // applies one anyway, harmlessly, since it is shared with the unsolicited commit fan-out.
+        if (payload.subpath.isNotEmpty()) HistoryWatchers.pushTo(server, player, payload.subpath)
+    }
+
+    fun handleRestoreRevision(server: MinecraftServer, player: ServerPlayer, payload: RestoreRevisionC2S) {
+        when (val outcome = StructureRestoreOps.restore(server, payload.subpath, payload.timestampMillis)) {
+            is RestoreOutcome.Refused -> {
+                fail(player, "restore failed: ${outcome.reason}")
+                // Push anyway: the likeliest refusal is a revision pruned between render and click,
+                // and a refreshed list is what corrects the panel. No undo entry — nothing happened.
+                HistoryWatchers.pushTo(server, player, payload.subpath)
+            }
+            is RestoreOutcome.Restored -> {
+                // `outcome.fromTimestampMillis`, NOT the timestamp that was requested: the restore's
+                // own quiesce can bank a revision, so what an undo must aim back at is whatever the
+                // restore reports it replaced. Seating the requested value instead would send a
+                // later undo at the wrong content (see EditorUndoNetworkSpec's redo/undo test).
+                // `push`, not `pushRedone`: this is a fresh action, so the redo branch is dead.
+                EditorUndoStack.push(player.uuid, EditorUndoCommand.RestoreRevision(
+                    outcome.subpath, outcome.fromTimestampMillis, outcome.toTimestampMillis,
+                ))
+                ServerPlayNetworking.send(player, StructureResultS2C(
+                    payload.subpath, 0, 0, 0, "restored ${payload.subpath}",
+                ))
+                // Every watcher of this subpath, not just this player: the restore banked a
+                // revision, so everyone's list is now short by one.
+                HistoryWatchers.pushAll(server, payload.subpath)
+                sendUndoState(player)
+            }
+        }
     }
 }

@@ -40,12 +40,13 @@ class ExplorerMenuState {
 }
 
 /**
- * The `New Folder` / `New Structure` / `Rename` / `Duplicate` / `Move to…` / `Delete` menu, anchored
- * at the click point.
+ * The `New Folder` / `New Structure` / `Rename` / `Duplicate` / `Move to…` / `Local History` /
+ * `Delete` menu, anchored at the click point.
  *
  * The `New` actions target the clicked folder, or a clicked file's parent folder — the IDE
  * convention. Every other action targets the clicked node itself and is disabled on the project
- * root, which has no parent to be renamed, duplicated, moved, or deleted within.
+ * root, which has no parent to be renamed, duplicated, moved, or deleted within. `Local History` is
+ * disabled on anything but a `.nbt` file, since only a structure has revisions to show.
  *
  * `Delete` and `Move to…` open a dialog rather than acting immediately; both do so only after this
  * menu has closed, keeping each dialog a single popup layer. See [ExplorerDialogs].
@@ -70,6 +71,7 @@ fun ExplorerContextMenu(
     onDuplicate: (path: String) -> Unit,
     onDelete: (path: String) -> Unit,
     onMove: (path: String) -> Unit,
+    onLocalHistory: (path: String) -> Unit,
 ) {
     val target = state.target ?: return
     val parent = newTargetFolderFor(target)
@@ -104,6 +106,16 @@ fun ExplorerContextMenu(
             onClick = { state.close(); onMove(target) },
         ) {
             Text("Move to…")
+        }
+        separator()
+        selectableItem(
+            selected = false,
+            // Only a structure has revisions to show; folders, the root and .spec.kts files have
+            // nothing to place.
+            enabled = target != ExplorerTreeState.ROOT_PATH && target.endsWith(".nbt"),
+            onClick = { state.close(); onLocalHistory(target) },
+        ) {
+            Text("Local History")
         }
         separator()
         selectableItem(

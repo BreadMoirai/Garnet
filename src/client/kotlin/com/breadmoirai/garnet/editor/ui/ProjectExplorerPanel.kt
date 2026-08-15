@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.text.input.setTextAndSelectAll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,13 +39,13 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.breadmoirai.garnet.ui.compose.GarnetTextField
 import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.editor.network.LoadEditorFolderC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.data.NewNodeKind
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
 import org.jetbrains.jewel.foundation.lazy.tree.DefaultTreeViewKeyActions
 import org.jetbrains.jewel.intui.standalone.styling.defaults
@@ -54,7 +54,6 @@ import org.jetbrains.jewel.ui.Outline
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.LazyTree
 import org.jetbrains.jewel.ui.component.Text
-import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.styling.LazyTreeMetrics
 import org.jetbrains.jewel.ui.component.styling.LazyTreeStyle
 import org.jetbrains.jewel.ui.component.styling.LocalLazyTreeStyle
@@ -164,6 +163,7 @@ private fun ProjectExplorer() {
                     // exactly where the menu item that triggered it was.
                     onDelete = { path -> dialogs.openDelete(path, menu.anchor) },
                     onMove = { path -> dialogs.openMove(path, menu.anchor) },
+                    onLocalHistory = { path -> ExplorerActions.openLocalHistory(path) },
                 )
                 ExplorerDialogs(
                     state = dialogs,
@@ -209,22 +209,34 @@ private fun flushTreeStyle(): LazyTreeStyle {
 }
 
 /**
- * Click behavior, preserved from the hand-rolled tree: a `.nbt` places its structure, a folder that
- * directly contains any `*.spec.kts` loads that folder as a project, and every other folder just
- * expands/collapses (which LazyTree already does on its own for nodes).
+ * Click behavior: a `.nbt` places its structure, and **any** folder toggles open/closed, with a
+ * folder that directly contains `*.spec.kts` also loading as a project on that same click.
+ *
+ * Toggling here rather than leaving it to Jewel is the point: LazyTree only opens a node from its
+ * chevron or a double-click, which makes the folder's own name — the largest target on the row —
+ * inert. IntelliJ's Project view expands from anywhere on the row, and so does this.
+ *
+ * A spec-bearing folder deliberately does both. Loading is idempotent, so the alternative — some
+ * folders expanding on click and others not — would buy nothing and cost a rule the player has to
+ * learn from the contents of a folder they cannot see until it opens.
+ *
+ * Sends route through [ExplorerActions.sender] rather than `ClientPlayNetworking` directly, so this
+ * policy is testable without a live connection, exactly like the create/rename commits.
  *
  * Deliberately does **not** call `ExplorerTreeState.select(path)`: LazyTree has already written the
  * clicked element's id into `TreeState.selectedKeys` before invoking this callback, and Jewel's
  * TreeState is the declared single source of truth for selection. A second writer here would be a
  * silent no-op today and a divergence the moment the two disagree (multi-select, drag-select).
  */
-private fun onElementClick(node: com.breadmoirai.garnet.editor.data.FileTreeNode, path: String) {
+fun onElementClick(node: com.breadmoirai.garnet.editor.data.FileTreeNode, path: String) {
     when (node) {
-        is FileNode -> if (node.extension == "nbt") ClientPlayNetworking.send(PlaceStructureC2S(path))
-        is FolderNode ->
+        is FileNode -> if (node.extension == "nbt") ExplorerActions.sender(PlaceStructureC2S(path))
+        is FolderNode -> {
+            ExplorerTreeState.toggleExpanded(path)
             if (node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }) {
-                ClientPlayNetworking.send(LoadEditorFolderC2S(path))
+                ExplorerActions.sender(LoadEditorFolderC2S(path))
             }
+        }
     }
 }
 
@@ -292,12 +304,18 @@ private fun TreeRow(
  * The in-tree name field. Enter commits, Escape cancels, and losing focus cancels — an abandoned
  * field must never linger as a phantom row after the user clicks elsewhere in the tree.
  *
+ * [initial] arrives fully selected, the way a rename behaves everywhere else: the common case is
+ * replacing the name outright, and the rarer "tweak it" case is one arrow key away.
+ *
  * EditBox-style note does not apply here: this is a Jewel TextField over a Compose TextFieldState,
- * and `setTextAndPlaceCursorAtEnd` does not fire a responder, so seeding [initial] is safe.
+ * and `setTextAndSelectAll` does not fire a responder, so seeding [initial] is safe.
  *
  * Caret movement, keyboard selection and Ctrl+A only reach this field because the enclosing
  * LazyTree is handed an [EditAwareKeyActions] while an edit is open — see that class for why a
  * nested field otherwise loses those keys to the tree's preview handler.
+ *
+ * [GarnetTextField] rather than Jewel's `TextField` because in this scene only the wrapper's bridged
+ * focus makes the caret and the focused border appear at all — see that component for why.
  */
 @Composable
 private fun RowScope.InlineNameField(
@@ -311,10 +329,10 @@ private fun RowScope.InlineNameField(
     // See the "first frame" note on [onFocusChanged] below.
     var everFocused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        state.setTextAndPlaceCursorAtEnd(initial)
+        state.setTextAndSelectAll(initial)
         focusRequester.requestFocus()
     }
-    TextField(
+    GarnetTextField(
         state = state,
         outline = if (error != null) Outline.Error else Outline.None,
         modifier = Modifier

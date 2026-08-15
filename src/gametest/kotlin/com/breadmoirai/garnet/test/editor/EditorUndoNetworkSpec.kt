@@ -15,8 +15,10 @@ import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
+import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
 import com.breadmoirai.garnet.editor.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
 import com.breadmoirai.garnet.editor.undo.CreatedFileKind
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
@@ -41,6 +43,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import net.minecraft.core.Vec3i
 import net.minecraft.core.registries.Registries
@@ -48,6 +51,7 @@ import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
 import java.nio.file.Path
@@ -777,6 +781,144 @@ class EditorUndoNetworkSpec : GarnetTestSpec({
             // guard that undo did not take a shortcut around it.
             EditorDimRegistry.of(server).placedBoxOf("gadget.nbt").shouldNotBeNull()
             EditorDimRegistry.of(server).placedBoxOf("widget.nbt").shouldBeNull()
+        }
+    }
+
+    /** The block sitting at the placed structure's local (0,0,0) — what each restore is asserted on. */
+    fun originBlockOf(server: MinecraftServer, subpath: String): Block {
+        val box = EditorDimRegistry.of(server).placedBoxOf(subpath).shouldNotBeNull()
+        return server.overworld().getBlockState(box.origin).block
+    }
+
+    /** Stamp [block] on the placed structure's origin, mark it dirty, and bank it as a revision. */
+    fun editAndCommit(server: MinecraftServer, subpath: String, block: Block) {
+        val box = EditorDimRegistry.of(server).placedBoxOf(subpath).shouldNotBeNull()
+        server.overworld().setBlockAndUpdate(box.origin, block.defaultBlockState())
+        // StructureAutoSave has no `markDirty(subpath, box)`; the watcher marks per-position via
+        // `onEdit`, which grows the dirty box itself.
+        StructureAutoSave.of(server).onEdit(subpath, box.origin, server.overworld().gameTime)
+        // Revisions are keyed by wall-clock millis, and `StructureRestoreOps.restore` refuses a
+        // timestamp that is ALSO the newest revision's ("already the current content"). Two commits
+        // landing inside one millisecond would therefore make this setup refuse instead of restore,
+        // flakily. The pause is that guard and nothing else.
+        Thread.sleep(2)
+        StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL)
+    }
+
+    /**
+     * Place `probe.nbt`, commit a redstone origin, commit a gold origin, restore the redstone
+     * revision, and seat the entry that restore produced. Returns the subpath.
+     *
+     * Driven through the real `EditorStructureHandlers.handleRestoreRevision` (Task 6), which both
+     * performs the restore and seats the undo entry. It is the entry point the panel actually uses,
+     * so the undo/redo behaviour asserted below is the behaviour a player gets — in particular that
+     * the seated command carries the timestamps the RESTORE reported, not the one that was
+     * requested, and that it goes on via `EditorUndoStack.push` (clearing redo).
+     */
+    fun restoreProbeToRedstone(server: MinecraftServer, player: ServerPlayer, root: Path): String {
+        val subpath = "probe.nbt"
+        EditorNewStructure.create(root, "probe")
+        EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S(subpath))
+
+        editAndCommit(server, subpath, Blocks.REDSTONE_BLOCK)
+        val redstoneRevision = LocalHistoryStore.revisions(root.resolve(subpath)).last()
+        editAndCommit(server, subpath, Blocks.GOLD_BLOCK)
+
+        EditorStructureHandlers.handleRestoreRevision(
+            server, player, RestoreRevisionC2S(subpath, redstoneRevision.timestampMillis),
+        )
+        // A refusal would otherwise surface only as a confusing block-state mismatch further down.
+        EditorUndoStack.peekUndo(player.uuid).shouldBeInstanceOf<EditorUndoCommand.RestoreRevision>()
+        return subpath
+    }
+
+    test("undoing a restore returns the structure to its pre-restore content") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val subpath = restoreProbeToRedstone(server, player, root)
+            // The restore landed: redstone is back.
+            originBlockOf(server, subpath) shouldBe Blocks.REDSTONE_BLOCK
+
+            EditorUndoOps.undo(server, player)
+
+            // Undo aims at the pre-restore state, which was gold. No content rode on the command --
+            // the restore's own quiesce banked that state as a real revision.
+            originBlockOf(server, subpath) shouldBe Blocks.GOLD_BLOCK
+        }
+    }
+
+    test("redoing a restore re-applies it") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val subpath = restoreProbeToRedstone(server, player, root)
+            EditorUndoOps.undo(server, player)
+            originBlockOf(server, subpath) shouldBe Blocks.GOLD_BLOCK
+
+            EditorUndoOps.redo(server, player)
+
+            originBlockOf(server, subpath) shouldBe Blocks.REDSTONE_BLOCK
+        }
+    }
+
+    test("a redo aims a later undo at what the redo itself replaced, not at the original revision") {
+        // Fix round 1 / Important 1. This pins design point 3: the command seated after a replay
+        // carries `outcome.fromTimestampMillis` -- where THIS replay came from -- not the original
+        // command's `from`.
+        //
+        // A bare undo/redo/undo/redo cycle canNOT pin it: with no intervening edit, the original
+        // `from` and the revision each replay banks hold the SAME content (gold), so an
+        // implementation that wrongly re-seats `command` passes every assertion. The intervening
+        // diamond edit is what separates them -- it becomes the newest revision, so the redo's
+        // quiesce banks diamond as the state it replaced, while the original `from` still names
+        // gold. The final undo therefore discriminates: diamond if the returned timestamp was
+        // seated, gold if the stale original was.
+        //
+        // Same shape, and same class of bug, as "redo of a delete banks the CURRENT bytes" above.
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            val subpath = restoreProbeToRedstone(server, player, root)
+
+            EditorUndoOps.undo(server, player)
+            originBlockOf(server, subpath) shouldBe Blocks.GOLD_BLOCK
+
+            // The player edits between the undo and the redo, and that edit is banked.
+            editAndCommit(server, subpath, Blocks.DIAMOND_BLOCK)
+            originBlockOf(server, subpath) shouldBe Blocks.DIAMOND_BLOCK
+
+            EditorUndoOps.redo(server, player)
+            originBlockOf(server, subpath) shouldBe Blocks.REDSTONE_BLOCK
+
+            EditorUndoOps.undo(server, player)
+
+            // Undoing the redo must give back what the redo replaced. Re-seating the original
+            // command would return GOLD here and silently discard the diamond edit.
+            originBlockOf(server, subpath) shouldBe Blocks.DIAMOND_BLOCK
+        }
+    }
+
+    test("undoing a restore whose target was pruned refuses and keeps the entry") {
+        withServer { server, player, root ->
+            EditorUndoStack.clear(player.uuid)
+            // A REAL placed structure, so the restore gets past the resolve and placed-only checks
+            // and genuinely reaches the "no such revision" branch -- the pruned-revision case this
+            // test is named for. Without the structure the refusal would come from `resolveSubpath`
+            // instead, proving only that a missing file refuses.
+            EditorNewStructure.create(root, "probe")
+            EditorStructureHandlers.handlePlaceStructure(server, player, PlaceStructureC2S("probe.nbt"))
+            drainPayloads(player)
+            // Timestamps that are not in the index -- as if the revisions had been pruned.
+            EditorUndoStack.push(player.uuid, EditorUndoCommand.RestoreRevision("probe.nbt", 1L, 2L))
+
+            EditorUndoOps.undo(server, player)
+
+            // Refusals never pop -- the player can retry after resolving the conflict.
+            EditorUndoStack.peekUndo(player.uuid).shouldBeInstanceOf<EditorUndoCommand.RestoreRevision>()
+            EditorUndoStack.peekRedo(player.uuid).shouldBeNull()
+            val errors = drainPayloads(player).filterIsInstance<EditorErrorS2C>()
+            errors.shouldNotBeEmpty()
+            // Pin the branch, not just "some refusal": this is the pruned-revision one, phrased by
+            // undo() as "can't undo restore 'probe.nbt' — <reason>".
+            errors.single().reason shouldContain "no such revision"
         }
     }
 })

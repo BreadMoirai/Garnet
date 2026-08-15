@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.config.SharedSettings
 import com.breadmoirai.garnet.core.async.onServer
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.world.EditorServerContext
@@ -105,6 +106,13 @@ suspend fun withEditorServer(
                         StructureCommit.clearBackoff(this, subpath)
                     }
                     EditorSession.clear(player.uuid)
+                    // Same one-server-many-roots reason: a watch entry survives the test that set
+                    // it (mock players are never disconnected, so the DISCONNECT cleanup never
+                    // runs), and `HistoryWatchers.pushAll` matches on subpath alone — every spec
+                    // here uses "probe.nbt" — so a leaked entry makes a LATER test's commit fan out
+                    // to this test's stale player against a deleted root. In the teardown, not at
+                    // the end of each test, so a failing assertion cannot leak it.
+                    HistoryWatchers.clear(player.uuid)
                     // Drop the EditorWorld this test may have created, for the same
                     // one-server-many-roots reason (fix round 1). Anything that reaches
                     // `EditorDimLifecycle.placeFolder`/`placeAll` (the only two callers of

@@ -35,6 +35,31 @@ object EditorNames {
     }
 
     /**
+     * The typed text turned into the actual on-disk name for a *rename* of [currentName]: trimmed,
+     * and carrying [currentName]'s extension over when the user typed a bare stem.
+     *
+     * Renaming "house.nbt" to "cottage" means "cottage.nbt", not an extensionless file the Explorer
+     * would render as an unknown type and refuse to place — retyping the extension every time is
+     * busywork, and forgetting it silently breaks the file. Typing an extension explicitly still
+     * wins, including changing it ("cottage.txt") or, for the deliberate case, `resolveFinalName`'s
+     * `.nbt` normalization does not apply here: a rename must be able to produce any name the user
+     * actually asked for.
+     *
+     * [isFolder] suppresses the whole rule: folder names may legitimately contain dots ("my.stuff"),
+     * so there is no extension there to preserve. The caller knows which it has from the node type.
+     *
+     * A leading dot names the file rather than introducing an extension (".gitignore"), so it is
+     * neither treated as an extension on [currentName] nor as one on [typed].
+     */
+    fun resolveRenameName(typed: String, currentName: String, isFolder: Boolean): String {
+        val trimmed = typed.trim()
+        if (isFolder || trimmed.isEmpty()) return trimmed
+        if (trimmed.lastIndexOf('.') > 0) return trimmed
+        val dot = currentName.lastIndexOf('.')
+        return if (dot > 0) trimmed + currentName.substring(dot) else trimmed
+    }
+
+    /**
      * The name a duplicate of [sourceName] should take among [siblings]: `house.nbt` →
      * `house copy.nbt` → `house copy 2.nbt`, counting up until the name is free.
      *

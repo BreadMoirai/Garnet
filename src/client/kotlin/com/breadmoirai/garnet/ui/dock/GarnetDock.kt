@@ -61,8 +61,9 @@ fun GarnetDock(realW: Int, realH: Int) {
 private fun RegionColumn(region: DockRegion, modifier: Modifier) {
     val panels = DockState.panelsFor(region)
     if (panels.isEmpty()) return
-    val active = activeTabFor(region).coerceIn(0, panels.lastIndex)
+    val active = DockState.activeTab(region).coerceIn(0, panels.lastIndex)
     Column(modifier.background(PANEL_BG)) {
+        DockTabStrip(region, panels, active) { DockState.setActiveTab(region, it) }
         // key(): a panel body must not be able to outlive its mount. Panel content is invoked at a
         // fixed slot, and a re-mounted panel from the same factory has the same composable source
         // key, so without this Compose reuses the group and every `remember` inside survives — most
@@ -88,11 +89,4 @@ private fun Splitter(modifier: Modifier, onDrag: (dx: Int, dy: Int) -> Unit) =
 @Composable
 private fun SplitterX(modifier: Modifier, onDragX: (dx: Int) -> Unit) =
     Splitter(modifier) { dx, _ -> onDragX(dx) }
-
-private fun activeTabFor(region: DockRegion) = when (region) {
-    DockRegion.LEFT -> DockState.leftActiveTab
-    DockRegion.RIGHT -> DockState.rightActiveTab
-    DockRegion.BOTTOM -> DockState.bottomActiveTab
-    DockRegion.CENTER -> DockState.centerActiveTab
-}
 

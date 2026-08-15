@@ -75,7 +75,10 @@ Construction is via `garnetSpec(id) { … }`.
   auto-fit + re-center), and the crash-safe `writeStructureAtomic`. `captureAutoFitIn` is the
   bounded-volume capture `StructureCommit` uses for auto-save, and the only capture there is — the
   region-wide `captureAutoFit`/`saveAutoFitToFile` pair was deleted once nothing in production
-  called it.
+  called it. `placeStructureCentered(file, ...)` is a thin read-then-delegate wrapper over
+  `placeStructureTagCentered(nbt, ...)`, which holds the actual centering/placement logic; the
+  split exists so a `CompoundTag` read straight out of a Local History blob can be placed without
+  spooling it to a temp file first.
 - `StructureDiff.kt` — palette-order-insensitive NBT comparison (`structuresDiffer`) used to
   decide whether a commit's captured content actually changed vs. the committed `.nbt`.
 - `StructureRegionMath.kt` — `centeredStart`/`anchorY`/`autoFit`: pure geometry for centering and
@@ -170,6 +173,9 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
 - `structure/` — the live structure-commit pipeline (dirty-track → debounce → commit → history):
   `StructureAutoSave`, `StructureEditWatcher`, `StructureCommit`. See the `editor/structure/`
   section above.
+- `history/` — `StructureRestoreOps.kt` (moving a placed structure back to a banked revision, through
+  `StructureCommit` so it stays the sole `.nbt` writer) and `HistoryWatchers.kt` (one watched subpath
+  per player, plus the push fan-out). See [ui/local-history-panel.md](../ui/local-history-panel.md).
 - `command/EditorCommand.kt` — `/garnet editor`.
 - `network/EditorPackets.kt` + `EditorNetworkRegistry.kt` + `EditorTreeHandlers.kt` +
   `EditorStructureHandlers.kt` + `EditorFileOpsHandlers.kt` + `EditorHandlerSupport.kt` (main) —
@@ -177,10 +183,13 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   structure ops; file ops; shared helpers). See
   [persistence/network-payload-contract.md](../persistence/network-payload-contract.md)
   for the authority model — a *different* one from the deleted block-entity trust anchor.
-- `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ProjectTreeState`.
+- `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ProjectTreeState`, and (for
+  the Local History panel) `OpenStructureState` and `LocalHistoryState`.
 - `ui/` (client) — `ProjectExplorerPanel.kt`, `ExplorerToolbar.kt`, `ExplorerContextMenu.kt`,
   `ExplorerEdit.kt`, `ExplorerLifecycle.kt`, `ExplorerTreeState.kt`, `ProjectTreeState.kt`,
-  `FolderPicker.kt`, `RootPickerController.kt` — the Compose LEFT-dock panel and its state. Note
+  `FolderPicker.kt`, `RootPickerController.kt`, `LocalHistoryPanel.kt`, `OpenStructureState.kt`,
+  `LocalHistoryState.kt` — the two Compose LEFT-dock panels (Explorer and Local History) and their
+  state; see [ui/local-history-panel.md](../ui/local-history-panel.md). Note
   these classes keep the `Project*`/legacy names deliberately (the `/garnet editor` command
   literal and "redstone project" domain term are unchanged); they are not `Editor*`.
 - `world/EditorIntegratedBoot.kt` (client) — `bootWorkspace()`, the "Redstone Projects…" title-screen
@@ -192,7 +201,7 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   `ImageComposeScene` wrapper), `ComposeSurface.kt` (lifecycle + blit rendering), `ComposeInput.kt`
   (pointer/scroll/key entry points), `GlStateStash.kt` (GL state save/restore around Skia draws).
 - `dock/` — `GarnetDock.kt` (the root composable), `DockState.kt`, `DockRegion.kt`,
-  `DockInsets.kt`, `Panel.kt`.
+  `DockInsets.kt`, `Panel.kt`, `DockTabStrip.kt` (rendered only for a region holding 2+ panels).
 - `input/` — `DockInputRouter.kt`, `GlfwKeyMap.kt`.
 - `viewport/` — `ViewportState.kt`, `ViewportToggle.kt`, `DockKeybinds.kt`, `DockViewportSync.kt`
   (`syncDockViewport`, split out so it has no live-client class-init dependency and can run under a

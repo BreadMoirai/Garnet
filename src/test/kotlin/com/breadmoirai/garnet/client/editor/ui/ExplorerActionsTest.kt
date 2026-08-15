@@ -1,12 +1,19 @@
 package com.breadmoirai.garnet.client.editor.ui
 
 import com.breadmoirai.garnet.editor.ui.ExplorerActions
+import com.breadmoirai.garnet.editor.ui.OpenStructureState
+import com.breadmoirai.garnet.editor.ui.ProjectTreeState
+import com.breadmoirai.garnet.editor.data.FileNode
+import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
+import com.breadmoirai.garnet.editor.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.data.NewNodeKind
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -27,7 +34,17 @@ class ExplorerActionsTest : FunSpec({
         return sent
     }
 
-    afterTest { ExplorerActions.resetForTest() }
+    /** A snapshot whose root contains a single file named [name] at the top level. */
+    fun snapshotWith(name: String) = EditorTreeSnapshotS2C(
+        root = FolderNode("project", listOf(FileNode(name, name.substringAfterLast('.', "")))),
+        currentSubpath = null,
+    )
+
+    afterTest {
+        ExplorerActions.resetForTest()
+        ProjectTreeState.reset()
+        OpenStructureState.reset()
+    }
 
     test("creating a folder sends CreateFolderC2S with the target parent") {
         val sent = captureSends()
@@ -58,6 +75,24 @@ class ExplorerActionsTest : FunSpec({
         val sent = captureSends()
         ExplorerActions.commitRename("redstone/clock.nbt", "ring-clock.nbt") shouldBe null
         sent shouldBe listOf(RenamePathC2S("redstone/clock.nbt", "ring-clock.nbt"))
+    }
+
+    test("renaming a file without an extension keeps the one it had") {
+        val sent = captureSends()
+        ExplorerActions.commitRename("redstone/clock.nbt", "ring-clock") shouldBe null
+        sent shouldBe listOf(RenamePathC2S("redstone/clock.nbt", "ring-clock.nbt"))
+    }
+
+    test("renaming a folder does not acquire an extension from its dots") {
+        ProjectTreeState.onSnapshot(
+            EditorTreeSnapshotS2C(
+                root = FolderNode("project", listOf(FolderNode("my.stuff", emptyList()))),
+                currentSubpath = null,
+            ),
+        )
+        val sent = captureSends()
+        ExplorerActions.commitRename("my.stuff", "your") shouldBe null
+        sent shouldBe listOf(RenamePathC2S("my.stuff", "your"))
     }
 
     test("renaming to a path is rejected") {
@@ -116,6 +151,33 @@ class ExplorerActionsTest : FunSpec({
     test("moving into the folder a node already lives in sends nothing") {
         val sent = captureSends()
         ExplorerActions.commitMove("redstone/clock.nbt", "redstone").shouldNotBeNull()
+        sent.shouldBeEmpty()
+    }
+
+    test("opening local history for an unplaced structure places it first") {
+        val sent = captureSends()
+        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+
+        ExplorerActions.openLocalHistory("clock.nbt") shouldBe null
+
+        sent.filterIsInstance<PlaceStructureC2S>().single().subpath shouldBe "clock.nbt"
+    }
+
+    test("opening local history for the already-placed structure sends no place packet") {
+        val sent = captureSends()
+        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+        OpenStructureState.onStructureResult(StructureResultS2C("clock.nbt", 1, 1, 1, "placed"))
+
+        ExplorerActions.openLocalHistory("clock.nbt") shouldBe null
+
+        sent.filterIsInstance<PlaceStructureC2S>().shouldBeEmpty()
+    }
+
+    test("local history is refused for a non-structure path") {
+        val sent = captureSends()
+
+        ExplorerActions.openLocalHistory("notes.spec.kts").shouldNotBeNull()
+
         sent.shouldBeEmpty()
     }
 })

@@ -9,6 +9,7 @@ import com.breadmoirai.garnet.test.editor.EditorStructureNetworkSpec
 import com.breadmoirai.garnet.test.editor.EditorTeleportSpec
 import com.breadmoirai.garnet.test.editor.EditorUndoNetworkSpec
 import com.breadmoirai.garnet.test.editor.StructureAutoSaveSpec
+import com.breadmoirai.garnet.test.editor.StructureRestoreSpec
 import com.breadmoirai.garnet.test.history.LocalHistoryStoreSpec
 import com.breadmoirai.garnet.test.structure.StructureRegionPersistenceSpec
 import com.breadmoirai.garnet.test.structure.StructureSidecarPersistenceSpec
@@ -56,11 +57,16 @@ class GametestSentinel {
         // SERVER_STARTED has already fired by the time a GameTest method runs.
         // Register tick events and install the dispatcher directly from the live server.
         AsyncEventHandler.registerWithServer(server)
+        // Published by the Kotest worker thread, read on the server thread by the sequence at the
+        // end of this method. `null` failure + finished == the run passed.
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+        val failure = java.util.concurrent.atomic.AtomicReference<String?>(null)
         val worker = Thread.ofPlatform()
             .name("kotest-gametest")
             .uncaughtExceptionHandler { _, t ->
                 logger.error("Kotest worker crashed", t)
-                server.execute { helper.fail("Kotest worker crashed: ${t.message}") }
+                failure.set("Kotest worker crashed: ${t.message}")
+                finished.set(true)
             }
             .unstarted {
                 val result = runCatching {
@@ -81,25 +87,35 @@ class GametestSentinel {
                             StructureSidecarPersistenceSpec::class,
                             LocalHistoryStoreSpec::class,
                             StructureAutoSaveSpec::class,
+                            StructureRestoreSpec::class,
                         ),
                     )
                 }
-                server.execute {
-                    result.fold(
-                        onSuccess = { r ->
-                            logger.info("Kotest: {}", r.summary())
-                            if (r.failed > 0) helper.fail(r.summary())
-                            else helper.succeed()
-                        },
-                        onFailure = { e ->
-                            logger.error("Kotest engine error", e)
-                            helper.fail("Kotest engine error: ${e.message}")
-                        },
-                    )
-                }
+                result.fold(
+                    onSuccess = { r ->
+                        logger.info("Kotest: {}", r.summary())
+                        if (r.failed > 0) failure.set(r.summary())
+                    },
+                    onFailure = { e ->
+                        logger.error("Kotest engine error", e)
+                        failure.set("Kotest engine error: ${e.message}")
+                    },
+                )
+                finished.set(true)
             }
         worker.start()
-        // Return immediately. GameTestSequence keeps the test alive until the worker
-        // resolves it via helper.succeed()/fail().
+        // Resolve the gametest from INSIDE a sequence step, never from a `server.execute` task.
+        //
+        // `helper.fail()` reports by THROWING GameTestAssertException. Thrown from a server task it
+        // unwinds into TickTask.run, where the server logs "Error executing task on Server" and
+        // discards it — the test is never marked failed and spins until maxTicks. That cost ~32
+        // minutes per failing run while a passing run took ~2, exactly backwards for TDD. Inside a
+        // sequence step the framework catches the assertion and fails the test immediately.
+        helper.startSequence()
+            // A GameTestAssertException thrown here means "not ready yet"; the step is retried next
+            // tick until it completes without throwing.
+            .thenWaitUntil { if (!finished.get()) helper.fail("Kotest run still in progress") }
+            .thenExecute { failure.get()?.let { helper.fail(it) } }
+            .thenSucceed()
     }
 }

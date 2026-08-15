@@ -100,6 +100,28 @@ object DockState {
         DockRegion.CENTER -> centerPanels
     }
 
+    fun activeTab(region: DockRegion): Int = when (region) {
+        DockRegion.LEFT -> leftActiveTab
+        DockRegion.RIGHT -> rightActiveTab
+        DockRegion.BOTTOM -> bottomActiveTab
+        DockRegion.CENTER -> centerActiveTab
+    }
+
+    /**
+     * Select which panel a region shows. Clamped to the region's real indices, so a stale index from
+     * a caller that has not seen a panel list change can never point past the end — [GarnetDock]
+     * would otherwise index out of bounds mid-composition.
+     */
+    fun setActiveTab(region: DockRegion, index: Int) {
+        val clamped = index.coerceIn(0, (panelsFor(region).size - 1).coerceAtLeast(0))
+        when (region) {
+            DockRegion.LEFT -> leftActiveTab = clamped
+            DockRegion.RIGHT -> rightActiveTab = clamped
+            DockRegion.BOTTOM -> bottomActiveTab = clamped
+            DockRegion.CENTER -> centerActiveTab = clamped
+        }
+    }
+
     fun isVisible(region: DockRegion): Boolean = when (region) {
         DockRegion.LEFT -> leftVisible
         DockRegion.RIGHT -> rightVisible
