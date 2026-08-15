@@ -1,7 +1,7 @@
 ---
 title: Explorer undo/redo command stack
 tags: [editor, undo, history, networking, persistence]
-summary: Why the undo stack stores server-authored EditorUndoCommand records rather than the C2S packets, how a delete is made reversible by banking every file, and why a stale entry is refused rather than discarded.
+summary: Why the undo stack stores server-authored EditorUndoCommand records rather than the C2S packets, how a delete is made reversible by banking every file, why RestoreRevision carries no content at all, and why a stale entry is refused rather than discarded.
 ---
 
 # Explorer undo/redo command stack
@@ -31,11 +31,11 @@ contact with two of the six mutating handlers:
   describes either.
 
 So each handler records what it *actually did*, as an `EditorUndoCommand`. That is also why the
-type is a sealed interface of five server-authored records rather than a wrapper around
+type is a sealed interface of six server-authored records rather than a wrapper around
 `CustomPacketPayload`, and why it is named `EditorUndoCommand` and not `EditorCommand` — the latter
 is the brigadier command object in `editor/command/`.
 
-## The five commands and their inverses
+## The six commands and their inverses
 
 | Command | Recorded by | Undo | Redo |
 |---|---|---|---|
@@ -44,6 +44,7 @@ is the brigadier command object in `editor/command/`.
 | `Duplicate(createdSubpath, banked?)` | `handleDuplicate` | `deleteSubtree` the copy | restore its `banked` delete |
 | `Relocate(oldSubpath, newSubpath, kind)` | `relocate`, for both `handleRename` (`RENAME`) and `handleMove` (`MOVE`) | `relocate` back | `relocate` forward again |
 | `Delete(rootSubpath, manifest, banked)` | `handleDelete` | `restoreSubtree` | `deleteSubtree` again |
+| `RestoreRevision(subpath, fromTimestampMillis, toTimestampMillis)` | `handleRestoreRevision` | restore `from` | restore `to` |
 
 `RelocateKind` and `CreatedFileKind` exist for **messages and side effects, not identity**: a rename
 and a move are the same filesystem operation, and the kind only decides whether the label reads
@@ -187,6 +188,35 @@ from the same report. That packet is not bookkeeping: `sendTree` refreshes the *
 client's `loadedSpecIds` for a folder, so an inverse that only re-placed server-side left the client
 listing a spec whose file was gone, with no error and no self-correction.
 
+## `RestoreRevision` carries no content, and both directions are the same operation
+
+`RestoreRevision` is the one command that is not a file operation: it records a Local History
+restore of a structure's *contents* (see [ui/local-history-panel.md](../ui/local-history-panel.md)).
+
+**Undo is the same operation aimed at the other timestamp.** Undo restores `from`, redo restores
+`to`; both go through `StructureRestoreOps.restore`, so there is no inverse machinery and no new
+replay path. The reason that works — and the reason the command carries **no content at all**, unlike
+`Delete`'s manifest and bank — is that the pre-restore state is *itself a banked revision*: a restore
+begins by quiescing pending world edits into a fresh `autosave` revision, and aborts if that fails.
+So "where this restore came from" is always a real revision on disk, nameable by timestamp. Nothing
+has to be reconstructed, and no bytes ride on the stack.
+
+This is also why `restore` takes no `ServerPlayer` and reports through a `RestoreOutcome` rather than
+sending packets: `EditorUndoOps` needs to phrase the failure as an undo/redo refusal, and the packet
+handler needs to phrase it as a restore refusal.
+
+Two details that are easy to get wrong:
+
+- **The seated command is not the one that was replayed.** `replayRestore` re-seats
+  `command.copy(fromTimestampMillis = outcome.fromTimestampMillis)` — the revision *this* replay's
+  own quiesce just banked. Re-seating the original `from` would aim every subsequent reversal at one
+  fixed revision, which is not what the intervening replays left on disk. `to` does not move: it
+  names the revision the entry is *about*. This is the same class of bug as re-seating a stale bank
+  on a delete redo — see "A replay re-banks; it never re-seats a stale bank" below.
+- **Refusals never pop**, exactly as elsewhere. A pruned target revision or a structure that is no
+  longer placed is a conflict the player can resolve and retry, so the entry stays put rather than
+  being half-applied or silently discarded.
+
 ## Test coverage
 
 `EditorUndoNetworkSpec` (`src/gametest/.../editor/`) covers the whole feature end to end: what each
@@ -197,7 +227,10 @@ unbankable and history-disabled delete paths, each command's undo and redo, the 
 that a redo does not discard the redo entries above it. Two tests pin the re-bank and the quiesce
 specifically: a redo of a delete must bank the file as the player edited it *after* the undo (so the
 next undo does not revert that edit), and a redo whose structure is dirty in `StructureAutoSave` must
-commit before banking (so an in-world edit survives the round trip). `EditorUndoStackTest` and
+commit before banking (so an in-world edit survives the round trip). Three more cover
+`RestoreRevision`: undoing a restore returns the structure to its pre-restore content, redoing it
+re-applies, and an undo whose target revision has been pruned refuses and keeps the entry.
+`EditorUndoStackTest` and
 `EditorUndoPacketsTest` (`src/test/`) cover the deque semantics and the payload codecs;
 `ExplorerUiSpec` (`src/clientTest/`) covers the toolbar buttons' enablement from `UndoStateS2C`.
 

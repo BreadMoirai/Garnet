@@ -1,7 +1,7 @@
 ---
 title: Kotest + coroutine test bridge
 tags: [testing, kotest, coroutines, gametest, client-gametest]
-summary: How specs work in src/gametest, src/clientTest, src/test — the awaitTicks / spawnStructure cookbook plus invariants you must respect.
+summary: How specs work in src/gametest, src/clientTest, src/test — the awaitTicks / spawnStructure cookbook, the GametestSentinel gotchas (no classpath discovery, never resolve from a server task, orphaned world locks), plus invariants you must respect.
 ---
 
 The same base class is used by shipped `.spec.kts` files at runtime — see `docs/superpowers/specs/2026-05-07-garnet-kotest-bridge-design.md`.
@@ -102,6 +102,63 @@ class ComparatorSpec : GarnetTestSpec({
 ```
 
 Use `spawnStructure` per test for isolation. With sequential mode (the default: `concurrentSpecs = 1`, `concurrentTests = 1`), the grid always allocates slot 0 and releases it after each test.
+
+## Sentinel gotchas (gametest only)
+
+Three things about `GametestSentinel` that cost hours each and are invisible from the code.
+
+### There is NO classpath discovery — register the spec or it silently never runs
+
+`GametestSentinel` passes an **explicit `specs = listOf(...)`** to `launchKotest`. Nothing scans the
+classpath. A new spec class under `src/gametest/` that is not added to that list **never runs**, and
+the build still reports PASS — no warning, no skipped-test entry, nothing. A green run is not
+evidence your new spec passed; it is equally consistent with your new spec never having existed.
+
+The only reliable check is that the **total test count rose** by the number of cases you added
+(`build/reports/garnet/gametest/`, or the `Kotest: …` summary line in the run log). Compare it
+against the previous run before believing a first green.
+
+`src/test/` is the opposite — Kotest's JUnit Platform engine discovers those specs automatically —
+which is exactly why this trap is easy to walk into after a session spent writing unit tests.
+
+### Never resolve a gametest from a server task; use a `GameTestSequence` step
+
+`helper.fail()` reports a failure by **throwing** `GameTestAssertException`. Thrown from inside
+`server.execute { }`, that exception unwinds into `TickTask.run`, where the server logs
+`"Error executing task on Server"` and **discards it**. The test is never marked failed, so it spins
+until `maxTicks` — which for this sentinel is 600000. A *failing* run therefore took ~32 minutes
+while a *passing* run took ~2: exactly backwards for TDD, and the failure was invisible in the
+gametest result even though the assertion had fired.
+
+The fix (commit `98b5b70`) resolves from inside a `GameTestSequence` instead:
+
+```kotlin
+helper.startSequence()
+    .thenWaitUntil { if (!finished.get()) helper.fail("Kotest run still in progress") }
+    .thenExecute { failure.get()?.let { helper.fail(it) } }
+    .thenSucceed()
+```
+
+The Kotest worker publishes into an `AtomicBoolean` (`finished`) and an `AtomicReference<String?>`
+(`failure`); the sequence reads them on the server thread. Inside a sequence step the framework
+*catches* the assertion — in `thenWaitUntil` it means "not ready yet, retry next tick", and in
+`thenExecute` it fails the test immediately. A failing run now finishes in ~97s.
+
+The rule generalizes: **any** `helper.fail()`/`helper.succeed()` must reach the harness from a
+sequence step (or the `@GameTest` method's own frame), never from a task posted to the server.
+
+### Kill an orphaned gametest server before re-running
+
+An interrupted `runGameTest` (Ctrl-C, a killed Gradle daemon, an IDE stop) leaves a live
+`java.exe -Dfabric-api.gametest` process holding the run world's `DirectoryLock`. The next run then
+dies after ~50s with:
+
+```
+IOException: The process cannot access the file because another process has locked a portion of the file
+```
+
+That message names a lock, not a corrupt world — nothing needs deleting. Find and kill the orphan
+(`tasklist`/`ps` for `fabric-api.gametest`) and re-run.
 
 ## Invariants
 
