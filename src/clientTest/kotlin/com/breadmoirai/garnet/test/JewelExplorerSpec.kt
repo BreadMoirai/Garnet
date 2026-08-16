@@ -23,6 +23,7 @@ import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
@@ -143,7 +144,7 @@ class JewelExplorerSpec : ClientSpec({
         // this is where that regression first showed itself. `header` proves the panel actually
         // painted; `menu` proves no dropdown leaked in from another spec's mount.
         val header = headerRegionDiffCount(treeShot)
-        val menu = PanelPixelProbe.menuRegionDiffCount(treeShot)
+        val menu = dropdownRegionDiffCount(treeShot)
         println("[jewel] fresh-mount guard: header=$header menu=$menu")
         header shouldBeGreaterThan 8
         menu shouldBeLessThan PanelPixelProbe.MENU_CLOSED_MAX
@@ -168,6 +169,18 @@ class JewelExplorerSpec : ClientSpec({
         capture("jewel_explorer_click.png")
         println("[jewel] click: selectedPath=${ExplorerTreeState.selectedPath}")
         ExplorerTreeState.selectedPath shouldBe "adders"
+
+        // A click on a folder row does double duty: it selects AND toggles expansion
+        // (ProjectExplorerPanel.onElementClick, `is FolderNode -> ExplorerTreeState.toggleExpanded(path)`,
+        // deliberate per that file's own doc). "adders" was expanded by mountExplorer(), so this same
+        // click that just selected it also collapsed it -- real, load-bearing coverage of that
+        // click-to-toggle contract, not incidental.
+        ExplorerTreeState.expandedPaths shouldNotContain "adders"
+
+        // Re-expand it before testing arrow-key descent, which is the actual point of step 4 below:
+        // DOWN should move into an expanded child, not just to the next visible row.
+        runOnClient { ExplorerTreeState.toggleExpanded("adders") }
+        waitClientTicks(4)
 
         // 4. arrow keys navigate the tree end-to-end through the new key path. The whole point of
         // Task 3: this was impossible before, because keys never reached the scene. Assert the exact

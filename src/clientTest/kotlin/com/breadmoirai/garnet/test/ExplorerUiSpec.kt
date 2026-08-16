@@ -4,6 +4,7 @@ import com.breadmoirai.garnet.editor.ui.ExplorerActions
 import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.ui.ProjectTreeState
 import com.breadmoirai.garnet.editor.ui.explorerPanel
+import com.breadmoirai.garnet.editor.ui.localHistoryPanel
 import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.ui.dock.DockRegion
@@ -16,6 +17,7 @@ import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.MovePathC2S
+import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.UndoStateS2C
 import com.breadmoirai.garnet.editor.data.FileNode
@@ -150,7 +152,8 @@ class ExplorerUiSpec : ClientSpec({
         click(x + 20.0, y + ROW_0_DY + index * ROW_PITCH + separatorsAbove * SEPARATOR_H)
     }
 
-    // Menu order: New Folder(0), New Structure(1), --, Rename(2), Duplicate(3), Move to…(4), --, Delete(5).
+    // Menu order (ExplorerContextMenu.kt): New Folder(0), New Structure(1), --, Rename(2),
+    // Duplicate(3), Move to…(4), --, Local History(5), --, Delete(6).
     fun rightClickThenDuplicate(x: Double, y: Double) {
         rightClick(x, y); clickMenuRow(x, y, index = 3, separatorsAbove = 1)
     }
@@ -159,8 +162,12 @@ class ExplorerUiSpec : ClientSpec({
         rightClick(x, y); clickMenuRow(x, y, index = 4, separatorsAbove = 1)
     }
 
-    fun rightClickThenDelete(x: Double, y: Double) {
+    fun rightClickThenLocalHistory(x: Double, y: Double) {
         rightClick(x, y); clickMenuRow(x, y, index = 5, separatorsAbove = 2)
+    }
+
+    fun rightClickThenDelete(x: Double, y: Double) {
+        rightClick(x, y); clickMenuRow(x, y, index = 6, separatorsAbove = 3)
     }
 
     /**
@@ -248,10 +255,12 @@ class ExplorerUiSpec : ClientSpec({
         newFolderRow(onRename) shouldBe 0 // the whole bug: this used to stay lit
         renameRow(onRename) shouldBeGreaterThan PanelPixelProbe.MENU_ROW_HOVERED_MIN
 
-        // ...and the click lands on Rename, not on a stale flyout. The field seeds with the current
-        // name and places the cursor at the end, so typing "2" commits "redstone2".
+        // ...and the click lands on Rename, not on a stale flyout. The field seeds fully SELECTED
+        // (ProjectExplorerPanel.kt: `state.setTextAndSelectAll(initial)`, deliberate -- "the way a
+        // rename behaves everywhere else"), so typing over it replaces the whole name rather than
+        // appending after a trailing cursor.
         click(110.0, 144.0)
-        type("2")
+        type("redstone2")
         pressEnter()
         sent shouldBe listOf(RenamePathC2S("redstone", "redstone2"))
 
@@ -324,6 +333,22 @@ class ExplorerUiSpec : ClientSpec({
         try {
             rightClickThenDuplicate(CLOCK_X, CLOCK_Y)
             sent shouldBe listOf(DuplicatePathC2S("redstone/clock.nbt"))
+        } finally {
+            unmountFromContextMenu()
+        }
+    }
+
+    test("Local History places the structure first when it isn't already open") {
+        // The row this task's coordinate fix (Finding 3/4) revealed was never actually exercised:
+        // rightClickThenDelete's old index/separatorsAbove landed exactly here instead, so this is
+        // the only menu row that had no dedicated coverage at all.
+        val sent = captureSends()
+        mountWithRedstoneExpanded()
+        runOnClient { DockState.panels += localHistoryPanel() }
+        try {
+            rightClickThenLocalHistory(CLOCK_X, CLOCK_Y)
+            sent shouldBe listOf(PlaceStructureC2S("redstone/clock.nbt"))
+            onClient { DockState.openPanelId(DockRegion.LEFT) } shouldBe "garnet.localHistory"
         } finally {
             unmountFromContextMenu()
         }
