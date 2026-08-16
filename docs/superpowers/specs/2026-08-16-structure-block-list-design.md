@@ -44,16 +44,19 @@ non-air to compute the auto-fit box. The same callback gains a per-block tally b
 `blockCount++`:
 
 ```kotlin
-val tally = Object2IntOpenHashMap<Block>()
+val tally = HashMap<Block, Int>()
 val fit = autoFit(scan.size.x, scan.size.y, scan.size.z) { lx, ly, lz ->
     val state = level.getBlockState(BlockPos(scan.origin.x + lx, scan.origin.y + ly, scan.origin.z + lz))
     val nonAir = !state.`is`(Blocks.AIR)
-    if (nonAir) { blockCount++; tally.addTo(state.block, 1) }
+    if (nonAir) { blockCount++; tally.merge(state.block, 1, Int::plus) }
     nonAir
 }
 ```
 
-`CapturedStructure` gains a `tally: Object2IntMap<Block>` field.
+`CapturedStructure` gains a `tally: Map<Block, Int>` field. A plain `Map` rather than a fastutil
+`Object2IntMap`: fastutil is used nowhere else in this codebase, and the tally is at most a few
+hundred entries built once per commit — not worth introducing a dependency style the repo doesn't
+already have.
 
 **Why the tally is exact.** The walk covers the whole *scan* volume, which is a superset of the
 tight auto-fit box — but the tight box is by definition the bounding box of all non-air, so every
