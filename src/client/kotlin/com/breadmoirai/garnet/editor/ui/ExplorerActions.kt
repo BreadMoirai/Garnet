@@ -12,6 +12,7 @@ import com.breadmoirai.garnet.editor.data.NewNodeKind
 import com.breadmoirai.garnet.editor.data.EditorNames
 import com.breadmoirai.garnet.editor.data.resolve
 import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.viewport.commitDockVisibilityChange
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
@@ -102,12 +103,20 @@ object ExplorerActions {
      * restore path single, with a footprint to clear and a commit to write through. So this is
      * "place, then look at", never "look at without placing".
      *
+     * The [commitDockVisibilityChange] follow-up is not optional even though this call *usually*
+     * cannot change the dock's geometry: the menu that reaches it is only reachable with LEFT already
+     * open, and Explorer and Local History happen to share a region and therefore a width. Both of
+     * those are coincidences of today's panel set, not invariants — the moment a Local History panel
+     * lands in another region, or the two widths diverge, skipping the follow-up leaves `WindowMixin`'s
+     * cached framebuffer override describing the old insets and the world blitted stretched.
+     *
      * Null on success, else the reason nothing happened.
      */
     fun openLocalHistory(path: String): String? {
         if (!path.endsWith(".nbt")) return "local history is only available for structures"
         if (OpenStructureState.subpath != path) sender(PlaceStructureC2S(path))
         DockState.showPanel("garnet.localHistory")
+        commitDockVisibilityChange()
         return null
     }
 

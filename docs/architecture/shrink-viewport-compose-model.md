@@ -43,7 +43,8 @@ coordinate system to convert between.
 
 ## The frame-ordering guarantee: insets are plain state, never gated on a compose pass
 
-`DockState`'s region sizes and visibility (`leftWidth`, `rightVisible`, etc.) are plain Compose
+`DockState`'s region sizes and visibility (`leftWidth`, and the `openPanel` map behind
+`isVisible(region)`) are plain Compose
 snapshot-state fields, mutated eagerly by input handlers (`DockKeybinds`, splitter drag) — **not**
 as a side effect of a `GarnetDock` recomposition. `ViewportState`/`WindowMixin` read those fields
 directly to compute `DockInsets` and the shrink rect. This ordering is deliberate: the shrink must be
@@ -72,8 +73,12 @@ top is missing. Nothing about the dock being unavailable can corrupt the base ga
 folds `DockInsets(left, right, bottom, top)` — computed from `DockState.leftWidth`/`rightWidth`/
 `bottomHeight` gated on `isVisible` — into the shrink rect the same way it already folded the older,
 independent viewport-shrink-keybind reservation. A dock resize or visibility toggle calls
-`garnet$updateScaledFramebuffer(true)` explicitly (see `DockKeybinds`'s Shift+1 handler) so the
-world inset updates immediately rather than waiting for the next incidental window resize.
+`garnet$updateScaledFramebuffer(true)` explicitly — for visibility, always through
+`commitDockVisibilityChange()` (`ui/viewport/DockVisibilityCommit.kt`), which is the single follow-up
+every mutation site runs — so the world inset updates immediately rather than waiting for the next
+incidental window resize. The override `WindowMixin` caches is **not** recomputed per frame, while
+`MinecraftPresentMixin` recomputes its blit rect fresh every present, so skipping that call leaves a
+texture of the old width stretched into a rect of the new one.
 
 ## Cursor input maps through the shrink offset
 

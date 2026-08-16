@@ -23,9 +23,14 @@ private val SPLITTER_COLOR = Color(0xFF10161F)
  * Full-window dock. Draws the visible LEFT/RIGHT/BOTTOM regions (with draggable splitters) and
  * any CENTER panel; everything else is transparent so the composited world shows through. Sizes
  * come from [DockState] in real pixels (the scene runs at Density(1f)).
+ *
+ * [onVisibilityChanged] is the only thing this composable takes that is not layout: the callback a
+ * stripe click must run once it has changed which panel is open. `ComposeSurface` supplies
+ * `commitDockVisibilityChange`; it is threaded in as a parameter so this package keeps no dependency
+ * on `ui/viewport` or `Minecraft` (see [DockStripe]).
  */
 @Composable
-fun GarnetDock(realW: Int, realH: Int) {
+fun GarnetDock(realW: Int, realH: Int, onVisibilityChanged: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
         val stripe = if (DockState.anyActive()) STRIPE_WIDTH else 0
         val left = if (DockState.isVisible(DockRegion.LEFT)) DockState.leftWidth else 0
@@ -58,7 +63,11 @@ fun GarnetDock(realW: Int, realH: Int) {
             )
         }
         if (stripe > 0) {
-            DockStripe(DockRegion.LEFT, Modifier.offset(0.dp, 0.dp).width(stripe.dp).height(realH.dp))
+            DockStripe(
+                DockRegion.LEFT,
+                Modifier.offset(0.dp, 0.dp).width(stripe.dp).height(realH.dp),
+                onVisibilityChanged,
+            )
         }
     }
 }

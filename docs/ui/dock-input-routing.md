@@ -174,30 +174,55 @@ One `KeyMapping` on `1`; the Alt/Shift distinction is read from live GLFW modifi
   alone — Alt+1 means "give the dock the keyboard", not "switch panels") and focus LEFT.
 - **Shift+1** — `DockState.togglePanel("garnet.explorer")`: opens the Explorer (evicting whatever LEFT
   currently shows), or closes LEFT if the Explorer is already what LEFT shows, or switches LEFT to the
-  Explorer when LEFT is showing something else. If the toggle ends up hiding a focused LEFT, also
-  `clearFocus()`, then `garnet$updateScaledFramebuffer(true)` so the world inset resizes immediately.
+  Explorer when LEFT is showing something else.
 - Bare `1` falls through to the vanilla hotbar slot.
 - Both branches are no-ops while `mc.level == null` (no world loaded) — see
   [dock-framework.md](dock-framework.md#world-session-lifecycle) for the disconnect-time teardown
   this guard pairs with.
 
-Both branches also call `syncDockViewport()` (defined in `viewport/DockViewportSync.kt`, split out
-of `DockKeybinds.kt` so it can be exercised by a plain-JVM test — see "Test coverage" below) right
-after mutating
-`DockState` and before the framebuffer-resize call — see "Render enablement is derived from
-DockState" below for what it does and why it makes the dock reachable on its own.
+Both branches end in `commitDockVisibilityChange()` (next section).
 
-Both branches also persist the resulting open-panel map via `DockLayoutStore.save(DockState.openMap())`
-(see [dock-stripe.md](dock-stripe.md#persistence-garnet-dockjson-moved-from-a-boolean-to-an-open-panel-map)
-for the record's shape): Shift+1 always writes, and Alt+1 only on its open-and-focus half (its
-focus-only half — clearing focus on an already-focused region — changes no panel, so it does not
-write). This is what joining a Garnet world later reads back — see
-[dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world](dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world).
+Registered from `GarnetClient.onInitializeClient()` next to `registerViewportToggle()`.
+
+## Every visibility change ends in `commitDockVisibilityChange()`
+
+`commitDockVisibilityChange(persist: Boolean = true)` (`ui/viewport/DockVisibilityCommit.kt`) is the
+one definition of "which panels are open just changed — now make the rest of the client agree". In
+order:
+
+1. **Persist** the new open-panel map via `DockLayoutStore.save(DockState.openMap())` (see
+   [dock-stripe.md](dock-stripe.md#persistence-garnet-dockjson-moved-from-a-boolean-to-an-open-panel-map)
+   for the record's shape). This is what joining a Garnet world later reads back — see
+   [dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world](dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world).
+   Skipped (`persist = false`) for changes the player did not choose: disconnect-time `closeAll()`,
+   join-time auto-open, and Alt+1's focus-only half, which changes no panel.
+2. **Drop focus if the focused region just closed** (`DockInputRouter.clearFocus()`). A closed region
+   has no scene to route into, so leaving `focusedRegion` pointing at it keeps the cursor released and
+   keeps feeding clicks and keys to nothing.
+3. `syncDockViewport()` — see "Render enablement is derived from DockState" below. Must run *after*
+   step 2, because `focusedRegion` is one of the two inputs to `anyActive()`.
+4. `garnet$updateScaledFramebuffer(true)` — re-caches `WindowMixin`'s framebuffer override.
+
+Step 4 is the one that makes this non-optional rather than tidy. `WindowMixin` **caches** the shrunk
+size in `garnet$overrideFramebufferWidth/Height` and recomputes it only from that call or a real OS
+window resize, while `MinecraftPresentMixin` recomputes its destination rect from `DockInsets` fresh
+on every present. Skip the call and the two disagree: close the Explorer and a `realW - 312`-wide game
+texture gets blitted into a `realW - 32`-wide rect, leaving the world visibly stretched until
+something else resizes the framebuffer. That was a real shipped bug — `DockStripe` mutated `DockState`
+and stopped there.
+
+The call sites are the Shift+1 and Alt+1 keybind branches, `registerDockWorldLifecycle`'s JOIN and
+DISCONNECT hooks, `ExplorerActions.openLocalHistory`, and the stripe's tap. The stripe reaches it
+through a callback: `ComposeSurface` passes `commitDockVisibilityChange` into `GarnetDock`, which
+threads it into `DockStripe`, whose `detectTapGestures` calls `stripeIconClicked(panelId, callback)`.
+That indirection is deliberate — it keeps the whole `ui/dock` package free of `Minecraft` imports so
+`DockState` and the stripe's click behaviour stay unit-testable with no render context
+(`DockVisibilityCommitTest` in `src/test`), and the seams on `DockVisibilityCommit` let that test pin
+all four steps without a config directory or a live window.
+
 Auto-open itself changes visibility only: `DockState.focusedRegion` stays `null`, so the mixins above
 keep routing to the game and the cursor stays grabbed — Alt+1 remains the only path to focusing the
 panel.
-
-Registered from `GarnetClient.onInitializeClient()` next to `registerViewportToggle()`.
 
 ## Render enablement is derived from `DockState`, not a separate toggle
 
@@ -209,9 +234,9 @@ open panel, or a non-null `focusedRegion`), and `syncDockViewport()` (`viewport/
 `ComposeOverlay.renderInto` early-returns).
 
 `syncDockViewport()` is intentionally free of any `Window` dependency (it only flips the two
-flags) so it can be exercised by a plain-JVM test without a live client or GLFW; the keybind handler calls
-`garnet$updateScaledFramebuffer(true)` separately, right after, to apply the shrink using
-the live window.
+flags) so it can be exercised by a plain-JVM test without a live client or GLFW;
+`commitDockVisibilityChange()` calls `garnet$updateScaledFramebuffer(true)` separately, right after,
+to apply the shrink using the live window.
 
 The `V`/`C` keybinds in `ViewportToggle.kt` remain independent debug toggles for the viewport
 shrink and Compose overlay individually — they are no longer required to reach the dock, and are

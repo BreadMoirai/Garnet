@@ -249,7 +249,11 @@ object ComposeSurface {
         host?.let { if (it.width == width && it.height == height) return it }
         host?.close()
         val h = ComposeSceneHost(width, height) {
-            com.breadmoirai.garnet.ui.dock.GarnetDock(width, height)
+            com.breadmoirai.garnet.ui.dock.GarnetDock(
+                width,
+                height,
+                { com.breadmoirai.garnet.ui.viewport.commitDockVisibilityChange() },
+            )
         }
         host = h
         logger.info("[compose] GarnetDock scene ({}x{}) created", width, height)

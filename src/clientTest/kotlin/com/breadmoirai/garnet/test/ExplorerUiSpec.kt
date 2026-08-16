@@ -9,6 +9,7 @@ import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.STRIPE_WIDTH
 import com.breadmoirai.garnet.ui.input.DockInputRouter
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
@@ -184,11 +185,28 @@ class ExplorerUiSpec : ClientSpec({
     fun clickMoveDestinationRoot(x: Double, y: Double) = clickMenuRow(x, y, index = 0, separatorsAbove = 0)
 
     /**
-     * The "clock.nbt" row, one tree row below "redstone" (which the nested-folder test above
-     * right-clicks at 90/68). Tree rows are 28px apart, measured from the root row at y=40.
+     * Tree-row hit points, in **scene** coordinates.
+     *
+     * Every x here is `STRIPE_WIDTH + <offset within the panel body>`: this spec mounts the dock with
+     * a panel open (`showPanel("garnet.explorer")`), which makes `DockState.anyActive()` true, which
+     * makes `GarnetDock` paint the tool-window stripe over `x ∈ [0, 32)` and push the LEFT panel body
+     * to start at `x = STRIPE_WIDTH`. The pre-stripe raw values still landed on a tree row — rows are
+     * full-width, so the suite stayed green — but each click was 32px further left *within the panel*
+     * than its comment claimed, and the context-menu pixel windows measured from them straddled the
+     * stripe. `JewelExplorerSpec` shifts by the same constant for the same reason.
+     *
+     * "clock.nbt" is one tree row below "redstone"; rows are 28px apart, measured from the root row
+     * at y=40.
      */
-    val CLOCK_X = 90.0
+    val ROOT_X = STRIPE_WIDTH + 60.0
+    val ROOT_Y = 40.0
+    val REDSTONE_X = STRIPE_WIDTH + 90.0
+    val REDSTONE_Y = 68.0
+    val CLOCK_X = STRIPE_WIDTH + 90.0
     val CLOCK_Y = 96.0
+
+    /** x inside an open context-menu card's rows, i.e. 20px right of the click point that opened it. */
+    val MENU_ROW_X = REDSTONE_X + 20.0
 
     fun type(text: String) {
         runOnClient { text.forEach { c -> DockInputRouter.onGlfwChar(c.code) } }
@@ -214,7 +232,7 @@ class ExplorerUiSpec : ClientSpec({
         val closedShot = capture("explorer_context_menu_closed.png")
         val closedCount = PanelPixelProbe.contextMenuRegionDiffCount(closedShot)
         println("[context-menu] probe (closed): diffCount=$closedCount")
-        rightClick(60.0, 40.0)
+        rightClick(ROOT_X, ROOT_Y)
         val openShot = capture("explorer_context_menu_open.png")
         val openCount = PanelPixelProbe.contextMenuRegionDiffCount(openShot)
         println("[context-menu] probe (open): diffCount=$openCount")
@@ -233,11 +251,11 @@ class ExplorerUiSpec : ClientSpec({
         // used to block all pointer input to the parent card below it). "redstone", not the project
         // root: the root's Rename is disabled, and a disabled Jewel menu item emits no hover
         // interactions at all, which would make the pixel half of this vacuous.
-        rightClick(90.0, 68.0)
-        runOnClient { DockInputRouter.onGlfwMove(110.0, 87.0) } // "New Folder", row 1
+        rightClick(REDSTONE_X, REDSTONE_Y)
+        runOnClient { DockInputRouter.onGlfwMove(MENU_ROW_X, 87.0) } // "New Folder", row 1
         waitClientTicks(10)
         val onNew = capture("context_menu_hover_new_folder.png")
-        runOnClient { DockInputRouter.onGlfwMove(110.0, 144.0) } // "Rename", row 3
+        runOnClient { DockInputRouter.onGlfwMove(MENU_ROW_X, 144.0) } // "Rename", row 3
         waitClientTicks(10)
         val onRename = capture("context_menu_hover_rename.png")
 
@@ -259,7 +277,7 @@ class ExplorerUiSpec : ClientSpec({
         // (ProjectExplorerPanel.kt: `state.setTextAndSelectAll(initial)`, deliberate -- "the way a
         // rename behaves everywhere else"), so typing over it replaces the whole name rather than
         // appending after a trailing cursor.
-        click(110.0, 144.0)
+        click(MENU_ROW_X, 144.0)
         type("redstone2")
         pressEnter()
         sent shouldBe listOf(RenamePathC2S("redstone", "redstone2"))
@@ -268,7 +286,7 @@ class ExplorerUiSpec : ClientSpec({
         // root. The panel opens the field by adding the target folder's path to treeState.openNodes
         // (see ProjectExplorer's onNew callback), so the field is visible without a separate click to
         // expand.
-        rightClickThenNewFolder(90.0, 68.0)
+        rightClickThenNewFolder(REDSTONE_X, REDSTONE_Y)
         ExplorerTreeState.treeState.openNodes.contains("redstone").shouldBeTrue()
 
         // 4. an invalid name keeps the inline field open for correction, and nothing new is sent.
@@ -287,7 +305,7 @@ class ExplorerUiSpec : ClientSpec({
         sent shouldBe listOf(RenamePathC2S("redstone", "redstone2"), CreateFolderC2S("redstone", "clocks"))
 
         // 6. reopen the field, press Escape -- nothing is sent and no stale text lingers.
-        rightClickThenNewFolder(60.0, 40.0)
+        rightClickThenNewFolder(ROOT_X, ROOT_Y)
         type("abandoned")
         pressEscape()
         // If Escape had not actually cancelled the field (e.g. the "cancels on mount" class of bug

@@ -282,24 +282,54 @@ class JewelExplorerSpec : ClientSpec({
         ComposeSurface.disabled.shouldBeFalse()
     }
 
-    test("switching panels from the stripe actually swaps what the LEFT region paints") {
+    test("clicking a stripe icon swaps the lit icon and what the LEFT region paints") {
         closeClientScreen(); waitClientTicks(2)
         runOnClient { OpenStructureState.reset(); LocalHistoryState.reset() }
         mountExplorer()
         // A second LEFT panel: this is also what puts a second icon in the stripe, so the stripe is
-        // part of what is being captured here.
+        // part of what is being captured here. Focus is needed because the click below goes through
+        // DockInputRouter, which only forwards to the scene while a region is captured.
         runOnClient {
             DockState.panels += localHistoryPanel()
             DockState.showPanel("garnet.explorer")
+            DockInputRouter.focus(DockRegion.LEFT)
         }
         waitClientTicks(12)
         val explorerShot = capture("stripe_panel_explorer.png")
         ComposeSurface.disabled.shouldBeFalse()
 
-        runOnClient { DockState.togglePanel("garnet.localHistory") }
+        // The stripe column itself, x in [0, 32) -- the one part of the dock no test sampled before
+        // the final review. Box 0 is the Explorer, box 1 is Local History; the open one carries
+        // ICON_SELECTED_BG across its whole 28x28 box, the other shows only its icon artwork.
+        val explorerIcon0 = PanelPixelProbe.stripeIconDiffCount(explorerShot, 0)
+        val explorerIcon1 = PanelPixelProbe.stripeIconDiffCount(explorerShot, 1)
+        println("[jewel] stripe icons (Explorer open): box0=$explorerIcon0/196 box1=$explorerIcon1/196")
+        explorerIcon0 shouldBeGreaterThan explorerIcon1
+        // The idle box still has to paint something: this is what proves the IconKey rasterized to
+        // real artwork rather than the stripe being an empty 32px gutter with a highlight in it.
+        explorerIcon1 shouldBeGreaterThan 0
+
+        // A REAL pointer click into the stripe, not DockState.togglePanel(): the whole point of the
+        // final review's Critical 1 was that no test ever routed an event through DockStripe's
+        // gesture detector, so the missing commitDockVisibilityChange() follow-up went unnoticed.
+        // Box 1 spans y in [36, 64) at Density(1f) (4dp top padding + 28dp box, twice), centre y=50;
+        // x=16 is the middle of the STRIPE_WIDTH=32 column.
+        runOnClient {
+            DockInputRouter.onGlfwMove(16.0, 50.0)
+            DockInputRouter.onGlfwPress(0)
+        }
+        waitClientTicks(3)
+        runOnClient { DockInputRouter.onGlfwRelease(0) }
         waitClientTicks(12)
         val historyShot = capture("stripe_panel_history.png")
         onClient { DockState.openPanelId(DockRegion.LEFT) } shouldBe "garnet.localHistory"
+
+        // ...and the highlight followed the click to the other icon.
+        val historyIcon0 = PanelPixelProbe.stripeIconDiffCount(historyShot, 0)
+        val historyIcon1 = PanelPixelProbe.stripeIconDiffCount(historyShot, 1)
+        println("[jewel] stripe icons (History open): box0=$historyIcon0/196 box1=$historyIcon1/196")
+        historyIcon1 shouldBeGreaterThan historyIcon0
+        historyIcon0 shouldBeGreaterThan 0
 
         // Asserted by pixel diff, not by state flags: showPanel reads back cleanly the instant it is
         // called, while a stale composition can still be the thing on screen -- exactly the

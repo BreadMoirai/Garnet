@@ -6,7 +6,7 @@ summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real frameb
 
 # GarnetDock — full-window Compose dock
 
-The dock is a single `@Composable` (`GarnetDock(realW, realH)`,
+The dock is a single `@Composable` (`GarnetDock(realW, realH, onVisibilityChanged)`,
 `src/client/kotlin/.../ui/dock/GarnetDock.kt`) hosted full-window by
 `ComposeSceneHost` and blitted over the world composite by `ComposeSurface`. It replaced the
 feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was deleted.
@@ -18,7 +18,9 @@ feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was 
 raster `org.jetbrains.skia.Image` each frame (`render(nanos)`) and exposes pointer/scroll/key
 forwarders (`pointerMove/Press/Release`, `scroll`, `sendKey`) driven by `DockInputRouter`
 (see `dock-input-routing.md`).
-`ComposeSurface.ensureHost(w, h)` recreates it on window-size change and hosts `GarnetDock(w, h)`.
+`ComposeSurface.ensureHost(w, h)` recreates it on window-size change and hosts the dock, passing
+`commitDockVisibilityChange` as the third argument — the follow-up a stripe click must run, threaded
+in as a parameter so `ui/dock` keeps no dependency on `ui/viewport` or `Minecraft`.
 
 ## Layout is in **real framebuffer pixels**
 
@@ -125,12 +127,15 @@ stale menu is still painting.
 `DockState` is a client-lifetime singleton — the Project Explorer is seeded once in
 `GarnetClient.onInitializeClient` and never re-added — but its *visibility* is world-scoped.
 `registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) hooks
-`ClientPlayConnectionEvents.DISCONNECT` and calls `DockState.closeAll()`, then `syncDockViewport()`
-and `garnet$updateScaledFramebuffer(true)`. Without it the dock keeps painting over the title screen,
-the viewport stays shrunk, and a focused region keeps eating GLFW input through the mixins. The same
-function also hooks `ClientPlayConnectionEvents.JOIN`, calling `applyDockAutoOpen()` and, only when it
-returns `true`, the same `syncDockViewport()` / `garnet$updateScaledFramebuffer(true)` pair — see
-"LEFT auto-opens on joining a Garnet-capable world" above.
+`ClientPlayConnectionEvents.DISCONNECT` and calls `DockState.closeAll()`, then
+`commitDockVisibilityChange(persist = false)` (see
+[dock-input-routing.md](dock-input-routing.md#every-visibility-change-ends-in-commitdockvisibilitychange)).
+Without it the dock keeps painting over the title screen, the viewport stays shrunk, and a focused
+region keeps eating GLFW input through the mixins. The same function also hooks
+`ClientPlayConnectionEvents.JOIN`, calling `applyDockAutoOpen()` and, only when it returns `true`, the
+same `commitDockVisibilityChange(persist = false)` — see "LEFT auto-opens on joining a Garnet-capable
+world" above. `persist = false` on both: neither is the player choosing a layout, and a
+disconnect-time save would overwrite the record of what they last chose with a programmatic close.
 
 The whole callback runs inside `mc.execute { ... }`. `fabric-networking-api-v1` fires `DISCONNECT`
 from two sites in `ClientConnectionMixin` — `handleDisconnection` on the main thread, or

@@ -18,6 +18,7 @@ import com.breadmoirai.garnet.editor.data.NewNodeKind
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.Panel
+import com.breadmoirai.garnet.ui.viewport.DockVisibilityCommit
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -49,7 +50,17 @@ class ExplorerActionsTest : FunSpec({
         DockState.panels += Panel(id, id, DockRegion.LEFT, AllIconsKeys.General.Information) {}
     }
 
+    // openLocalHistory ends in commitDockVisibilityChange(), whose production side effects reach the
+    // config directory and Minecraft.getInstance(). Stub all three for this plain-JVM spec; the real
+    // sequence is pinned by DockVisibilityCommitTest and exercised live by ExplorerUiSpec.
+    beforeTest {
+        DockVisibilityCommit.persistLayout = {}
+        DockVisibilityCommit.dropFocus = {}
+        DockVisibilityCommit.applyFramebuffer = {}
+    }
+
     afterTest {
+        DockVisibilityCommit.resetForTest()
         ExplorerActions.resetForTest()
         ProjectTreeState.reset()
         OpenStructureState.reset()

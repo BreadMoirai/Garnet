@@ -21,8 +21,9 @@ what it was before. So to undo the most recent edit, restore `revisions[size - 2
 *before* the latest one), not `revisions.last()` — the last revision already matches what's
 currently on disk.
 
-**There is a UI for this now.** The [Local History panel](../ui/local-history-panel.md), tabbed
-beside the Project Explorer and reached from a `.nbt` node's right-click → *Local History*, lists
+**There is a UI for this now.** The [Local History panel](../ui/local-history-panel.md), which shares
+the LEFT dock region with the Project Explorer (its own icon in the tool-window stripe) and is reached
+from a `.nbt` node's right-click → *Local History*, lists
 these revisions and restores one into the world and the `.nbt` — undoably. Rollback no longer means
 copying a blob out of `<instance>/.garnet/local-history/…` with an external NBT tool. The panel
 renders the newest revision but makes it inert, and the server refuses it independently, for exactly

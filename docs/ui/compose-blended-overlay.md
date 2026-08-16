@@ -10,8 +10,8 @@ summary: BlitUvPipeline gained a premultiplied-alpha blend pipeline so the Compo
 `ComposeSurface` at the width of the viewport's reserved-left strip and blit it as an **opaque**
 rectangle. It now renders `ComposeSurface` at the **full real window size** and alpha-blends it over
 the already-composited world with `BlitUvPipeline.blit(..., blend = true)`. Only the pixels Compose
-actually paints (the dock's edge regions — panel bodies, plus a tab strip on any region holding 2+
-panels) end up opaque; everywhere else
+actually paints (the dock's edge regions — panel bodies, plus the 32px tool-window stripe down the
+left edge) end up opaque; everywhere else
 the canvas is cleared to `0x00000000` (`ComposeSurface.kt`, `s.canvas.clear(...)`) and `GarnetDock`'s
 root `Box` (hosted by `ComposeSceneHost`) has **no** background — its transparent CENTER leaves those
 pixels untouched — so the live game world composited underneath shows through.

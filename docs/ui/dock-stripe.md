@@ -47,10 +47,18 @@ to remember to call `showPanel`, not just append to `panels`.
 
 ## Rendering: one icon per LEFT panel, open one highlighted
 
-`DockStripe(region, modifier)` reads `DockState.panelsFor(region)` and returns early (renders nothing)
-if it's empty. Each panel gets a 28dp tappable `Box` with its `icon` (a Jewel `IconKey`), highlighted
-with `ICON_SELECTED_BG` when it is the region's open panel. A tap calls `togglePanel(panel.id)`. Only
-`DockRegion.LEFT` is wired into `GarnetDock` today — RIGHT/BOTTOM have no stripe yet, though the
+`DockStripe(region, modifier, onVisibilityChanged)` reads `DockState.panelsFor(region)` and returns
+early (renders nothing) if it's empty. Each panel gets a 28dp tappable `Box` with its `icon` (a Jewel
+`IconKey`), highlighted with `ICON_SELECTED_BG` when it is the region's open panel.
+
+A tap calls `stripeIconClicked(panel.id, onVisibilityChanged)` — `togglePanel` **plus** the mandatory
+follow-up. See
+[dock-input-routing.md](dock-input-routing.md#every-visibility-change-ends-in-commitdockvisibilitychange)
+for why the toggle alone leaves the world blitted stretched, and why the follow-up arrives as a
+callback threaded down from `GarnetDock` rather than being called here (it keeps `ui/dock` free of
+`Minecraft` imports, which is what makes `DockState` and the click behaviour unit-testable).
+
+Only `DockRegion.LEFT` is wired into `GarnetDock` today — RIGHT/BOTTOM have no stripe yet, though the
 composable takes a `region` parameter and nothing about it is LEFT-specific.
 
 Hand-rolled over `Box`/`pointerInput` rather than built from a Jewel `IconButton`, for the same reason
@@ -70,12 +78,20 @@ happened in two passes:
   each `IntelliJIconKey` constructor call resolves to (`toolwindows/toolWindowProject.svg`,
   `vcs/history.svg`), then confirmed present in the jar's entry list. This proves the lookup resolves
   to a real jar entry, not that the SVG rasterizes correctly.
-- **Live pixel-diff run** (`:26.2:runClientTest`, Task 7, commit `9f1dcb9`, 15/15 green): the
-  `JewelExplorerSpec` "stripe panel probe" and "structure info probe" cases both diffed non-trivial
-  pixel counts (`changed=118/1450`, `changed=32/1450`) after clicking a stripe icon, confirming the
-  Structure Info icon (`General.Information`, not statically checked in Task 4 because the panel did
-  not exist yet) renders and its panel body paints through a real Skia raster pass, not just a jar
-  lookup.
+- **Live pixel-diff run** (`:26.2:runClientTest`): two separate probes in `JewelExplorerSpec`, both
+  reading the real Skia raster of the composite, not a jar lookup.
+  - *Panel bodies swap.* The "stripe panel probe" and "structure info probe" cases diff the LEFT
+    panel **body** (`BODY_XS` starts at `STRIPE_WIDTH + 4`, i.e. it deliberately excludes the stripe
+    column) across a panel switch, confirming the body genuinely repaints.
+  - *The stripe's own pixels.* The stripe-click case samples the icon boxes inside `x ∈ [0, 32)` via
+    `PanelPixelProbe.stripeIconDiffCount`, driving a **real pointer event** into box 1 through
+    `DockInputRouter` rather than calling `togglePanel` programmatically. It asserts that the idle
+    icon box is non-empty (so the `IconKey` rasterized to actual artwork rather than nothing) and
+    that the `ICON_SELECTED_BG` highlight moves from box 0 to box 1 when the click lands. That probe
+    was added in the final fix wave: before it, no test on this branch sampled a single pixel with
+    `x < STRIPE_WIDTH` or routed a pointer event into the stripe, so the earlier wording here —
+    which claimed icon rendering had been confirmed "after clicking a stripe icon" — described a
+    verification that had not happened.
 
 ## Why the stripe is gated on `anyActive()`, and the dead end that creates
 

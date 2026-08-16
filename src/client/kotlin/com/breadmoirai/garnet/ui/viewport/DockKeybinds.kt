@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.ui.viewport
 
-import com.breadmoirai.garnet.config.DockLayoutStore
 import com.breadmoirai.garnet.ui.dock.DockAutoOpenGate
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
@@ -41,9 +40,6 @@ fun registerDockKeybinds() {
                 mc.level == null -> {}
                 shift -> {
                     DockState.togglePanel(EXPLORER_PANEL_ID)
-                    if (!DockState.isVisible(DockRegion.LEFT) && DockState.focusedRegion == DockRegion.LEFT) {
-                        DockInputRouter.clearFocus()
-                    }
                     // Persist here, on the user's keypress, rather than reading DockState at
                     // DISCONNECT: closeAll() hides LEFT on that same event, so a disconnect-time
                     // save would race Fabric's handler ordering and persist the programmatic close
@@ -53,24 +49,23 @@ fun registerDockKeybinds() {
                     // applyDockAutoOpen() — deliberately: toggling on a vanilla server still
                     // persists "what the player last chose" for the next Garnet join, which is
                     // the one place this keybind's scope and the auto-open gate's scope diverge.
-                    DockLayoutStore.save(DockState.openMap())
-                    syncDockViewport()
-                    (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+                    // The save, the drop-focus-if-LEFT-just-closed guard, syncDockViewport() and the
+                    // framebuffer re-cache all live in commitDockVisibilityChange().
+                    commitDockVisibilityChange()
                 }
                 alt -> {
                     if (DockState.focusedRegion == DockRegion.LEFT) {
                         // Focus-only change: visibility is untouched, so nothing to persist.
                         DockInputRouter.clearFocus()
+                        commitDockVisibilityChange(persist = false)
                     } else {
                         // Focus needs something to focus: open the Explorer when LEFT is empty, but
                         // leave an already-open Local History alone — Alt+1 is "give the dock the
                         // keyboard", not "switch panels".
                         if (!DockState.isVisible(DockRegion.LEFT)) DockState.showPanel(EXPLORER_PANEL_ID)
-                        DockLayoutStore.save(DockState.openMap())
                         DockInputRouter.focus(DockRegion.LEFT)
+                        commitDockVisibilityChange()
                     }
-                    syncDockViewport()
-                    (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
                 }
                 else -> {} // bare "1" is the vanilla hotbar slot; do nothing here
             }
@@ -89,10 +84,10 @@ fun registerDockKeybinds() {
  * disconnect, and a server kick. Without this the dock keeps painting over the title screen and the
  * viewport stays shrunk, because [DockState] is a client-lifetime singleton with no notion of a world.
  *
- * The `garnet$updateScaledFramebuffer(true)` follow-up mirrors both keybind branches in
- * [registerDockKeybinds]: without it the shrink survives until something else resizes the framebuffer.
- * On the JOIN side it is run only when the dock actually opened, since a resize for an unchanged
- * layout is pure churn.
+ * Both bodies end in [commitDockVisibilityChange], the same follow-up both keybind branches run:
+ * without its `garnet$updateScaledFramebuffer(true)` the shrink survives until something else resizes
+ * the framebuffer. On the JOIN side it is run only when the dock actually opened, since a resize for
+ * an unchanged layout is pure churn.
  *
  * Both bodies run inside `mc.execute { ... }` because `fabric-networking-api-v1` fires these events
  * from two sites in `ClientConnectionMixin` — `handleDisconnection` on the main thread, or
@@ -111,17 +106,16 @@ fun registerDockWorldLifecycle() {
             // vanilla server, on a remembered-closed dock, and when every remembered panel is
             // already the open one, and
             // a framebuffer resize for a no-op change is pure churn.
-            if (applyDockAutoOpen()) {
-                syncDockViewport()
-                (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
-            }
+            // persist = false on both lifecycle paths: neither is the player choosing a layout.
+            // JOIN is replaying what was already saved, and DISCONNECT's closeAll() is exactly the
+            // programmatic close the shift-branch comment above refuses to let overwrite the record.
+            if (applyDockAutoOpen()) commitDockVisibilityChange(persist = false)
         }
     }
     ClientPlayConnectionEvents.DISCONNECT.register { _, mc ->
         mc.execute {
             DockState.closeAll()
-            syncDockViewport()
-            (mc.window as Any as WindowViewportExt).`garnet$updateScaledFramebuffer`(true)
+            commitDockVisibilityChange(persist = false)
         }
     }
 }
