@@ -4,16 +4,20 @@ import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.ui.LocalHistoryState
 import com.breadmoirai.garnet.editor.ui.OpenStructureState
 import com.breadmoirai.garnet.editor.ui.ProjectTreeState
+import com.breadmoirai.garnet.editor.ui.StructureInfoState
 import com.breadmoirai.garnet.editor.ui.explorerPanel
 import com.breadmoirai.garnet.editor.ui.localHistoryPanel
+import com.breadmoirai.garnet.editor.ui.structureInfoPanel
 import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
+import com.breadmoirai.garnet.ui.dock.STRIPE_WIDTH
 import com.breadmoirai.garnet.ui.input.DockInputRouter
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.harness.ClientSpec
@@ -61,15 +65,27 @@ class JewelExplorerSpec : ClientSpec({
     // differ from a plain-panel background sample. A menu card painted over that region fills it
     // almost entirely (measured 162/162 open vs 31/162 with the panel mounted but no menu), so this
     // discriminates "menu rendered" from "menu absent" rather than just "capture file exists".
-    fun dropdownRegionDiffCount(png: Path): Int = PanelPixelProbe.menuRegionDiffCount(png)
+    //
+    // PanelPixelProbe.menuRegionDiffCount's x window (10..112) was measured before the tool-window
+    // stripe existed, when the LEFT panel body started at x=0. The stripe is now always painted
+    // whenever any panel is open (DockState.anyActive()), which every test in this file triggers, so
+    // the panel body actually starts at x=STRIPE_WIDTH -- shift the window by the same amount rather
+    // than reuse the helper's stale one.
+    fun dropdownRegionDiffCount(png: Path): Int =
+        PanelPixelProbe.regionDiffCount(png, (STRIPE_WIDTH + 10)..(STRIPE_WIDTH + 112) step 6, 36..68 step 4)
+
+    // Same stripe-offset reasoning as dropdownRegionDiffCount, applied to headerRegionDiffCount's
+    // x window (originally 4..108).
+    fun headerRegionDiffCount(png: Path): Int =
+        PanelPixelProbe.regionDiffCount(png, (STRIPE_WIDTH + 4)..(STRIPE_WIDTH + 108) step 4, 36..48 step 4)
 
     fun openKebabMenu() {
         runOnClient {
             // Click the kebab (overflow) button in ExplorerToolbar's first row. The old root-name
             // Dropdown anchor is gone (task 3); the toolbar's leftmost control is the kebab, which
-            // sits at roughly (14, 12) with the tab strip removed and the toolbar as the panel's
-            // first row.
-            DockInputRouter.onGlfwMove(14.0, 12.0)
+            // sits at roughly (14, 12) relative to the panel body -- offset by STRIPE_WIDTH in scene
+            // coordinates now that the tool-window stripe occupies x=0..31.
+            DockInputRouter.onGlfwMove((STRIPE_WIDTH + 14).toDouble(), 12.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(2)
@@ -126,7 +142,7 @@ class JewelExplorerSpec : ClientSpec({
         // 2. fold in the former ProjectExplorerSpec's leaked-popup guard, at this same fresh mount --
         // this is where that regression first showed itself. `header` proves the panel actually
         // painted; `menu` proves no dropdown leaked in from another spec's mount.
-        val header = PanelPixelProbe.headerRegionDiffCount(treeShot)
+        val header = headerRegionDiffCount(treeShot)
         val menu = PanelPixelProbe.menuRegionDiffCount(treeShot)
         println("[jewel] fresh-mount guard: header=$header menu=$menu")
         header shouldBeGreaterThan 8
@@ -137,12 +153,13 @@ class JewelExplorerSpec : ClientSpec({
 
         // 3. a routed pointer click selects a tree row. Rows start right below the toolbar; the root
         // itself is row 0 ("myproject", y~44), pushing every child down a row and indenting it a
-        // level deeper -- click the first CHILD row ("adders", y~68, x~70, chosen to land inside a
-        // solid glyph stroke rather than an inter-letter gap). If this coordinate drifts onto a
-        // neighbouring row the click still fires ExplorerTreeState.select(path) for THAT row, so
+        // level deeper -- click the first CHILD row ("adders", y~68, x~70 relative to the panel body,
+        // chosen to land inside a solid glyph stroke rather than an inter-letter gap; offset by
+        // STRIPE_WIDTH in scene coordinates for the tool-window stripe). If this coordinate drifts onto
+        // a neighbouring row the click still fires ExplorerTreeState.select(path) for THAT row, so
         // assert the exact expected path rather than just "non-null".
         runOnClient {
-            DockInputRouter.onGlfwMove(70.0, 68.0)
+            DockInputRouter.onGlfwMove((STRIPE_WIDTH + 70).toDouble(), 68.0)
             DockInputRouter.onGlfwPress(0)
         }
         waitClientTicks(3)
@@ -252,32 +269,67 @@ class JewelExplorerSpec : ClientSpec({
         ComposeSurface.disabled.shouldBeFalse()
     }
 
-    test("switching to the Local History tab actually swaps what the LEFT region paints") {
+    test("switching panels from the stripe actually swaps what the LEFT region paints") {
         closeClientScreen(); waitClientTicks(2)
         runOnClient { OpenStructureState.reset(); LocalHistoryState.reset() }
         mountExplorer()
-        // A second LEFT panel, so the region has something to switch to.
+        // A second LEFT panel: this is also what puts a second icon in the stripe, so the stripe is
+        // part of what is being captured here.
         runOnClient {
             DockState.panels += localHistoryPanel()
             DockState.showPanel("garnet.explorer")
         }
         waitClientTicks(12)
-        val explorerShot = capture("local_history_tab_explorer.png")
+        val explorerShot = capture("stripe_panel_explorer.png")
         ComposeSurface.disabled.shouldBeFalse()
 
-        runOnClient { DockState.showPanel("garnet.localHistory") }
+        runOnClient { DockState.togglePanel("garnet.localHistory") }
         waitClientTicks(12)
-        val historyShot = capture("local_history_tab_history.png")
+        val historyShot = capture("stripe_panel_history.png")
         onClient { DockState.openPanelId(DockRegion.LEFT) } shouldBe "garnet.localHistory"
 
-        // Asserted by pixel diff, not by state flags: showPanel reads back cleanly the instant it
-        // is called, while a stale composition can still be the thing on screen -- exactly the
+        // Asserted by pixel diff, not by state flags: showPanel reads back cleanly the instant it is
+        // called, while a stale composition can still be the thing on screen -- exactly the
         // ghost-panel failure DockState.mountEpoch exists to prevent. The Explorer's tree fills this
         // region with glyphs; Local History with no structure open paints a single line, so the two
         // frames must differ across most of the body.
         val changed = bodyDiffCount(explorerShot, historyShot)
-        println("[jewel] local-history tab probe: changed=$changed/${BODY_SAMPLES}")
+        println("[jewel] stripe panel probe: changed=$changed/${BODY_SAMPLES}")
         changed shouldBeGreaterThan 50
+        ComposeSurface.disabled.shouldBeFalse()
+
+        unmount()
+        ComposeSurface.disabled.shouldBeFalse()
+    }
+
+    test("the Structure Info panel paints its fields, and its empty state when nothing is open") {
+        closeClientScreen(); waitClientTicks(2)
+        runOnClient { StructureInfoState.reset() }
+        mountExplorer()
+        runOnClient {
+            DockState.panels += structureInfoPanel()
+            DockState.showPanel("garnet.structureInfo")
+        }
+        waitClientTicks(12)
+        val emptyShot = capture("structure_info_empty.png")
+        ComposeSurface.disabled.shouldBeFalse()
+
+        // Drive it through the real receiver rather than by writing fields: that is the path the
+        // panel actually sees, and it is what pins the packet-to-field mapping end to end.
+        runOnClient {
+            StructureInfoState.onAutoSaved(
+                StructureAutoSavedS2C("redstone/clock.nbt", 5, 3, 7, 42, savedAtMillis = 1_700_000_000_000L),
+            )
+        }
+        waitClientTicks(12)
+        val filledShot = capture("structure_info_filled.png")
+        onClient { StructureInfoState.blockCount } shouldBe 42
+
+        // Empty state is one line; the filled state is a name plus three rows, so the two frames must
+        // differ well below the first line of text.
+        val changed = bodyDiffCount(emptyShot, filledShot)
+        println("[jewel] structure info probe: changed=$changed/${BODY_SAMPLES}")
+        changed shouldBeGreaterThan 10
         ComposeSurface.disabled.shouldBeFalse()
 
         unmount()
@@ -286,7 +338,7 @@ class JewelExplorerSpec : ClientSpec({
 
 })
 
-private val BODY_XS = 4..300 step 6
+private val BODY_XS = (STRIPE_WIDTH + 4)..(STRIPE_WIDTH + 300) step 6
 private val BODY_YS = 30..200 step 6
 private val BODY_SAMPLES = BODY_XS.count() * BODY_YS.count()
 
