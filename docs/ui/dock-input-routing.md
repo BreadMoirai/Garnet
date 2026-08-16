@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
 tags: [compose, dock, input, mixin, glfw, keybind, hit-test]
-summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, and the DockState.regionAt hit test behind click-to-focus in both directions.
+summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds (Shift+1 toggles the Explorer panel itself) and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, and the DockState.regionAt hit test — stripe first, then BOTTOM/LEFT/RIGHT/CENTER — behind click-to-focus in both directions.
 ---
 
 # Dock input routing
@@ -20,12 +20,15 @@ through the content-rect offset by `MouseHandlerViewportMixin` — see
 
 Focus is not keyboard-only. `DockState.regionAt(x, y, realW, realH)` (`ui/dock/DockHitTest.kt`)
 answers "who owns this window pixel", returning `null` for the **bare world viewport**. It is the
-pointer-side mirror of `insets()` and reproduces `GarnetDock`'s draw order — BOTTOM's full-width band
-first (so it wins both corners, exactly as it is drawn over where the LEFT/RIGHT columns stop), then
-LEFT, then RIGHT, then CENTER *only when `centerPanels` is non-empty*. An empty CENTER is transparent
-by omission and **is** the world, which is the whole point of the `null` case. Hidden regions and
-splitters need no special case: a hidden region reserves nothing, and splitters are drawn inside the
-reserved strips. It takes no `Minecraft`/GLFW dependency, so it is unit-tested in `DockHitTestTest`
+pointer-side mirror of `insets()` and reproduces `GarnetDock`'s draw order — the **stripe's own
+column first** (it is drawn last, over everything, so it is tested first; see
+[dock-stripe.md](dock-stripe.md#why-the-stripe-is-drawn-last-and-hit-tested-first--one-decision-not-two)
+for why those are one decision, not two), then BOTTOM's full-width band (so it wins both corners,
+exactly as it is drawn over where the LEFT/RIGHT columns stop), then LEFT, then RIGHT, then CENTER
+*only when it has an open panel*. An empty CENTER is transparent by omission and **is** the world,
+which is the whole point of the `null` case. Hidden/closed regions and splitters need no special
+case: a closed region reserves nothing, and splitters are drawn inside the reserved strips. It takes
+no `Minecraft`/GLFW dependency, so it is unit-tested in `DockHitTestTest`
 (`src/test/.../ui/dock/`) the same way `syncDockViewport` was split out for testability.
 
 Both gestures skip themselves when `ViewportState.realWidth/realHeight` are still `0` — before
@@ -166,10 +169,13 @@ open — so with the dock closed it is still byte-for-byte vanilla.
 One `KeyMapping` on `1`; the Alt/Shift distinction is read from live GLFW modifier state on
 `consumeClick()` (via `GLFW.glfwGetKey(mc.window.handle(), ...)`):
 
-- **Alt+1** — toggle focus of LEFT (Explorer): focus + cursor-release, or `clearFocus()` if already
-  focused.
-- **Shift+1** — toggle LEFT visibility; if hiding a focused region, also `clearFocus()`, then
-  `garnet$updateScaledFramebuffer(true)` so the world inset resizes immediately.
+- **Alt+1** — focus LEFT: `clearFocus()` if LEFT is already focused, otherwise open the Explorer
+  *only if LEFT is currently showing nothing* (an already-open Local History or Structure Info is left
+  alone — Alt+1 means "give the dock the keyboard", not "switch panels") and focus LEFT.
+- **Shift+1** — `DockState.togglePanel("garnet.explorer")`: opens the Explorer (evicting whatever LEFT
+  currently shows), or closes LEFT if the Explorer is already what LEFT shows, or switches LEFT to the
+  Explorer when LEFT is showing something else. If the toggle ends up hiding a focused LEFT, also
+  `clearFocus()`, then `garnet$updateScaledFramebuffer(true)` so the world inset resizes immediately.
 - Bare `1` falls through to the vanilla hotbar slot.
 - Both branches are no-ops while `mc.level == null` (no world loaded) — see
   [dock-framework.md](dock-framework.md#world-session-lifecycle) for the disconnect-time teardown
@@ -181,10 +187,11 @@ after mutating
 `DockState` and before the framebuffer-resize call — see "Render enablement is derived from
 DockState" below for what it does and why it makes the dock reachable on its own.
 
-Both branches also persist the resulting LEFT visibility via `DockLayoutStore.save(...)`: the Shift+1
-toggle always does, and Alt+1 only on its show-and-focus half (its focus-only half — clearing focus on
-an already-focused region — changes no visibility, so it does not write). This is what joining a
-Garnet world later reads back — see
+Both branches also persist the resulting open-panel map via `DockLayoutStore.save(DockState.openMap())`
+(see [dock-stripe.md](dock-stripe.md#persistence-garnet-dockjson-moved-from-a-boolean-to-an-open-panel-map)
+for the record's shape): Shift+1 always writes, and Alt+1 only on its open-and-focus half (its
+focus-only half — clearing focus on an already-focused region — changes no panel, so it does not
+write). This is what joining a Garnet world later reads back — see
 [dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world](dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world).
 Auto-open itself changes visibility only: `DockState.focusedRegion` stays `null`, so the mixins above
 keep routing to the game and the cursor stays grabbed — Alt+1 remains the only path to focusing the
@@ -195,9 +202,8 @@ Registered from `GarnetClient.onInitializeClient()` next to `registerViewportTog
 ## Render enablement is derived from `DockState`, not a separate toggle
 
 The dock keybind is now self-sufficient: pressing Shift+1 (or Alt+1) is enough to see the dock
-in-world. `DockState.anyActive()` reports whether the dock has anything to show (any of
-`leftVisible`/`rightVisible`/`bottomVisible`, a non-empty `centerPanels`, or a non-null
-`focusedRegion`), and `syncDockViewport()` (`viewport/DockViewportSync.kt`) sets `ViewportState.active` and
+in-world. `DockState.anyActive()` reports whether the dock has anything to show (any region with an
+open panel, or a non-null `focusedRegion`), and `syncDockViewport()` (`viewport/DockViewportSync.kt`) sets `ViewportState.active` and
 `ComposeOverlay.enabled` to that value. When nothing is visible/focused, both flags go back to
 `false` and the client is byte-for-byte vanilla (`WindowMixin.shouldModify()` is false, and
 `ComposeOverlay.renderInto` early-returns).
@@ -214,11 +220,11 @@ unaffected by `syncDockViewport()`.
 ## Test coverage
 
 `DockInputSpec` (clientTest) is a single merged story — one probe panel, mounted once via
-`DockState.reset()` + a LEFT panel append (necessary because `DockState.leftPanels` already holds
-the production Explorer panel at tab index 0, and a panel appended without a reset would land on a
-non-active tab whose `content()` is never composed, since `RegionColumn` only invokes
-`panels[active].content(panels[active])`) — exercised through eight numbered steps, all through the
-**real** router→`ComposeInput`→scene path:
+`DockState.reset()` + a `panels +=` registration + `DockState.showPanel(...)` (necessary because
+`DockState.panels` already holds the production Explorer/Local History/Structure Info panels, and a
+panel registered without a reset would land in the registry unopened, since `RegionColumn` only
+invokes `openPanelOf(region).content(...)` — a registered-but-unopened panel is never composed) —
+exercised through eight numbered steps, all through the **real** router→`ComposeInput`→scene path:
 
 1. A raw secondary press (`onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`) is collected by a
    `pointerInput { awaitPointerEventScope { ... } }` probe and asserted to arrive as exactly

@@ -201,7 +201,8 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   `ImageComposeScene` wrapper), `ComposeSurface.kt` (lifecycle + blit rendering), `ComposeInput.kt`
   (pointer/scroll/key entry points), `GlStateStash.kt` (GL state save/restore around Skia draws).
 - `dock/` — `GarnetDock.kt` (the root composable), `DockState.kt`, `DockRegion.kt`,
-  `DockInsets.kt`, `Panel.kt`, `DockTabStrip.kt` (rendered only for a region holding 2+ panels).
+  `DockInsets.kt`, `Panel.kt`, `DockStripe.kt` (the LEFT icon stripe, rendered only while any region
+  is open).
 - `input/` — `DockInputRouter.kt`, `GlfwKeyMap.kt`.
 - `viewport/` — `ViewportState.kt`, `ViewportToggle.kt`, `DockKeybinds.kt`, `DockViewportSync.kt`
   (`syncDockViewport`, split out so it has no live-client class-init dependency and can run under a

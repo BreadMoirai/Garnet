@@ -39,45 +39,48 @@ transparent and the composited world shows through. Do not add a background to t
 occlude the world. (See `compose-blended-overlay.md` for the premultiplied-alpha blend that composites
 these transparent pixels.)
 
-## Regions, panels, and tabs
+## Regions, panels, and the stripe
 
-Each of the four `DockRegion`s (LEFT/RIGHT/BOTTOM/CENTER) holds an independent
-`SnapshotStateList<Panel>` (`DockState.leftPanels`/`rightPanels`/`bottomPanels`/`centerPanels`) plus an
-`activeTab: Int` index (read via `DockState.activeTab(region)`, written via
-`DockState.setActiveTab(region, index)`, which clamps to the region's real panel indices so a stale
-index can never point past the end — an empty region clamps to 0). `Panel(id, title, region, icon,
-content)` is a plain data holder — `region` and `icon` (a Jewel `IconKey`) are the panel's own
-declaration of where it lives and how a future icon stripe would offer it; nothing yet reads them
-back out of the panel to route it (`leftPanels`/`rightPanels`/etc. are still populated by hand at
-each call site). `RegionColumn` in `GarnetDock.kt` renders the active panel's `content`, filling the
-region, preceded by `DockTabStrip` (`DockTabStrip.kt`) — a hand-rolled `Row`+`BasicText` strip with its
-own tap-gesture handling and hardcoded colours, deliberately Jewel-free so a Jewel tab component's
-focus-and-popup behaviour doesn't get pulled into this scene's already-subtle layer routing (see
-`jewel-widget-layer.md`). The strip renders only when a region holds 2+ panels; a single-panel region
-still shows its body full-bleed. It came back because LEFT gained a second panel — the Local History
-panel, seeded beside the Explorer at client init and switched to from the Explorer's context menu
-via `setActiveTab`; see [local-history-panel.md](local-history-panel.md). The existing
-`key(mountEpoch, panels[active].id)` guard already makes swapping which panel occupies the slot a
-fresh composition, so tab switching inherits that protection for free. LEFT/RIGHT/
-BOTTOM start hidden at client init (`DockState.leftVisible` etc. all start `false`); CENTER's
-visibility is derived (`centerPanels.isNotEmpty()`) rather than an independent flag, since an empty
-CENTER must stay transparent. Seeding a panel into a region (e.g. `explorerPanel()` into `leftPanels`
-at client init) does not make the region visible — only `setVisible`/`toggleVisible` does that, driven
-by the Alt+1/Shift+1 keybinds (see `dock-input-routing.md`) or, on joining a world, by auto-open below.
+`DockState` holds one flat `panels: SnapshotStateList<Panel>` registry rather than four independent
+per-region lists. `Panel(id, title, region, icon, content)` carries its own `region` and `icon` (a
+Jewel `IconKey`); `DockState.panelsFor(region)` derives the per-region view by filtering on that
+field, so there is exactly one definition of "which panels does this region have" — the one
+`DockStripe` renders.
+
+**Each region renders its open panel's body.** Visibility is per-*panel*, not per-region: a private
+`openPanel: Map<DockRegion, String>` names which panel id is open in each region (absence = closed),
+read through `DockState.isVisible(region)`/`openPanelOf(region)` and written through
+`DockState.showPanel(id)`/`closeRegion(region)`/`togglePanel(id)`. `RegionColumn` in `GarnetDock.kt`
+renders `openPanelOf(region)`'s `content`, filling the region — there is no tab strip inside a region
+any more. Instead, a JetBrains-IDE-style icon **stripe** (`DockStripe.kt`, replacing the deleted
+`DockTabStrip.kt`) sits at `x = 0`, one icon per LEFT panel, the open one highlighted; clicking an icon
+calls `togglePanel`, which opens it (evicting whatever LEFT had open) or, if it's already open, closes
+LEFT. See [dock-stripe.md](dock-stripe.md) for the full model — the visibility API, why the stripe is
+gated on `anyActive()` and vanishes with a fully-closed dock, and why it is drawn last and hit-tested
+first. LEFT now has three registered panels: the Project Explorer, [Local History](local-history-panel.md),
+and the [Structure Info panel](structure-info-panel.md) — reached via the stripe's three icons, not
+tabs.
+
+Every region starts with nothing open at client init (`DockState.panels` gets populated, but no
+`showPanel` call follows) except by explicit action: the Alt+1/Shift+1 keybinds (see
+`dock-input-routing.md`) or, on joining a world, auto-open below. Seeding a panel into the registry
+does not make its region visible on its own.
 
 ### LEFT auto-opens on joining a Garnet-capable world
 
 A JOIN handler in `registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) calls
-`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`), which reveals LEFT — and only LEFT — when three
-things all hold: the peer speaks Garnet (`DockAutoOpenGate.isGarnetServer()`, defaulting to
-`ClientPlayNetworking.canSend(ListEditorTreeC2S.TYPE)` — a swappable `var` that is the seam unit
-tests use to drive both branches without a server), the boolean remembered in `config/garnet-dock.json`
-(`DockLayoutStore`, see
+`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`), which applies the open-panel map remembered in
+`config/garnet-dock.json` (`DockLayoutStore`, see
 [persistence/explorer-session-state.md](../persistence/explorer-session-state.md#sibling-store-configgarnet-dockjson))
-is `true`, and LEFT is not already visible. A vanilla server never gets a dock: an empty Explorer that
-shrinks the viewport is strictly worse than no dock at all. `applyDockAutoOpen()` only changes
-visibility — it never calls `DockInputRouter.focus(...)`, so `DockState.focusedRegion` stays `null` and
-the game keeps input (see [dock-input-routing.md](dock-input-routing.md)).
+when the peer speaks Garnet (`DockAutoOpenGate.isGarnetServer()`, defaulting to
+`ClientPlayNetworking.canSend(ListEditorTreeC2S.TYPE)` — a swappable `var` that is the seam unit
+tests use to drive both branches without a server) and that map isn't already exactly what's open. The
+record is an **open-panel map keyed by region** (`{"open": {"LEFT": "garnet.explorer"}}`), not a
+boolean — see [dock-stripe.md](dock-stripe.md#persistence-garnet-dockjson-moved-from-a-boolean-to-an-open-panel-map)
+for the legacy `{"leftVisible": true}` shape it migrates from. A vanilla server never gets a dock: an
+empty Explorer that shrinks the viewport is strictly worse than no dock at all. `applyDockAutoOpen()`
+only changes visibility — it never calls `DockInputRouter.focus(...)`, so `DockState.focusedRegion`
+stays `null` and the game keeps input (see [dock-input-routing.md](dock-input-routing.md)).
 
 Default region sizes live on `DockState` (`DEFAULT_LEFT` = **280**, `DEFAULT_RIGHT`, `DEFAULT_BOTTOM`).
 `DEFAULT_LEFT` is 280 rather than a rounder 260 for historical reasons only: it was originally sized
@@ -94,12 +97,15 @@ consequences follow, each of which was observed as a real defect (a Jewel `Dropd
 painted over the panel after the dock was hidden and shown again, with ESC unable to reach it):
 
 1. **Remounting the same panel reuses its composition.** `RegionColumn` invokes
-   `panels[active].content(...)` at a fixed slot, and a panel rebuilt by the same factory yields a
+   `openPanelOf(region).content(...)` at a fixed slot, and a panel rebuilt by the same factory yields a
    composable lambda with the *same source key* — so Compose reuses the group and every `remember`
    inside the panel survives, including a `Dropdown`'s open flag and the `Popup`/`ComposeSceneLayer`
-   it attached. Guard: `DockState.mountEpoch(region)`, a per-region counter bumped on hide and on
-   `reset()`, used together with the panel id as the `key(...)` of the panel body. A remount is then
-   a genuinely new composition.
+   it attached. Guard: `DockState.mountEpoch(region)`, a per-region counter bumped whenever a region's
+   **open panel changes** — a hide (`closeRegion`), a same-region panel switch (`showPanel` moving
+   LEFT from Explorer to Local History, say), and `reset()` — used together with the panel id as the
+   `key(...)` of the panel body. A remount, including a same-region panel *swap*, is then a genuinely
+   new composition. See [dock-stripe.md](dock-stripe.md#mount-epochs-now-bump-on-a-panel-switch-not-only-on-hide--the-ghost-popup-bug-this-fixes)
+   for the ghost-popup bug that widening this trigger from "hide only" fixed.
 2. **Hiding the dock stops rendering before the removal can be disposed.** `syncDockViewport` drives
    `ComposeOverlay.enabled` off `DockState.anyActive()`, so the frame after a hide never happens: the
    scene freezes with the panel still mounted, still focused, popup layers still attached. Guard:
@@ -147,16 +153,17 @@ what keeps it unit-testable.
 
 | Dropped on disconnect | Kept |
 |---|---|
-| Region visibility (LEFT/RIGHT/BOTTOM hidden) | Splitter sizes (`leftWidth`, …) |
-| CENTER panels — per-world documents | LEFT/RIGHT/BOTTOM panel registrations |
+| Every region's open panel (LEFT/RIGHT/BOTTOM/CENTER closed via `closeRegion`) | Splitter sizes (`leftWidth`, …) |
+| CENTER panels — per-world documents, removed from the registry entirely | LEFT/RIGHT/BOTTOM panel registrations |
 | Input focus (`focusedRegion`) | |
 
-A full `reset()` would clear `leftPanels`, and since the Explorer is only added at client init that
-would leave LEFT permanently empty for the rest of the process.
+A full `reset()` would clear `panels` entirely, and since the Explorer is only added at client init
+that would leave LEFT permanently empty for the rest of the process.
 
-Two non-obvious details. `closeAll()` bumps CENTER's mount epoch by hand — `setVisible` covers the
-edges, but CENTER's visibility is derived from `centerPanels.isNotEmpty()` and never goes through it,
-so without the explicit bump a popup opened in a center panel could outlive the world. And it clears
+Two non-obvious details. `closeAll()` bumps CENTER's mount epoch by hand after removing its panels —
+`closeRegion` already bumps the epoch for a region whose open panel changes, but a CENTER panel can be
+*registered* without ever being opened, so the explicit bump after the removal guarantees a popup
+opened in a center panel cannot outlive the world even in that edge case. And it clears
 `focusedRegion` directly rather than calling `DockInputRouter.clearFocus()`: that helper re-grabs the
 mouse when no `Screen` is open, and at `DISCONNECT` time the title screen is not reliably installed
 yet, so it would capture the cursor on the title screen. `DockInputRouter.captured` reads through to
@@ -205,16 +212,16 @@ rows. The pattern:
   [jewel-widget-layer.md](jewel-widget-layer.md#tree-state-is-jewels-not-a-custom-model) for the
   NUL-suffixed placeholder id it injects for a pending create. Keep both state objects separate
   from the `Panel` so packet handlers never touch Compose internals.
-- **`explorerPanel(): Panel`** returns the tab (`Panel("garnet.explorer", "Explorer", DockRegion.LEFT,
+- **`explorerPanel(): Panel`** returns the panel (`Panel("garnet.explorer", "Explorer", DockRegion.LEFT,
   AllIconsKeys.Toolwindows.ToolWindowProject) { … }`);
-  it is seeded once into `DockState.leftPanels` at client init (`GarnetClient`). LEFT starts hidden
-  at that point; Shift+1/Alt+1 reveal it manually, and joining a Garnet-capable world auto-opens it
-  (see "LEFT auto-opens on joining a Garnet-capable world" above).
+  it is registered once into `DockState.panels` at client init (`GarnetClient`). LEFT starts with
+  nothing open at that point; Shift+1/Alt+1 open it manually, and joining a Garnet-capable world
+  auto-opens it (see "LEFT auto-opens on joining a Garnet-capable world" above).
 - **The tree renders via Jewel's `LazyTree`**, not a hand-written recursive composable.
   `val tree = remember(snap.root, edit) { ExplorerTreeState.buildTreeFrom(snap.root, edit) }` builds
-  the `Tree<FileTreeNode>` — **`remember` it**: the enclosing scope also reads `ProjectTreeState.status`,
-  which changes on every S2C packet, so an un-remembered call rebuilds the whole project tree
-  recursively (and makes `LazyTree` re-flatten it) on each packet; keying on `edit` too means the
+  the `Tree<FileTreeNode>` — **`remember` it**: `buildTreeFrom` walks the whole project tree
+  recursively and allocates a fresh `Tree`, which `LazyTree` then has to re-flatten, so an
+  un-remembered call would pay that cost on every recomposition; keying on `edit` too means the
   pending-create placeholder row appears and disappears without an unrelated rebuild being needed.
   `buildTreeFrom` emits the project
   root itself as the tree's single top-level element (id `ExplorerTreeState.ROOT_PATH`, `""`), with

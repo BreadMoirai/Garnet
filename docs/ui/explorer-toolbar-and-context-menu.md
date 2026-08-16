@@ -55,6 +55,13 @@ its focus into its own interaction source; see
 [text-field-caret-in-raster-scene.md](text-field-caret-in-raster-scene.md) for why the dock's scene
 needs that and what breaks without it.
 
+A failed commit's message (`editError`, set by `ExplorerActions.commitCreate`/`commitRename`) renders
+**inline, directly under the field**, not on a panel-wide status line — the Explorer no longer has one;
+transient status now lives in the [Structure Info panel](structure-info-panel.md#why-editerror-stayed-in-the-explorer-rendered-at-the-field).
+Structure Info can be closed at the moment a rename fails, so a message parked there would leave the
+field showing its red `Outline.Error` border with no explanation anywhere on screen; rendering it at
+the field guarantees the two always appear together.
+
 ## Local History
 
 One flat `selectableItem`, between its own two `separator()`s, enabled **only when the target is a
@@ -69,7 +76,7 @@ item instead. See [jewel-widget-layer.md](jewel-widget-layer.md) for the layer r
 
 `ExplorerActions.openLocalHistory(path)` is the whole client action: refuse a non-`.nbt` path, send
 `PlaceStructureC2S(path)` unless `OpenStructureState.subpath` already names it, then
-`DockState.setActiveTab(DockRegion.LEFT, …)` onto the `"garnet.localHistory"` panel. It is
+`DockState.showPanel("garnet.localHistory")`, switching LEFT onto it. It is
 "place, *then* look at", never "look at without placing" — that ordering is what upholds the
 server-side invariant the restore path depends on. See
 [local-history-panel.md](local-history-panel.md) for what that invariant buys.

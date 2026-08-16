@@ -1,14 +1,16 @@
 ---
 title: The Local History panel
 tags: [screens, widgets, history, dock, restore, explorer]
-summary: The revision list tabbed beside the Project Explorer — why it only ever shows a placed structure, why the newest revision is shown but inert, why a revision is addressed by timestamp rather than list index, how the server pushes refreshes to watchers, and the ordering rules the restore sequence cannot be reordered without losing data.
+summary: The revision list reached via the LEFT stripe's second icon — why it only ever shows a placed structure, why the newest revision is shown but inert, why a revision is addressed by timestamp rather than list index, how the server pushes refreshes to watchers, and the ordering rules the restore sequence cannot be reordered without losing data.
 ---
 
 # The Local History panel
 
 `LocalHistoryPanel.kt` (`src/client/kotlin/.../editor/ui/`) is the second LEFT-region dock panel,
-tabbed beside the Project Explorer. It lists a structure's banked revisions and offers **Restore**,
-which moves both the world copy and the `.nbt` back to a chosen revision — undoably.
+reached via the [dock stripe](dock-stripe.md)'s second icon — sharing the LEFT region with the Project
+Explorer and the [Structure Info panel](structure-info-panel.md), not tabbed beside them. It lists a
+structure's banked revisions and offers **Restore**, which moves both the world copy and the `.nbt`
+back to a chosen revision — undoably.
 
 The store behind it is documented in [persistence/local-history.md](../persistence/local-history.md);
 the undo entry a restore pushes is documented in
@@ -21,8 +23,8 @@ several, and the orderings that silently lose edits if reversed.
 The only way to point the panel at anything is right-click → *Local History* on a `.nbt` node, which
 places the structure first if it is not already placed
 (`ExplorerActions.openLocalHistory` sends `PlaceStructureC2S` unless
-`OpenStructureState.subpath` already names it) and then switches the LEFT region to the
-`"garnet.localHistory"` tab. Nothing else can set the panel's subject.
+`OpenStructureState.subpath` already names it) and then calls `DockState.showPanel("garnet.localHistory")`,
+switching LEFT to it. Nothing else can set the panel's subject.
 
 **This is the load-bearing decision of the whole feature, and it is a decision about the *server*,
 not the UI.** It removes the branch that would otherwise dominate `StructureRestoreOps`: restoring
@@ -211,8 +213,7 @@ panel state parked in a global survives a re-mount and paints over the next one.
 [dock-framework.md](dock-framework.md#panel-composition-must-not-outlive-its-mount) and
 `DockState.mountEpoch`.
 
-Reaching the panel needs the dock's tab strip, which returned for exactly this feature — see
-[dock-framework.md](dock-framework.md#regions-panels-and-tabs).
+Reaching the panel needs the dock's icon stripe — see [dock-stripe.md](dock-stripe.md).
 
 ## Test coverage
 
@@ -230,4 +231,7 @@ payload registrations; plain client unit tests cover `LocalHistoryState`'s list 
 - [persistence/local-history.md](../persistence/local-history.md) — the revision store this panel reads.
 - [persistence/editor-undo-stack.md](../persistence/editor-undo-stack.md) — `RestoreRevision` and why it carries no content.
 - [explorer-toolbar-and-context-menu.md](explorer-toolbar-and-context-menu.md) — the context-menu entry point.
-- [dock-framework.md](dock-framework.md) — the tab strip and the region model.
+- [dock-framework.md](dock-framework.md) — the region model.
+- [dock-stripe.md](dock-stripe.md) — the icon stripe and per-panel visibility model.
+- [structure-info-panel.md](structure-info-panel.md) — the sibling LEFT panel with the same no-glyph
+  rule.
