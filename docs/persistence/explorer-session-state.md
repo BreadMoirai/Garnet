@@ -147,8 +147,8 @@ both restrictions.
 
 It is also written at a different point in the session than `garnet-explorer.json`. Rather than
 reading `DockState` in the `DISCONNECT` handler, `DockLayoutStore.save(...)` is called directly in
-`registerDockKeybinds()` on the Shift+1 / Alt+1 keypresses that change LEFT visibility. A
+`registerDockKeybinds()` on the Shift+1 / Alt+1 keypresses that change which panel LEFT shows. A
 disconnect-time read would race handler ordering: `DockState.closeAll()` (also run on
 `DISCONNECT`, see [ui/dock-framework.md#world-session-lifecycle](../ui/dock-framework.md#world-session-lifecycle))
-sets `leftVisible = false` on that same event, so a save at that point could easily persist the
+closes every region's open panel on that same event, so a save at that point could easily persist the
 programmatic close instead of the player's last real choice.
