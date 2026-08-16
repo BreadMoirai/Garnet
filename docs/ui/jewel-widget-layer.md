@@ -156,6 +156,10 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
   `TextFieldState`- and `TextFieldValue`-keyed overloads exist. The Explorer's inline rename/create
   field (below) uses `rememberTextFieldState()` and the `TextFieldState.clearText()` extension
   rather than a plain `String` state hoist.
+- **Use `GarnetTextField`, never Jewel's `TextField` directly.** A Jewel input needs its focus
+  bridged into its interaction source to look focused at all in this scene — no caret, no focused
+  border otherwise — and the wrapper is what carries that wiring. See
+  [text-field-caret-in-raster-scene.md](text-field-caret-in-raster-scene.md).
 - **Inline rename/create uses a NUL-suffixed synthetic id, never a real path.** `ExplorerEdit` (the
   in-tree name-field state — `Creating(parentPath, kind)` or `Renaming(path, original)`) needs
   `Renaming` to swap the label of an *existing* row for a field, which is a pure render-time switch
