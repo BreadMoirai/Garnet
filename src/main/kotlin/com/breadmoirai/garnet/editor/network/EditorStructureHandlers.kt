@@ -57,7 +57,7 @@ object EditorStructureHandlers {
         player.teleportTo(
             level,
             (origin.x + width / 2) + 0.5, tpY.toDouble(), (origin.z + width / 2) + 0.5,
-            emptySet<Relative>(), player.yRot, player.xRot, true,
+            emptySet<Relative>(), -180f, 0f, true,
         )
         ServerPlayNetworking.send(player, StructureResultS2C(
             subpath, placed.size.x, placed.size.y, placed.size.z, message,
