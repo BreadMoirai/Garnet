@@ -139,8 +139,9 @@ assume it is already on the client thread; `garnet$updateScaledFramebuffer` reac
 `eventHandler.resizeGui()`, which is unsafe to call concurrently with rendering.
 
 The Project Explorer's per-world state is reset from its **own** `DISCONNECT` registration in
-`editor/ui/ExplorerLifecycle.kt`, not from this one: `ProjectTreeState`, `ExplorerTreeState`,
-`UndoState`, `OpenStructureState` and `LocalHistoryState` are all reset there (after the session
+`editor/ui/ExplorerLifecycle.kt`, not from this one: `ProjectTreeState`, `StructureInfoState`,
+`ExplorerTreeState`, `UndoState`, `OpenStructureState` and `LocalHistoryState` are all reset there
+(after the session
 save — see
 [persistence/explorer-session-state.md](../persistence/explorer-session-state.md#save-trigger-points)),
 clearing the previous session's tree snapshot, its expansion/selection, the undo labels, and the
@@ -199,9 +200,11 @@ migration, the panel is built entirely from JetBrains Jewel components (`LazyTre
 rows. The pattern:
 
 - **State is split across two `mutableStateOf`-backed singletons**, neither of which is the
-  panel. `ProjectTreeState` holds only the server-driven data: `snapshot:
-  EditorTreeSnapshotS2C?` and `status: String`, mutated by its S2C packet handlers
-  (`onSnapshot/onFolderLoaded/onSaveReport/onError`). `ExplorerTreeState` owns all UI-only tree
+  panel. `ProjectTreeState` holds only the server-driven tree data: `snapshot:
+  EditorTreeSnapshotS2C?`, mutated by its one S2C packet handler (`onSnapshot`). The editor's
+  transient status line and the open structure's facts live in `StructureInfoState` instead — see
+  [structure-info-panel.md](structure-info-panel.md) for its `onFolderLoaded`/`onSaveReport`/
+  `onError`/`onStructureResult`/`onAutoSaved` handlers. `ExplorerTreeState` owns all UI-only tree
   state — selection and expansion — by wrapping a single Jewel `TreeState` (hoisted, not
   `rememberTreeState()`'d inside composition, so packet handlers and tests can drive it from
   outside a composable): `selectedPath`/`select(path)` and `expandedPaths`/`toggleExpanded(path)`
@@ -284,9 +287,10 @@ rows. The pattern:
   wired server-side and covered by `EditorStructureNetworkSpec`, with no tree-row action that sends
   it yet. There is no `Discard` any more: a placed structure auto-saves continuously, so there is
   nothing to discard back to — see `docs/persistence/local-history.md` for the rollback path.
-  `StructureResultS2C` still surfaces through `ProjectTreeState.onStructureResult` into the same
-  status line as folder load/save results whenever those packets fire (e.g. from gametest
-  coverage). See
+  `StructureResultS2C` still surfaces through `StructureInfoState.onStructureResult` — the same
+  status line folder load/save results write to (see [structure-info-panel.md](structure-info-panel.md))
+  — and through `OpenStructureState.onStructureResult`, whenever those packets fire (e.g. from
+  gametest coverage). See
   [architecture/redstone-project.md#standalone-structure-files](../architecture/redstone-project.md#standalone-structure-files)
   for the region-placement model those packets drive.
 - **"Open Folder…" runs `RootPickerController.openFolder()`**, a native folder picker that swaps

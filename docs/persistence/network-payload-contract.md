@@ -34,9 +34,9 @@ back to (recovery goes through `LocalHistoryStore` instead, see `docs/persistenc
 clientbound payload here that is **not** a reply to a specific request: `StructureCommit` broadcasts
 it to every player on every successful commit (debounced auto-save or a forced `SaveStructureC2S`),
 since a structure region is server-global and any player looking at it wants the update. The client
-handler (`ProjectTreeState.onAutoSaved`) only renders `subpath`/`sizeX`/`sizeY`/`sizeZ`/`blockCount`
-into the Explorer status line today; `blockCount` and `savedAtMillis` are carried for a structure
-info panel that consumes this same packet later.
+handler (`StructureInfoState.onAutoSaved`) renders every field —
+`subpath`/`sizeX`/`sizeY`/`sizeZ`/`blockCount`/`savedAtMillis` — into the
+[Structure Info panel](../ui/structure-info-panel.md).
 
 ## Invariant 2: every client-supplied path goes through `EditorRoot.resolveSubpath`
 

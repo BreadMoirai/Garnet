@@ -103,7 +103,9 @@ Client:
   Shift+1/Alt+1 as the manual toggles — see
   [ui/dock-framework.md](../ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world)).
   `ProjectTreeState` is `mutableStateOf`-backed server-driven state
-  (snapshot + status) fed by the S2C receivers; `ExplorerTreeState` owns selection/expansion by
+  (just the tree `snapshot` — the transient status line and the open structure's facts live in
+  `StructureInfoState`, read by the [Structure Info panel](../ui/structure-info-panel.md) instead)
+  fed by the S2C receivers; `ExplorerTreeState` owns selection/expansion by
   wrapping a single Jewel `TreeState`; `explorerPanel()` returns the LEFT-dock `Panel`. A folder is
   a "spec-folder" (loadable) iff it directly contains a `FileNode` named `*.spec.kts`: clicking it
   sends `LoadEditorFolderC2S(path)`; other folders just toggle expand (Jewel `LazyTree`'s own
@@ -166,18 +168,23 @@ inside the `deleteSubtree` primitive, not the handler, so the undo/redo replays 
   world-list-screen root picker) were deleted in the Compose-dock hard-cut. See
   [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the
   `ExplorerTreeState`/`ProjectTreeState` split.
-- `editor/network/EditorClientNetworking` — S2C receivers. They feed `ProjectTreeState`
-  (snapshot/folder-loaded/save-report/error/structure-result/auto-saved); no client screen is
-  opened in response. The tree is not only reloaded on an explicit Refresh click: `ExplorerLifecycle`'s
+- `editor/network/EditorClientNetworking` — S2C receivers. `EditorTreeSnapshotS2C` feeds
+  `ProjectTreeState.onSnapshot`; folder-loaded/save-report/error/structure-result/auto-saved all feed
+  `StructureInfoState` instead (see [ui/structure-info-panel.md](../ui/structure-info-panel.md)) —
+  no client screen is opened in response to any of them. The tree is not only reloaded on an explicit
+  Refresh click: `ExplorerLifecycle`'s
   `ClientPlayConnectionEvents.JOIN` handler also sends `ListEditorTreeC2S` automatically on every
   world join, so the Explorer auto-populates without the player having to ask for it, and the
   resulting `EditorTreeSnapshotS2C` receiver applies a one-shot restore of last session's
   expansion/selection right after feeding `ProjectTreeState.onSnapshot` — see
   [persistence/explorer-session-state.md](../persistence/explorer-session-state.md) for the
-  save/restore mechanics. `StructureResultS2C` → `ProjectTreeState.onStructureResult` sets `status` to
-  `r.message` (place/save/new-structure outcomes all surface through the same status line as
-  folder load/save results). `StructureAutoSavedS2C` → `ProjectTreeState.onAutoSaved` sets
-  `status` to `"auto-saved $subpath ($sizeX×$sizeY×$sizeZ, $blockCount blocks)"`. The packet is
+  save/restore mechanics. `StructureResultS2C` → `StructureInfoState.onStructureResult` sets `status`
+  to `r.message` (place/save/new-structure outcomes all surface through the same Structure Info status
+  line as folder load/save results) and resets `blockCount`/`lastSavedMillis` to their sentinels while
+  keeping the sizes; the same payload also feeds `OpenStructureState.onStructureResult`, which the
+  Local History panel keys off (see [ui/local-history-panel.md](../ui/local-history-panel.md)).
+  `StructureAutoSavedS2C` → `StructureInfoState.onAutoSaved` fills `subpath`/sizes/`blockCount`/
+  `lastSavedMillis` from the payload directly. The packet is
   broadcast by `StructureCommit` (see the "Standalone structure files" section below), from both
   the end-of-tick debounce pass and the `commitAll` backstop.
 - `editor/world/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from

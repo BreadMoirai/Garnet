@@ -103,7 +103,8 @@ blank out a perfectly good record from a prior session.
 ## Save trigger points
 
 - **`ClientPlayConnectionEvents.DISCONNECT`** — saves first, then resets `ProjectTreeState`,
-  `ExplorerTreeState`, `UndoState`, `OpenStructureState`, and `LocalHistoryState`. The order
+  `StructureInfoState`, `ExplorerTreeState`, `UndoState`, `OpenStructureState`, and
+  `LocalHistoryState`. The order
   matters: reading tree state after the reset would persist empty sets instead of the session that
   just ended. This covers quit-to-title, a multiplayer disconnect, and a kick. The last two are
   reset here too: a structure placed in the editor world, and its revision list, do not survive a

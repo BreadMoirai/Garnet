@@ -49,9 +49,11 @@ Two consequences follow directly:
   *"no structure open"* state and sends `WatchStructureHistoryC2S("")`. It never lists revisions for
   something that is not in the world.
 
-`OpenStructureState` exists solely to make the client side of this checkable. `ProjectTreeState`
-records only the *status message* from a `StructureResultS2C`, which nothing can key off; the panel
-needs the subpath. All three senders of that payload refer to a structure that is placed (place,
+`OpenStructureState` exists solely to make the client side of this checkable. `StructureInfoState`,
+the other receiver of a `StructureResultS2C`, records only the *status message* plus the structure's
+facts — nothing there is a stable "is this subpath currently placed" flag the panel can key off.
+`OpenStructureState.onStructureResult` records just the subpath, which is what the panel actually
+needs. All three senders of that payload refer to a structure that is placed (place,
 a no-change save, and a completed restore), so tracking it there is sound. It is reset on
 disconnect — a placed structure does not survive a world.
 
@@ -158,7 +160,8 @@ size check would conflate the two and NBT-write a wrapper tag as if it were a te
 
 ### Failure modes
 
-Every refusal is a message on the Explorer status line, never a silent no-op. A refusal also
+Every refusal is a message in the [Structure Info panel](structure-info-panel.md)'s status line
+(`StructureInfoState.onError`), never a silent no-op. A refusal also
 **pushes the refreshed list back**, because the likeliest cause is a revision pruned between render
 and click, and a fresh list is what corrects the panel. A refusal pushes no undo entry — nothing
 happened.

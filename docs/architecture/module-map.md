@@ -183,13 +183,16 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   structure ops; file ops; shared helpers). See
   [persistence/network-payload-contract.md](../persistence/network-payload-contract.md)
   for the authority model — a *different* one from the deleted block-entity trust anchor.
-- `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ProjectTreeState`, and (for
+- `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ProjectTreeState` (tree
+  snapshot only), `StructureInfoState` (structure facts and the transient status line), and (for
   the Local History panel) `OpenStructureState` and `LocalHistoryState`.
 - `ui/` (client) — `ProjectExplorerPanel.kt`, `ExplorerToolbar.kt`, `ExplorerContextMenu.kt`,
   `ExplorerEdit.kt`, `ExplorerLifecycle.kt`, `ExplorerTreeState.kt`, `ProjectTreeState.kt`,
   `FolderPicker.kt`, `RootPickerController.kt`, `LocalHistoryPanel.kt`, `OpenStructureState.kt`,
-  `LocalHistoryState.kt` — the two Compose LEFT-dock panels (Explorer and Local History) and their
-  state; see [ui/local-history-panel.md](../ui/local-history-panel.md). Note
+  `LocalHistoryState.kt`, `StructureInfoState.kt`, `StructureInfoPanel.kt` — the three Compose
+  LEFT-dock panels (Explorer, Local History, Structure Info) and their state; see
+  [ui/local-history-panel.md](../ui/local-history-panel.md) and
+  [ui/structure-info-panel.md](../ui/structure-info-panel.md). Note
   these classes keep the `Project*`/legacy names deliberately (the `/garnet editor` command
   literal and "redstone project" domain term are unchanged); they are not `Editor*`.
 - `world/EditorIntegratedBoot.kt` (client) — `bootWorkspace()`, the "Redstone Projects…" title-screen
