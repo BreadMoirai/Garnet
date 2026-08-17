@@ -15,7 +15,7 @@
 - **No behavior change.** This is a move plus two renames. Do not edit logic, do not delete code, do not "improve" anything you pass. If a file looks wrong, leave it and report it.
 - **Six source sets, five compile targets.** `main`, `client`, `gametest`, `clientTest`, `test`, `testSupport`. Verification is `:26.2:clientClasses :26.2:classes :26.2:gametestClasses :26.2:clientTestClasses :26.2:testClasses` — `compileKotlin` alone covers only `main`.
 - **Gradle from WSL runs through cmd.exe:** `cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat <tasks>"`. See `docs/tooling/wsl2-gradle-invocation.md`.
-- **`:26.2:test` runs unfiltered.** Gradle's `--tests` filter does not select Kotest specs. Read the per-class JUnit XML under `build/test-results/test/`.
+- **`:26.2:test` runs unfiltered.** Gradle's `--tests` filter does not select Kotest specs. Read the per-class JUnit XML under `versions/26.2/build/test-results/test/`.
 - **`docs/superpowers/**` is never edited.** Specs and plans are commit-time historical snapshots. Every `sed` over `docs/` must exclude that subtree. This plan file and its spec are the only exceptions, and only if you are correcting them deliberately.
 - **These package roots do not move:** `com.breadmoirai.garnet.Garnet`, `com.breadmoirai.garnet.GarnetClient` (pinned by `fabric.mod.json` entrypoints), `com.breadmoirai.garnet.mixin`, `com.breadmoirai.garnet.mixin.client` (pinned by the `package` field of `src/main/resources/garnet.mixins.json` and `src/client/resources/garnet.client.mixins.json`).
 - **`testSupport/harness/` does not move.** It is the Kotest bridge, not tests.
@@ -54,7 +54,7 @@ cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:clientClasses :26.2:classe
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: `BUILD SUCCESSFUL` for both. If `:26.2:test` reports failures, open `build/test-results/test/TEST-*.xml` for the failing class — do not trust the console summary alone for Kotest specs.
+Expected: `BUILD SUCCESSFUL` for both. If `:26.2:test` reports failures, open `versions/26.2/build/test-results/test/TEST-*.xml` for the failing class — do not trust the console summary alone for Kotest specs.
 
 **A stale-directory check to run before each commit** — `git mv` leaves empty directories behind on some filesystems, and an empty package directory is invisible to Gradle but confusing to readers:
 
@@ -160,7 +160,7 @@ Expected: eventually `BUILD SUCCESSFUL`.
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: `BUILD SUCCESSFUL`. The kts loader/emitter/persistence tests are the ones that would catch a half-applied package rename — confirm `KtsSpecLoaderRoundtripTest` and `SpecPersistenceTest` are green in `build/test-results/test/`.
+Expected: `BUILD SUCCESSFUL`. The kts loader/emitter/persistence tests are the ones that would catch a half-applied package rename — confirm `KtsSpecLoaderRoundtripTest` and `SpecPersistenceTest` are green in `versions/26.2/build/test-results/test/`.
 
 - [ ] **Step 6: Update the doc citations this task invalidated**
 
@@ -317,7 +317,7 @@ Add exactly the imports each `unresolved reference` names, re-run, repeat until 
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: `BUILD SUCCESSFUL`. `ExplorerActionsTest`, `ExplorerLifecycleTest`, `ExplorerTreeStateTest`, `RootPickerControllerTest`, and the `editor/data` tests are the coverage for this task; confirm each in `build/test-results/test/`.
+Expected: `BUILD SUCCESSFUL`. `ExplorerActionsTest`, `ExplorerLifecycleTest`, `ExplorerTreeStateTest`, `RootPickerControllerTest`, and the `editor/data` tests are the coverage for this task; confirm each in `versions/26.2/build/test-results/test/`.
 
 - [ ] **Step 9: Update doc prose**
 
@@ -931,7 +931,7 @@ cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:testClasses"
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: both successful, with the **same test count** as before the move. Compare against the previous run's `build/test-results/test/` — a test that silently stopped being discovered is the failure mode this step is guarding against.
+Expected: both successful, with the **same test count** as before the move. Compare against the previous run's `versions/26.2/build/test-results/test/` — a test that silently stopped being discovered is the failure mode this step is guarding against.
 
 - [ ] **Step 4: Commit, then move gametest**
 
