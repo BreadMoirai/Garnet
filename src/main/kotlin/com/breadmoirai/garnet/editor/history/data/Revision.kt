@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.history
+package com.breadmoirai.garnet.editor.history.data
 
 /**
  * One recorded state of a structure. [file] is the blob's filename inside the structure's history

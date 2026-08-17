@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.test.editor
 
-import com.breadmoirai.garnet.editor.history.HistoryWatchers
-import com.breadmoirai.garnet.editor.history.RestoreOutcome
-import com.breadmoirai.garnet.editor.history.StructureRestoreOps
+import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
+import com.breadmoirai.garnet.editor.history.ops.RestoreOutcome
+import com.breadmoirai.garnet.editor.history.ops.StructureRestoreOps
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
@@ -18,8 +18,8 @@ import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
-import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.history.Revision
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.Revision
 import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import com.breadmoirai.garnet.editor.structure.data.structuresDiffer

@@ -18,8 +18,8 @@ import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.undo.ManifestEntry
 import com.breadmoirai.garnet.editor.undo.RelocateKind
 import com.breadmoirai.garnet.editor.world.*
-import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.history.Revision
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.Revision
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.NbtAccounter

@@ -28,7 +28,7 @@ import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
-import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import net.minecraft.core.Vec3i
 import com.breadmoirai.garnet.test.drainPayloads

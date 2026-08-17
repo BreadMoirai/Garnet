@@ -7,7 +7,7 @@ import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
-import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer

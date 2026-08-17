@@ -6,7 +6,7 @@ summary: How auto-saved .nbt structures record revisions under <instance>/.garne
 
 # Local history for standalone structures
 
-`com.breadmoirai.garnet.history.LocalHistoryStore` is a JetBrains-style local history for
+`com.breadmoirai.garnet.editor.history.data.LocalHistoryStore` is a JetBrains-style local history for
 standalone `.nbt` structures: every time `StructureCommit` is about to rewrite a structure's
 `.nbt` file, it first writes a **revision** — a snapshot of the NEWLY CAPTURED content that is
 about to become the live `.nbt`, not the content being replaced — so an edit can be rolled back

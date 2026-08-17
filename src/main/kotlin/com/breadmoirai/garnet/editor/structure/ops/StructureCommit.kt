@@ -1,11 +1,11 @@
 package com.breadmoirai.garnet.editor.structure.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.history.HistoryWatchers
+import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
-import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import com.breadmoirai.garnet.editor.structure.data.structuresDiffer

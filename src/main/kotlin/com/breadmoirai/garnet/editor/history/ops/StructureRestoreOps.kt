@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.history
+package com.breadmoirai.garnet.editor.history.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.commitDirtyUnder
@@ -6,7 +6,7 @@ import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
-import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import net.minecraft.server.MinecraftServer
 import org.slf4j.LoggerFactory

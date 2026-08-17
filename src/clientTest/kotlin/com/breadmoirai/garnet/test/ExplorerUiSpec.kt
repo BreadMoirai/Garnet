@@ -4,7 +4,7 @@ import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
 import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
-import com.breadmoirai.garnet.editor.ui.localHistoryPanel
+import com.breadmoirai.garnet.editor.history.ui.localHistoryPanel
 import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.compose.ComposeSurface
 import com.breadmoirai.garnet.ui.dock.DockRegion

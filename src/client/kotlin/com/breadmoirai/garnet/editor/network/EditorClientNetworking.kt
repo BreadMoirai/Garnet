@@ -2,7 +2,7 @@ package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.ui.LocalHistoryState
+import com.breadmoirai.garnet.editor.history.ui.LocalHistoryState
 import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
 import com.breadmoirai.garnet.editor.structure.ui.StructureInfoState
 import com.breadmoirai.garnet.editor.ui.UndoState

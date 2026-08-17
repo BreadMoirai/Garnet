@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.history.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures

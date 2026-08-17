@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.undo
 
-import com.breadmoirai.garnet.editor.history.RestoreOutcome
-import com.breadmoirai.garnet.editor.history.StructureRestoreOps
+import com.breadmoirai.garnet.editor.history.ops.RestoreOutcome
+import com.breadmoirai.garnet.editor.history.ops.StructureRestoreOps
 import com.breadmoirai.garnet.editor.explorer.network.DeleteOutcome
 import com.breadmoirai.garnet.editor.explorer.network.EditorFileOpsHandlers
 import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C

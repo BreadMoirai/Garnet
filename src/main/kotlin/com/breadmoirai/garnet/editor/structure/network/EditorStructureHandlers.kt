@@ -2,9 +2,9 @@ package com.breadmoirai.garnet.editor.structure.network
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.data.*
-import com.breadmoirai.garnet.editor.history.HistoryWatchers
-import com.breadmoirai.garnet.editor.history.RestoreOutcome
-import com.breadmoirai.garnet.editor.history.StructureRestoreOps
+import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
+import com.breadmoirai.garnet.editor.history.ops.RestoreOutcome
+import com.breadmoirai.garnet.editor.history.ops.StructureRestoreOps
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentFolder
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
@@ -23,7 +23,7 @@ import com.breadmoirai.garnet.editor.undo.CreatedFileKind
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.*
-import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.registries.Registries

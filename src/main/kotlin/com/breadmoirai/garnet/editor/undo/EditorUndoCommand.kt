@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.undo
 
-import com.breadmoirai.garnet.history.Revision
+import com.breadmoirai.garnet.editor.history.data.Revision
 import java.nio.file.Path
 
 /** Which flavour of relocation produced a [EditorUndoCommand.Relocate] — messages only. */

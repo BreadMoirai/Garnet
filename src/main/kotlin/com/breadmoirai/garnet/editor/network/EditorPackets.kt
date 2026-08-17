@@ -412,7 +412,7 @@ data class WatchStructureHistoryC2S(val subpath: String) : CustomPacketPayload {
 }
 
 /**
- * A structure's revisions, oldest first — as [com.breadmoirai.garnet.history.LocalHistoryStore.revisions]
+ * A structure's revisions, oldest first — as [com.breadmoirai.garnet.editor.history.data.LocalHistoryStore.revisions]
  * returns them. The panel reverses for display; keeping the store's own order on the wire means a
  * future consumer does not inherit a presentation decision.
  *

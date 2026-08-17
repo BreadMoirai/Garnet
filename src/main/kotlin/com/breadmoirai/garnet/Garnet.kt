@@ -2,7 +2,7 @@ package com.breadmoirai.garnet
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.core.events.SubTickPhaseEvents
-import com.breadmoirai.garnet.editor.history.HistoryWatchers
+import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry
 import com.breadmoirai.garnet.editor.command.EditorCommand
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
@@ -10,7 +10,7 @@ import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
-import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback

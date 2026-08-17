@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.history
+package com.breadmoirai.garnet.editor.history.data
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.google.gson.Gson

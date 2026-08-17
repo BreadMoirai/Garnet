@@ -1,9 +1,9 @@
-package com.breadmoirai.garnet.editor.history
+package com.breadmoirai.garnet.editor.history.network
 
 import com.breadmoirai.garnet.editor.network.RevisionEntry
 import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
-import com.breadmoirai.garnet.history.LocalHistoryStore
+import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
