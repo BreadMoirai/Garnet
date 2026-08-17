@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.history.ui.LocalHistoryState
@@ -21,6 +21,11 @@ import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.harness.ClientSpec
+import com.breadmoirai.garnet.dock.shell.PanelPixelProbe
+import com.breadmoirai.garnet.test.closeClientScreen
+import com.breadmoirai.garnet.test.onClient
+import com.breadmoirai.garnet.test.runOnClient
+import com.breadmoirai.garnet.test.waitClientTicks
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldNotContain

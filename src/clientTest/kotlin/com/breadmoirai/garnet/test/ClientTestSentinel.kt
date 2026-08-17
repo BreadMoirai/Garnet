@@ -7,9 +7,15 @@ import com.breadmoirai.garnet.harness.client.WorldHolder
 import com.breadmoirai.garnet.harness.launcher.LauncherResult
 import com.breadmoirai.garnet.harness.launcher.launchKotest
 import com.breadmoirai.garnet.dock.compose.ComposeOverlay
+import com.breadmoirai.garnet.dock.shell.DockInputSpec
+import com.breadmoirai.garnet.dock.shell.DockRenderSpec
 import com.breadmoirai.garnet.dock.shell.DockState
+import com.breadmoirai.garnet.dock.viewport.CursorFocusToggleSpec
+import com.breadmoirai.garnet.dock.viewport.ViewportSpec
 import com.breadmoirai.garnet.dock.viewport.ViewportState
 import com.breadmoirai.garnet.dock.viewport.WindowViewportExt
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerUiSpec
+import com.breadmoirai.garnet.editor.explorer.ui.JewelExplorerSpec
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.minecraft.client.Minecraft

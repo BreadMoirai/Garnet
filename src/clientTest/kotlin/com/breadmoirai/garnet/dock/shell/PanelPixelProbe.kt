@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test
+package com.breadmoirai.garnet.dock.shell
 
 import com.breadmoirai.garnet.dock.shell.STRIPE_WIDTH
 import java.nio.file.Path
