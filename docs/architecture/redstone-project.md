@@ -187,7 +187,7 @@ inside the `deleteSubtree` primitive, not the handler, so the undo/redo replays 
   `lastSavedMillis` from the payload directly. The packet is
   broadcast by `StructureCommit` (see the "Standalone structure files" section below), from both
   the end-of-tick debounce pass and the `commitAll` backstop.
-- `editor/world/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
+- `editor/workspace/ui/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
   the UI via `TitleScreenMixin`) opens/creates the single shared `garnet-workspace` save
   with no root pinned. The dormant `pendingRoot`/`EditorServerContext` pinning machinery is
   retained for programmatic use, but no caller sets `pendingRoot`, so the SERVER_STARTING listener

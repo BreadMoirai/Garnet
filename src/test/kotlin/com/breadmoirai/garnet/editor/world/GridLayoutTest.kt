@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.world
+package com.breadmoirai.garnet.editor.workspace.world
 
 import com.breadmoirai.garnet.core.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec

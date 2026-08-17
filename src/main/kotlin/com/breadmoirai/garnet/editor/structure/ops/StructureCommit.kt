@@ -3,8 +3,8 @@ package com.breadmoirai.garnet.editor.structure.ops
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
-import com.breadmoirai.garnet.editor.world.EditorDimRegistry
-import com.breadmoirai.garnet.editor.world.EditorRootResolver
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.workspace.world.EditorRootResolver
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.data.PlacedBox

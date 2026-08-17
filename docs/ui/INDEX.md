@@ -6,7 +6,7 @@ dock** (`GarnetDock`) blended over the composited game world — see
 (`RecorderScreen`, `RunnerScreen`, `ProjectScreen`, `ProjectRootListScreen`, and their widgets
 `IntEditBox`, `DropdownButton`, `IntStepper`, `TimelineSliderWidget`) was hard-cut once the dock
 replaced it; only `GarnetIconButton` (the title-screen "Redstone Projects…" button) survives
-under `src/client/kotlin/.../ui/widget/`.
+under `src/client/kotlin/.../editor/workspace/ui/`.
 
 **Tags:** compose, dock, screens, widgets, rendering, layout, input
 

@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.ui.widget
+package com.breadmoirai.garnet.editor.workspace.ui
 
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.Button

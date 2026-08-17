@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.structure.ops
 
-import com.breadmoirai.garnet.editor.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 

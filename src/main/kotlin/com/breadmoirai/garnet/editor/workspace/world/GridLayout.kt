@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.world
+package com.breadmoirai.garnet.editor.workspace.world
 
 import com.breadmoirai.garnet.editor.explorer.data.EditorCell
 import com.breadmoirai.garnet.core.spec.GarnetSpec

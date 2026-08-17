@@ -25,8 +25,8 @@ import com.breadmoirai.garnet.editor.undo.data.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.ops.EditorUndoOps
 import com.breadmoirai.garnet.editor.undo.data.EditorUndoStack
 import com.breadmoirai.garnet.editor.undo.data.RelocateKind
-import com.breadmoirai.garnet.editor.world.EditorDimRegistry
-import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.test.deleteRecursively

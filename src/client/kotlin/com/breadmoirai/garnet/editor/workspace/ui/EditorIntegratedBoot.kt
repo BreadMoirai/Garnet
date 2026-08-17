@@ -1,7 +1,7 @@
-package com.breadmoirai.garnet.editor.world
+package com.breadmoirai.garnet.editor.workspace.ui
 
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
-import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.core.registries.Registries

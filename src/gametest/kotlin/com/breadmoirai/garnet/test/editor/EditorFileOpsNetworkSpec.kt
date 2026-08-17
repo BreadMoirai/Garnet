@@ -12,7 +12,7 @@ import com.breadmoirai.garnet.editor.explorer.network.EditorFileOpsHandlers
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
-import com.breadmoirai.garnet.editor.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit

@@ -12,10 +12,10 @@ import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
-import com.breadmoirai.garnet.editor.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
-import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer

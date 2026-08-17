@@ -7,8 +7,8 @@ import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
-import com.breadmoirai.garnet.editor.world.EditorServerContext
-import com.breadmoirai.garnet.editor.world.EditorWorld
+import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
+import com.breadmoirai.garnet.editor.workspace.world.EditorWorld
 import com.breadmoirai.garnet.mixin.ConnectionAccessor
 import com.breadmoirai.garnet.mixin.ServerCommonPacketListenerImplAccessor
 import com.mojang.authlib.GameProfile

@@ -12,8 +12,8 @@ import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
-import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
-import com.breadmoirai.garnet.editor.world.EditorRootResolver
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimLifecycle
+import com.breadmoirai.garnet.editor.workspace.world.EditorRootResolver
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer

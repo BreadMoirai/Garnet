@@ -4,10 +4,10 @@ import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.core.events.SubTickPhaseEvents
 import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry
-import com.breadmoirai.garnet.editor.command.EditorCommand
-import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
+import com.breadmoirai.garnet.editor.workspace.command.EditorCommand
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
-import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore

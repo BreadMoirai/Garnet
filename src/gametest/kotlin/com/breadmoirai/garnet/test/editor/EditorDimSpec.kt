@@ -1,10 +1,10 @@
 package com.breadmoirai.garnet.test.editor
 
-import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
-import com.breadmoirai.garnet.editor.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimLifecycle
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewSpec
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
-import com.breadmoirai.garnet.editor.world.EditorWorld
+import com.breadmoirai.garnet.editor.workspace.world.EditorWorld
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec

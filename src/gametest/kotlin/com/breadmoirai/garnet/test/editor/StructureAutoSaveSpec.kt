@@ -5,8 +5,8 @@ import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
-import com.breadmoirai.garnet.editor.world.EditorDimRegistry
-import com.breadmoirai.garnet.editor.world.EditorServerContext
+import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
+import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit

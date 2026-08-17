@@ -102,7 +102,7 @@ Consequences:
 
 ## Root resolution has a priority chain, not a single lookup
 
-`EditorRootResolver.rootFor(server)` (`editor/world/EditorRootResolver.kt`): `EditorWorld.get(server)?.root` → `EditorServerContext.get(server)?.root`
+`EditorRootResolver.rootFor(server)` (`editor/workspace/world/EditorRootResolver.kt`): `EditorWorld.get(server)?.root` → `EditorServerContext.get(server)?.root`
 → `SharedSettings.projectRootPath` (if non-blank). This is a fallback chain, not authority
 delegation — whichever resolves first is used for the entire request.
 
