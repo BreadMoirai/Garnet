@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.history
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.commitDirtyUnder
 import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureCommit

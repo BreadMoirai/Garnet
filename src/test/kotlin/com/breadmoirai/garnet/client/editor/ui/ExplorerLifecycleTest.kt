@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.client.editor.ui
 
 import com.breadmoirai.garnet.config.ExplorerStateStore
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.ui.ExplorerSessionGate

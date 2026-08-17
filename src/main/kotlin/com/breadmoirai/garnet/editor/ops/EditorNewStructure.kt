@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.ops
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtIo
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate

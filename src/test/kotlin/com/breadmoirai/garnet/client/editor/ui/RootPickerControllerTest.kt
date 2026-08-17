@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.client.editor.ui
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.ui.FolderPicker
 import com.breadmoirai.garnet.editor.ui.RootPickerController
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S

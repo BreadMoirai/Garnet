@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.spec
+package com.breadmoirai.garnet.core.spec
 
 import com.mojang.serialization.Codec
 import com.mojang.serialization.DataResult

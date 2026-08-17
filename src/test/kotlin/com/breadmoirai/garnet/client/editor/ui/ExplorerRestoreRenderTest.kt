@@ -9,7 +9,7 @@ package com.breadmoirai.garnet.client.editor.ui
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import com.breadmoirai.garnet.config.ExplorerSession
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.FileNode
 import com.breadmoirai.garnet.editor.data.FolderNode
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C

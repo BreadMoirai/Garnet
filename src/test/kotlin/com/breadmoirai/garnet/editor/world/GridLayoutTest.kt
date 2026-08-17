@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.world
 
-import com.breadmoirai.garnet.spec.GarnetSpec
+import com.breadmoirai.garnet.core.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe

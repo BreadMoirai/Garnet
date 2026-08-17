@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.testing.data
 
-import com.breadmoirai.garnet.spec.GarnetSpec
+import com.breadmoirai.garnet.core.spec.GarnetSpec
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.ScriptCompilationConfiguration
 import kotlin.script.experimental.api.defaultImports
@@ -9,7 +9,7 @@ import kotlin.script.experimental.jvm.jvm
 
 object SpecScriptCompilationConfig : ScriptCompilationConfiguration({
     defaultImports(
-        "com.breadmoirai.garnet.spec.*",
+        "com.breadmoirai.garnet.core.spec.*",
         "net.minecraft.core.Vec3i",
     )
     jvm {

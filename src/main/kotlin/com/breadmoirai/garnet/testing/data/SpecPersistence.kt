@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.testing.data
 
-import com.breadmoirai.garnet.spec.GarnetSpec
+import com.breadmoirai.garnet.core.spec.GarnetSpec
 import com.breadmoirai.garnet.playback.data.RecordingSidecar
 import com.breadmoirai.garnet.playback.data.StateRecording
 import org.slf4j.LoggerFactory

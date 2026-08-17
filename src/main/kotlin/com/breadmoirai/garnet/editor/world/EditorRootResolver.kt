@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.world
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import net.minecraft.server.MinecraftServer
 import java.nio.file.Path

@@ -1,7 +1,7 @@
-package com.breadmoirai.garnet.spec
+package com.breadmoirai.garnet.core.spec
 
-import com.breadmoirai.garnet.spec.DEFAULT_CONDITION
-import com.breadmoirai.garnet.spec.StateCondition
+import com.breadmoirai.garnet.core.spec.DEFAULT_CONDITION
+import com.breadmoirai.garnet.core.spec.StateCondition
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.SharedConstants

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet
 
-import com.breadmoirai.garnet.config.ModConfig
+import com.breadmoirai.garnet.core.config.ModConfig
 import com.breadmoirai.garnet.editor.network.EditorClientNetworking
 import com.breadmoirai.garnet.editor.ui.explorerPanel
 import com.breadmoirai.garnet.editor.ui.localHistoryPanel

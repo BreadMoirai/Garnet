@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.spec
+package com.breadmoirai.garnet.core.spec
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.testing.data
 
-import com.breadmoirai.garnet.spec.GarnetSpec
+import com.breadmoirai.garnet.core.spec.GarnetSpec
 import java.nio.file.Path
 import kotlin.io.path.readText
 import kotlin.script.experimental.api.EvaluationResult
@@ -42,7 +42,7 @@ object KtsSpecLoader {
                 "Ensure the script ends with a `garnetSpec(...) { ... }` expression.")
         return value as? GarnetSpec
             ?: error("$name: script result is not a spec.GarnetSpec (got: ${value::class.qualifiedName}). " +
-                "Ensure the script ends with a `garnetSpec(...) { ... }` expression from com.breadmoirai.garnet.spec.")
+                "Ensure the script ends with a `garnetSpec(...) { ... }` expression from com.breadmoirai.garnet.core.spec.")
     }
 
     /** Loads a `.spec.kts` file and returns its [GarnetSpec] value. */

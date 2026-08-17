@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.network
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.*
 import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.history.RestoreOutcome

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.core.events.SubTickPhaseEvents
 import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry

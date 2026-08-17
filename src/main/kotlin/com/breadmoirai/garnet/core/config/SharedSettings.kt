@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.config
+package com.breadmoirai.garnet.core.config
 
 object SharedSettings {
     var projectCellSize: net.minecraft.core.Vec3i = net.minecraft.core.Vec3i(32, 32, 32)

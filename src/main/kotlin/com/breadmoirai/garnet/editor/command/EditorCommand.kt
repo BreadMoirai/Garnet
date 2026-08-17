@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.command
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.data.EditorRoot
 import com.breadmoirai.garnet.editor.data.EditorSession
 import com.breadmoirai.garnet.editor.data.scanFolder

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.test.history
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import io.kotest.matchers.collections.shouldHaveSize

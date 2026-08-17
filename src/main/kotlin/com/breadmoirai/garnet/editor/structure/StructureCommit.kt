@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.structure
 
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
@@ -42,7 +42,7 @@ import kotlin.io.path.exists
  *
  * **Pruning invariant (fix round 2 / Finding 1b):** a failed attempt must cause NO net loss of
  * genuine history, at any revision count — including at/above
- * [com.breadmoirai.garnet.config.SharedSettings.localHistoryMaxRevisions]. The speculative revision
+ * [com.breadmoirai.garnet.core.config.SharedSettings.localHistoryMaxRevisions]. The speculative revision
  * write above therefore passes `prune = false`: it appends without ever deleting an older blob.
  * Only once the `.nbt` rewrite has actually succeeded does [commit] call
  * [LocalHistoryStore.prune] to apply the age/count cap — so a real, kept write still prunes

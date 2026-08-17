@@ -13,7 +13,7 @@ import net.minecraft.server.Bootstrap
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import java.nio.file.Files
 import kotlin.io.path.exists
 import kotlin.io.path.name

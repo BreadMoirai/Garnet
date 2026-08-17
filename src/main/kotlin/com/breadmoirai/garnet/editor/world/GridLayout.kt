@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.world
 
 import com.breadmoirai.garnet.editor.data.EditorCell
-import com.breadmoirai.garnet.spec.GarnetSpec
+import com.breadmoirai.garnet.core.spec.GarnetSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 

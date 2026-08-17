@@ -1,7 +1,7 @@
-package com.breadmoirai.garnet.client.config
+package com.breadmoirai.garnet.core.config
 
-import com.breadmoirai.garnet.config.ModConfig
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.ModConfig
+import com.breadmoirai.garnet.core.config.SharedSettings
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlin.io.path.createTempDirectory

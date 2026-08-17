@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.ui
 
 import com.breadmoirai.garnet.config.ExplorerStateStore
-import com.breadmoirai.garnet.config.SharedSettings
+import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
