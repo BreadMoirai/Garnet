@@ -45,6 +45,13 @@ rewrite() {  # rewrite OLD_FQN NEW_FQN
 
 This single pass fixes the `package` declaration at the top of each moved file, every `import` of it, every fully-qualified reference in code, and every doc citation — they are all the same string.
 
+**Package-line rewrites must target the package line, not line 1.** Kotlin files may open with
+`@file:OptIn(...)`, a license header, or a comment — Task 2 lost a `@file:OptIn` to a blind
+`1s/.*/…/` and had to restore it by hand. Every package rewrite in this plan therefore uses
+`sed -i '0,/^package /{s|^package .*|package <new>|}'`, which replaces the first line that actually
+begins with `package` wherever it sits. Verify afterwards with `grep -Hn '^package' <files>`: every
+file must report exactly one hit, naming the new package.
+
 **3. Add the imports the compiler asks for.** `sed` cannot do this part. When files that used to share a package land in different packages, references between them that needed no import now need one. Compile, read the `unresolved reference` errors, add exactly those imports, repeat until clean. Do not resolve an error by moving a file somewhere the plan didn't put it.
 
 **Verification, run at the end of every task:**
@@ -129,17 +136,17 @@ grep -rl 'com\.breadmoirai\.garnet\.config\.ModConfig\b' src docs --exclude-dir=
 Note the per-class rewrite here rather than a whole-package one: `com.breadmoirai.garnet.config` still exists after this step, holding `DockLayoutStore` and `ExplorerStateStore`. The moved files' own `package` lines are also `com.breadmoirai.garnet.config` and are **not** matched by a per-class pattern — fix those two by hand:
 
 ```bash
-sed -i '1s/.*/package com.breadmoirai.garnet.core.config/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.core.config|}' \
   src/main/kotlin/com/breadmoirai/garnet/core/config/SharedSettings.kt \
   src/client/kotlin/com/breadmoirai/garnet/core/config/ModConfig.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.core.config/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.core.config|}' \
   src/test/kotlin/com/breadmoirai/garnet/core/config/ModConfigTest.kt
 ```
 
-Then check line 1 of each of the three really is the package declaration and nothing was clobbered:
+Then confirm each of the three has exactly one package declaration and it names the new package:
 
 ```bash
-head -1 src/main/kotlin/com/breadmoirai/garnet/core/config/SharedSettings.kt \
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/core/config/SharedSettings.kt \
         src/client/kotlin/com/breadmoirai/garnet/core/config/ModConfig.kt \
         src/test/kotlin/com/breadmoirai/garnet/core/config/ModConfigTest.kt
 ```
@@ -241,10 +248,10 @@ for c in EditorTreeHandlers EditorFileOpsHandlers DeleteOutcome; do
   grep -rl "com\.breadmoirai\.garnet\.editor\.network\.$c\b" src docs --exclude-dir=superpowers \
     | xargs -r sed -i "s/com\.breadmoirai\.garnet\.editor\.network\.$c\b/com.breadmoirai.garnet.editor.explorer.network.$c/g"
 done
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.explorer.network/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.explorer.network|}' \
   src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/EditorTreeHandlers.kt \
   src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/EditorFileOpsHandlers.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/*.kt
 ```
 
 `DeleteOutcome` is declared in `EditorFileOpsHandlers.kt` and referenced from `editor/undo/EditorUndoOps.kt`; it moves with its file, which is why it is in the loop.
@@ -283,9 +290,9 @@ Expected: the second command prints nothing.
 `editor/ui` does **not** empty out in this task (Local History, Structure Info, and `UndoState` are still there until Tasks 3–5), so the package line fix is per-file:
 
 ```bash
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.explorer.ui/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.explorer.ui|}' \
   src/client/kotlin/com/breadmoirai/garnet/editor/explorer/ui/*.kt
-head -1 src/client/kotlin/com/breadmoirai/garnet/editor/explorer/ui/*.kt
+grep -Hn '^package' src/client/kotlin/com/breadmoirai/garnet/editor/explorer/ui/*.kt
 ```
 
 `ExplorerStateStore.kt` had `package com.breadmoirai.garnet.config` — the same line-1 rewrite covers it. Then rewrite its importers, and the importers of everything else that moved out of `editor/ui`:
@@ -407,11 +414,11 @@ done
 Then set every moved file's package line:
 
 ```bash
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.data/'    src/main/kotlin/com/breadmoirai/garnet/editor/structure/data/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.ops/'     src/main/kotlin/com/breadmoirai/garnet/editor/structure/ops/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.network/' src/main/kotlin/com/breadmoirai/garnet/editor/structure/network/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.ui/'      src/client/kotlin/com/breadmoirai/garnet/editor/structure/ui/*.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/structure/*/*.kt \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.data|}'    src/main/kotlin/com/breadmoirai/garnet/editor/structure/data/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.ops|}'     src/main/kotlin/com/breadmoirai/garnet/editor/structure/ops/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.network|}' src/main/kotlin/com/breadmoirai/garnet/editor/structure/network/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.ui|}'      src/client/kotlin/com/breadmoirai/garnet/editor/structure/ui/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/structure/*/*.kt \
         src/client/kotlin/com/breadmoirai/garnet/editor/structure/ui/*.kt
 ```
 
@@ -502,11 +509,11 @@ for c in LocalHistoryPanel LocalHistoryState; do
   grep -rl "com\.breadmoirai\.garnet\.editor\.ui\.$c\b" src docs --exclude-dir=superpowers \
     | xargs -r sed -i "s/com\.breadmoirai\.garnet\.editor\.ui\.$c\b/com.breadmoirai.garnet.editor.history.ui.$c/g"
 done
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.data/'    src/main/kotlin/com/breadmoirai/garnet/editor/history/data/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.ops/'     src/main/kotlin/com/breadmoirai/garnet/editor/history/ops/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.network/' src/main/kotlin/com/breadmoirai/garnet/editor/history/network/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.ui/'      src/client/kotlin/com/breadmoirai/garnet/editor/history/ui/*.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/history/*/*.kt \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.data|}'    src/main/kotlin/com/breadmoirai/garnet/editor/history/data/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.ops|}'     src/main/kotlin/com/breadmoirai/garnet/editor/history/ops/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.network|}' src/main/kotlin/com/breadmoirai/garnet/editor/history/network/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.ui|}'      src/client/kotlin/com/breadmoirai/garnet/editor/history/ui/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/history/*/*.kt \
         src/client/kotlin/com/breadmoirai/garnet/editor/history/ui/*.kt
 ```
 
@@ -582,10 +589,10 @@ grep -rl 'com\.breadmoirai\.garnet\.editor\.undo\.EditorUndoOps\b' src docs --ex
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.editor\.undo\.EditorUndoOps\b/com.breadmoirai.garnet.editor.undo.ops.EditorUndoOps/g'
 grep -rl 'com\.breadmoirai\.garnet\.editor\.ui\.UndoState\b' src docs --exclude-dir=superpowers \
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.editor\.ui\.UndoState\b/com.breadmoirai.garnet.editor.undo.ui.UndoState/g'
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.undo.data/' src/main/kotlin/com/breadmoirai/garnet/editor/undo/data/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.undo.ops/'  src/main/kotlin/com/breadmoirai/garnet/editor/undo/ops/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.undo.ui/'   src/client/kotlin/com/breadmoirai/garnet/editor/undo/ui/*.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/undo/*/*.kt \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.undo.data|}' src/main/kotlin/com/breadmoirai/garnet/editor/undo/data/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.undo.ops|}'  src/main/kotlin/com/breadmoirai/garnet/editor/undo/ops/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.undo.ui|}'   src/client/kotlin/com/breadmoirai/garnet/editor/undo/ui/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/undo/*/*.kt \
         src/client/kotlin/com/breadmoirai/garnet/editor/undo/ui/*.kt
 ```
 
@@ -655,7 +662,7 @@ grep -rl 'com\.breadmoirai\.garnet\.editor\.command\b' src docs --exclude-dir=su
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.editor\.command\b/com.breadmoirai.garnet.editor.workspace.command/g'
 grep -rl 'com\.breadmoirai\.garnet\.ui\.widget\b' src docs --exclude-dir=superpowers \
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.ui\.widget\b/com.breadmoirai.garnet.editor.workspace.ui/g'
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.workspace.ui/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.workspace.ui|}' \
   src/client/kotlin/com/breadmoirai/garnet/editor/workspace/ui/EditorIntegratedBoot.kt
 ```
 
@@ -818,7 +825,7 @@ grep -rl 'com\.breadmoirai\.garnet\.client\.viewport\b' src docs --exclude-dir=s
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.client\.viewport\b/com.breadmoirai.garnet.dock.viewport/g'
 grep -rl 'com\.breadmoirai\.garnet\.config\.DockLayoutStore\b' src docs --exclude-dir=superpowers \
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.config\.DockLayoutStore\b/com.breadmoirai.garnet.dock.data.DockLayoutStore/g'
-sed -i '1s/.*/package com.breadmoirai.garnet.dock.data/' src/client/kotlin/com/breadmoirai/garnet/dock/data/DockLayoutStore.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.dock.data|}' src/client/kotlin/com/breadmoirai/garnet/dock/data/DockLayoutStore.kt
 ```
 
 - [ ] **Step 2: Check the Java file and the mixins**
@@ -915,12 +922,12 @@ Rather than 30 hand-written `sed` calls, derive the package from the directory:
 for f in $(git diff --cached --name-only -- 'src/test/*'); do
   [ -f "$f" ] || continue
   pkg=$(dirname "$f" | sed 's|src/test/kotlin/||; s|/|.|g')
-  sed -i "1s/.*/package $pkg/" "$f"
+  sed -i "0,/^package /{s|^package .*|package $pkg|}" "$f"
 done
 grep -c '^package' $(git diff --cached --name-only -- 'src/test/*' | while read f; do [ -f "$f" ] && echo "$f"; done)
 ```
 
-Every file must report `1`. A `0` means line 1 was something else — a license header or comment — and that `sed` destroyed it; find it in `git diff` and restore by hand.
+Every file must report exactly `1`. A `0` means the file had no package declaration to replace; a `2` means one was duplicated. Both mean the rewrite went wrong — inspect `git diff` and fix by hand.
 
 Then confirm the packages match the new paths before compiling.
 
