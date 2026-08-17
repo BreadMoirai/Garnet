@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test.editor
+package com.breadmoirai.garnet.editor
 
 import com.breadmoirai.garnet.playback.recorder.RecordingDslEmitter
 import net.minecraft.core.BlockPos

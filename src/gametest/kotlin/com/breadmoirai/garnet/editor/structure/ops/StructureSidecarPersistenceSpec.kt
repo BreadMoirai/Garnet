@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test.structure
+package com.breadmoirai.garnet.editor.structure.ops
 
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry

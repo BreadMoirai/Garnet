@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test.history
+package com.breadmoirai.garnet.editor.history.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.harness.GarnetTestSpec

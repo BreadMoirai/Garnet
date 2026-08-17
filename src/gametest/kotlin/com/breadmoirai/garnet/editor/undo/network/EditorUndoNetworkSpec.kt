@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test.editor
+package com.breadmoirai.garnet.editor.undo.network
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot

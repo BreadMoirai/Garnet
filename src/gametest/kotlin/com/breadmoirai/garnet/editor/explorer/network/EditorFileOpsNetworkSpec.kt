@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.test.editor
+package com.breadmoirai.garnet.editor.explorer.network
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.network.CreateFolderC2S

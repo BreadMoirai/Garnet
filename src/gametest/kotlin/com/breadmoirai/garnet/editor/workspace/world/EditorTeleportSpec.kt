@@ -1,6 +1,7 @@
-package com.breadmoirai.garnet.test.editor
+package com.breadmoirai.garnet.editor.workspace.world
 
 import com.breadmoirai.garnet.core.config.SharedSettings
+import com.breadmoirai.garnet.editor.writeStub
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
