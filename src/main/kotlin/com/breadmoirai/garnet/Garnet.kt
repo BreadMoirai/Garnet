@@ -15,7 +15,7 @@ import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import com.breadmoirai.garnet.editor.explorer.data.EditorSession
-import com.breadmoirai.garnet.editor.undo.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoStack
 import com.breadmoirai.garnet.playback.recorder.StateRecorder
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents

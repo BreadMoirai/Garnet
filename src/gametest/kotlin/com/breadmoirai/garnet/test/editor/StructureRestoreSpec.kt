@@ -14,8 +14,8 @@ import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
-import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
-import com.breadmoirai.garnet.editor.undo.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore

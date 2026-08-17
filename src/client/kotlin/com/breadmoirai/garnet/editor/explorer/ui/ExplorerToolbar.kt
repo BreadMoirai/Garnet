@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
 import com.breadmoirai.garnet.editor.network.RedoC2S
 import com.breadmoirai.garnet.editor.network.UndoC2S
-import com.breadmoirai.garnet.editor.ui.UndoState
+import com.breadmoirai.garnet.editor.undo.ui.UndoState
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton

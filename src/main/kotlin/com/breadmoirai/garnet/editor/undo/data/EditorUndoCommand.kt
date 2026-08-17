@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.undo
+package com.breadmoirai.garnet.editor.undo.data
 
 import com.breadmoirai.garnet.editor.history.data.Revision
 import java.nio.file.Path

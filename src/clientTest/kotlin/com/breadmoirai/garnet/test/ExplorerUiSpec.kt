@@ -23,7 +23,7 @@ import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.UndoStateS2C
 import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
-import com.breadmoirai.garnet.editor.ui.UndoState
+import com.breadmoirai.garnet.editor.undo.ui.UndoState
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue

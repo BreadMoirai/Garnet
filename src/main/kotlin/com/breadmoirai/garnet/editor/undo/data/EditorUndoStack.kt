@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.undo
+package com.breadmoirai.garnet.editor.undo.data
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap

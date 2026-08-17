@@ -19,9 +19,9 @@ import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
-import com.breadmoirai.garnet.editor.undo.CreatedFileKind
-import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
-import com.breadmoirai.garnet.editor.undo.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.data.CreatedFileKind
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence

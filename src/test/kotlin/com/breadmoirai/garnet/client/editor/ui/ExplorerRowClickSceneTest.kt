@@ -31,7 +31,7 @@ import org.jetbrains.jewel.ui.component.Text
  * would look dead. Asserting the state after a real click is the only way to know which of the two
  * handlers actually runs.
  *
- * The tree is mounted the way [com.breadmoirai.garnet.editor.ui.explorerPanel] mounts it — same
+ * The tree is mounted the way [com.breadmoirai.garnet.editor.explorer.ui.explorerPanel] mounts it — same
  * click handler — but without the panel's toolbar above it, so the root row is at a known y and no
  * toolbar-height assumption is baked into the click coordinates.
  */

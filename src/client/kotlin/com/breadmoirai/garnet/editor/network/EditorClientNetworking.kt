@@ -5,7 +5,7 @@ import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.history.ui.LocalHistoryState
 import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
 import com.breadmoirai.garnet.editor.structure.ui.StructureInfoState
-import com.breadmoirai.garnet.editor.ui.UndoState
+import com.breadmoirai.garnet.editor.undo.ui.UndoState
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C

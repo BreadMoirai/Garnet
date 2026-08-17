@@ -1,5 +1,9 @@
-package com.breadmoirai.garnet.editor.undo
+package com.breadmoirai.garnet.editor.undo.ops
 
+import com.breadmoirai.garnet.editor.undo.data.CreatedFileKind
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.data.RelocateKind
 import com.breadmoirai.garnet.editor.history.ops.RestoreOutcome
 import com.breadmoirai.garnet.editor.history.ops.StructureRestoreOps
 import com.breadmoirai.garnet.editor.explorer.network.DeleteOutcome
@@ -35,6 +39,13 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
  * here or from a primitive that failed mid-flight — leaves both deques untouched. A stack that
  * moved an entry for an operation the filesystem refused would claim an undo that never occurred
  * and destroy the player's only handle on retrying it.
+ *
+ * **Layering exception.** This file imports `explorer/network` ([EditorFileOpsHandlers]) and the
+ * `editor/network` spine ([EditorHandlerSupport]), against the usual `ops` → `data` direction,
+ * because undoing a file operation replays it through the very handlers the client would have
+ * invoked. This is the codebase's only `ops` → `network` edge and is recorded in
+ * `docs/superpowers/specs/2026-08-16-feature-sub-package-layout-design.md`. A second one means
+ * the rule is wrong and should be revisited, not extended.
  */
 object EditorUndoOps {
 

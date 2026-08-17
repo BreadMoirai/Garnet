@@ -12,11 +12,11 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
-import com.breadmoirai.garnet.editor.undo.BankedFile
-import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
-import com.breadmoirai.garnet.editor.undo.EditorUndoStack
-import com.breadmoirai.garnet.editor.undo.ManifestEntry
-import com.breadmoirai.garnet.editor.undo.RelocateKind
+import com.breadmoirai.garnet.editor.undo.data.BankedFile
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.data.ManifestEntry
+import com.breadmoirai.garnet.editor.undo.data.RelocateKind
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.history.data.Revision

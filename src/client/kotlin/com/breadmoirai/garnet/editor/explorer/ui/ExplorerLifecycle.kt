@@ -5,7 +5,7 @@ import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
 import com.breadmoirai.garnet.editor.history.ui.LocalHistoryState
 import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
 import com.breadmoirai.garnet.editor.structure.ui.StructureInfoState
-import com.breadmoirai.garnet.editor.ui.UndoState
+import com.breadmoirai.garnet.editor.undo.ui.UndoState
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking

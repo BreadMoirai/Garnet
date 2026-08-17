@@ -20,11 +20,11 @@ import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
-import com.breadmoirai.garnet.editor.undo.CreatedFileKind
-import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
-import com.breadmoirai.garnet.editor.undo.EditorUndoOps
-import com.breadmoirai.garnet.editor.undo.EditorUndoStack
-import com.breadmoirai.garnet.editor.undo.RelocateKind
+import com.breadmoirai.garnet.editor.undo.data.CreatedFileKind
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoCommand
+import com.breadmoirai.garnet.editor.undo.ops.EditorUndoOps
+import com.breadmoirai.garnet.editor.undo.data.EditorUndoStack
+import com.breadmoirai.garnet.editor.undo.data.RelocateKind
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.harness.GarnetTestSpec

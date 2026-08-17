@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.undo.ui
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
