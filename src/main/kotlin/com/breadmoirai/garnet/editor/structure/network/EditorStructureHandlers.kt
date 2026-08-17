@@ -10,12 +10,9 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentF
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
-import com.breadmoirai.garnet.editor.network.NewStructureC2S
-import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
-import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
-import com.breadmoirai.garnet.editor.network.SaveStructureC2S
-import com.breadmoirai.garnet.editor.network.StructureResultS2C
-import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
+import com.breadmoirai.garnet.editor.explorer.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.history.network.RestoreRevisionC2S
+import com.breadmoirai.garnet.editor.history.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit

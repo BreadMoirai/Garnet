@@ -18,9 +18,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.ui.formatClock
-import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
-import com.breadmoirai.garnet.editor.network.RevisionEntry
-import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
+import com.breadmoirai.garnet.editor.history.network.RestoreRevisionC2S
+import com.breadmoirai.garnet.editor.history.network.RevisionEntry
+import com.breadmoirai.garnet.editor.history.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.Panel

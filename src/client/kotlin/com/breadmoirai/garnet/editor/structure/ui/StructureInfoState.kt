@@ -5,11 +5,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.garnet.editor.network.EditorErrorS2C
-import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
-import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
-import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
-import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorErrorS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorFolderLoadedS2C
+import com.breadmoirai.garnet.editor.structure.network.EditorSaveReportS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureResultS2C
 
 /**
  * Client-side, Compose-observable facts about the open structure, plus the editor's transient status

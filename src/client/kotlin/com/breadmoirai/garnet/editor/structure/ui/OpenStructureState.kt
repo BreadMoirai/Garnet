@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.editor.structure.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureResultS2C
 
 /**
  * Which structure is currently placed in the editor world, client-side.

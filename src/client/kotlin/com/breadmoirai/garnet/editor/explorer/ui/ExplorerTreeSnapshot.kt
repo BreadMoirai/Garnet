@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.editor.explorer.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
 
 /**
  * Client-side, Compose-observable state for the Project Explorer: the server's tree snapshot. The

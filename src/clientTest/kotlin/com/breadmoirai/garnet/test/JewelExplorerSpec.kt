@@ -16,8 +16,8 @@ import com.breadmoirai.garnet.ui.dock.STRIPE_WIDTH
 import com.breadmoirai.garnet.ui.input.DockInputRouter
 import com.breadmoirai.garnet.ui.viewport.ViewportState
 import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
-import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
-import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.harness.ClientSpec

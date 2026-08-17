@@ -3,8 +3,8 @@ package com.breadmoirai.garnet.editor.history.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.garnet.editor.network.RevisionEntry
-import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
+import com.breadmoirai.garnet.editor.history.network.RevisionEntry
+import com.breadmoirai.garnet.editor.history.network.StructureHistoryS2C
 
 /**
  * The Local History panel's list model.

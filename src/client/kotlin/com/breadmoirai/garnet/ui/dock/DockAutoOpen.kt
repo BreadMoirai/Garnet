@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.ui.dock
 
 import com.breadmoirai.garnet.config.DockLayoutStore
-import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
+import com.breadmoirai.garnet.editor.explorer.network.ListEditorTreeC2S
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 
 /**

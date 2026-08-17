@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.client.editor.ui
 
-import com.breadmoirai.garnet.editor.network.RevisionEntry
-import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
+import com.breadmoirai.garnet.editor.history.network.RevisionEntry
+import com.breadmoirai.garnet.editor.history.network.StructureHistoryS2C
 import com.breadmoirai.garnet.editor.history.ui.LocalHistoryState
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse

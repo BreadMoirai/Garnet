@@ -1,12 +1,12 @@
 package com.breadmoirai.garnet.editor.explorer.ui
 
-import com.breadmoirai.garnet.editor.network.CreateFolderC2S
-import com.breadmoirai.garnet.editor.network.DeletePathC2S
-import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
-import com.breadmoirai.garnet.editor.network.MovePathC2S
-import com.breadmoirai.garnet.editor.network.NewStructureC2S
-import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
-import com.breadmoirai.garnet.editor.network.RenamePathC2S
+import com.breadmoirai.garnet.editor.explorer.network.CreateFolderC2S
+import com.breadmoirai.garnet.editor.explorer.network.DeletePathC2S
+import com.breadmoirai.garnet.editor.explorer.network.DuplicatePathC2S
+import com.breadmoirai.garnet.editor.explorer.network.MovePathC2S
+import com.breadmoirai.garnet.editor.explorer.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
+import com.breadmoirai.garnet.editor.explorer.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
 import com.breadmoirai.garnet.editor.explorer.data.EditorNames

@@ -2,8 +2,8 @@ package com.breadmoirai.garnet.client.editor.ui
 
 import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
-import com.breadmoirai.garnet.editor.network.LoadEditorFolderC2S
-import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
+import com.breadmoirai.garnet.editor.explorer.network.LoadEditorFolderC2S
+import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.explorer.ui.onElementClick

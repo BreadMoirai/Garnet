@@ -3,7 +3,7 @@ package com.breadmoirai.garnet.editor.undo.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.breadmoirai.garnet.editor.network.UndoStateS2C
+import com.breadmoirai.garnet.editor.undo.network.UndoStateS2C
 
 /**
  * Client mirror of the server's per-player undo/redo availability.

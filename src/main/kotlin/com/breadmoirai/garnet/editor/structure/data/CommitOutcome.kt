@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.structure.data
 
-import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
 
 /**
  * The result of a single [StructureCommit.commit] attempt. Deliberately distinguishes "there was

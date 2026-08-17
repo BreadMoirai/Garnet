@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.client.editor.ui
 
-import com.breadmoirai.garnet.editor.network.EditorErrorS2C
-import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
-import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorErrorS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.structure.ui.StructureInfoState
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

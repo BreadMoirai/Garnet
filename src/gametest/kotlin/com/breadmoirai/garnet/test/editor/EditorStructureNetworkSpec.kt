@@ -1,14 +1,14 @@
 package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.network.NewStructureC2S
-import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
-import com.breadmoirai.garnet.editor.network.SaveStructureC2S
-import com.breadmoirai.garnet.editor.network.StructureResultS2C
-import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
-import com.breadmoirai.garnet.editor.network.EditorErrorS2C
+import com.breadmoirai.garnet.editor.explorer.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
+import com.breadmoirai.garnet.editor.structure.network.SaveStructureC2S
+import com.breadmoirai.garnet.editor.structure.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
-import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence

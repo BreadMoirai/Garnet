@@ -5,7 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.breadmoirai.garnet.core.config.ModConfig
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
+import com.breadmoirai.garnet.editor.explorer.network.SetEditorRootC2S
 import java.nio.file.Path
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft

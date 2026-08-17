@@ -8,7 +8,8 @@ import com.breadmoirai.garnet.editor.history.ops.RestoreOutcome
 import com.breadmoirai.garnet.editor.history.ops.StructureRestoreOps
 import com.breadmoirai.garnet.editor.explorer.network.DeleteOutcome
 import com.breadmoirai.garnet.editor.explorer.network.EditorFileOpsHandlers
-import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorFolderLoadedS2C
+import com.breadmoirai.garnet.editor.network.EditorHandlerSupport
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState

@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.explorer.ui
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
+import com.breadmoirai.garnet.editor.explorer.network.ListEditorTreeC2S
 import com.breadmoirai.garnet.editor.history.ui.LocalHistoryState
 import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
 import com.breadmoirai.garnet.editor.structure.ui.StructureInfoState

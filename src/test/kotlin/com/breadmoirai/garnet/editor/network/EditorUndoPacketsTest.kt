@@ -1,5 +1,8 @@
 package com.breadmoirai.garnet.editor.network
 
+import com.breadmoirai.garnet.editor.undo.network.RedoC2S
+import com.breadmoirai.garnet.editor.undo.network.UndoC2S
+import com.breadmoirai.garnet.editor.undo.network.UndoStateS2C
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.netty.buffer.Unpooled

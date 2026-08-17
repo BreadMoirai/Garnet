@@ -6,7 +6,7 @@ import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.editor.explorer.data.walk
-import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
+import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
