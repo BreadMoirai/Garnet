@@ -284,7 +284,7 @@ to `Primary`/`Secondary`/`Tertiary` and an unmapped index (`7`) to `null`) and t
 `false`: stays `false` when nothing is visible, flips to `true` once `LEFT` becomes visible,
 reverts to `false` once hidden again, and also flips to `true` when only `focusedRegion` is set)
 don't need a client at all, so they live in `DockViewportSyncTest`
-(`src/test/kotlin/com/breadmoirai/garnet/client/ui/dock/`) instead of `DockInputSpec`.
+(`src/test/kotlin/com/breadmoirai/garnet/dock/shell/`) instead of `DockInputSpec`.
 
 `DockHitTestTest`, in the same package, is client-free for the same reason: it pins
 `DockState.regionAt`'s geometry against `GarnetDock`'s layout (bare world, each visible edge, hidden

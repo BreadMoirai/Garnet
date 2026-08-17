@@ -262,7 +262,7 @@ for how `StructureCommit` decides *when* to commit (debounce ticks, max-dirty ca
 
 ## Test coverage
 
-`LocalHistoryStoreSpec` (`src/gametest/kotlin/com/breadmoirai/garnet/test/history/`) exercises
+`LocalHistoryStoreSpec` (`src/gametest/kotlin/com/breadmoirai/garnet/editor/history/ops/`) exercises
 the store directly against a temp directory, filesystem-level and without a running world: writing
 and reading a revision byte-for-byte, same-millisecond sequence numbers, chronological ordering
 regardless of write order, age- and count-based pruning, and `localHistoryEnabled = false` writing
