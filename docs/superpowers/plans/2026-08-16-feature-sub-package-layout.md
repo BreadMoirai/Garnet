@@ -52,6 +52,20 @@ This single pass fixes the `package` declaration at the top of each moved file, 
 begins with `package` wherever it sits. Verify afterwards with `grep -Hn '^package' <files>`: every
 file must report exactly one hit, naming the new package.
 
+**Per-class rewrite loops miss lowercase top-level declarations.** The per-class `sed` loops in
+this plan enumerate capitalized class and object names. Kotlin top-level *functions* — `explorerPanel`,
+`localHistoryPanel`, `structureInfoPanel`, `bootWorkspace` — are imported by FQN too, and a loop over
+capitalized names silently skips them. Task 4 hit this: `com.breadmoirai.garnet.editor.ui.localHistoryPanel`
+survived its rewrite and broke `GarnetClient.kt` plus two clientTest specs. After every rewrite step,
+sweep for any survivor of the package you just emptied:
+
+```bash
+grep -rn 'com\.breadmoirai\.garnet\.<old-package>\.' src docs --exclude-dir=superpowers
+```
+
+Anything it prints is either a lowercase declaration the loop missed or a class you forgot to list.
+Only `docs/architecture/module-map.md` hits are expected survivors — that file is rewritten in Task 10.
+
 **3. Add the imports the compiler asks for.** `sed` cannot do this part. When files that used to share a package land in different packages, references between them that needed no import now need one. Compile, read the `unresolved reference` errors, add exactly those imports, repeat until clean. Do not resolve an error by moving a file somewhere the plan didn't put it.
 
 **Verification, run at the end of every task:**
