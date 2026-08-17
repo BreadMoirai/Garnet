@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.ui.dock.STRIPE_WIDTH
+import com.breadmoirai.garnet.dock.shell.STRIPE_WIDTH
 import java.nio.file.Path
 import javax.imageio.ImageIO
 import kotlin.math.abs

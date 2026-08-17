@@ -7,7 +7,7 @@ summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real frameb
 # GarnetDock — full-window Compose dock
 
 The dock is a single `@Composable` (`GarnetDock(realW, realH, onVisibilityChanged)`,
-`src/client/kotlin/.../ui/dock/GarnetDock.kt`) hosted full-window by
+`src/client/kotlin/.../dock/shell/GarnetDock.kt`) hosted full-window by
 `ComposeSceneHost` and blitted over the world composite by `ComposeSurface`. It replaced the
 feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was deleted.
 
@@ -20,7 +20,7 @@ forwarders (`pointerMove/Press/Release`, `scroll`, `sendKey`) driven by `DockInp
 (see `dock-input-routing.md`).
 `ComposeSurface.ensureHost(w, h)` recreates it on window-size change and hosts the dock, passing
 `commitDockVisibilityChange` as the third argument — the follow-up a stripe click must run, threaded
-in as a parameter so `ui/dock` keeps no dependency on `ui/viewport` or `Minecraft`.
+in as a parameter so `dock/shell` keeps no dependency on `dock/viewport` or `Minecraft`.
 
 ## Layout is in **real framebuffer pixels**
 
@@ -70,8 +70,8 @@ does not make its region visible on its own.
 
 ### LEFT auto-opens on joining a Garnet-capable world
 
-A JOIN handler in `registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) calls
-`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`), which applies the open-panel map remembered in
+A JOIN handler in `registerDockWorldLifecycle()` (`dock/viewport/DockKeybinds.kt`) calls
+`applyDockAutoOpen()` (`dock/shell/DockAutoOpen.kt`), which applies the open-panel map remembered in
 `config/garnet-dock.json` (`DockLayoutStore`, see
 [persistence/explorer-session-state.md](../persistence/explorer-session-state.md#sibling-store-configgarnet-dockjson))
 when the peer speaks Garnet (`DockAutoOpenGate.isGarnetServer()`, defaulting to
@@ -126,7 +126,7 @@ stale menu is still painting.
 
 `DockState` is a client-lifetime singleton — the Project Explorer is seeded once in
 `GarnetClient.onInitializeClient` and never re-added — but its *visibility* is world-scoped.
-`registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) hooks
+`registerDockWorldLifecycle()` (`dock/viewport/DockKeybinds.kt`) hooks
 `ClientPlayConnectionEvents.DISCONNECT` and calls `DockState.closeAll()`, then
 `commitDockVisibilityChange(persist = false)` (see
 [dock-input-routing.md](dock-input-routing.md#every-visibility-change-ends-in-commitdockvisibilitychange)).

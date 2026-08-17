@@ -22,7 +22,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.text.TextRange
 import com.breadmoirai.garnet.editor.explorer.ui.EditAwareKeyActions
-import com.breadmoirai.garnet.ui.compose.ComposeSceneHost
+import com.breadmoirai.garnet.dock.compose.ComposeSceneHost
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import org.jetbrains.jewel.foundation.lazy.SelectableLazyListState

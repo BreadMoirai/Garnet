@@ -74,7 +74,7 @@ folds `DockInsets(left, right, bottom, top)` — computed from `DockState.leftWi
 `bottomHeight` gated on `isVisible` — into the shrink rect the same way it already folded the older,
 independent viewport-shrink-keybind reservation. A dock resize or visibility toggle calls
 `garnet$updateScaledFramebuffer(true)` explicitly — for visibility, always through
-`commitDockVisibilityChange()` (`ui/viewport/DockVisibilityCommit.kt`), which is the single follow-up
+`commitDockVisibilityChange()` (`dock/viewport/DockVisibilityCommit.kt`), which is the single follow-up
 every mutation site runs — so the world inset updates immediately rather than waiting for the next
 incidental window resize. The override `WindowMixin` caches is **not** recomputed per frame, while
 `MinecraftPresentMixin` recomputes its blit rect fresh every present, so skipping that call leaves a

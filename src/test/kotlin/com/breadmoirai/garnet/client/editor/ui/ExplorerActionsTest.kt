@@ -15,10 +15,10 @@ import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.explorer.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.structure.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
-import com.breadmoirai.garnet.ui.dock.DockRegion
-import com.breadmoirai.garnet.ui.dock.DockState
-import com.breadmoirai.garnet.ui.dock.Panel
-import com.breadmoirai.garnet.ui.viewport.DockVisibilityCommit
+import com.breadmoirai.garnet.dock.shell.DockRegion
+import com.breadmoirai.garnet.dock.shell.DockState
+import com.breadmoirai.garnet.dock.shell.Panel
+import com.breadmoirai.garnet.dock.viewport.DockVisibilityCommit
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull

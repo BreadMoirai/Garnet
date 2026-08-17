@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.garnet.ui.viewport.ViewportState;
+import com.breadmoirai.garnet.dock.viewport.ViewportState;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.MouseHandler;
 import org.spongepowered.asm.mixin.Mixin;

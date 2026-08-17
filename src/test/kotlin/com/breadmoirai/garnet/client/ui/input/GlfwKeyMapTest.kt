@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.client.ui.input
 
 import androidx.compose.ui.input.key.Key
-import com.breadmoirai.garnet.ui.input.GlfwMods
-import com.breadmoirai.garnet.ui.input.glfwKeyToComposeKey
+import com.breadmoirai.garnet.dock.input.GlfwMods
+import com.breadmoirai.garnet.dock.input.glfwKeyToComposeKey
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue

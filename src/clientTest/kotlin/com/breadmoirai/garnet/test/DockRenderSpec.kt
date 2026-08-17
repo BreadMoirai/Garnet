@@ -1,12 +1,12 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.ui.compose.ComposeOverlay
-import com.breadmoirai.garnet.ui.compose.ComposeSurface
-import com.breadmoirai.garnet.ui.dock.DockRegion
-import com.breadmoirai.garnet.ui.dock.DockState
-import com.breadmoirai.garnet.ui.dock.Panel
-import com.breadmoirai.garnet.ui.viewport.ViewportState
-import com.breadmoirai.garnet.ui.viewport.WindowViewportExt
+import com.breadmoirai.garnet.dock.compose.ComposeOverlay
+import com.breadmoirai.garnet.dock.compose.ComposeSurface
+import com.breadmoirai.garnet.dock.shell.DockRegion
+import com.breadmoirai.garnet.dock.shell.DockState
+import com.breadmoirai.garnet.dock.shell.Panel
+import com.breadmoirai.garnet.dock.viewport.ViewportState
+import com.breadmoirai.garnet.dock.viewport.WindowViewportExt
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue

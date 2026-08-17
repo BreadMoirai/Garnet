@@ -39,9 +39,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.breadmoirai.garnet.ui.compose.GarnetTextField
-import com.breadmoirai.garnet.ui.dock.DockRegion
-import com.breadmoirai.garnet.ui.dock.Panel
+import com.breadmoirai.garnet.dock.compose.GarnetTextField
+import com.breadmoirai.garnet.dock.shell.DockRegion
+import com.breadmoirai.garnet.dock.shell.Panel
 import com.breadmoirai.garnet.editor.explorer.network.LoadEditorFolderC2S
 import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.explorer.data.FileNode

@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.client.ui.dock
 
-import com.breadmoirai.garnet.config.DockLayoutStore
-import com.breadmoirai.garnet.ui.dock.DockRegion
+import com.breadmoirai.garnet.dock.data.DockLayoutStore
+import com.breadmoirai.garnet.dock.shell.DockRegion
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import java.io.File

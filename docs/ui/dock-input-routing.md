@@ -7,7 +7,7 @@ summary: How raw GLFW pointer/key/char callbacks are routed into the dock Compos
 # Dock input routing
 
 Raw GLFW input reaches the full-window dock `ComposeScene` through `DockInputRouter`
-(`src/client/kotlin/.../ui/input/DockInputRouter.kt`), fed by two HEAD-injecting mixins on
+(`src/client/kotlin/.../dock/input/DockInputRouter.kt`), fed by two HEAD-injecting mixins on
 MC's input handlers. The whole path is **active-only and OFF by default**: it does nothing until a
 region is focused, so uncaptured input stays byte-for-byte vanilla.
 
@@ -18,7 +18,7 @@ through the content-rect offset by `MouseHandlerViewportMixin` — see
 
 ## Click-to-focus, both directions
 
-Focus is not keyboard-only. `DockState.regionAt(x, y, realW, realH)` (`ui/dock/DockHitTest.kt`)
+Focus is not keyboard-only. `DockState.regionAt(x, y, realW, realH)` (`dock/shell/DockHitTest.kt`)
 answers "who owns this window pixel", returning `null` for the **bare world viewport**. It is the
 pointer-side mirror of `insets()` and reproduces `GarnetDock`'s draw order — the **stripe's own
 column first** (it is drawn last, over everything, so it is tested first; see
@@ -186,7 +186,7 @@ Registered from `GarnetClient.onInitializeClient()` next to `registerViewportTog
 
 ## Every visibility change ends in `commitDockVisibilityChange()`
 
-`commitDockVisibilityChange(persist: Boolean = true)` (`ui/viewport/DockVisibilityCommit.kt`) is the
+`commitDockVisibilityChange(persist: Boolean = true)` (`dock/viewport/DockVisibilityCommit.kt`) is the
 one definition of "which panels are open just changed — now make the rest of the client agree". In
 order:
 
@@ -215,7 +215,7 @@ The call sites are the Shift+1 and Alt+1 keybind branches, `registerDockWorldLif
 DISCONNECT hooks, `ExplorerActions.openLocalHistory`, and the stripe's tap. The stripe reaches it
 through a callback: `ComposeSurface` passes `commitDockVisibilityChange` into `GarnetDock`, which
 threads it into `DockStripe`, whose `detectTapGestures` calls `stripeIconClicked(panelId, callback)`.
-That indirection is deliberate — it keeps the whole `ui/dock` package free of `Minecraft` imports so
+That indirection is deliberate — it keeps the whole `dock/shell` package free of `Minecraft` imports so
 `DockState` and the stripe's click behaviour stay unit-testable with no render context
 (`DockVisibilityCommitTest` in `src/test`), and the seams on `DockVisibilityCommit` let that test pin
 all four steps without a config directory or a live window.

@@ -14,7 +14,7 @@ import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.explorer.ui.onElementClick
-import com.breadmoirai.garnet.ui.compose.ComposeSceneHost
+import com.breadmoirai.garnet.dock.compose.ComposeSceneHost
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain

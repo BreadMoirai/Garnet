@@ -29,7 +29,7 @@ class GarnetTextFieldUsageTest : StringSpec({
         return requireNotNull(dir) { "could not locate the repo root from ${System.getProperty("user.dir")}" }
     }
 
-    val wrapper = "src/client/kotlin/com/breadmoirai/garnet/ui/compose/GarnetTextField.kt"
+    val wrapper = "src/client/kotlin/com/breadmoirai/garnet/dock/compose/GarnetTextField.kt"
 
     "GarnetTextField is the only client file importing Jewel's TextField" {
         val root = repoRoot()

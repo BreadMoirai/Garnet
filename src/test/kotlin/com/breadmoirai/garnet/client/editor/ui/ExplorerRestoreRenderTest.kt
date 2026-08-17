@@ -16,7 +16,7 @@ import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
 import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
-import com.breadmoirai.garnet.ui.compose.ComposeSceneHost
+import com.breadmoirai.garnet.dock.compose.ComposeSceneHost
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainAll
 import org.jetbrains.jewel.foundation.lazy.tree.DefaultTreeViewKeyActions

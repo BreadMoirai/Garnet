@@ -6,7 +6,7 @@ summary: The JetBrains-style icon stripe that replaced the dock's tab strip, the
 
 # The dock stripe — per-panel visibility
 
-`DockStripe.kt` (`src/client/kotlin/.../ui/dock/DockStripe.kt`) is a JetBrains-IDE-style icon column,
+`DockStripe.kt` (`src/client/kotlin/.../dock/shell/DockStripe.kt`) is a JetBrains-IDE-style icon column,
 one icon per LEFT panel, that replaced `DockTabStrip.kt` (deleted). It renders at `STRIPE_WIDTH = 32`
 real framebuffer px, full window height, at `x = 0`. This article covers the visibility model behind
 it and the two draw/hit-test decisions that keep it usable; see [dock-framework.md](dock-framework.md)
@@ -55,7 +55,7 @@ A tap calls `stripeIconClicked(panel.id, onVisibilityChanged)` — `togglePanel`
 follow-up. See
 [dock-input-routing.md](dock-input-routing.md#every-visibility-change-ends-in-commitdockvisibilitychange)
 for why the toggle alone leaves the world blitted stretched, and why the follow-up arrives as a
-callback threaded down from `GarnetDock` rather than being called here (it keeps `ui/dock` free of
+callback threaded down from `GarnetDock` rather than being called here (it keeps `dock/shell` free of
 `Minecraft` imports, which is what makes `DockState` and the click behaviour unit-testable).
 
 Only `DockRegion.LEFT` is wired into `GarnetDock` today — RIGHT/BOTTOM have no stripe yet, though the

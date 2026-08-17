@@ -22,8 +22,8 @@ import com.breadmoirai.garnet.editor.history.network.RestoreRevisionC2S
 import com.breadmoirai.garnet.editor.history.network.RevisionEntry
 import com.breadmoirai.garnet.editor.history.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
-import com.breadmoirai.garnet.ui.dock.DockRegion
-import com.breadmoirai.garnet.ui.dock.Panel
+import com.breadmoirai.garnet.dock.shell.DockRegion
+import com.breadmoirai.garnet.dock.shell.Panel
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.component.DefaultButton

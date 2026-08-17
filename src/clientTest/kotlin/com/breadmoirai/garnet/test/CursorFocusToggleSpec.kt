@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.ui.viewport.cursorFocusActive
+import com.breadmoirai.garnet.dock.viewport.cursorFocusActive
 import com.breadmoirai.garnet.harness.ClientSpec
 import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
 import io.kotest.matchers.booleans.shouldBeFalse
@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
  * Drives the real keybind (via a simulated key press on the Fabric test thread — the same
  * `ctx.getInput().pressKey` mechanism [SpecTestContext.closeScreen] uses for `ESCAPE`) rather
  * than calling `MouseHandler` directly, so this exercises
- * [com.breadmoirai.garnet.ui.viewport.registerCursorFocusToggle]'s actual
+ * [com.breadmoirai.garnet.dock.viewport.registerCursorFocusToggle]'s actual
  * `END_CLIENT_TICK` consumption path, not just the underlying API.
  *
  * The hard assertions here are on [cursorFocusActive] and

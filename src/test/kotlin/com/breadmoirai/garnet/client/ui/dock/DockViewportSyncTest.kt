@@ -1,12 +1,12 @@
 package com.breadmoirai.garnet.client.ui.dock
 
-import com.breadmoirai.garnet.ui.compose.ComposeOverlay
-import com.breadmoirai.garnet.ui.dock.DockRegion
-import com.breadmoirai.garnet.ui.dock.DockState
-import com.breadmoirai.garnet.ui.dock.Panel
-import com.breadmoirai.garnet.ui.input.glfwMouseButtonToPointerButton
-import com.breadmoirai.garnet.ui.viewport.ViewportState
-import com.breadmoirai.garnet.ui.viewport.syncDockViewport
+import com.breadmoirai.garnet.dock.compose.ComposeOverlay
+import com.breadmoirai.garnet.dock.shell.DockRegion
+import com.breadmoirai.garnet.dock.shell.DockState
+import com.breadmoirai.garnet.dock.shell.Panel
+import com.breadmoirai.garnet.dock.input.glfwMouseButtonToPointerButton
+import com.breadmoirai.garnet.dock.viewport.ViewportState
+import com.breadmoirai.garnet.dock.viewport.syncDockViewport
 import androidx.compose.ui.input.pointer.PointerButton
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse

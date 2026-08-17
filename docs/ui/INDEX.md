@@ -28,4 +28,4 @@ under `src/client/kotlin/.../editor/workspace/ui/`.
 ## See also
 
 - [architecture/shrink-viewport-compose-model.md](../architecture/shrink-viewport-compose-model.md) — how the framebuffer shrink, the present-time composite, and this dock stack into one frame.
-- [minecraft/render-state-extraction-26.1.md](../minecraft/render-state-extraction-26.1.md) — the legacy `GuiGraphicsExtractor` deferred-render rules, still relevant to `GarnetIconButton` but not to anything under `ui/compose/`.
+- [minecraft/render-state-extraction-26.1.md](../minecraft/render-state-extraction-26.1.md) — the legacy `GuiGraphicsExtractor` deferred-render rules, still relevant to `GarnetIconButton` but not to anything under `dock/compose/`.

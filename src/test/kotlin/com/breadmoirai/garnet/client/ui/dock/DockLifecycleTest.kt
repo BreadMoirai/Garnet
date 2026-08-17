@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.client.ui.dock
 
-import com.breadmoirai.garnet.ui.dock.DockRegion
-import com.breadmoirai.garnet.ui.dock.DockState
-import com.breadmoirai.garnet.ui.dock.Panel
+import com.breadmoirai.garnet.dock.shell.DockRegion
+import com.breadmoirai.garnet.dock.shell.DockState
+import com.breadmoirai.garnet.dock.shell.Panel
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import org.jetbrains.jewel.ui.icons.AllIconsKeys

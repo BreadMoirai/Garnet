@@ -9,8 +9,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import com.breadmoirai.garnet.ui.compose.ComposeSceneHost
-import com.breadmoirai.garnet.ui.compose.GarnetTextField
+import com.breadmoirai.garnet.dock.compose.ComposeSceneHost
+import com.breadmoirai.garnet.dock.compose.GarnetTextField
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
@@ -22,7 +22,7 @@ import org.jetbrains.jewel.ui.component.TextField
  * It does not on its own: `FocusableNode` never emits its `FocusInteraction.Focus` inside an
  * `ImageComposeScene`, so `BasicTextField` never learns it is focused and
  * `TextFieldCoreModifierNode.showCursor` stays false — see
- * [com.breadmoirai.garnet.ui.compose.focusInteractionBridge] for the full chain. These specs assert
+ * [com.breadmoirai.garnet.dock.compose.focusInteractionBridge] for the full chain. These specs assert
  * the caret through the only signal a raster scene offers: a blinking caret is the one thing that
  * makes consecutive frames of an otherwise static field differ.
  *

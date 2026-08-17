@@ -130,13 +130,13 @@ state is keyed against, and
 
 ## Sibling store: `config/garnet-dock.json`
 
-`com.breadmoirai.garnet.config.DockLayoutStore` round-trips a second, unrelated file:
+`com.breadmoirai.garnet.dock.data.DockLayoutStore` round-trips a second, unrelated file:
 `config/garnet-dock.json`, a `{ "open": { "LEFT": "garnet.explorer" } }` record mapping each
 `DockRegion` to the id of the panel open there (absent region = closed). This replaced an earlier
 `{ "leftVisible": true }` shape; `DockLayoutStore.load()` still reads that legacy shape and migrates
 it in memory (`true` → `{"LEFT": "garnet.explorer"}`, `false` → `{}`), and the file is rewritten in
 the new shape on the next `save()`. It is read on `ClientPlayConnectionEvents.JOIN` by
-`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`) to auto-open the Explorer on a Garnet-capable
+`applyDockAutoOpen()` (`dock/shell/DockAutoOpen.kt`) to auto-open the Explorer on a Garnet-capable
 world — see [ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world](../ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world).
 
 It is a separate file from `garnet-explorer.json` above, not a field added to that record, because
