@@ -1,3 +1,4 @@
+// ExperimentalJewelApi: passing an explicit `style` to LazyTree selects its experimental overload.
 @file:OptIn(ExperimentalComposeUiApi::class, ExperimentalJewelApi::class)
 
 package com.breadmoirai.garnet.editor.explorer.ui
