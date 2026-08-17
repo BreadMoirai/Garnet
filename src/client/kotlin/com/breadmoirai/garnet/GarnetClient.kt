@@ -1,10 +1,10 @@
 package com.breadmoirai.garnet
 
 import com.breadmoirai.garnet.core.config.ModConfig
+import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
+import com.breadmoirai.garnet.editor.explorer.ui.registerExplorerLifecycle
 import com.breadmoirai.garnet.editor.network.EditorClientNetworking
-import com.breadmoirai.garnet.editor.ui.explorerPanel
 import com.breadmoirai.garnet.editor.ui.localHistoryPanel
-import com.breadmoirai.garnet.editor.ui.registerExplorerLifecycle
 import com.breadmoirai.garnet.editor.ui.structureInfoPanel
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.viewport.registerCursorFocusToggle

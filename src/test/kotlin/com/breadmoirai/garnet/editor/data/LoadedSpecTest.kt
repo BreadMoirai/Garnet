@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.explorer.data
 
 import com.breadmoirai.garnet.core.spec.GarnetSpec
 import io.kotest.core.spec.style.FunSpec

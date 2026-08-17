@@ -144,7 +144,7 @@ assume it is already on the client thread; `garnet$updateScaledFramebuffer` reac
 `eventHandler.resizeGui()`, which is unsafe to call concurrently with rendering.
 
 The Project Explorer's per-world state is reset from its **own** `DISCONNECT` registration in
-`editor/ui/ExplorerLifecycle.kt`, not from this one: `ProjectTreeState`, `StructureInfoState`,
+`editor/ui/ExplorerLifecycle.kt`, not from this one: `ExplorerTreeSnapshot`, `StructureInfoState`,
 `ExplorerTreeState`, `UndoState`, `OpenStructureState` and `LocalHistoryState` are all reset there
 (after the session
 save — see
@@ -197,15 +197,15 @@ whole dock (rendering and input) silently no-ops back to vanilla, never crashing
 
 ## First real panel: the Project Explorer (live-data pattern, now on Jewel)
 
-`editor/ui/ProjectExplorerPanel.kt` + `editor/ui/ExplorerToolbar.kt` +
-`editor/ui/ProjectTreeState.kt` + `editor/ui/ExplorerTreeState.kt` are the first non-demo panel
+`editor/explorer/ui/ExplorerPanel.kt` + `editor/ui/ExplorerToolbar.kt` +
+`editor/ui/ExplorerTreeSnapshot.kt` + `editor/ui/ExplorerTreeState.kt` are the first non-demo panel
 and the template future panels (debugger, timeline) should copy. As of the jewel-widget-layer
 migration, the panel is built entirely from JetBrains Jewel components (`LazyTree`, `PopupMenu`,
 `IconButton`) under one `IntUiTheme(isDark = true)`, not hand-rolled `BasicText`/`Box.clickable`
 rows. The pattern:
 
 - **State is split across two `mutableStateOf`-backed singletons**, neither of which is the
-  panel. `ProjectTreeState` holds only the server-driven tree data: `snapshot:
+  panel. `ExplorerTreeSnapshot` holds only the server-driven tree data: `snapshot:
   EditorTreeSnapshotS2C?`, mutated by its one S2C packet handler (`onSnapshot`). The editor's
   transient status line and the open structure's facts live in `StructureInfoState` instead — see
   [structure-info-panel.md](structure-info-panel.md) for its `onFolderLoaded`/`onSaveReport`/
@@ -249,7 +249,7 @@ rows. The pattern:
   `SelectionMode.Multiple`, which is *not* what a single-selection file tree wants).
   `Tree.Element.Node.children` is lazy (only materializes once `open()`/expand is called) while
   node `id`s are eager — this doesn't affect `LazyTree` itself, only direct `Tree` traversal.
-- **Clicks dispatch by node kind** (`onElementClick` in `ProjectExplorerPanel.kt`): **any** folder
+- **Clicks dispatch by node kind** (`onElementClick` in `ExplorerPanel.kt`): **any** folder
   toggles open/closed from anywhere on its row, and a "spec-folder" (directly contains a `FileNode`
   named `*.spec.kts`, i.e. `node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }`)
   *additionally* sends `LoadEditorFolderC2S(path)` on that same click. The row toggle is ours, not

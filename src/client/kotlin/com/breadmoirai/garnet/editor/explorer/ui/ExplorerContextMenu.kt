@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -9,8 +9,8 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.PopupPositionProvider
-import com.breadmoirai.garnet.editor.data.NewNodeKind
-import com.breadmoirai.garnet.editor.data.resolve
+import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
+import com.breadmoirai.garnet.editor.explorer.data.resolve
 import org.jetbrains.jewel.ui.component.PopupMenu
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.separator
@@ -134,9 +134,9 @@ fun ExplorerContextMenu(
  * name may legitimately contain a dot.
  */
 private fun newTargetFolderFor(target: String): String {
-    val root = ProjectTreeState.snapshot?.root ?: return ExplorerTreeState.ROOT_PATH
+    val root = ExplorerTreeSnapshot.snapshot?.root ?: return ExplorerTreeState.ROOT_PATH
     val node = root.resolve(target)
-    return if (node is com.breadmoirai.garnet.editor.data.FolderNode) target
+    return if (node is com.breadmoirai.garnet.editor.explorer.data.FolderNode) target
     else target.substringBeforeLast('/', ExplorerTreeState.ROOT_PATH)
 }
 

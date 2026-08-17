@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.config
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject

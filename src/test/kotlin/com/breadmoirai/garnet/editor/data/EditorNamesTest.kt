@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.explorer.data
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldNotBeNull

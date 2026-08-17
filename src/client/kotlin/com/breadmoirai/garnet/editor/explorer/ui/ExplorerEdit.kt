@@ -1,6 +1,6 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
-import com.breadmoirai.garnet.editor.data.NewNodeKind
+import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
 
 /**
  * The Explorer's in-tree text-field state. Exactly one edit can be active at a time.

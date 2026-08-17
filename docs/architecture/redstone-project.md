@@ -57,12 +57,12 @@ Pure data:
 - `EditorFolderTree` — leaves vs intermediates scan; used by `EditorDimLifecycle.placeAll` for
   region placement. Separate concern from the Explorer's tree model (below).
 - `FileTree` — recursive tree model (`FolderNode`/`FileNode` under sealed `FileTreeNode`, package
-  `com.breadmoirai.garnet.editor.data`) built by `scanFolder(path)`; mirrors the whole folder
+  `com.breadmoirai.garnet.editor.explorer.data`) built by `scanFolder(path)`; mirrors the whole folder
   (all files/folders, incl. empty), folders-first ordering. Paths are **computed, not stored** —
   `FolderNode.walk()` (node→path) and `FolderNode.resolve(path)` (path→node), both relative to
   whichever folder is the root, so re-rooting is free. This is the tree carried by
   `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` and rendered recursively by
-  `ProjectExplorerPanel` (below) — the old flat `leaves`/`intermediates`/`ProjectLeafEntry` payload
+  `ExplorerPanel` (below) — the old flat `leaves`/`intermediates`/`ProjectLeafEntry` payload
   fields are gone. `FileNode` is just `(name, extension)` — there is no per-node dirty flag; a
   `.nbt`'s auto-save state lives server-side in `StructureAutoSave` (see below), not in the tree.
 - `GridLayout` — `(specs, cellSize, gap, rowMax, yBase) → cells`.
@@ -95,14 +95,14 @@ Network:
   authority; see [persistence/network-payload-contract.md](../persistence/network-payload-contract.md).
 
 Client:
-- `editor/ui/ProjectExplorerPanel` + `editor/ui/ExplorerToolbar` + `editor/ui/ProjectTreeState` +
+- `editor/explorer/ui/ExplorerPanel` + `editor/ui/ExplorerToolbar` + `editor/ui/ExplorerTreeSnapshot` +
   `editor/ui/ExplorerTreeState` — the Compose dock panel, built on Jewel widgets (`LazyTree`,
   `PopupMenu`, `IconButton`), that renders `snapshot.root` (`FolderNode`/`FileNode`) via
   `ExplorerTreeState.buildTreeFrom`, with per-folder expand/collapse (LEFT region, auto-opened on
   joining a Garnet-capable world subject to the remembered `garnet-dock.json` preference, with
   Shift+1/Alt+1 as the manual toggles — see
   [ui/dock-framework.md](../ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world)).
-  `ProjectTreeState` is `mutableStateOf`-backed server-driven state
+  `ExplorerTreeSnapshot` is `mutableStateOf`-backed server-driven state
   (just the tree `snapshot` — the transient status line and the open structure's facts live in
   `StructureInfoState`, read by the [Structure Info panel](../ui/structure-info-panel.md) instead)
   fed by the S2C receivers; `ExplorerTreeState` owns selection/expansion by
@@ -167,16 +167,16 @@ inside the `deleteSubtree` primitive, not the handler, so the undo/redo replays 
   tree — `ProjectScreen` and `ProjectRootListScreen` (the legacy folder-browser GUI and
   world-list-screen root picker) were deleted in the Compose-dock hard-cut. See
   [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the
-  `ExplorerTreeState`/`ProjectTreeState` split.
+  `ExplorerTreeState`/`ExplorerTreeSnapshot` split.
 - `editor/network/EditorClientNetworking` — S2C receivers. `EditorTreeSnapshotS2C` feeds
-  `ProjectTreeState.onSnapshot`; folder-loaded/save-report/error/structure-result/auto-saved all feed
+  `ExplorerTreeSnapshot.onSnapshot`; folder-loaded/save-report/error/structure-result/auto-saved all feed
   `StructureInfoState` instead (see [ui/structure-info-panel.md](../ui/structure-info-panel.md)) —
   no client screen is opened in response to any of them. The tree is not only reloaded on an explicit
   Refresh click: `ExplorerLifecycle`'s
   `ClientPlayConnectionEvents.JOIN` handler also sends `ListEditorTreeC2S` automatically on every
   world join, so the Explorer auto-populates without the player having to ask for it, and the
   resulting `EditorTreeSnapshotS2C` receiver applies a one-shot restore of last session's
-  expansion/selection right after feeding `ProjectTreeState.onSnapshot` — see
+  expansion/selection right after feeding `ExplorerTreeSnapshot.onSnapshot` — see
   [persistence/explorer-session-state.md](../persistence/explorer-session-state.md) for the
   save/restore mechanics. `StructureResultS2C` → `StructureInfoState.onStructureResult` sets `status`
   to `r.message` (place/save/new-structure outcomes all surface through the same Structure Info status
@@ -250,7 +250,7 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
 - *"What gets saved?"* → `EditorCellSaver.captureAndSaveIfDirty`, called from
   `EditorDimLifecycle.saveFolder`.
 - *"How are folders placed in the overworld?"* → `EditorDimRegistry.getOrAssignRegion`.
-- *"How does the GUI show the folder tree?"* → `ProjectExplorerPanel` reading `ProjectTreeState`
+- *"How does the GUI show the folder tree?"* → `ExplorerPanel` reading `ExplorerTreeSnapshot`
   (fed from `EditorTreeSnapshotS2C`) — the only client UI for this since the legacy `ProjectScreen`
   was hard-cut.
 

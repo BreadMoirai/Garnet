@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
@@ -7,10 +7,11 @@ import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
-import com.breadmoirai.garnet.editor.data.FolderNode
-import com.breadmoirai.garnet.editor.data.NewNodeKind
-import com.breadmoirai.garnet.editor.data.EditorNames
-import com.breadmoirai.garnet.editor.data.resolve
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
+import com.breadmoirai.garnet.editor.explorer.data.EditorNames
+import com.breadmoirai.garnet.editor.explorer.data.resolve
+import com.breadmoirai.garnet.editor.ui.OpenStructureState
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.viewport.commitDockVisibilityChange
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -138,10 +139,10 @@ object ExplorerActions {
      * extension.
      */
     private fun isFolder(path: String): Boolean =
-        ProjectTreeState.snapshot?.root?.resolve(path) is FolderNode
+        ExplorerTreeSnapshot.snapshot?.root?.resolve(path) is FolderNode
 
     private fun siblingsOf(parentPath: String): List<String> {
-        val root = ProjectTreeState.snapshot?.root ?: return emptyList()
+        val root = ExplorerTreeSnapshot.snapshot?.root ?: return emptyList()
         val node = root.resolve(parentPath) as? FolderNode ?: return emptyList()
         return node.children.map { it.name }
     }

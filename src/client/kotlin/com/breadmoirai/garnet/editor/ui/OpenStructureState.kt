@@ -8,7 +8,7 @@ import com.breadmoirai.garnet.editor.network.StructureResultS2C
 /**
  * Which structure is currently placed in the editor world, client-side.
  *
- * [ProjectTreeState] records only the status *message* from a `StructureResultS2C`, which is not
+ * [ExplorerTreeSnapshot] records only the status *message* from a `StructureResultS2C`, which is not
  * something anything can key off. The Local History panel needs the subpath itself: it only ever
  * shows a structure that is actually in the world.
  */

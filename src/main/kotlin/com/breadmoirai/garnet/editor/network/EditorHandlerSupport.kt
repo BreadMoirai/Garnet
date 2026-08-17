@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.network
 
-import com.breadmoirai.garnet.editor.data.EditorSession
-import com.breadmoirai.garnet.editor.data.scanFolder
+import com.breadmoirai.garnet.editor.explorer.data.EditorSession
+import com.breadmoirai.garnet.editor.explorer.data.scanFolder
 import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit

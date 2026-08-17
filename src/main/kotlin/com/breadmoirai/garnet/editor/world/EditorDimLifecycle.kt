@@ -1,10 +1,10 @@
 package com.breadmoirai.garnet.editor.world
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.data.EditorFolderTree
-import com.breadmoirai.garnet.editor.data.EditorRoot
+import com.breadmoirai.garnet.editor.explorer.data.EditorFolderTree
+import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.testing.data.KtsSpecLoader
-import com.breadmoirai.garnet.editor.data.LoadedSpec
+import com.breadmoirai.garnet.editor.explorer.data.LoadedSpec
 import com.breadmoirai.garnet.core.spec.GarnetSpec
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.Registries

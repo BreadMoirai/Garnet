@@ -8,14 +8,14 @@ package com.breadmoirai.garnet.client.editor.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import com.breadmoirai.garnet.config.ExplorerSession
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerSession
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
-import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.ui.ProjectTreeState
-import com.breadmoirai.garnet.editor.ui.explorerPanel
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
+import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
 import com.breadmoirai.garnet.ui.compose.ComposeSceneHost
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainAll
@@ -88,7 +88,7 @@ class ExplorerRestoreRenderTest : StringSpec({
         val prior = SharedSettings.projectRootPath
         try {
             SharedSettings.projectRootPath = "/tmp/proj"
-            ProjectTreeState.reset()
+            ExplorerTreeSnapshot.reset()
             ExplorerTreeState.reset()
             ExplorerTreeState.armRestore(ExplorerSession("/tmp/proj", restored, null))
 
@@ -99,7 +99,7 @@ class ExplorerRestoreRenderTest : StringSpec({
                 host.render(System.nanoTime())
 
                 // The snapshot receiver, verbatim: state first, then the restore.
-                ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(root, null))
+                ExplorerTreeSnapshot.onSnapshot(EditorTreeSnapshotS2C(root, null))
                 ExplorerTreeState.applyPendingRestore(root)
 
                 host.render(System.nanoTime() + 16_000_000)
@@ -111,7 +111,7 @@ class ExplorerRestoreRenderTest : StringSpec({
             ExplorerTreeState.expandedPaths shouldContainAll restored
         } finally {
             SharedSettings.projectRootPath = prior
-            ProjectTreeState.reset()
+            ExplorerTreeSnapshot.reset()
             ExplorerTreeState.reset()
         }
     }

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.client.config
 
-import com.breadmoirai.garnet.config.ExplorerStateStore
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerStateStore
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull

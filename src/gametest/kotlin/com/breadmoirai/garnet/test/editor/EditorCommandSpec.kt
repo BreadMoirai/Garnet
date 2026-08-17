@@ -2,10 +2,10 @@ package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.command.EditorCommand
-import com.breadmoirai.garnet.editor.data.EditorRoot
+import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
-import com.breadmoirai.garnet.editor.data.EditorSession
-import com.breadmoirai.garnet.editor.data.walk
+import com.breadmoirai.garnet.editor.explorer.data.EditorSession
+import com.breadmoirai.garnet.editor.explorer.data.walk
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer

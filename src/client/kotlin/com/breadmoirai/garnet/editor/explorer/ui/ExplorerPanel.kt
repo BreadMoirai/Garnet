@@ -1,7 +1,6 @@
-// ExperimentalJewelApi: passing an explicit `style` to LazyTree selects its experimental overload.
 @file:OptIn(ExperimentalComposeUiApi::class, ExperimentalJewelApi::class)
 
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -44,9 +43,9 @@ import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.Panel
 import com.breadmoirai.garnet.editor.network.LoadEditorFolderC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FolderNode
-import com.breadmoirai.garnet.editor.data.NewNodeKind
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
 import org.jetbrains.jewel.foundation.lazy.tree.DefaultTreeViewKeyActions
 import org.jetbrains.jewel.intui.standalone.styling.defaults
@@ -80,7 +79,7 @@ private fun ProjectExplorer() {
             var editError by remember { mutableStateOf<String?>(null) }
             val menu = remember { ExplorerMenuState() }
             val dialogs = remember { ExplorerDialogState() }
-            val snap = ProjectTreeState.snapshot
+            val snap = ExplorerTreeSnapshot.snapshot
             if (snap == null) {
                 Text("(no project loaded — Refresh)", Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
             } else {
@@ -228,7 +227,7 @@ private fun flushTreeStyle(): LazyTreeStyle {
  * TreeState is the declared single source of truth for selection. A second writer here would be a
  * silent no-op today and a divergence the moment the two disagree (multi-select, drag-select).
  */
-fun onElementClick(node: com.breadmoirai.garnet.editor.data.FileTreeNode, path: String) {
+fun onElementClick(node: com.breadmoirai.garnet.editor.explorer.data.FileTreeNode, path: String) {
     when (node) {
         is FileNode -> if (node.extension == "nbt") ExplorerActions.sender(PlaceStructureC2S(path))
         is FolderNode -> {
@@ -242,7 +241,7 @@ fun onElementClick(node: com.breadmoirai.garnet.editor.data.FileTreeNode, path: 
 
 @Composable
 private fun TreeRow(
-    node: com.breadmoirai.garnet.editor.data.FileTreeNode,
+    node: com.breadmoirai.garnet.editor.explorer.data.FileTreeNode,
     path: String,
     currentSubpath: String?,
     edit: ExplorerEdit?,

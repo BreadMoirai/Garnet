@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ops
+package com.breadmoirai.garnet.editor.explorer.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import net.minecraft.nbt.CompoundTag

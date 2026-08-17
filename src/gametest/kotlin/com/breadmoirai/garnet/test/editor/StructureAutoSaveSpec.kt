@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.ops.EditorNewStructure
-import com.breadmoirai.garnet.editor.data.EditorRoot
+import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
+import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry

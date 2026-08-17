@@ -1,8 +1,11 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
-import com.breadmoirai.garnet.config.ExplorerStateStore
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.ListEditorTreeC2S
+import com.breadmoirai.garnet.editor.ui.LocalHistoryState
+import com.breadmoirai.garnet.editor.ui.OpenStructureState
+import com.breadmoirai.garnet.editor.ui.StructureInfoState
+import com.breadmoirai.garnet.editor.ui.UndoState
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -66,7 +69,7 @@ fun registerExplorerLifecycle() {
             // Per-world Explorer state: the tree snapshot and its expansion/selection are stale once
             // the session that produced them ends. Reset here, not in DockState.closeAll(), which
             // stays free of IDE-state and Minecraft dependencies.
-            ProjectTreeState.reset()
+            ExplorerTreeSnapshot.reset()
             StructureInfoState.reset()
             ExplorerTreeState.reset()
             UndoState.reset()
@@ -100,6 +103,6 @@ fun saveExplorerSession() {
     if (!ExplorerSessionGate.isSingleplayer()) return
     val root = SharedSettings.projectRootPath
     if (root.isBlank()) return
-    if (ProjectTreeState.snapshot == null) return
+    if (ExplorerTreeSnapshot.snapshot == null) return
     ExplorerStateStore.save(root, ExplorerTreeState.expandedPaths, ExplorerTreeState.selectedPath)
 }

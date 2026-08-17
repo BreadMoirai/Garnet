@@ -9,11 +9,11 @@ package com.breadmoirai.garnet.client.editor.ui
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FolderNode
-import com.breadmoirai.garnet.editor.ui.ExplorerActions
-import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.ui.onElementClick
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.explorer.ui.onElementClick
 import com.breadmoirai.garnet.ui.compose.ComposeSceneHost
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
@@ -54,7 +54,7 @@ class ExplorerRowClickSceneTest : StringSpec({
 
     /** Mounts the tree with the root open, clicks once at [x],[y], and reports the open nodes. */
     fun openNodesAfterClickAt(x: Float, y: Float, handler: (Any, String) -> Unit = { node, path ->
-        onElementClick(node as com.breadmoirai.garnet.editor.data.FileTreeNode, path)
+        onElementClick(node as com.breadmoirai.garnet.editor.explorer.data.FileTreeNode, path)
     }): Set<String> {
         ExplorerTreeState.reset()
         ExplorerActions.sender = { }

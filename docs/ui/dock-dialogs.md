@@ -13,7 +13,7 @@ Two rules govern any menu or dialog inside the Compose dock.
 **Retired 2026-07-28 (jewel-widget-layer spike):** this doc previously said the dock's
 `ImageComposeScene` couldn't host a Compose `Popup`/`DropdownMenu` because they open a
 separate desktop window, and told panels to hand-roll overlays instead
-(`ProjectExplorerPanel.RootMenu` was the reference for that pattern). That premise was wrong
+(`ExplorerPanel.RootMenu` was the reference for that pattern). That premise was wrong
 for Compose 1.11's `ImageComposeScene`: it is internally a `CanvasLayersComposeScene`, so
 popup layers draw into the *same* canvas as the rest of the scene rather than spawning an OS
 window. The spike confirmed a bare Compose `Popup` renders in-scene; the Explorer panel now

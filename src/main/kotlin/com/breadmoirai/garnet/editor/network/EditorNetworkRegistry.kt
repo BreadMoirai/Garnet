@@ -1,5 +1,7 @@
 package com.breadmoirai.garnet.editor.network
 
+import com.breadmoirai.garnet.editor.explorer.network.EditorFileOpsHandlers
+import com.breadmoirai.garnet.editor.explorer.network.EditorTreeHandlers
 import com.breadmoirai.garnet.editor.undo.EditorUndoOps
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking

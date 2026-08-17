@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.explorer.data
 
 import com.breadmoirai.garnet.core.spec.GarnetSpec
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate

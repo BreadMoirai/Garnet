@@ -3,8 +3,8 @@ package com.breadmoirai.garnet.test.editor
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
-import com.breadmoirai.garnet.editor.data.EditorRoot
-import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
+import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.editor.world.EditorTeleport
 import com.breadmoirai.garnet.editor.world.EditorWorld
 import com.breadmoirai.garnet.test.makeMockServerPlayer

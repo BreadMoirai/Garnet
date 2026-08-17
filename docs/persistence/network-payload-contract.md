@@ -41,7 +41,7 @@ handler (`StructureInfoState.onAutoSaved`) renders every field —
 ## Invariant 2: every client-supplied path goes through `EditorRoot.resolveSubpath`
 
 There is no `originPos` lookup anymore — the trust anchor is **path containment**, not a
-block-entity cast. `EditorRoot.resolveSubpath(subpath)` (in `editor/data/EditorRoot.kt`):
+block-entity cast. `EditorRoot.resolveSubpath(subpath)` (in `editor/explorer/data/EditorRoot.kt`):
 
 ```kotlin
 fun resolveSubpath(subpath: String): Path? {
@@ -86,7 +86,7 @@ A request either resolves against the current directory tree or gets an explicit
 
 ## Invariant 3: per-player intent lives in `EditorSession`, not on a block
 
-`EditorSession` (`editor/data/EditorSession.kt`) is a `ConcurrentHashMap<UUID, EditorSession>`
+`EditorSession` (`editor/explorer/data/EditorSession.kt`) is a `ConcurrentHashMap<UUID, EditorSession>`
 tracking each player's `activeSubpath` — the folder actions like "New Spec" target. This replaces
 the old model where the *block itself* (looked up by `originPos`) implicitly scoped every action.
 Consequences:

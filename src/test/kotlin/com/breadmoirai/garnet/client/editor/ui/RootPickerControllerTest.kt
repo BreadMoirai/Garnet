@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.client.editor.ui
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.ui.FolderPicker
-import com.breadmoirai.garnet.editor.ui.RootPickerController
+import com.breadmoirai.garnet.editor.explorer.ui.FolderPicker
+import com.breadmoirai.garnet.editor.explorer.ui.RootPickerController
 import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldBeNull

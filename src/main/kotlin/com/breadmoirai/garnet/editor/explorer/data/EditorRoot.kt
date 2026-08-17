@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.explorer.data
 
 import java.nio.file.Path
 import kotlin.io.path.exists

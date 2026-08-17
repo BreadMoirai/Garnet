@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.network
 
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.netty.buffer.Unpooled

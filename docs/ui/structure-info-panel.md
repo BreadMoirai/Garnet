@@ -28,9 +28,9 @@ for why anything panel-local has to be `remember`-ed inside the composable rathe
 global — the dock composes into a long-lived singleton scene, so global state survives a re-mount and
 paints over the next one).
 
-## The `ProjectTreeState.status` split, and why one string could not serve both purposes
+## The `ExplorerTreeSnapshot.status` split, and why one string could not serve both purposes
 
-`ProjectTreeState` used to hold a single `status: String`, written by **five** different S2C
+`ExplorerTreeSnapshot` used to hold a single `status: String`, written by **five** different S2C
 receivers: `onFolderLoaded`, `onSaveReport`, `onError` (three *transient* feedback messages) and
 `onStructureResult`, `onAutoSaved` (two carrying *structural facts* — subpath, size, block count, save
 time). Because all five wrote the same field, whichever packet arrived last won, unconditionally. A
@@ -42,7 +42,7 @@ packets had put there, with no way to recover it until the next structural packe
 `lastSavedMillis` are written only by `onStructureResult`/`onAutoSaved`; `status` is still a single
 transient string, but it no longer shares a field with the facts it used to overwrite. An error can
 now update `status` alone, leaving the structure's size and block count exactly as they were.
-`ProjectTreeState` itself shrank to just `snapshot` — the server's tree — plus `onSnapshot`/`reset`.
+`ExplorerTreeSnapshot` itself shrank to just `snapshot` — the server's tree — plus `onSnapshot`/`reset`.
 
 ## Why a `StructureResultS2C` resets `blockCount` and `lastSavedMillis` while keeping the sizes
 
@@ -112,7 +112,7 @@ The Explorer's rename/create inline field used to report a failed commit on a pa
 at the bottom of the Explorer panel. That line is gone — status now lives in `StructureInfoState` and
 renders in the Structure Info panel instead. `editError`, the inline field's own failure message
 (`"a name with that extension already exists"` and similar), did **not** move with it. It stayed in
-`ProjectExplorerPanel.kt`, `remember`-ed alongside the field it belongs to, and now renders directly
+`ExplorerPanel.kt`, `remember`-ed alongside the field it belongs to, and now renders directly
 underneath the name field itself.
 
 The reason is that Structure Info and the Explorer are two *different* stripe panels, and only one of

@@ -9,7 +9,7 @@ import io.kotest.matchers.shouldBe
 
 /**
  * Which packet lands which field. This replaced `StructureExplorerStatusTest`, which asserted on the
- * pre-baked `ProjectTreeState.status` string — the panel needs the numbers, not a sentence.
+ * pre-baked `ExplorerTreeSnapshot.status` string — the panel needs the numbers, not a sentence.
  */
 class StructureInfoStateTest : FunSpec({
 

@@ -131,7 +131,7 @@ expansion and selection — there is no separate hand-rolled expand/selected mod
   the root is still closed at prune time — with the observed effect that this prune throws away
   *every other* pre-existing `openNodes` entry too (e.g. a caller/test that expanded a child folder
   before the panel ever mounted), because none of them were reachable from a closed root either.
-  `ProjectExplorerPanel`'s `ProjectExplorer()` opens `ROOT_PATH` synchronously inside the same
+  `ExplorerPanel`'s `ProjectExplorer()` opens `ROOT_PATH` synchronously inside the same
   `remember(snap.root) { ... }` block that builds the `Tree`, before `LazyTree` is even called, so the
   root is already open by the time `BasicLazyTree`'s prune runs.
 - `openNodes` and `selectedKeys` on the underlying `SelectableLazyListState` *are* the
@@ -194,7 +194,7 @@ folder icon — dead space in a tool window only a couple hundred pixels wide �
 12 dp is outside the background shape, a selected row's highlight never reaches the panel edge the
 way IntelliJ's own Project view does.
 
-`ProjectExplorerPanel.flushTreeStyle()` fixes both by rebuilding the ambient
+`ExplorerPanel.flushTreeStyle()` fixes both by rebuilding the ambient
 `LocalLazyTreeStyle.current` with `elementPadding = PaddingValues(horizontal = 0.dp)` and passing it
 as `LazyTree(style = …)`. Zeroing the **outer** padding (not the content padding) is the whole trick:
 the row background goes edge-to-edge while the 4 dp content padding survives as the icon's inset.
@@ -219,7 +219,7 @@ button at the (14, 12) hit point `JewelExplorerSpec` clicks.
 
 `ExplorerContextMenu` (in `ExplorerContextMenu.kt`) is a Jewel `PopupMenu` with `New Folder`, `New
 Structure`, `Rename`, `Duplicate`, `Move to…` and `Delete` items, opened by a right-click on a
-`TreeRow`. `New`/`Rename` set `edit` on `ProjectExplorerPanel`'s hoisted `ExplorerEdit?` state — the
+`TreeRow`. `New`/`Rename` set `edit` on `ExplorerPanel`'s hoisted `ExplorerEdit?` state — the
 same state the previous section describes — so the menu and the inline field are two faces of one
 mechanism: the menu picks *what* to edit, the field does the actual typing.
 
@@ -263,7 +263,7 @@ item that triggered it was.
   `TreeRow`'s `Modifier.pointerInput(path) { awaitPointerEventScope { ... } }` filters for
   `PointerEventType.Press` with `event.button == PointerButton.Secondary`.  Reading
   `PointerEvent.button` is `@ExperimentalComposeUiApi` in this Compose version, hence the
-  file-level `@file:OptIn(ExperimentalComposeUiApi::class)` on `ProjectExplorerPanel.kt`.
+  file-level `@file:OptIn(ExperimentalComposeUiApi::class)` on `ExplorerPanel.kt`.
 - **`ExplorerActions` is the validate-then-send seam** for `commitCreate`/`commitRename`, called
   from the inline field's `onCommit`. It re-runs `EditorNames.validate` against the client's own
   tree snapshot before sending a C2S packet — a pre-check, not a replacement for the server's own

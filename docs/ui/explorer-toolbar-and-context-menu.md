@@ -121,7 +121,7 @@ detect the placeholder and render the field in its place instead of a label.
 ## Why `ExplorerMenuState` must be panel-scoped, not a top-level object
 
 `ExplorerMenuState` (`target`, `anchor`) is `remember`-ed inside `ProjectExplorer()`, never a
-top-level `object` the way `ProjectTreeState`/`ExplorerTreeState` are. A popup layer belongs to the
+top-level `object` the way `ExplorerTreeSnapshot`/`ExplorerTreeState` are. A popup layer belongs to the
 composition that opened it — the dock composes into a **long-lived singleton scene** that survives
 across panel hide/show and world-session boundaries (see
 [dock-framework.md#panel-composition-must-not-outlive-its-mount](dock-framework.md#panel-composition-must-not-outlive-its-mount)

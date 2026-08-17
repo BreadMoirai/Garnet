@@ -1,9 +1,9 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.editor.ui.ExplorerActions
-import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.ui.ProjectTreeState
-import com.breadmoirai.garnet.editor.ui.explorerPanel
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
+import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
 import com.breadmoirai.garnet.editor.ui.localHistoryPanel
 import com.breadmoirai.garnet.ui.compose.ComposeOverlay
 import com.breadmoirai.garnet.ui.compose.ComposeSurface
@@ -21,8 +21,8 @@ import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.UndoStateS2C
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.ui.UndoState
 import com.breadmoirai.garnet.harness.ClientSpec
 import io.kotest.matchers.booleans.shouldBeFalse
@@ -68,8 +68,8 @@ class ExplorerUiSpec : ClientSpec({
     /** Mounts the Explorer with one root -> "redstone" -> "clock.nbt", focused and ready to click. */
     fun mountForContextMenu() {
         runOnClient { mc ->
-            DockState.reset(); ProjectTreeState.reset(); ExplorerTreeState.reset()
-            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(
+            DockState.reset(); ExplorerTreeSnapshot.reset(); ExplorerTreeState.reset()
+            ExplorerTreeSnapshot.onSnapshot(EditorTreeSnapshotS2C(
                 FolderNode("myproject", listOf(FolderNode("redstone", listOf(FileNode("clock.nbt", "nbt"))))),
                 null,
             ))

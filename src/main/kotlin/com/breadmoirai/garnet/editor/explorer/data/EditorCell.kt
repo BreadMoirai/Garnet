@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.explorer.data
 
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i

@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import androidx.compose.ui.input.key.KeyEvent
 import org.jetbrains.jewel.foundation.lazy.SelectableLazyListKey

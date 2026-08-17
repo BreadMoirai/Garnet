@@ -1,14 +1,14 @@
 package com.breadmoirai.garnet.client.editor.ui
 
-import com.breadmoirai.garnet.config.ExplorerStateStore
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerStateStore
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
-import com.breadmoirai.garnet.editor.ui.ExplorerSessionGate
-import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.ui.ProjectTreeState
-import com.breadmoirai.garnet.editor.ui.armRestoreIfSingleplayer
-import com.breadmoirai.garnet.editor.ui.saveExplorerSession
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerSessionGate
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
+import com.breadmoirai.garnet.editor.explorer.ui.armRestoreIfSingleplayer
+import com.breadmoirai.garnet.editor.explorer.ui.saveExplorerSession
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
@@ -35,7 +35,7 @@ class ExplorerLifecycleTest : FunSpec({
         try {
             ExplorerSessionGate.isSingleplayer = { true }
             SharedSettings.projectRootPath = "/tmp/proj"
-            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, null))
+            ExplorerTreeSnapshot.onSnapshot(EditorTreeSnapshotS2C(tree, null))
             ExplorerTreeState.reset()
             ExplorerTreeState.toggleExpanded("adders")
 
@@ -48,7 +48,7 @@ class ExplorerLifecycleTest : FunSpec({
             ExplorerStateStore.resetConfigFileForTest()
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
-            ProjectTreeState.reset()
+            ExplorerTreeSnapshot.reset()
             ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }
@@ -62,7 +62,7 @@ class ExplorerLifecycleTest : FunSpec({
         try {
             ExplorerSessionGate.isSingleplayer = { false }
             SharedSettings.projectRootPath = "/tmp/proj"
-            ProjectTreeState.onSnapshot(EditorTreeSnapshotS2C(tree, null))
+            ExplorerTreeSnapshot.onSnapshot(EditorTreeSnapshotS2C(tree, null))
             ExplorerTreeState.reset()
             ExplorerTreeState.toggleExpanded("adders")
 
@@ -74,7 +74,7 @@ class ExplorerLifecycleTest : FunSpec({
             ExplorerStateStore.resetConfigFileForTest()
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
-            ProjectTreeState.reset()
+            ExplorerTreeSnapshot.reset()
             ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }
@@ -98,7 +98,7 @@ class ExplorerLifecycleTest : FunSpec({
             ExplorerStateStore.resetConfigFileForTest()
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
-            ProjectTreeState.reset()
+            ExplorerTreeSnapshot.reset()
             ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }
@@ -122,7 +122,7 @@ class ExplorerLifecycleTest : FunSpec({
             ExplorerStateStore.resetConfigFileForTest()
             ExplorerSessionGate.resetForTest()
             SharedSettings.projectRootPath = priorRoot
-            ProjectTreeState.reset()
+            ExplorerTreeSnapshot.reset()
             ExplorerTreeState.reset()
             dir.toFile().deleteRecursively()
         }

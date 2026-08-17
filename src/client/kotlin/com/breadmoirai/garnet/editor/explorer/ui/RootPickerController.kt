@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,7 +14,7 @@ import org.lwjgl.system.Platform
 
 /**
  * Compose-observable state + action controller for the Explorer's root-picker header.
- * Sibling of [ProjectTreeState]; packet handlers never touch this UI state.
+ * Sibling of [ExplorerTreeSnapshot]; packet handlers never touch this UI state.
  *
  * External effects are seams (swapped in tests): [picker] (native dialog), [runner]
  * (background thread — the dialog blocks), [executor] (marshal back to the client thread),

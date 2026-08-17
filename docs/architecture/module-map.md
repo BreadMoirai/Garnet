@@ -183,11 +183,11 @@ The Explorer and the void-workspace grid are the only reachable in-game feature 
   structure ops; file ops; shared helpers). See
   [persistence/network-payload-contract.md](../persistence/network-payload-contract.md)
   for the authority model — a *different* one from the deleted block-entity trust anchor.
-- `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ProjectTreeState` (tree
+- `network/EditorClientNetworking.kt` (client) — S2C receivers feeding `ExplorerTreeSnapshot` (tree
   snapshot only), `StructureInfoState` (structure facts and the transient status line), and (for
   the Local History panel) `OpenStructureState` and `LocalHistoryState`.
 - `ui/` (client) — `ProjectExplorerPanel.kt`, `ExplorerToolbar.kt`, `ExplorerContextMenu.kt`,
-  `ExplorerEdit.kt`, `ExplorerLifecycle.kt`, `ExplorerTreeState.kt`, `ProjectTreeState.kt`,
+  `ExplorerEdit.kt`, `ExplorerLifecycle.kt`, `ExplorerTreeState.kt`, `ExplorerTreeSnapshot.kt`,
   `FolderPicker.kt`, `RootPickerController.kt`, `LocalHistoryPanel.kt`, `OpenStructureState.kt`,
   `LocalHistoryState.kt`, `StructureInfoState.kt`, `StructureInfoPanel.kt` — the three Compose
   LEFT-dock panels (Explorer, Local History, Structure Info) and their state; see

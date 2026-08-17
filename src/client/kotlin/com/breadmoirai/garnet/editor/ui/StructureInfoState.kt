@@ -15,7 +15,7 @@ import com.breadmoirai.garnet.editor.network.StructureResultS2C
  * Client-side, Compose-observable facts about the open structure, plus the editor's transient status
  * line. Read by [structureInfoPanel]; written by the network receivers in `EditorClientNetworking`.
  *
- * Fields, not a pre-baked sentence. This replaced `ProjectTreeState.status`, a single string that
+ * Fields, not a pre-baked sentence. This replaced `ExplorerTreeSnapshot.status`, a single string that
  * five receivers wrote to — three with transient feedback and two with structure facts — so the
  * size and block count of the open structure were destroyed by the next unrelated error.
  *

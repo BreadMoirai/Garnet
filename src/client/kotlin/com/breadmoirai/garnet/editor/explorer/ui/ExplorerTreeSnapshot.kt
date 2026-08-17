@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +16,7 @@ import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
  * Tree *interaction* state (expansion, selection) deliberately lives in [ExplorerTreeState], owned by
  * Jewel's TreeState, so there is exactly one copy of it.
  */
-object ProjectTreeState {
+object ExplorerTreeSnapshot {
     var snapshot by mutableStateOf<EditorTreeSnapshotS2C?>(null)
         private set
 

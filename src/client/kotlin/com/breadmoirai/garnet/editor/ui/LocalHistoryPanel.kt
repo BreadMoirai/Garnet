@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.breadmoirai.garnet.core.config.SharedSettings
+import com.breadmoirai.garnet.editor.explorer.ui.formatClock
 import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
 import com.breadmoirai.garnet.editor.network.RevisionEntry
 import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S

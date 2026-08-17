@@ -129,7 +129,7 @@ and the client falls back to the plain solid-edge composite; it must never crash
 
 ## What remains (post-GO)
 
-- **Panel framework:** docking via Compose layout, `ProjectExplorerPanel` as a composable over
+- **Panel framework:** docking via Compose layout, `ExplorerPanel` as a composable over
   `ProjectTreeSnapshotS2C`, `mutableStateOf` for live debugger/timeline data.
 - **Real input routing:** wire the actual GLFW cursor/mouse hooks (not just test-driven
   `sendPointerEvent`) into the scene, gated to the reserved strip, with focus handling vs MC's own input.

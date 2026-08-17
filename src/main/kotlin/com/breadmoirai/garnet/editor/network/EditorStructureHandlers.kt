@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.data.*
+import com.breadmoirai.garnet.editor.explorer.data.*
 import com.breadmoirai.garnet.editor.history.HistoryWatchers
 import com.breadmoirai.garnet.editor.history.RestoreOutcome
 import com.breadmoirai.garnet.editor.history.StructureRestoreOps
@@ -10,7 +10,7 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentF
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
-import com.breadmoirai.garnet.editor.ops.EditorNewStructure
+import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.undo.CreatedFileKind

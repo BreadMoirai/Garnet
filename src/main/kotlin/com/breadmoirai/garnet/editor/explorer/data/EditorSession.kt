@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.explorer.data
 
 import net.minecraft.server.level.ServerPlayer
 import java.util.UUID

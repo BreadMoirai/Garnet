@@ -10,7 +10,7 @@ import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
 import com.breadmoirai.garnet.editor.network.RevisionEntry
 import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
 import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
-import com.breadmoirai.garnet.editor.ops.EditorNewStructure
+import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit

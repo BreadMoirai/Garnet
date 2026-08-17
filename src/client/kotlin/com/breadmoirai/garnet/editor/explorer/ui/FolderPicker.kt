@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.util.nfd.NativeFileDialog

@@ -1,13 +1,13 @@
 package com.breadmoirai.garnet.client.editor.ui
 
-import com.breadmoirai.garnet.config.ExplorerSession
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerSession
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.ui.ExplorerEdit
-import com.breadmoirai.garnet.editor.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FileTreeNode
-import com.breadmoirai.garnet.editor.data.FolderNode
-import com.breadmoirai.garnet.editor.data.NewNodeKind
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerEdit
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FileTreeNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -146,14 +146,14 @@ class ExplorerTreeStateTest : FunSpec({
         rootElement.data shouldBe root
 
         // Tree.Element.Node.children is lazy — open() materializes it.
-        val node = rootElement as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
+        val node = rootElement as Tree.Element.Node<com.breadmoirai.garnet.editor.explorer.data.FileTreeNode>
         node.open()
         node.children!!.map { ExplorerTreeState.pathOf(it) } shouldBe listOf("adders", "clock.nbt")
     }
 
     test("buildTreeFrom mirrors the snapshot with path ids, folders keeping their children") {
         val built = ExplorerTreeState.buildTreeFrom(tree)
-        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
+        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.editor.explorer.data.FileTreeNode>
         rootElement.open(false)
         val ids = (rootElement.children ?: emptyList()).map { it.id }
         ids shouldContainExactly listOf("adders", "dirty.nbt", "clean.nbt")
@@ -161,14 +161,14 @@ class ExplorerTreeStateTest : FunSpec({
 
     test("buildTreeFrom nests folder children with /-joined ids, matching select/toggleExpanded's format") {
         val built = ExplorerTreeState.buildTreeFrom(tree)
-        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
+        val rootElement = built.roots.single() as Tree.Element.Node<com.breadmoirai.garnet.editor.explorer.data.FileTreeNode>
         rootElement.open(false)
         val rootChildren = rootElement.children ?: emptyList()
-        val adders = rootChildren.first { it.id == "adders" } as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
+        val adders = rootChildren.first { it.id == "adders" } as Tree.Element.Node<com.breadmoirai.garnet.editor.explorer.data.FileTreeNode>
         adders.open(false) // children are lazily evaluated on open, per Jewel's Tree.Element.Node
         val addersChildren = adders.children ?: emptyList()
         addersChildren.map { it.id } shouldContainExactly listOf("adders/full-adder")
-        val fullAdder = addersChildren.first() as Tree.Element.Node<com.breadmoirai.garnet.editor.data.FileTreeNode>
+        val fullAdder = addersChildren.first() as Tree.Element.Node<com.breadmoirai.garnet.editor.explorer.data.FileTreeNode>
         fullAdder.open(false)
         val fullAdderChildren = fullAdder.children ?: emptyList()
         fullAdderChildren.map { it.id } shouldContainExactly listOf("adders/full-adder/full.spec.kts")

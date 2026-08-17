@@ -1,8 +1,8 @@
 package com.breadmoirai.garnet.editor.network
 
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FileTreeNode
-import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FileTreeNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec

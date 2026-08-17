@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.data
+package com.breadmoirai.garnet.editor.explorer.data
 
 /** What an Explorer "New" action creates. */
 enum class NewNodeKind { FOLDER, STRUCTURE }

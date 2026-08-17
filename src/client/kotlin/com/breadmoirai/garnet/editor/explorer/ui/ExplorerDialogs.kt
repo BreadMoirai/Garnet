@@ -1,14 +1,14 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.explorer.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntOffset
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FolderNode
-import com.breadmoirai.garnet.editor.data.resolve
-import com.breadmoirai.garnet.editor.data.walk
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.data.resolve
+import com.breadmoirai.garnet.editor.explorer.data.walk
 import org.jetbrains.jewel.ui.component.PopupMenu
 import org.jetbrains.jewel.ui.component.Text
 
@@ -131,7 +131,7 @@ private fun MoveTargetDialog(
  * afraid of losing.
  */
 internal fun structureCountUnder(path: String): Int? {
-    val root = ProjectTreeState.snapshot?.root ?: return null
+    val root = ExplorerTreeSnapshot.snapshot?.root ?: return null
     val node = root.resolve(path) as? FolderNode ?: return null
     return node.walk().count { (_, child) -> child is FileNode && child.extension == "nbt" }
 }
@@ -145,7 +145,7 @@ internal fun structureCountUnder(path: String): Int? {
  * destination is never offered rather than being offered and then refused.
  */
 internal fun moveDestinationsFor(movedPath: String): List<Pair<String, String>> {
-    val root = ProjectTreeState.snapshot?.root ?: return emptyList()
+    val root = ExplorerTreeSnapshot.snapshot?.root ?: return emptyList()
     val currentParent = movedPath.substringBeforeLast('/', "")
     return root.walk()
         .filter { (_, node) -> node is FolderNode }

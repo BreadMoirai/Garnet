@@ -1,22 +1,22 @@
 package com.breadmoirai.garnet.test.editor
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.data.EditorRoot
-import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
+import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.network.DuplicatePathC2S
 import com.breadmoirai.garnet.editor.network.EditorErrorS2C
-import com.breadmoirai.garnet.editor.network.EditorFileOpsHandlers
+import com.breadmoirai.garnet.editor.explorer.network.EditorFileOpsHandlers
 import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
-import com.breadmoirai.garnet.editor.network.EditorTreeHandlers
+import com.breadmoirai.garnet.editor.explorer.network.EditorTreeHandlers
 import com.breadmoirai.garnet.editor.network.MovePathC2S
 import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
-import com.breadmoirai.garnet.editor.ops.EditorNewStructure
+import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.structure.StructureEditWatcher

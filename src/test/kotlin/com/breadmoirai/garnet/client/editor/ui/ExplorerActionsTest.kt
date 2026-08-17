@@ -1,10 +1,10 @@
 package com.breadmoirai.garnet.client.editor.ui
 
-import com.breadmoirai.garnet.editor.ui.ExplorerActions
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
 import com.breadmoirai.garnet.editor.ui.OpenStructureState
-import com.breadmoirai.garnet.editor.ui.ProjectTreeState
-import com.breadmoirai.garnet.editor.data.FileNode
-import com.breadmoirai.garnet.editor.data.FolderNode
+import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
+import com.breadmoirai.garnet.editor.explorer.data.FileNode
+import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.network.DeletePathC2S
@@ -14,7 +14,7 @@ import com.breadmoirai.garnet.editor.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.network.StructureResultS2C
-import com.breadmoirai.garnet.editor.data.NewNodeKind
+import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
 import com.breadmoirai.garnet.ui.dock.DockRegion
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.dock.Panel
@@ -62,7 +62,7 @@ class ExplorerActionsTest : FunSpec({
     afterTest {
         DockVisibilityCommit.resetForTest()
         ExplorerActions.resetForTest()
-        ProjectTreeState.reset()
+        ExplorerTreeSnapshot.reset()
         OpenStructureState.reset()
         DockState.reset()
     }
@@ -105,7 +105,7 @@ class ExplorerActionsTest : FunSpec({
     }
 
     test("renaming a folder does not acquire an extension from its dots") {
-        ProjectTreeState.onSnapshot(
+        ExplorerTreeSnapshot.onSnapshot(
             EditorTreeSnapshotS2C(
                 root = FolderNode("project", listOf(FolderNode("my.stuff", emptyList()))),
                 currentSubpath = null,
@@ -177,7 +177,7 @@ class ExplorerActionsTest : FunSpec({
 
     test("opening local history for an unplaced structure places it first") {
         val sent = captureSends()
-        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+        ExplorerTreeSnapshot.onSnapshot(snapshotWith("clock.nbt"))
 
         ExplorerActions.openLocalHistory("clock.nbt") shouldBe null
 
@@ -186,7 +186,7 @@ class ExplorerActionsTest : FunSpec({
 
     test("opening local history for the already-placed structure sends no place packet") {
         val sent = captureSends()
-        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+        ExplorerTreeSnapshot.onSnapshot(snapshotWith("clock.nbt"))
         OpenStructureState.onStructureResult(StructureResultS2C("clock.nbt", 1, 1, 1, "placed"))
 
         ExplorerActions.openLocalHistory("clock.nbt") shouldBe null
@@ -196,7 +196,7 @@ class ExplorerActionsTest : FunSpec({
 
     test("opening local history switches the LEFT region to the Local History panel") {
         captureSends()
-        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+        ExplorerTreeSnapshot.onSnapshot(snapshotWith("clock.nbt"))
         registerLeftPanel("garnet.explorer")
         registerLeftPanel("garnet.localHistory")
         DockState.showPanel("garnet.explorer")
@@ -212,7 +212,7 @@ class ExplorerActionsTest : FunSpec({
         // into index 0, so an unregistered Local History silently selected the *Explorer* tab on an
         // already-open LEFT. showPanel does nothing at all instead.
         captureSends()
-        ProjectTreeState.onSnapshot(snapshotWith("clock.nbt"))
+        ExplorerTreeSnapshot.onSnapshot(snapshotWith("clock.nbt"))
         registerLeftPanel("garnet.explorer")
 
         ExplorerActions.openLocalHistory("clock.nbt") shouldBe null

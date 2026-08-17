@@ -1,11 +1,12 @@
-package com.breadmoirai.garnet.editor.network
+package com.breadmoirai.garnet.editor.explorer.network
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.data.*
+import com.breadmoirai.garnet.editor.explorer.data.*
+import com.breadmoirai.garnet.editor.network.*
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.fail
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
-import com.breadmoirai.garnet.editor.ops.EditorNewSpec
+import com.breadmoirai.garnet.editor.explorer.ops.EditorNewSpec
 import com.breadmoirai.garnet.editor.structure.StructureAutoSave
 import com.breadmoirai.garnet.editor.structure.StructureCommit
 import com.breadmoirai.garnet.editor.undo.CreatedFileKind

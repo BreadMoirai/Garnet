@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ops
+package com.breadmoirai.garnet.editor.explorer.ops
 
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag

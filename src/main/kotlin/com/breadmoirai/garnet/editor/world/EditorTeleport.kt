@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.world
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.data.EditorSession
+import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Relative
