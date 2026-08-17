@@ -242,7 +242,7 @@ sizes (they come from the loaded template), while a *raw* one is zero on all fou
 
 Three, and only three:
 
-- `com.breadmoirai.garnet.editor.structure.StructureCommit` writes every `autosave`, `manual`,
+- `com.breadmoirai.garnet.editor.structure.ops.StructureCommit` writes every `autosave`, `manual`,
   `external`, and `restore` revision. There is no separate "manual snapshot" feature — a `manual`
   revision is a forced commit, not a distinct action. A `restore` revision is likewise not a fourth
   writer: `editor/history/StructureRestoreOps` re-places a chosen revision's tag into the world and

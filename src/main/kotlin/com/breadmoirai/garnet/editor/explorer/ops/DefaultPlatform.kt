@@ -19,7 +19,7 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
  * the only way to populate a template is `fillFromWorld`, which needs a live `ServerLevel`, and
  * this runs during a pure filesystem create — before anything exists in a world. The key names and
  * shapes below mirror `StructureTemplate.save`/`load` exactly. No `DataVersion` is written because
- * the read path ([com.breadmoirai.garnet.structure.StructurePersistence.placeStructureCentered])
+ * the read path ([com.breadmoirai.garnet.editor.structure.ops.StructurePersistence.placeStructureCentered])
  * calls `template.load` directly, with no datafixer step.
  */
 object DefaultPlatform {

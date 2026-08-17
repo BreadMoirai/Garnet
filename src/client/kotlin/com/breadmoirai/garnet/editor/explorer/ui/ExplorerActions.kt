@@ -11,7 +11,7 @@ import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.explorer.data.NewNodeKind
 import com.breadmoirai.garnet.editor.explorer.data.EditorNames
 import com.breadmoirai.garnet.editor.explorer.data.resolve
-import com.breadmoirai.garnet.editor.ui.OpenStructureState
+import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.viewport.commitDockVisibilityChange
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking

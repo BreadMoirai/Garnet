@@ -5,8 +5,8 @@ import com.breadmoirai.garnet.core.async.onServer
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.editor.history.HistoryWatchers
-import com.breadmoirai.garnet.editor.structure.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.world.EditorServerContext
 import com.breadmoirai.garnet.editor.world.EditorWorld
 import com.breadmoirai.garnet.mixin.ConnectionAccessor

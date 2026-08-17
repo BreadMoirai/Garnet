@@ -14,7 +14,7 @@ import com.breadmoirai.garnet.editor.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry
 import com.breadmoirai.garnet.editor.explorer.network.EditorTreeHandlers
-import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
+import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.EditorSaveReportS2C
 import com.breadmoirai.garnet.editor.network.EditorTreeSnapshotS2C
 import com.breadmoirai.garnet.editor.network.NewEditorSpecC2S
@@ -25,11 +25,11 @@ import com.breadmoirai.garnet.editor.network.SetEditorRootC2S
 import com.breadmoirai.garnet.editor.network.StructureHistoryS2C
 import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
-import com.breadmoirai.garnet.editor.structure.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.StructureCommit
-import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
+import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
+import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
 import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.structure.PlacedBox
+import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import net.minecraft.core.Vec3i
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer

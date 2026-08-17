@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.structure
+package com.breadmoirai.garnet.editor.structure.data
 
 import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 

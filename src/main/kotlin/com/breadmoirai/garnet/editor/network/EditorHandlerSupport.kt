@@ -2,9 +2,9 @@ package com.breadmoirai.garnet.editor.network
 
 import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.editor.explorer.data.scanFolder
-import com.breadmoirai.garnet.editor.structure.CommitOutcome
-import com.breadmoirai.garnet.editor.structure.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
+import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
 import com.breadmoirai.garnet.history.LocalHistoryStore

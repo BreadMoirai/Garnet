@@ -3,19 +3,19 @@ package com.breadmoirai.garnet.test.editor
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
-import com.breadmoirai.garnet.editor.network.EditorStructureHandlers
+import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorServerContext
-import com.breadmoirai.garnet.editor.structure.CommitOutcome
-import com.breadmoirai.garnet.editor.structure.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.StructureCommit
-import com.breadmoirai.garnet.editor.structure.StructureEditWatcher
+import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
+import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
+import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.core.async.onServer
-import com.breadmoirai.garnet.structure.StructurePersistence
-import com.breadmoirai.garnet.structure.structuresDiffer
+import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
+import com.breadmoirai.garnet.editor.structure.data.structuresDiffer
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
@@ -38,7 +38,7 @@ import kotlin.io.path.writeBytes
 
 /**
  * Dirty-state bookkeeping only — the commit itself is covered by the network-level tests once
- * [com.breadmoirai.garnet.editor.structure.StructureCommit] exists.
+ * [com.breadmoirai.garnet.editor.structure.ops.StructureCommit] exists.
  *
  * These drive [StructureEditWatcher.onBlockChanged] directly rather than calling `level.setBlock`:
  * the setBlock mixin is unreliable under the gametest harness, and what needs testing here is the

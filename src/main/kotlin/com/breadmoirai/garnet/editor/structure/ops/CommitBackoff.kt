@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.structure
+package com.breadmoirai.garnet.editor.structure.ops
 
 import net.minecraft.server.MinecraftServer
 import org.slf4j.LoggerFactory

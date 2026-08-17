@@ -8,8 +8,8 @@ import com.breadmoirai.garnet.editor.command.EditorCommand
 import com.breadmoirai.garnet.editor.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.world.EditorServerContext
-import com.breadmoirai.garnet.editor.structure.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.history.LocalHistoryStore
 import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import net.fabricmc.api.ModInitializer

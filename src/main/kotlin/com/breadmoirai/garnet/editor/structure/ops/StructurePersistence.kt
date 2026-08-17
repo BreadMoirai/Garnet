@@ -1,5 +1,9 @@
-package com.breadmoirai.garnet.structure
+package com.breadmoirai.garnet.editor.structure.ops
 
+import com.breadmoirai.garnet.editor.structure.data.PlacedBox
+import com.breadmoirai.garnet.editor.structure.data.anchorY
+import com.breadmoirai.garnet.editor.structure.data.autoFit
+import com.breadmoirai.garnet.editor.structure.data.centeredStart
 import net.minecraft.core.BlockPos
 import net.minecraft.core.HolderGetter
 import net.minecraft.core.Vec3i

@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.ui
+package com.breadmoirai.garnet.editor.structure.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column

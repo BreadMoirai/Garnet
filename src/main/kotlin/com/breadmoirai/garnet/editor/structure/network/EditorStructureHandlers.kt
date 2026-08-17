@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.network
+package com.breadmoirai.garnet.editor.structure.network
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.data.*
@@ -10,15 +10,21 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.resolveParentF
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendTree
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.siblingNames
+import com.breadmoirai.garnet.editor.network.NewStructureC2S
+import com.breadmoirai.garnet.editor.network.PlaceStructureC2S
+import com.breadmoirai.garnet.editor.network.RestoreRevisionC2S
+import com.breadmoirai.garnet.editor.network.SaveStructureC2S
+import com.breadmoirai.garnet.editor.network.StructureResultS2C
+import com.breadmoirai.garnet.editor.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
-import com.breadmoirai.garnet.editor.structure.CommitOutcome
-import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
+import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.undo.CreatedFileKind
 import com.breadmoirai.garnet.editor.undo.EditorUndoCommand
 import com.breadmoirai.garnet.editor.undo.EditorUndoStack
 import com.breadmoirai.garnet.editor.world.*
 import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.structure.StructurePersistence
+import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.NbtAccounter

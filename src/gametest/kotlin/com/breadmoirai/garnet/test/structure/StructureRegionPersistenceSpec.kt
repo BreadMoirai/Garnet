@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.test.structure
 
-import com.breadmoirai.garnet.structure.PlacedBox
-import com.breadmoirai.garnet.structure.StructurePersistence
+import com.breadmoirai.garnet.editor.structure.data.PlacedBox
+import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.test.GametestSentinel

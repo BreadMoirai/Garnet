@@ -1,12 +1,12 @@
-package com.breadmoirai.garnet.editor.structure
+package com.breadmoirai.garnet.editor.structure.ops
 
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 
 /**
- * Layer: `editor.structure` — the live editing pipeline, distinct from the top-level
- * [com.breadmoirai.garnet.structure] package (pure NBT and region geometry, no server state).
+ * Layer: `editor.structure.ops` — the live editing pipeline, distinct from
+ * [com.breadmoirai.garnet.editor.structure.data] (pure NBT and region geometry, no server state).
  *
  * The bridge from a successful world block change to auto-save bookkeeping.
  *

@@ -2,12 +2,12 @@ package com.breadmoirai.garnet.editor.history
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.commitDirtyUnder
-import com.breadmoirai.garnet.editor.structure.CommitOutcome
-import com.breadmoirai.garnet.editor.structure.StructureCommit
+import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
+import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
 import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.structure.StructurePersistence
+import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import net.minecraft.server.MinecraftServer
 import org.slf4j.LoggerFactory
 

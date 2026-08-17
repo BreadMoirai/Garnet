@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.structure
+package com.breadmoirai.garnet.editor.structure.data
 
 /** A tight axis-aligned box in region-local coordinates. */
 data class FitBox(

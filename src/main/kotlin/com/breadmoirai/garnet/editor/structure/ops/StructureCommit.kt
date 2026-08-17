@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.editor.structure
+package com.breadmoirai.garnet.editor.structure.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.history.HistoryWatchers
@@ -6,9 +6,9 @@ import com.breadmoirai.garnet.editor.network.StructureAutoSavedS2C
 import com.breadmoirai.garnet.editor.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.world.EditorRootResolver
 import com.breadmoirai.garnet.history.LocalHistoryStore
-import com.breadmoirai.garnet.structure.PlacedBox
-import com.breadmoirai.garnet.structure.StructurePersistence
-import com.breadmoirai.garnet.structure.structuresDiffer
+import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
+import com.breadmoirai.garnet.editor.structure.data.PlacedBox
+import com.breadmoirai.garnet.editor.structure.data.structuresDiffer
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
@@ -22,8 +22,8 @@ import java.nio.file.Path
 import kotlin.io.path.exists
 
 /**
- * Layer: `editor.structure` — the live editing pipeline (dirty-track → debounce → commit →
- * history), distinct from the top-level [com.breadmoirai.garnet.structure] package (pure NBT and
+ * Layer: `editor.structure.ops` — the live editing pipeline (dirty-track → debounce → commit →
+ * history), distinct from [com.breadmoirai.garnet.editor.structure.data] (pure NBT and
  * region geometry, no server state).
  *
  * Turns a structure's dirty state into a committed `.nbt` plus a history revision.

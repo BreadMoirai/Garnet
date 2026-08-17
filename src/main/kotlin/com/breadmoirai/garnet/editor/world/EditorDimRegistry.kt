@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.editor.world
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.structure.PlacedBox
+import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import net.minecraft.core.BlockPos
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel

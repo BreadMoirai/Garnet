@@ -418,7 +418,7 @@ object LocalHistoryStore {
     /**
      * Writes `index.json` crash-safely: to a same-directory temp file first, then an atomic (or
      * best-effort) move over the target — the same pattern
-     * [com.breadmoirai.garnet.structure.StructurePersistence.writeStructureAtomic] uses for the
+     * [com.breadmoirai.garnet.editor.structure.ops.StructurePersistence.writeStructureAtomic] uses for the
      * `.nbt` itself. A plain `writeText` truncates in place, so a crash, power loss, or full disk
      * mid-write would leave a half-written `index.json`; [readIndex] can only degrade that to "no
      * history", silently hiding every revision whose blob is still sitting right there on disk.

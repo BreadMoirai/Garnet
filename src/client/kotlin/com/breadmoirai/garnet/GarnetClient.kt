@@ -5,7 +5,7 @@ import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
 import com.breadmoirai.garnet.editor.explorer.ui.registerExplorerLifecycle
 import com.breadmoirai.garnet.editor.network.EditorClientNetworking
 import com.breadmoirai.garnet.editor.ui.localHistoryPanel
-import com.breadmoirai.garnet.editor.ui.structureInfoPanel
+import com.breadmoirai.garnet.editor.structure.ui.structureInfoPanel
 import com.breadmoirai.garnet.ui.dock.DockState
 import com.breadmoirai.garnet.ui.viewport.registerCursorFocusToggle
 import com.breadmoirai.garnet.ui.viewport.registerDockKeybinds

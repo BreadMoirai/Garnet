@@ -1,15 +1,15 @@
-package com.breadmoirai.garnet.editor.structure
+package com.breadmoirai.garnet.editor.structure.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.structure.PlacedBox
+import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.server.MinecraftServer
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Layer: `editor.structure` — the live editing pipeline, distinct from the top-level
- * [com.breadmoirai.garnet.structure] package (pure NBT and region geometry, no server state).
+ * Layer: `editor.structure.ops` — the live editing pipeline, distinct from
+ * [com.breadmoirai.garnet.editor.structure.data] (pure NBT and region geometry, no server state).
  *
  * Per-server dirty bookkeeping for placed standalone structures: which ones have unsaved edits,
  * where those edits landed, and when they are due to be committed.
