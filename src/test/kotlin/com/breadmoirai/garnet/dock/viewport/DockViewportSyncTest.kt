@@ -1,4 +1,4 @@
-package com.breadmoirai.garnet.dock.shell
+package com.breadmoirai.garnet.dock.viewport
 
 import com.breadmoirai.garnet.dock.compose.ComposeOverlay
 import com.breadmoirai.garnet.dock.shell.DockRegion

@@ -13,11 +13,12 @@ private val LOGGER = LoggerFactory.getLogger("Garnet")
 /**
  * The `config/garnet-dock.json` round-trip for which dock panel is open in each region.
  *
- * Deliberately NOT part of [ModConfig]: that object's contract is a pure [SharedSettings] round-trip,
- * and `SharedSettings` is read by the dedicated server — dock layout is client UI state a server must
- * never see. Deliberately NOT part of [ExplorerStateStore] either: that record is keyed by project
- * root and written only in singleplayer, and dock layout is neither. Reusing that file would silently
- * inherit both restrictions and break auto-open on a remote Garnet server.
+ * Deliberately NOT part of [com.breadmoirai.garnet.core.config.ModConfig]: that object's contract is
+ * a pure [com.breadmoirai.garnet.core.config.SharedSettings] round-trip, and `SharedSettings` is read
+ * by the dedicated server — dock layout is client UI state a server must never see. Deliberately NOT
+ * part of [com.breadmoirai.garnet.editor.explorer.ui.ExplorerStateStore] either: that record is keyed
+ * by project root and written only in singleplayer, and dock layout is neither. Reusing that file
+ * would silently inherit both restrictions and break auto-open on a remote Garnet server.
  *
  * Panel ids, not a boolean. The record used to be `{"leftVisible": true}`, from when visibility was
  * per-region; [load] still reads that shape and migrates it, and the file is rewritten in the new

@@ -75,7 +75,8 @@ object StructureCommit {
      * 1. not placed (`registry.placedBoxOf(subpath) == null`) — genuinely nothing left to commit.
      *    There is no world content standing by; the dirty flag is cleared unconditionally. This is
      *    safe because both repo-wide callers of [EditorDimRegistry.unplaceStructure] —
-     *    `EditorFileOpsHandlers.handleRename` (per-subpath, aborting the whole rename on [Failed]) and
+     *    `EditorFileOpsHandlers.handleRename` (per-subpath, aborting the whole rename on
+     *    [CommitOutcome.Failed]) and
      *    `EditorTreeHandlers.handleSetRoot` (a [commitAll] flush of the OLD root before the swap) —
      *    commit every dirty subpath first and only unplace afterward — so a dirty key never survives
      *    into an unplace.

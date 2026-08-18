@@ -7,11 +7,12 @@ import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
 
 /**
  * Client-side, Compose-observable state for the Project Explorer: the server's tree snapshot. The
- * networking layer mutates it from the client thread; [ProjectExplorerPanel] reads it during
+ * networking layer mutates it from the client thread; [explorerPanel] reads it during
  * composition and recomposes on change.
  *
- * The status line used to live here too. It moved wholesale to [StructureInfoState], which holds the
- * open structure's facts as fields rather than as a formatted sentence.
+ * The status line used to live here too. It moved wholesale to
+ * [com.breadmoirai.garnet.editor.structure.ui.StructureInfoState], which holds the open structure's
+ * facts as fields rather than as a formatted sentence.
  *
  * Tree *interaction* state (expansion, selection) deliberately lives in [ExplorerTreeState], owned by
  * Jewel's TreeState, so there is exactly one copy of it.

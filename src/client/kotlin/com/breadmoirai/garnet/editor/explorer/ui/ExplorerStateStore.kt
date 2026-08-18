@@ -23,9 +23,10 @@ data class ExplorerSession(
 /**
  * The `config/garnet-explorer.json` round-trip for the Explorer's per-session tree state.
  *
- * Deliberately NOT part of [ModConfig]: that object's contract is a pure [SharedSettings] round-trip
- * with no shadow state, and expansion/selection is client UI state a server must never see —
- * `SharedSettings` is read by the dedicated server. A separate file keeps that boundary intact.
+ * Deliberately NOT part of [com.breadmoirai.garnet.core.config.ModConfig]: that object's contract is
+ * a pure [com.breadmoirai.garnet.core.config.SharedSettings] round-trip with no shadow state, and
+ * expansion/selection is client UI state a server must never see — `SharedSettings` is read by the
+ * dedicated server. A separate file keeps that boundary intact.
  *
  * Exactly one record is stored, keyed by the project root it was captured against. Root swaps are
  * rare, so a per-root map would grow forever for no benefit; a record whose [ExplorerSession.root]

@@ -278,7 +278,7 @@ class ExplorerUiSpec : ClientSpec({
         renameRow(onRename) shouldBeGreaterThan PanelPixelProbe.MENU_ROW_HOVERED_MIN
 
         // ...and the click lands on Rename, not on a stale flyout. The field seeds fully SELECTED
-        // (ProjectExplorerPanel.kt: `state.setTextAndSelectAll(initial)`, deliberate -- "the way a
+        // (ExplorerPanel.kt: `state.setTextAndSelectAll(initial)`, deliberate -- "the way a
         // rename behaves everywhere else"), so typing over it replaces the whole name rather than
         // appending after a trailing cursor.
         click(MENU_ROW_X, 144.0)

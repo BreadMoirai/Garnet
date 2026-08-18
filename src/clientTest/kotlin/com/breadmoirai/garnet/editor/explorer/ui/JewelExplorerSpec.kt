@@ -176,7 +176,7 @@ class JewelExplorerSpec : ClientSpec({
         ExplorerTreeState.selectedPath shouldBe "adders"
 
         // A click on a folder row does double duty: it selects AND toggles expansion
-        // (ProjectExplorerPanel.onElementClick, `is FolderNode -> ExplorerTreeState.toggleExpanded(path)`,
+        // (ExplorerPanel.kt: onElementClick, `is FolderNode -> ExplorerTreeState.toggleExpanded(path)`,
         // deliberate per that file's own doc). "adders" was expanded by mountExplorer(), so this same
         // click that just selected it also collapsed it -- real, load-bearing coverage of that
         // click-to-toggle contract, not incidental.

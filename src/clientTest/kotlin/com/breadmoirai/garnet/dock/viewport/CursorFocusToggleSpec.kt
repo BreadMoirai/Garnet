@@ -17,8 +17,8 @@ import org.slf4j.LoggerFactory
  * for future panel-focus support (spike-level only — not wired to a real panel yet).
  *
  * Drives the real keybind (via a simulated key press on the Fabric test thread — the same
- * `ctx.getInput().pressKey` mechanism [SpecTestContext.closeScreen] uses for `ESCAPE`) rather
- * than calling `MouseHandler` directly, so this exercises
+ * `ctx.getInput().pressKey` mechanism [com.breadmoirai.garnet.test.SpecTestContext.closeScreen] uses
+ * for `ESCAPE`) rather than calling `MouseHandler` directly, so this exercises
  * [com.breadmoirai.garnet.dock.viewport.registerCursorFocusToggle]'s actual
  * `END_CLIENT_TICK` consumption path, not just the underlying API.
  *
