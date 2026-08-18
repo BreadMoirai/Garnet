@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.undo.network
 
-import com.breadmoirai.garnet.editor.network.id
+import com.breadmoirai.garnet.editor.network.payloadId
 import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
@@ -12,7 +12,7 @@ class UndoC2S private constructor() : CustomPacketPayload {
     companion object {
         // Must be sent as INSTANCE — StreamCodec.unit captures this object by identity.
         val INSTANCE = UndoC2S()
-        val TYPE = CustomPacketPayload.Type<UndoC2S>(id("undo"))
+        val TYPE = CustomPacketPayload.Type<UndoC2S>(payloadId("undo"))
         val STREAM_CODEC: StreamCodec<ByteBuf, UndoC2S> = StreamCodec.unit(INSTANCE)
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
@@ -21,7 +21,7 @@ class UndoC2S private constructor() : CustomPacketPayload {
 class RedoC2S private constructor() : CustomPacketPayload {
     companion object {
         val INSTANCE = RedoC2S()
-        val TYPE = CustomPacketPayload.Type<RedoC2S>(id("redo"))
+        val TYPE = CustomPacketPayload.Type<RedoC2S>(payloadId("redo"))
         val STREAM_CODEC: StreamCodec<ByteBuf, RedoC2S> = StreamCodec.unit(INSTANCE)
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
@@ -39,7 +39,7 @@ class RedoC2S private constructor() : CustomPacketPayload {
  */
 data class UndoStateS2C(val undoLabel: String?, val redoLabel: String?) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<UndoStateS2C>(id("undo_state"))
+        val TYPE = CustomPacketPayload.Type<UndoStateS2C>(payloadId("undo_state"))
         val STREAM_CODEC: StreamCodec<ByteBuf, UndoStateS2C> = object : StreamCodec<ByteBuf, UndoStateS2C> {
             override fun decode(buf: ByteBuf): UndoStateS2C {
                 val undo = if (buf.readBoolean()) ByteBufCodecs.STRING_UTF8.decode(buf) else null

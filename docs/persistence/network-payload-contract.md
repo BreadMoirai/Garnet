@@ -20,7 +20,7 @@ It lives in four per-sub-feature payload files —
 `editor/structure/network/StructurePackets.kt`, `editor/history/network/HistoryPackets.kt`,
 `editor/undo/network/UndoPackets.kt` — over a shared spine of
 `editor/network/EditorNetworkRegistry.kt` (registration), `editor/network/EditorHandlerSupport.kt`
-(shared handler helpers) and `editor/network/PacketCodecs.kt` (the `id()` identifier helper), with
+(shared handler helpers) and `editor/network/PayloadIds.kt` (the `payloadId()` identifier helper), with
 the server handlers in `editor/explorer/network/EditorTreeHandlers.kt`,
 `editor/explorer/network/EditorFileOpsHandlers.kt` and
 `editor/structure/network/EditorStructureHandlers.kt`. There is no

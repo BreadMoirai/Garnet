@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.history.network
 
-import com.breadmoirai.garnet.editor.network.id
+import com.breadmoirai.garnet.editor.network.payloadId
 import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
@@ -41,7 +41,7 @@ val REVISION_ENTRY_STREAM_CODEC: StreamCodec<ByteBuf, RevisionEntry> = StreamCod
  */
 data class WatchStructureHistoryC2S(val subpath: String) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<WatchStructureHistoryC2S>(id("watch_history"))
+        val TYPE = CustomPacketPayload.Type<WatchStructureHistoryC2S>(payloadId("watch_history"))
         val STREAM_CODEC: StreamCodec<ByteBuf, WatchStructureHistoryC2S> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, WatchStructureHistoryC2S::subpath,
             ::WatchStructureHistoryC2S,
@@ -63,7 +63,7 @@ data class StructureHistoryS2C(
     val revisions: List<RevisionEntry>,
 ) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<StructureHistoryS2C>(id("structure_history"))
+        val TYPE = CustomPacketPayload.Type<StructureHistoryS2C>(payloadId("structure_history"))
         val STREAM_CODEC: StreamCodec<ByteBuf, StructureHistoryS2C> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, StructureHistoryS2C::subpath,
             REVISION_ENTRY_STREAM_CODEC.apply(ByteBufCodecs.list()), StructureHistoryS2C::revisions,
@@ -86,7 +86,7 @@ data class RestoreRevisionC2S(
     val timestampMillis: Long,
 ) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<RestoreRevisionC2S>(id("restore_revision"))
+        val TYPE = CustomPacketPayload.Type<RestoreRevisionC2S>(payloadId("restore_revision"))
         val STREAM_CODEC: StreamCodec<ByteBuf, RestoreRevisionC2S> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, RestoreRevisionC2S::subpath,
             ByteBufCodecs.VAR_LONG, RestoreRevisionC2S::timestampMillis,

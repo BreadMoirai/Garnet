@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.editor.structure.network
 
-import com.breadmoirai.garnet.editor.network.id
+import com.breadmoirai.garnet.editor.network.payloadId
 import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
@@ -8,7 +8,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
 class SaveNowC2S : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<SaveNowC2S>(id("save_now"))
+        val TYPE = CustomPacketPayload.Type<SaveNowC2S>(payloadId("save_now"))
         val STREAM_CODEC: StreamCodec<ByteBuf, SaveNowC2S> = StreamCodec.unit(SaveNowC2S())
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
@@ -16,7 +16,7 @@ class SaveNowC2S : CustomPacketPayload {
 
 data class EditorSaveReportS2C(val perSpec: List<String>) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<EditorSaveReportS2C>(id("save_report"))
+        val TYPE = CustomPacketPayload.Type<EditorSaveReportS2C>(payloadId("save_report"))
         val STREAM_CODEC: StreamCodec<ByteBuf, EditorSaveReportS2C> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()), EditorSaveReportS2C::perSpec,
             ::EditorSaveReportS2C,
@@ -29,7 +29,7 @@ data class EditorSaveReportS2C(val perSpec: List<String>) : CustomPacketPayload 
 
 data class PlaceStructureC2S(val subpath: String) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<PlaceStructureC2S>(id("place_structure"))
+        val TYPE = CustomPacketPayload.Type<PlaceStructureC2S>(payloadId("place_structure"))
         val STREAM_CODEC: StreamCodec<ByteBuf, PlaceStructureC2S> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, PlaceStructureC2S::subpath,
             ::PlaceStructureC2S,
@@ -40,7 +40,7 @@ data class PlaceStructureC2S(val subpath: String) : CustomPacketPayload {
 
 data class SaveStructureC2S(val subpath: String) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<SaveStructureC2S>(id("save_structure"))
+        val TYPE = CustomPacketPayload.Type<SaveStructureC2S>(payloadId("save_structure"))
         val STREAM_CODEC: StreamCodec<ByteBuf, SaveStructureC2S> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, SaveStructureC2S::subpath,
             ::SaveStructureC2S,
@@ -65,7 +65,7 @@ data class StructureAutoSavedS2C(
     val savedAtMillis: Long,
 ) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<StructureAutoSavedS2C>(id("structure_autosaved"))
+        val TYPE = CustomPacketPayload.Type<StructureAutoSavedS2C>(payloadId("structure_autosaved"))
         val STREAM_CODEC: StreamCodec<ByteBuf, StructureAutoSavedS2C> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, StructureAutoSavedS2C::subpath,
             ByteBufCodecs.VAR_INT, StructureAutoSavedS2C::sizeX,
@@ -85,7 +85,7 @@ data class StructureResultS2C(
     val message: String,
 ) : CustomPacketPayload {
     companion object {
-        val TYPE = CustomPacketPayload.Type<StructureResultS2C>(id("structure_result"))
+        val TYPE = CustomPacketPayload.Type<StructureResultS2C>(payloadId("structure_result"))
         val STREAM_CODEC: StreamCodec<ByteBuf, StructureResultS2C> = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, StructureResultS2C::subpath,
             ByteBufCodecs.VAR_INT, StructureResultS2C::sizeX,

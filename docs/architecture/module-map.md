@@ -271,7 +271,7 @@ The three files that genuinely fan out across all four payload-carrying sub-feat
 - `EditorNetworkRegistry.kt` (main) — registers every payload type and server receiver.
 - `EditorHandlerSupport.kt` (main) — shared handler helpers (`fail`, `sendTree`, `sendUndoState`,
   `commitDirtyUnder`).
-- `PacketCodecs.kt` (main) — the `id(p)` helper minting `garnet:project_<p>` identifiers, shared by
+- `PayloadIds.kt` (main) — the `payloadId(p)` helper minting `garnet:project_<p>` identifiers, shared by
   all four per-sub-feature payload files.
 - `EditorClientNetworking.kt` (client) — S2C receivers feeding `ExplorerTreeSnapshot`,
   `StructureInfoState`, `OpenStructureState`, `LocalHistoryState`, and `UndoState`.
@@ -468,7 +468,7 @@ rather than to attack 27 imports.
 - *"Where did `EditorPackets.kt` go?"* → it split four ways along the sub-feature seam:
   `editor/explorer/network/ExplorerPackets.kt`, `editor/structure/network/StructurePackets.kt`,
   `editor/history/network/HistoryPackets.kt`, `editor/undo/network/UndoPackets.kt`, with the shared
-  `id()` codec helper in `editor/network/PacketCodecs.kt`.
+  `payloadId()` helper in `editor/network/PayloadIds.kt`.
 - *"Why is the GUI structured this way?"* → the legacy `RecorderScreen`/`RunnerScreen`/
   `ProjectScreen` were hard-cut in favor of a full-window Compose dock; start at
   [ui/dock-framework.md](../ui/dock-framework.md) and

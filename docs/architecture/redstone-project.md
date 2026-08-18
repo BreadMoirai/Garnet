@@ -92,7 +92,7 @@ Server state and lifecycle:
 Network:
 - `editor/explorer/network/ExplorerPackets` + `editor/structure/network/StructurePackets` +
   `editor/history/network/HistoryPackets` + `editor/undo/network/UndoPackets` (the payloads, with
-  the shared `id()` helper in `editor/network/PacketCodecs`) + `editor/network/EditorNetworkRegistry`
+  the shared `payloadId()` helper in `editor/network/PayloadIds`) + `editor/network/EditorNetworkRegistry`
   + `editor/explorer/network/EditorTreeHandlers` / `editor/structure/network/EditorStructureHandlers`
   / `editor/explorer/network/EditorFileOpsHandlers` — path-containment + per-player-session
   authority; see [persistence/network-payload-contract.md](../persistence/network-payload-contract.md).
