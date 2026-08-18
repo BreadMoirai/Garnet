@@ -149,7 +149,7 @@ class ViewportSpec : ClientSpec({
         teleportAndSettle()
         val hitOff = onClient { mc -> mc.hitResult as? BlockHitResult }
         hitOff.shouldNotBeNull()
-        val hitOffBlock = onClient { mc -> mc.level?.getBlockState(hitOff!!.blockPos)?.block }
+        val hitOffBlock = onClient { mc -> mc.level?.getBlockState(hitOff.blockPos)?.block }
         hitOffBlock shouldBe Blocks.DIAMOND_BLOCK
 
         // ---- Phase 2: Enable ----
@@ -207,9 +207,9 @@ class ViewportSpec : ClientSpec({
         teleportAndSettle()
         val hitOn = onClient { mc -> mc.hitResult as? BlockHitResult }
         hitOn.shouldNotBeNull()
-        val hitOnBlock = onClient { mc -> mc.level?.getBlockState(hitOn!!.blockPos)?.block }
+        val hitOnBlock = onClient { mc -> mc.level?.getBlockState(hitOn.blockPos)?.block }
         hitOnBlock shouldBe Blocks.DIAMOND_BLOCK
-        hitOn!!.blockPos shouldBe hitOff!!.blockPos
+        hitOn.blockPos shouldBe hitOff.blockPos
 
         // -- Composite proof: the actual Task-3 deliverable. The normal screenshot path captures
         // the (upstream) main render target, so it only shows the shrunk world full-frame — it

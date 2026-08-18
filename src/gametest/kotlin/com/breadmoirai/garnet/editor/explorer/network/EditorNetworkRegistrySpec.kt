@@ -404,9 +404,10 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     // Force the commit's history write to fail deterministically and portably by
                     // occupying index.json's path with a directory -- the same trick
                     // EditorFileOpsNetworkSpec's rename-abort test uses.
-                    historyDir = LocalHistoryStore.dirFor(fileA)
-                    historyDir!!.resolve("index.json").toFile().delete()
-                    historyDir!!.resolve("index.json").createDirectories()
+                    val dir = LocalHistoryStore.dirFor(fileA)
+                    historyDir = dir
+                    dir.resolve("index.json").toFile().delete()
+                    dir.resolve("index.json").createDirectories()
 
                     EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
 
