@@ -1,9 +1,9 @@
 package com.breadmoirai.garnet.playback.data
 
 import com.breadmoirai.garnet.playback.recorder.StateRecorder
-import com.breadmoirai.garnet.spec.Phase
-import com.breadmoirai.garnet.spec.SimTime
-import com.breadmoirai.garnet.spec.applyPropertyFromString
+import com.breadmoirai.garnet.core.spec.Phase
+import com.breadmoirai.garnet.core.spec.SimTime
+import com.breadmoirai.garnet.core.spec.applyPropertyFromString
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.level.block.state.BlockState
@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.properties.Property
 class StateRecordingView(
     val initialSnapshot: Map<BlockPos, BlockState>,
     private val changes: List<BlockStateChange>,
-) : com.breadmoirai.garnet.spec.StateRecordingViewLike {
+) : com.breadmoirai.garnet.core.spec.StateRecordingViewLike {
     /**
      * Reconstructs [BlockState] at [pos] as of [simTime] by replaying diffs from [initialSnapshot].
      *

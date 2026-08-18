@@ -3,11 +3,11 @@ package com.breadmoirai.garnet.testing.runner
 import com.breadmoirai.garnet.playback.data.StateRecording
 import com.breadmoirai.garnet.playback.data.StateRecordingView
 import com.breadmoirai.garnet.playback.recorder.StateRecorder
-import com.breadmoirai.garnet.spec.Phase
-import com.breadmoirai.garnet.spec.GarnetSpec
-import com.breadmoirai.garnet.spec.SimTime
-import com.breadmoirai.garnet.spec.SpecRun
-import com.breadmoirai.garnet.spec.StateRecordingViewLike
+import com.breadmoirai.garnet.core.spec.Phase
+import com.breadmoirai.garnet.core.spec.GarnetSpec
+import com.breadmoirai.garnet.core.spec.SimTime
+import com.breadmoirai.garnet.core.spec.SpecRun
+import com.breadmoirai.garnet.core.spec.StateRecordingViewLike
 import com.breadmoirai.garnet.core.async.AsyncDispatchers
 import com.breadmoirai.garnet.core.async.awaitTickEnd
 import kotlinx.coroutines.withContext
@@ -92,7 +92,7 @@ private fun recorderLiveView(recorder: StateRecorder): StateRecordingViewLike {
     // on StateRecorder. Until that exists, fall back to building a recording
     // snapshot on each call (slower but correct for short tests).
     return object : StateRecordingViewLike {
-        override fun stateAt(pos: net.minecraft.core.BlockPos, time: com.breadmoirai.garnet.spec.SimTime) =
+        override fun stateAt(pos: net.minecraft.core.BlockPos, time: com.breadmoirai.garnet.core.spec.SimTime) =
             StateRecordingView.of(recorder.toRecording()).stateAt(pos, time)
 
         override fun initialAt(pos: net.minecraft.core.BlockPos) =
@@ -115,7 +115,7 @@ private fun scanForUnexpectedChanges(
             val cur = view.stateAt(pos, SimTime(t, Phase.END_OF_TICK, Int.MAX_VALUE))
             if (cur != prev && t !in declaredTicks) {
                 run.reportFailure(
-                    com.breadmoirai.garnet.spec.SpecFailure(
+                    com.breadmoirai.garnet.core.spec.SpecFailure(
                         label = pos.toString(),
                         time = SimTime(t, Phase.END_OF_TICK),
                         message = "unexpected change (expected no change, got changed)",

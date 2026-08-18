@@ -6,7 +6,7 @@ summary: BlitUvPipeline gained a premultiplied-alpha blend pipeline so the Compo
 
 # Full-window transparent Compose overlay via premultiplied-alpha blit
 
-`ComposeOverlay.renderInto` (`src/client/kotlin/.../ui/compose/ComposeOverlay.kt`) used to render
+`ComposeOverlay.renderInto` (`src/client/kotlin/.../dock/compose/ComposeOverlay.kt`) used to render
 `ComposeSurface` at the width of the viewport's reserved-left strip and blit it as an **opaque**
 rectangle. It now renders `ComposeSurface` at the **full real window size** and alpha-blends it over
 the already-composited world with `BlitUvPipeline.blit(..., blend = true)`. Only the pixels Compose

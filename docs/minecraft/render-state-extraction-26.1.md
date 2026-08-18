@@ -56,7 +56,7 @@ Note `centeredText(..., -1)`: text color is ARGB; `-1` (=0xFFFFFFFF) is white.
 record/replay step, and no scissor-stratum baking to worry about inside the dock. The scissor/stratum
 caveats below are historical, from when a dropdown popup (`DropdownButton`, deleted) needed to escape a
 scrollable list's scissor; they remain accurate for any *future* `GuiGraphicsExtractor`-based widget
-(i.e. `GarnetIconButton`-style code), but do not apply to anything under `ui/compose/`.
+(i.e. `GarnetIconButton`-style code), but do not apply to anything under `dock/compose/`.
 
 ## Why the change matters: scissor and stratum baking
 

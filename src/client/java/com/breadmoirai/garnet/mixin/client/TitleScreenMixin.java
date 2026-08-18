@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.garnet.ui.widget.GarnetIconButton;
+import com.breadmoirai.garnet.editor.workspace.ui.GarnetIconButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -33,7 +33,7 @@ public abstract class TitleScreenMixin extends Screen {
         Component label = Component.literal("Redstone Projects...");
         GarnetIconButton button = new GarnetIconButton(
                 this.width / 2 + 104, topPos, 20, label,
-                b -> com.breadmoirai.garnet.editor.world.EditorIntegratedBoot.INSTANCE.bootWorkspace()
+                b -> com.breadmoirai.garnet.editor.workspace.ui.EditorIntegratedBoot.INSTANCE.bootWorkspace()
         );
         button.setTooltip(Tooltip.create(label));
         this.addRenderableWidget(button);

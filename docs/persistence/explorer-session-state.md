@@ -6,7 +6,7 @@ summary: The Explorer's expansion and selection persist to config/garnet-explore
 
 # Explorer session state
 
-`com.breadmoirai.garnet.config.ExplorerStateStore` round-trips `config/garnet-explorer.json`: a
+`com.breadmoirai.garnet.editor.explorer.ui.ExplorerStateStore` round-trips `config/garnet-explorer.json`: a
 single `{root, expanded[], selected}` record capturing which folders were open and which node was
 selected in the Compose Project Explorer, so a player who quits mid-session gets the tree back the
 way they left it rather than fully collapsed.
@@ -76,7 +76,7 @@ The restore is a two-step, one-shot handshake between `ExplorerLifecycle` and
    just stashes the loaded `ExplorerSession?` in `pendingRestore`.
 2. **Apply** — `EditorClientNetworking`'s snapshot receiver calls
    `ExplorerTreeState.applyPendingRestore(payload.root)` immediately after feeding the same
-   payload to `ProjectTreeState.onSnapshot`, then clears `pendingRestore`.
+   payload to `ExplorerTreeSnapshot.onSnapshot`, then clears `pendingRestore`.
 
 The two steps can't collapse into one because a path like `"adders/full-adder"` can't be expanded
 before a tree containing that id exists — `applyPendingRestore` needs the just-arrived
@@ -95,14 +95,14 @@ the wrong project's tree.
 ## Save skips when no snapshot was ever seen
 
 `ExplorerLifecycle`'s public `saveExplorerSession()` — the function both save trigger points call
-— returns early when `ProjectTreeState.snapshot == null`. Without a snapshot, `ExplorerTreeState`'s
+— returns early when `ExplorerTreeSnapshot.snapshot == null`. Without a snapshot, `ExplorerTreeState`'s
 expansion/selection are empty because the player never actually saw a tree (joined a vanilla
 server, or disconnected before the snapshot arrived); persisting that emptiness would silently
 blank out a perfectly good record from a prior session.
 
 ## Save trigger points
 
-- **`ClientPlayConnectionEvents.DISCONNECT`** — saves first, then resets `ProjectTreeState`,
+- **`ClientPlayConnectionEvents.DISCONNECT`** — saves first, then resets `ExplorerTreeSnapshot`,
   `StructureInfoState`, `ExplorerTreeState`, `UndoState`, `OpenStructureState`, and
   `LocalHistoryState`. The order
   matters: reading tree state after the reset would persist empty sets instead of the session that
@@ -126,17 +126,17 @@ must not later apply against the new root's snapshot.
 See [ui/dock-dialogs.md](../ui/dock-dialogs.md) for the root picker that produces the `root` this
 state is keyed against, and
 [architecture/redstone-project.md](../architecture/redstone-project.md) for where
-`ExplorerTreeState`/`ProjectTreeState` sit in the Explorer's overall client-side split.
+`ExplorerTreeState`/`ExplorerTreeSnapshot` sit in the Explorer's overall client-side split.
 
 ## Sibling store: `config/garnet-dock.json`
 
-`com.breadmoirai.garnet.config.DockLayoutStore` round-trips a second, unrelated file:
+`com.breadmoirai.garnet.dock.data.DockLayoutStore` round-trips a second, unrelated file:
 `config/garnet-dock.json`, a `{ "open": { "LEFT": "garnet.explorer" } }` record mapping each
 `DockRegion` to the id of the panel open there (absent region = closed). This replaced an earlier
 `{ "leftVisible": true }` shape; `DockLayoutStore.load()` still reads that legacy shape and migrates
 it in memory (`true` → `{"LEFT": "garnet.explorer"}`, `false` → `{}`), and the file is rewritten in
 the new shape on the next `save()`. It is read on `ClientPlayConnectionEvents.JOIN` by
-`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`) to auto-open the Explorer on a Garnet-capable
+`applyDockAutoOpen()` (`dock/shell/DockAutoOpen.kt`) to auto-open the Explorer on a Garnet-capable
 world — see [ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world](../ui/dock-framework.md#left-auto-opens-on-joining-a-garnet-capable-world).
 
 It is a separate file from `garnet-explorer.json` above, not a field added to that record, because

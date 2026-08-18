@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.core.events
 
-import com.breadmoirai.garnet.spec.Phase
+import com.breadmoirai.garnet.core.spec.Phase
 import net.fabricmc.fabric.api.event.Event
 import net.fabricmc.fabric.api.event.EventFactory
 import net.minecraft.server.level.ServerLevel

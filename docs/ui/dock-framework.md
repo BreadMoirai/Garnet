@@ -7,7 +7,7 @@ summary: How GarnetDock lays out LEFT/RIGHT/BOTTOM/CENTER regions at real frameb
 # GarnetDock — full-window Compose dock
 
 The dock is a single `@Composable` (`GarnetDock(realW, realH, onVisibilityChanged)`,
-`src/client/kotlin/.../ui/dock/GarnetDock.kt`) hosted full-window by
+`src/client/kotlin/.../dock/shell/GarnetDock.kt`) hosted full-window by
 `ComposeSceneHost` and blitted over the world composite by `ComposeSurface`. It replaced the
 feasibility spike's `ComposeScenePanel` demo (button + `clickCount`), which was deleted.
 
@@ -20,7 +20,7 @@ forwarders (`pointerMove/Press/Release`, `scroll`, `sendKey`) driven by `DockInp
 (see `dock-input-routing.md`).
 `ComposeSurface.ensureHost(w, h)` recreates it on window-size change and hosts the dock, passing
 `commitDockVisibilityChange` as the third argument — the follow-up a stripe click must run, threaded
-in as a parameter so `ui/dock` keeps no dependency on `ui/viewport` or `Minecraft`.
+in as a parameter so `dock/shell` keeps no dependency on `dock/viewport` or `Minecraft`.
 
 ## Layout is in **real framebuffer pixels**
 
@@ -70,8 +70,8 @@ does not make its region visible on its own.
 
 ### LEFT auto-opens on joining a Garnet-capable world
 
-A JOIN handler in `registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) calls
-`applyDockAutoOpen()` (`ui/dock/DockAutoOpen.kt`), which applies the open-panel map remembered in
+A JOIN handler in `registerDockWorldLifecycle()` (`dock/viewport/DockKeybinds.kt`) calls
+`applyDockAutoOpen()` (`dock/shell/DockAutoOpen.kt`), which applies the open-panel map remembered in
 `config/garnet-dock.json` (`DockLayoutStore`, see
 [persistence/explorer-session-state.md](../persistence/explorer-session-state.md#sibling-store-configgarnet-dockjson))
 when the peer speaks Garnet (`DockAutoOpenGate.isGarnetServer()`, defaulting to
@@ -126,7 +126,7 @@ stale menu is still painting.
 
 `DockState` is a client-lifetime singleton — the Project Explorer is seeded once in
 `GarnetClient.onInitializeClient` and never re-added — but its *visibility* is world-scoped.
-`registerDockWorldLifecycle()` (`ui/viewport/DockKeybinds.kt`) hooks
+`registerDockWorldLifecycle()` (`dock/viewport/DockKeybinds.kt`) hooks
 `ClientPlayConnectionEvents.DISCONNECT` and calls `DockState.closeAll()`, then
 `commitDockVisibilityChange(persist = false)` (see
 [dock-input-routing.md](dock-input-routing.md#every-visibility-change-ends-in-commitdockvisibilitychange)).
@@ -144,7 +144,7 @@ assume it is already on the client thread; `garnet$updateScaledFramebuffer` reac
 `eventHandler.resizeGui()`, which is unsafe to call concurrently with rendering.
 
 The Project Explorer's per-world state is reset from its **own** `DISCONNECT` registration in
-`editor/ui/ExplorerLifecycle.kt`, not from this one: `ProjectTreeState`, `StructureInfoState`,
+`editor/explorer/ui/ExplorerLifecycle.kt`, not from this one: `ExplorerTreeSnapshot`, `StructureInfoState`,
 `ExplorerTreeState`, `UndoState`, `OpenStructureState` and `LocalHistoryState` are all reset there
 (after the session
 save — see
@@ -197,15 +197,15 @@ whole dock (rendering and input) silently no-ops back to vanilla, never crashing
 
 ## First real panel: the Project Explorer (live-data pattern, now on Jewel)
 
-`editor/ui/ProjectExplorerPanel.kt` + `editor/ui/ExplorerToolbar.kt` +
-`editor/ui/ProjectTreeState.kt` + `editor/ui/ExplorerTreeState.kt` are the first non-demo panel
+`editor/explorer/ui/ExplorerPanel.kt` + `editor/explorer/ui/ExplorerToolbar.kt` +
+`editor/explorer/ui/ExplorerTreeSnapshot.kt` + `editor/explorer/ui/ExplorerTreeState.kt` are the first non-demo panel
 and the template future panels (debugger, timeline) should copy. As of the jewel-widget-layer
 migration, the panel is built entirely from JetBrains Jewel components (`LazyTree`, `PopupMenu`,
 `IconButton`) under one `IntUiTheme(isDark = true)`, not hand-rolled `BasicText`/`Box.clickable`
 rows. The pattern:
 
 - **State is split across two `mutableStateOf`-backed singletons**, neither of which is the
-  panel. `ProjectTreeState` holds only the server-driven tree data: `snapshot:
+  panel. `ExplorerTreeSnapshot` holds only the server-driven tree data: `snapshot:
   EditorTreeSnapshotS2C?`, mutated by its one S2C packet handler (`onSnapshot`). The editor's
   transient status line and the open structure's facts live in `StructureInfoState` instead — see
   [structure-info-panel.md](structure-info-panel.md) for its `onFolderLoaded`/`onSaveReport`/
@@ -249,7 +249,7 @@ rows. The pattern:
   `SelectionMode.Multiple`, which is *not* what a single-selection file tree wants).
   `Tree.Element.Node.children` is lazy (only materializes once `open()`/expand is called) while
   node `id`s are eager — this doesn't affect `LazyTree` itself, only direct `Tree` traversal.
-- **Clicks dispatch by node kind** (`onElementClick` in `ProjectExplorerPanel.kt`): **any** folder
+- **Clicks dispatch by node kind** (`onElementClick` in `ExplorerPanel.kt`): **any** folder
   toggles open/closed from anywhere on its row, and a "spec-folder" (directly contains a `FileNode`
   named `*.spec.kts`, i.e. `node.children.any { it is FileNode && it.name.endsWith(".spec.kts") }`)
   *additionally* sends `LoadEditorFolderC2S(path)` on that same click. The row toggle is ours, not
@@ -265,7 +265,7 @@ rows. The pattern:
   The exception is a `.nbt` `FileNode` (`node.extension == "nbt"`), which additionally sends
   `PlaceStructureC2S(path)` to place the standalone structure centered in its auto-assigned region.
   The Refresh `IconButton` sends `ListEditorTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh
-  unit payload — see `EditorPackets`). `TreeRow` prefixes a row's label with `●` when the row's
+  unit payload — see `editor/explorer/network/ExplorerPackets.kt`). `TreeRow` prefixes a row's label with `●` when the row's
   path equals `snapshot.currentSubpath`, and shows
   a Jewel `AllIconsKeys` icon per node kind (`Nodes.Folder`, `FileTypes.Archive` for `.nbt`,
   `FileTypes.Text` otherwise). There is no per-node dirty flag any more — a `.nbt`'s auto-save
@@ -278,7 +278,8 @@ rows. The pattern:
   (`UndoC2S.INSTANCE`) and Redo (`RedoC2S.INSTANCE`), each enabled only while the server's last
   `UndoStateS2C` carried a label for it, then Refresh
   (`ListEditorTreeC2S.INSTANCE` — send the `INSTANCE`, never a fresh unit payload, see
-  `EditorPackets`; the same rule applies to the two undo singletons) and Collapse All
+  `editor/explorer/network/ExplorerPackets.kt`; the same rule applies to the two undo singletons,
+  which live in `editor/undo/network/UndoPackets.kt`) and Collapse All
   (`ExplorerTreeState.collapseAll()`, which clears
   `treeState.openNodes` and leaves selection untouched). `PopupMenu`'s `onDismissRequest` takes an
   `(InputMode) -> Boolean` in this Jewel version, not a no-arg lambda.

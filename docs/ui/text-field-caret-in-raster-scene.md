@@ -45,12 +45,12 @@ animations advance, and the field redraws every frame.
 ## The fix: bridge focus into the interaction source
 
 `Modifier.focusInteractionBridge(interactionSource)`
-(`client/.../ui/compose/FocusInteractionBridge.kt`) emits `FocusInteraction.Focus` / `Unfocus` from
+(`client/.../dock/compose/FocusInteractionBridge.kt`) emits `FocusInteraction.Focus` / `Unfocus` from
 the path that *does* work, `onFocusChanged`. It only helps when the **same** interaction source
 reaches both the bridge and the widget.
 
 **Use `GarnetTextField`, not Jewel's `TextField`.** That wrapper
-(`client/.../ui/compose/GarnetTextField.kt`) owns the interaction source and applies the bridge
+(`client/.../dock/compose/GarnetTextField.kt`) owns the interaction source and applies the bridge
 itself, so there is no correct way to use it that leaves the caret invisible — the two-part wiring
 is exactly what a call site forgets, and the failure mode is a field that types perfectly and merely
 *looks* dead. `GarnetTextFieldUsageTest` scans `src/client` and fails if anything but the wrapper

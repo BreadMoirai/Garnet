@@ -21,7 +21,7 @@ the handshakes it describes are still a reasonable design to copy. None of it is
 and the coverage matrix below has been corrected to reflect that the tests it used to cite were
 deleted along with the classes they tested.
 
-The editor/Explorer wire protocol (`editor/network/EditorPackets.kt`) is unrelated and *is* live —
+The editor/Explorer wire protocol (the per-sub-feature payload files under `editor/*/network/`) is unrelated and *is* live —
 see [persistence/network-payload-contract.md](../persistence/network-payload-contract.md) and
 [redstone-project.md](redstone-project.md).
 

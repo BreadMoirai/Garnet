@@ -15,7 +15,7 @@
 - **No behavior change.** This is a move plus two renames. Do not edit logic, do not delete code, do not "improve" anything you pass. If a file looks wrong, leave it and report it.
 - **Six source sets, five compile targets.** `main`, `client`, `gametest`, `clientTest`, `test`, `testSupport`. Verification is `:26.2:clientClasses :26.2:classes :26.2:gametestClasses :26.2:clientTestClasses :26.2:testClasses` — `compileKotlin` alone covers only `main`.
 - **Gradle from WSL runs through cmd.exe:** `cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat <tasks>"`. See `docs/tooling/wsl2-gradle-invocation.md`.
-- **`:26.2:test` runs unfiltered.** Gradle's `--tests` filter does not select Kotest specs. Read the per-class JUnit XML under `build/test-results/test/`.
+- **`:26.2:test` runs unfiltered.** Gradle's `--tests` filter does not select Kotest specs. Read the per-class JUnit XML under `versions/26.2/build/test-results/test/`.
 - **`docs/superpowers/**` is never edited.** Specs and plans are commit-time historical snapshots. Every `sed` over `docs/` must exclude that subtree. This plan file and its spec are the only exceptions, and only if you are correcting them deliberately.
 - **These package roots do not move:** `com.breadmoirai.garnet.Garnet`, `com.breadmoirai.garnet.GarnetClient` (pinned by `fabric.mod.json` entrypoints), `com.breadmoirai.garnet.mixin`, `com.breadmoirai.garnet.mixin.client` (pinned by the `package` field of `src/main/resources/garnet.mixins.json` and `src/client/resources/garnet.client.mixins.json`).
 - **`testSupport/harness/` does not move.** It is the Kotest bridge, not tests.
@@ -45,6 +45,27 @@ rewrite() {  # rewrite OLD_FQN NEW_FQN
 
 This single pass fixes the `package` declaration at the top of each moved file, every `import` of it, every fully-qualified reference in code, and every doc citation — they are all the same string.
 
+**Package-line rewrites must target the package line, not line 1.** Kotlin files may open with
+`@file:OptIn(...)`, a license header, or a comment — Task 2 lost a `@file:OptIn` to a blind
+`1s/.*/…/` and had to restore it by hand. Every package rewrite in this plan therefore uses
+`sed -i '0,/^package /{s|^package .*|package <new>|}'`, which replaces the first line that actually
+begins with `package` wherever it sits. Verify afterwards with `grep -Hn '^package' <files>`: every
+file must report exactly one hit, naming the new package.
+
+**Per-class rewrite loops miss lowercase top-level declarations.** The per-class `sed` loops in
+this plan enumerate capitalized class and object names. Kotlin top-level *functions* — `explorerPanel`,
+`localHistoryPanel`, `structureInfoPanel`, `bootWorkspace` — are imported by FQN too, and a loop over
+capitalized names silently skips them. Task 4 hit this: `com.breadmoirai.garnet.editor.ui.localHistoryPanel`
+survived its rewrite and broke `GarnetClient.kt` plus two clientTest specs. After every rewrite step,
+sweep for any survivor of the package you just emptied:
+
+```bash
+grep -rn 'com\.breadmoirai\.garnet\.<old-package>\.' src docs --exclude-dir=superpowers
+```
+
+Anything it prints is either a lowercase declaration the loop missed or a class you forgot to list.
+Only `docs/architecture/module-map.md` hits are expected survivors — that file is rewritten in Task 10.
+
 **3. Add the imports the compiler asks for.** `sed` cannot do this part. When files that used to share a package land in different packages, references between them that needed no import now need one. Compile, read the `unresolved reference` errors, add exactly those imports, repeat until clean. Do not resolve an error by moving a file somewhere the plan didn't put it.
 
 **Verification, run at the end of every task:**
@@ -54,7 +75,7 @@ cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:clientClasses :26.2:classe
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: `BUILD SUCCESSFUL` for both. If `:26.2:test` reports failures, open `build/test-results/test/TEST-*.xml` for the failing class — do not trust the console summary alone for Kotest specs.
+Expected: `BUILD SUCCESSFUL` for both. If `:26.2:test` reports failures, open `versions/26.2/build/test-results/test/TEST-*.xml` for the failing class — do not trust the console summary alone for Kotest specs.
 
 **A stale-directory check to run before each commit** — `git mv` leaves empty directories behind on some filesystems, and an empty package directory is invisible to Gradle but confusing to readers:
 
@@ -129,17 +150,17 @@ grep -rl 'com\.breadmoirai\.garnet\.config\.ModConfig\b' src docs --exclude-dir=
 Note the per-class rewrite here rather than a whole-package one: `com.breadmoirai.garnet.config` still exists after this step, holding `DockLayoutStore` and `ExplorerStateStore`. The moved files' own `package` lines are also `com.breadmoirai.garnet.config` and are **not** matched by a per-class pattern — fix those two by hand:
 
 ```bash
-sed -i '1s/.*/package com.breadmoirai.garnet.core.config/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.core.config|}' \
   src/main/kotlin/com/breadmoirai/garnet/core/config/SharedSettings.kt \
   src/client/kotlin/com/breadmoirai/garnet/core/config/ModConfig.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.core.config/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.core.config|}' \
   src/test/kotlin/com/breadmoirai/garnet/core/config/ModConfigTest.kt
 ```
 
-Then check line 1 of each of the three really is the package declaration and nothing was clobbered:
+Then confirm each of the three has exactly one package declaration and it names the new package:
 
 ```bash
-head -1 src/main/kotlin/com/breadmoirai/garnet/core/config/SharedSettings.kt \
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/core/config/SharedSettings.kt \
         src/client/kotlin/com/breadmoirai/garnet/core/config/ModConfig.kt \
         src/test/kotlin/com/breadmoirai/garnet/core/config/ModConfigTest.kt
 ```
@@ -160,7 +181,7 @@ Expected: eventually `BUILD SUCCESSFUL`.
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: `BUILD SUCCESSFUL`. The kts loader/emitter/persistence tests are the ones that would catch a half-applied package rename — confirm `KtsSpecLoaderRoundtripTest` and `SpecPersistenceTest` are green in `build/test-results/test/`.
+Expected: `BUILD SUCCESSFUL`. The kts loader/emitter/persistence tests are the ones that would catch a half-applied package rename — confirm `KtsSpecLoaderRoundtripTest` and `SpecPersistenceTest` are green in `versions/26.2/build/test-results/test/`.
 
 - [ ] **Step 6: Update the doc citations this task invalidated**
 
@@ -241,10 +262,10 @@ for c in EditorTreeHandlers EditorFileOpsHandlers DeleteOutcome; do
   grep -rl "com\.breadmoirai\.garnet\.editor\.network\.$c\b" src docs --exclude-dir=superpowers \
     | xargs -r sed -i "s/com\.breadmoirai\.garnet\.editor\.network\.$c\b/com.breadmoirai.garnet.editor.explorer.network.$c/g"
 done
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.explorer.network/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.explorer.network|}' \
   src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/EditorTreeHandlers.kt \
   src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/EditorFileOpsHandlers.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/explorer/network/*.kt
 ```
 
 `DeleteOutcome` is declared in `EditorFileOpsHandlers.kt` and referenced from `editor/undo/EditorUndoOps.kt`; it moves with its file, which is why it is in the loop.
@@ -283,9 +304,9 @@ Expected: the second command prints nothing.
 `editor/ui` does **not** empty out in this task (Local History, Structure Info, and `UndoState` are still there until Tasks 3–5), so the package line fix is per-file:
 
 ```bash
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.explorer.ui/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.explorer.ui|}' \
   src/client/kotlin/com/breadmoirai/garnet/editor/explorer/ui/*.kt
-head -1 src/client/kotlin/com/breadmoirai/garnet/editor/explorer/ui/*.kt
+grep -Hn '^package' src/client/kotlin/com/breadmoirai/garnet/editor/explorer/ui/*.kt
 ```
 
 `ExplorerStateStore.kt` had `package com.breadmoirai.garnet.config` — the same line-1 rewrite covers it. Then rewrite its importers, and the importers of everything else that moved out of `editor/ui`:
@@ -317,7 +338,7 @@ Add exactly the imports each `unresolved reference` names, re-run, repeat until 
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: `BUILD SUCCESSFUL`. `ExplorerActionsTest`, `ExplorerLifecycleTest`, `ExplorerTreeStateTest`, `RootPickerControllerTest`, and the `editor/data` tests are the coverage for this task; confirm each in `build/test-results/test/`.
+Expected: `BUILD SUCCESSFUL`. `ExplorerActionsTest`, `ExplorerLifecycleTest`, `ExplorerTreeStateTest`, `RootPickerControllerTest`, and the `editor/data` tests are the coverage for this task; confirm each in `versions/26.2/build/test-results/test/`.
 
 - [ ] **Step 9: Update doc prose**
 
@@ -407,11 +428,11 @@ done
 Then set every moved file's package line:
 
 ```bash
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.data/'    src/main/kotlin/com/breadmoirai/garnet/editor/structure/data/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.ops/'     src/main/kotlin/com/breadmoirai/garnet/editor/structure/ops/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.network/' src/main/kotlin/com/breadmoirai/garnet/editor/structure/network/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.structure.ui/'      src/client/kotlin/com/breadmoirai/garnet/editor/structure/ui/*.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/structure/*/*.kt \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.data|}'    src/main/kotlin/com/breadmoirai/garnet/editor/structure/data/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.ops|}'     src/main/kotlin/com/breadmoirai/garnet/editor/structure/ops/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.network|}' src/main/kotlin/com/breadmoirai/garnet/editor/structure/network/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.structure.ui|}'      src/client/kotlin/com/breadmoirai/garnet/editor/structure/ui/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/structure/*/*.kt \
         src/client/kotlin/com/breadmoirai/garnet/editor/structure/ui/*.kt
 ```
 
@@ -502,11 +523,11 @@ for c in LocalHistoryPanel LocalHistoryState; do
   grep -rl "com\.breadmoirai\.garnet\.editor\.ui\.$c\b" src docs --exclude-dir=superpowers \
     | xargs -r sed -i "s/com\.breadmoirai\.garnet\.editor\.ui\.$c\b/com.breadmoirai.garnet.editor.history.ui.$c/g"
 done
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.data/'    src/main/kotlin/com/breadmoirai/garnet/editor/history/data/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.ops/'     src/main/kotlin/com/breadmoirai/garnet/editor/history/ops/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.network/' src/main/kotlin/com/breadmoirai/garnet/editor/history/network/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.history.ui/'      src/client/kotlin/com/breadmoirai/garnet/editor/history/ui/*.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/history/*/*.kt \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.data|}'    src/main/kotlin/com/breadmoirai/garnet/editor/history/data/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.ops|}'     src/main/kotlin/com/breadmoirai/garnet/editor/history/ops/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.network|}' src/main/kotlin/com/breadmoirai/garnet/editor/history/network/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.history.ui|}'      src/client/kotlin/com/breadmoirai/garnet/editor/history/ui/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/history/*/*.kt \
         src/client/kotlin/com/breadmoirai/garnet/editor/history/ui/*.kt
 ```
 
@@ -582,10 +603,10 @@ grep -rl 'com\.breadmoirai\.garnet\.editor\.undo\.EditorUndoOps\b' src docs --ex
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.editor\.undo\.EditorUndoOps\b/com.breadmoirai.garnet.editor.undo.ops.EditorUndoOps/g'
 grep -rl 'com\.breadmoirai\.garnet\.editor\.ui\.UndoState\b' src docs --exclude-dir=superpowers \
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.editor\.ui\.UndoState\b/com.breadmoirai.garnet.editor.undo.ui.UndoState/g'
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.undo.data/' src/main/kotlin/com/breadmoirai/garnet/editor/undo/data/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.undo.ops/'  src/main/kotlin/com/breadmoirai/garnet/editor/undo/ops/*.kt
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.undo.ui/'   src/client/kotlin/com/breadmoirai/garnet/editor/undo/ui/*.kt
-head -1 src/main/kotlin/com/breadmoirai/garnet/editor/undo/*/*.kt \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.undo.data|}' src/main/kotlin/com/breadmoirai/garnet/editor/undo/data/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.undo.ops|}'  src/main/kotlin/com/breadmoirai/garnet/editor/undo/ops/*.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.undo.ui|}'   src/client/kotlin/com/breadmoirai/garnet/editor/undo/ui/*.kt
+grep -Hn '^package' src/main/kotlin/com/breadmoirai/garnet/editor/undo/*/*.kt \
         src/client/kotlin/com/breadmoirai/garnet/editor/undo/ui/*.kt
 ```
 
@@ -655,7 +676,7 @@ grep -rl 'com\.breadmoirai\.garnet\.editor\.command\b' src docs --exclude-dir=su
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.editor\.command\b/com.breadmoirai.garnet.editor.workspace.command/g'
 grep -rl 'com\.breadmoirai\.garnet\.ui\.widget\b' src docs --exclude-dir=superpowers \
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.ui\.widget\b/com.breadmoirai.garnet.editor.workspace.ui/g'
-sed -i '1s/.*/package com.breadmoirai.garnet.editor.workspace.ui/' \
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.editor.workspace.ui|}' \
   src/client/kotlin/com/breadmoirai/garnet/editor/workspace/ui/EditorIntegratedBoot.kt
 ```
 
@@ -818,7 +839,7 @@ grep -rl 'com\.breadmoirai\.garnet\.client\.viewport\b' src docs --exclude-dir=s
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.client\.viewport\b/com.breadmoirai.garnet.dock.viewport/g'
 grep -rl 'com\.breadmoirai\.garnet\.config\.DockLayoutStore\b' src docs --exclude-dir=superpowers \
   | xargs -r sed -i 's/com\.breadmoirai\.garnet\.config\.DockLayoutStore\b/com.breadmoirai.garnet.dock.data.DockLayoutStore/g'
-sed -i '1s/.*/package com.breadmoirai.garnet.dock.data/' src/client/kotlin/com/breadmoirai/garnet/dock/data/DockLayoutStore.kt
+sed -i '0,/^package /{s|^package .*|package com.breadmoirai.garnet.dock.data|}' src/client/kotlin/com/breadmoirai/garnet/dock/data/DockLayoutStore.kt
 ```
 
 - [ ] **Step 2: Check the Java file and the mixins**
@@ -915,12 +936,12 @@ Rather than 30 hand-written `sed` calls, derive the package from the directory:
 for f in $(git diff --cached --name-only -- 'src/test/*'); do
   [ -f "$f" ] || continue
   pkg=$(dirname "$f" | sed 's|src/test/kotlin/||; s|/|.|g')
-  sed -i "1s/.*/package $pkg/" "$f"
+  sed -i "0,/^package /{s|^package .*|package $pkg|}" "$f"
 done
 grep -c '^package' $(git diff --cached --name-only -- 'src/test/*' | while read f; do [ -f "$f" ] && echo "$f"; done)
 ```
 
-Every file must report `1`. A `0` means line 1 was something else — a license header or comment — and that `sed` destroyed it; find it in `git diff` and restore by hand.
+Every file must report exactly `1`. A `0` means the file had no package declaration to replace; a `2` means one was duplicated. Both mean the rewrite went wrong — inspect `git diff` and fix by hand.
 
 Then confirm the packages match the new paths before compiling.
 
@@ -931,7 +952,7 @@ cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:testClasses"
 cmd.exe /c "cd /d H:\Repo\garnet && gradlew.bat :26.2:test"
 ```
 
-Expected: both successful, with the **same test count** as before the move. Compare against the previous run's `build/test-results/test/` — a test that silently stopped being discovered is the failure mode this step is guarding against.
+Expected: both successful, with the **same test count** as before the move. Compare against the previous run's `versions/26.2/build/test-results/test/` — a test that silently stopped being discovered is the failure mode this step is guarding against.
 
 - [ ] **Step 4: Commit, then move gametest**
 

@@ -7,7 +7,7 @@ summary: How raw GLFW pointer/key/char callbacks are routed into the dock Compos
 # Dock input routing
 
 Raw GLFW input reaches the full-window dock `ComposeScene` through `DockInputRouter`
-(`src/client/kotlin/.../ui/input/DockInputRouter.kt`), fed by two HEAD-injecting mixins on
+(`src/client/kotlin/.../dock/input/DockInputRouter.kt`), fed by two HEAD-injecting mixins on
 MC's input handlers. The whole path is **active-only and OFF by default**: it does nothing until a
 region is focused, so uncaptured input stays byte-for-byte vanilla.
 
@@ -18,7 +18,7 @@ through the content-rect offset by `MouseHandlerViewportMixin` — see
 
 ## Click-to-focus, both directions
 
-Focus is not keyboard-only. `DockState.regionAt(x, y, realW, realH)` (`ui/dock/DockHitTest.kt`)
+Focus is not keyboard-only. `DockState.regionAt(x, y, realW, realH)` (`dock/shell/DockHitTest.kt`)
 answers "who owns this window pixel", returning `null` for the **bare world viewport**. It is the
 pointer-side mirror of `insets()` and reproduces `GarnetDock`'s draw order — the **stripe's own
 column first** (it is drawn last, over everything, so it is tested first; see
@@ -29,7 +29,7 @@ exactly as it is drawn over where the LEFT/RIGHT columns stop), then LEFT, then 
 which is the whole point of the `null` case. Hidden/closed regions and splitters need no special
 case: a closed region reserves nothing, and splitters are drawn inside the reserved strips. It takes
 no `Minecraft`/GLFW dependency, so it is unit-tested in `DockHitTestTest`
-(`src/test/.../ui/dock/`) the same way `syncDockViewport` was split out for testability.
+(`src/test/.../dock/shell/`) the same way `syncDockViewport` was split out for testability.
 
 Both gestures skip themselves when `ViewportState.realWidth/realHeight` are still `0` — before
 `WindowMixin` has cached a real framebuffer size the layout is unknowable, and guessing it from a
@@ -186,7 +186,7 @@ Registered from `GarnetClient.onInitializeClient()` next to `registerViewportTog
 
 ## Every visibility change ends in `commitDockVisibilityChange()`
 
-`commitDockVisibilityChange(persist: Boolean = true)` (`ui/viewport/DockVisibilityCommit.kt`) is the
+`commitDockVisibilityChange(persist: Boolean = true)` (`dock/viewport/DockVisibilityCommit.kt`) is the
 one definition of "which panels are open just changed — now make the rest of the client agree". In
 order:
 
@@ -215,7 +215,7 @@ The call sites are the Shift+1 and Alt+1 keybind branches, `registerDockWorldLif
 DISCONNECT hooks, `ExplorerActions.openLocalHistory`, and the stripe's tap. The stripe reaches it
 through a callback: `ComposeSurface` passes `commitDockVisibilityChange` into `GarnetDock`, which
 threads it into `DockStripe`, whose `detectTapGestures` calls `stripeIconClicked(panelId, callback)`.
-That indirection is deliberate — it keeps the whole `ui/dock` package free of `Minecraft` imports so
+That indirection is deliberate — it keeps the whole `dock/shell` package free of `Minecraft` imports so
 `DockState` and the stripe's click behaviour stay unit-testable with no render context
 (`DockVisibilityCommitTest` in `src/test`), and the seams on `DockVisibilityCommit` let that test pin
 all four steps without a config directory or a live window.
@@ -284,7 +284,7 @@ to `Primary`/`Secondary`/`Tertiary` and an unmapped index (`7`) to `null`) and t
 `false`: stays `false` when nothing is visible, flips to `true` once `LEFT` becomes visible,
 reverts to `false` once hidden again, and also flips to `true` when only `focusedRegion` is set)
 don't need a client at all, so they live in `DockViewportSyncTest`
-(`src/test/kotlin/com/breadmoirai/garnet/client/ui/dock/`) instead of `DockInputSpec`.
+(`src/test/kotlin/com/breadmoirai/garnet/dock/shell/`) instead of `DockInputSpec`.
 
 `DockHitTestTest`, in the same package, is client-free for the same reason: it pins
 `DockState.regionAt`'s geometry against `GarnetDock`'s layout (bare world, each visible edge, hidden

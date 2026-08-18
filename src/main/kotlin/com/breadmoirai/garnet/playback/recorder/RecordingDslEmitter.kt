@@ -2,9 +2,9 @@ package com.breadmoirai.garnet.playback.recorder
 
 import com.breadmoirai.garnet.playback.data.StateRecording
 import com.breadmoirai.garnet.playback.data.StateRecordingView
-import com.breadmoirai.garnet.spec.Phase
-import com.breadmoirai.garnet.spec.SimTime
-import com.breadmoirai.garnet.spec.StateCondition
+import com.breadmoirai.garnet.core.spec.Phase
+import com.breadmoirai.garnet.core.spec.SimTime
+import com.breadmoirai.garnet.core.spec.StateCondition
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 
@@ -43,7 +43,7 @@ object RecordingDslEmitter {
         val view = StateRecordingView.of(recording)
 
         val sb = StringBuilder()
-        sb.appendLine("import com.breadmoirai.garnet.spec.*")
+        sb.appendLine("import com.breadmoirai.garnet.core.spec.*")
         sb.appendLine("import net.minecraft.core.Vec3i")
         sb.appendLine()
 
@@ -253,7 +253,7 @@ object RecordingDslEmitter {
         strict: Boolean,
     ): String {
         val sb = StringBuilder()
-        sb.appendLine("import com.breadmoirai.garnet.spec.*")
+        sb.appendLine("import com.breadmoirai.garnet.core.spec.*")
         sb.appendLine("import net.minecraft.core.Vec3i")
         sb.appendLine()
         sb.append("garnetSpec(")
@@ -273,7 +273,7 @@ object RecordingDslEmitter {
      */
     fun emitStub(id: String): String {
         val sb = StringBuilder()
-        sb.appendLine("import com.breadmoirai.garnet.spec.*")
+        sb.appendLine("import com.breadmoirai.garnet.core.spec.*")
         sb.appendLine("import net.minecraft.core.Vec3i")
         sb.appendLine()
         sb.append("garnetSpec(id = ${quoted(id)}, bounds = Vec3i(5, 5, 5), lifespan = 20) {}")

@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.test
 
-import com.breadmoirai.garnet.spec.garnetSpec
+import com.breadmoirai.garnet.core.spec.garnetSpec
 import com.breadmoirai.garnet.harness.ClientSpec
 import com.breadmoirai.garnet.core.async.AsyncDispatchers
 import com.breadmoirai.garnet.harness.runGarnetSpec

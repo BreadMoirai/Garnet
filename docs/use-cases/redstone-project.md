@@ -19,7 +19,7 @@ referenced them outside their own unit tests. UC-MAN-01 and UC-MAN-02.a below ar
 historical notes on that removed machinery. UC-MAN-06
 ("New Spec"), UC-MAN-07 ("Save Now"), and UC-MAN-08 ("Unload") describe buttons that lived on the
 deleted `ProjectScreen`; their server handlers are unchanged and reachable by sending the C2S payload
-directly, but the Compose `ProjectExplorerPanel` (the only live LEFT-dock panel today) does not yet
+directly, but the Compose `ExplorerPanel` (the only live LEFT-dock panel today) does not yet
 expose New Spec/Save Now/Unload actions — only browse/load/refresh.
 
 ---
@@ -83,7 +83,7 @@ Each leaf folder's specs are sorted, assigned to a row-major grid slot, and phys
 A player selects a leaf folder from the in-game UI, which teleports them to that folder's region and marks it as their active focus.
 
 - **UC-MAN-05.a** `/garnet editor` immediately sends `ListEditorTreeC2S`. `EditorTreeHandlers.handleListTree` (via `EditorHandlerSupport.sendTree`) calls `scanFolder(root.path)` on the server and replies with `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` carrying the full recursive folder tree (every file/folder, not just spec leaves) and the player's current `activeSubpath`.
-- **UC-MAN-05.b** `EditorClientNetworking` receives `EditorTreeSnapshotS2C` and feeds it into `ProjectTreeState.onSnapshot(payload)`. The Compose Project Explorer (`ProjectExplorerPanel` in the LEFT dock) reads `ProjectTreeState.snapshot`, converts it via `ExplorerTreeState.buildTreeFrom(snapshot.root)`, and renders it with Jewel's `LazyTree`, recomposing on change. `EditorClientNetworking` also calls `ExplorerTreeState.applyPendingRestore(payload.root)` right after — see UC-MAN-11.b — so `ProjectTreeState.onSnapshot` is no longer the *only* client-side reaction to the snapshot, just the one that rebuilds the visible tree. The legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the `ExplorerTreeState`/`ProjectTreeState` split (expand/select state vs. server data).
+- **UC-MAN-05.b** `EditorClientNetworking` receives `EditorTreeSnapshotS2C` and feeds it into `ExplorerTreeSnapshot.onSnapshot(payload)`. The Compose Project Explorer (`ExplorerPanel` in the LEFT dock) reads `ExplorerTreeSnapshot.snapshot`, converts it via `ExplorerTreeState.buildTreeFrom(snapshot.root)`, and renders it with Jewel's `LazyTree`, recomposing on change. `EditorClientNetworking` also calls `ExplorerTreeState.applyPendingRestore(payload.root)` right after — see UC-MAN-11.b — so `ExplorerTreeSnapshot.onSnapshot` is no longer the *only* client-side reaction to the snapshot, just the one that rebuilds the visible tree. The legacy `ProjectScreen`, which used to auto-rebuild on snapshot, was deleted in the Compose-dock hard-cut. See [ui/dock-framework.md](../ui/dock-framework.md) for the `LazyTree` render pattern and the `ExplorerTreeState`/`ExplorerTreeSnapshot` split (expand/select state vs. server data).
 - **UC-MAN-05.c** Clicking a "spec-folder" row (a folder directly containing a `*.spec.kts` file) sends `LoadEditorFolderC2S(path)`. `EditorTreeHandlers.handleLoadFolder` validates the subpath via `root.resolveSubpath` (path-traversal guard), calls `EditorTeleport.toFolder`, and sends `EditorFolderLoadedS2C` with the spec-id list and any errors. Clicking a non-spec folder or its expand triangle just toggles expand client-side (no packet); clicking a file row selects/highlights it client-side (no packet).
 - **UC-MAN-05.d** `EditorTeleport.toFolder` looks up `EditorDimRegistry.regionOriginOf(subpath)`, teleports the player to `(region.x+0.5, yBase+2, region.z+0.5)` in `projectLevel()`, and calls `EditorSession.setActive(player.uuid, subpath)` so subsequent server actions (save, new-spec) scope to the right folder.
 - **UC-MAN-05.e** If the subpath's region has not been assigned (folder not yet placed), `toFolder` returns `false` and the server replies with `EditorErrorS2C`. `StructureInfoState.onError(payload)` sets `status = "error: ${payload.reason}"`, which the [Structure Info panel](../ui/structure-info-panel.md) renders as its status line — the same mechanism that used to update `ProjectScreen`'s status label.
@@ -92,7 +92,7 @@ A player selects a leaf folder from the in-game UI, which teleports them to that
 
 ### UC-MAN-06 — Create a new spec cell in the active folder
 
-A player names a new spec from the in-game UI; the server writes a stub `.spec.kts`, re-places the folder, and the new cell appears in the world. **No live UI currently sends `NewEditorSpecC2S`** — the deleted `ProjectScreen` had the "New Spec" `EditBox`/button; `ProjectExplorerPanel` (the current LEFT-dock panel) does not yet have an equivalent control. The server handler and packet are otherwise unchanged and reachable by sending the payload directly (as the coverage tests below do).
+A player names a new spec from the in-game UI; the server writes a stub `.spec.kts`, re-places the folder, and the new cell appears in the world. **No live UI currently sends `NewEditorSpecC2S`** — the deleted `ProjectScreen` had the "New Spec" `EditBox`/button; `ExplorerPanel` (the current LEFT-dock panel) does not yet have an equivalent control. The server handler and packet are otherwise unchanged and reachable by sending the payload directly (as the coverage tests below do).
 
 - **UC-MAN-06.a** *(historical UI path)* The player types a name into the `EditBox` in the deleted `ProjectScreen` (validated client-side for non-blank) and clicks "New Spec", sending `NewEditorSpecC2S(name)`.
 - **UC-MAN-06.b** `EditorTreeHandlers.handleNewSpec` reads `EditorSession.get(player.uuid)?.activeSubpath`; if no folder is active it replies with `EditorErrorS2C("no folder selected")`.
@@ -104,7 +104,7 @@ A player names a new spec from the in-game UI; the server writes a stub `.spec.k
 
 ### UC-MAN-07 — Save edited cell blocks back to disk
 
-When the player has modified blocks inside a spec's cell AABB, the server detects the diff and overwrites the source `.spec.kts` structure file. **No live UI currently sends `SaveNowC2S`** — the deleted `ProjectScreen` had the "Save Now" button; `ProjectExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged and reachable by sending the payload directly.
+When the player has modified blocks inside a spec's cell AABB, the server detects the diff and overwrites the source `.spec.kts` structure file. **No live UI currently sends `SaveNowC2S`** — the deleted `ProjectScreen` had the "Save Now" button; `ExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged and reachable by sending the payload directly.
 
 - **UC-MAN-07.a** *(historical UI path)* The player clicks "Save Now" in the deleted `ProjectScreen`, sending `SaveNowC2S`. `EditorTreeHandlers.handleSaveNow` calls `EditorDimLifecycle.saveAll(server)`, which iterates every subpath in `EditorWorld.perFolder` and calls `saveFolder`.
 - **UC-MAN-07.b** `saveFolder` resolves each spec's absolute cell origin via `EditorWorld.absoluteCellOrigin` (adds `regionOrigin.x/z` to the region-relative `cell.origin.x/z`; Y from `cell.origin.y` is already absolute). It then passes `level`, `loaded`, and `absoluteCellOrigin` to `EditorCellSaver.captureAndSaveIfDirty`.
@@ -117,7 +117,7 @@ When the player has modified blocks inside a spec's cell AABB, the server detect
 
 ### UC-MAN-08 — Unload active folder and handle ungraceful session end
 
-A player explicitly unloads their active folder focus, or the session is cleared when the player disconnects or the server stops. **No live UI currently sends `UnloadEditorFolderC2S`** — the deleted `ProjectScreen` had the "Unload" button; `ProjectExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged.
+A player explicitly unloads their active folder focus, or the session is cleared when the player disconnects or the server stops. **No live UI currently sends `UnloadEditorFolderC2S`** — the deleted `ProjectScreen` had the "Unload" button; `ExplorerPanel` does not yet have an equivalent control. The server handler is otherwise unchanged.
 
 - **UC-MAN-08.a** *(historical UI path)* The player clicks "Unload" in the deleted `ProjectScreen`, sending `UnloadEditorFolderC2S`. `EditorTreeHandlers.handleUnload` calls `EditorSession.clear(player.uuid)` and replies with `EditorSaveReportS2C(emptyList())`.
 - **UC-MAN-08.b** After unload, the player's `activeSubpath` is `null`; a subsequent `handleNewSpec` (which requires a folder focus) receives `EditorErrorS2C("no folder selected")`. `handleSaveNow` is deliberately session-independent — it calls `EditorDimLifecycle.saveAll(server)` over every loaded folder in `EditorWorld.perFolder`, so post-unload it still returns a `EditorSaveReportS2C` (empty when nothing is loaded), not an error.
@@ -217,7 +217,7 @@ save/restore mechanics; this use case is the player-visible behavior it produces
   no-op rather than a throw) — the same request UC-MAN-05.a's `/garnet editor` command sends, but
   fired automatically on join instead of waiting for the player to type a command.
 - **UC-MAN-11.b** When `EditorTreeSnapshotS2C` lands, `EditorClientNetworking` feeds it to
-  `ProjectTreeState.onSnapshot` as usual (UC-MAN-05.b) and then calls
+  `ExplorerTreeSnapshot.onSnapshot` as usual (UC-MAN-05.b) and then calls
   `ExplorerTreeState.applyPendingRestore(payload.root)`, which reopens the persisted folders and
   reselects the persisted node — but only if something was armed (see UC-MAN-11.a: never true on a
   remote session) and the record's `root` matches the client's currently configured root; a
@@ -265,7 +265,7 @@ save/restore mechanics; this use case is the player-visible behavior it produces
 | UC-MAN-04.f | `world.perFolder[subpath]` replaced atomically via `ConcurrentHashMap` | `EditorDimSpec."re-place after adding a new spec keeps region origin and includes new spec"` | **GAP-PARTIAL** |
 | UC-MAN-05 | Browse folder tree in-game and teleport to a folder | `EditorNetworkRegistrySpec."handleListTree sends a recursive snapshot matching scanFolder"` | **GAP-PARTIAL** |
 | UC-MAN-05.a | `ListEditorTreeC2S` triggers scan and `EditorTreeSnapshotS2C` reply | `EditorNetworkRegistrySpec."handleListTree sends a recursive snapshot matching scanFolder"` | covered |
-| UC-MAN-05.b | `EditorClientNetworking` receives snapshot and feeds `ProjectTreeState`; the Compose Explorer renders it | `JewelExplorerSpec."the Explorer tree renders, selects, navigates, and its kebab menu never outlives a remount"` | covered |
+| UC-MAN-05.b | `EditorClientNetworking` receives snapshot and feeds `ExplorerTreeSnapshot`; the Compose Explorer renders it | `JewelExplorerSpec."the Explorer tree renders, selects, navigates, and its kebab menu never outlives a remount"` | covered |
 | UC-MAN-05.c | `LoadEditorFolderC2S` triggers path-traversal guard, teleport, and `EditorFolderLoadedS2C` reply | `EditorNetworkRegistrySpec."handleLoadFolder rejects path traversal with EditorErrorS2C"`, `EditorNetworkRegistrySpec."handleLoadFolder happy path sends EditorFolderLoadedS2C and sets session"` | covered |
 | UC-MAN-05.d | `EditorTeleport.toFolder` teleports player and calls `EditorSession.setActive` | `EditorTeleportSpec."toFolder teleports player to region and sets active subpath"` | covered |
 | UC-MAN-05.e | Unknown subpath: `toFolder` returns `false`, server replies with `EditorErrorS2C` | `EditorTeleportSpec."toFolder returns false for unknown subpath and does not change session"` | covered |
@@ -303,7 +303,7 @@ save/restore mechanics; this use case is the player-visible behavior it produces
 
 **UI-caller gap (not a test gap):** UC-MAN-01/02/06/07/08's `.a` rows above are marked historical
 because their only client trigger (`ProjectScreen`/`ProjectRootListScreen`) was deleted in the
-Compose-dock hard-cut and `ProjectExplorerPanel` does not yet expose New Spec / Save Now / Unload /
+Compose-dock hard-cut and `ExplorerPanel` does not yet expose New Spec / Save Now / Unload /
 multi-root controls. The server handlers remain fully covered by their gametest specs; what's missing
 is a UI to drive them, tracked as future dock-panel work, not a coverage regression to backfill with
 more tests.

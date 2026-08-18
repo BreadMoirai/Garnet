@@ -58,8 +58,8 @@ before chasing wire connection or signal-strength bugs.
 
 ## Related code in this repo
 
-No code currently reads `DiodeBlock.FACING` directly — `spec/ConditionScope.kt` and
-`spec/ConditionEvaluator.kt` reason about block state generically (`prop`, `range`, `block`
+No code currently reads `DiodeBlock.FACING` directly — `core/spec/ConditionScope.kt` and
+`core/spec/ConditionEvaluator.kt` reason about block state generically (`prop`, `range`, `block`
 predicates) rather than special-casing diode orientation, and the in-world tool that used to
 consume it (`SpecMarkerTool`) was deleted along with the recorder/runner blocks. This article is
 kept as a general MC-API note: any future code that reasons about "which neighbor is the input"

@@ -16,14 +16,14 @@ The mod exposes server-side subcommands under `/garnet editor`. Each parent UC b
 **Actor:** Player (server-side command source)
 **Trigger:** A player executes `/garnet editor` on a server where a project root is available.
 **Preconditions:** Either `EditorServerContext.get(server)` returns a non-null context pin, or `SharedSettings.projectRootPath` is a non-blank string that resolves to an absolute path; the command is registered via `EditorCommand.register(dispatcher)`.
-**Outcome:** The server scans the root via `scanFolder(root.path)`, builds a `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` payload carrying the full recursive folder tree, and sends it to the requesting player. The client receiver feeds the snapshot into `ProjectTreeState` (the Compose Project Explorer's observable state); it no longer auto-opens `ProjectScreen`. The command returns `Command.SINGLE_SUCCESS`.
+**Outcome:** The server scans the root via `scanFolder(root.path)`, builds a `EditorTreeSnapshotS2C(root: FolderNode, currentSubpath: String?)` payload carrying the full recursive folder tree, and sends it to the requesting player. The client receiver feeds the snapshot into `ExplorerTreeSnapshot` (the Compose Project Explorer's observable state); it no longer auto-opens `ProjectScreen`. The command returns `Command.SINGLE_SUCCESS`.
 
 **System interactions:**
 - UC-CMD-01.a — `EditorCommand.open` calls `EditorServerContext.get(server)` first; if non-null, its `root` field is used directly without reading `SharedSettings`.
 - UC-CMD-01.b — If the context pin is null but `SharedSettings.projectRootPath` is non-blank, `EditorRoot(Path.of(rootCfg).toAbsolutePath())` is constructed as the fallback root.
 - UC-CMD-01.c — `scanFolder(root.path)` mirrors the whole folder recursively into a `FolderNode` tree — all files and folders, including empty ones — with folders-first ordering.
 - UC-CMD-01.d — `EditorSession.get(player.uuid)?.activeSubpath` is read to embed the player's current active folder in the snapshot; this value is `null` if the player has no prior session.
-- UC-CMD-01.e — `ServerPlayNetworking.send(player, EditorTreeSnapshotS2C(root, currentSubpath))` delivers the snapshot; the client-side receiver (`EditorClientNetworking`) calls `ProjectTreeState.onSnapshot(payload)`, which the Compose Explorer renders.
+- UC-CMD-01.e — `ServerPlayNetworking.send(player, EditorTreeSnapshotS2C(root, currentSubpath))` delivers the snapshot; the client-side receiver (`EditorClientNetworking`) calls `ExplorerTreeSnapshot.onSnapshot(payload)`, which the Compose Explorer renders.
 - UC-CMD-01.f — The return value is `Command.SINGLE_SUCCESS` (integer 1); Brigadier records a successful execution.
 
 ---

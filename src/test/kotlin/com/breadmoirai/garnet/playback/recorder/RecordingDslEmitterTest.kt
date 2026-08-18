@@ -3,8 +3,8 @@ package com.breadmoirai.garnet.playback.recorder
 import com.breadmoirai.garnet.playback.data.BlockStateChange
 import com.breadmoirai.garnet.playback.data.PropertyDiff
 import com.breadmoirai.garnet.playback.data.StateRecording
-import com.breadmoirai.garnet.spec.Phase
-import com.breadmoirai.garnet.spec.SimTime
+import com.breadmoirai.garnet.core.spec.Phase
+import com.breadmoirai.garnet.core.spec.SimTime
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -123,7 +123,7 @@ class RecordingDslEmitterTest : FunSpec({
             recording = buildRecording(),
         )
 
-        source shouldContain "import com.breadmoirai.garnet.spec.*"
+        source shouldContain "import com.breadmoirai.garnet.core.spec.*"
         source shouldContain "import net.minecraft.core.Vec3i"
     }
 

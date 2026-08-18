@@ -19,10 +19,11 @@ dependency; `main`/`client` do not ship it in the jar.
   registries are needed (`StateRecordingStorageTest` is the canonical
   example). Since 2026-08-03 this source set also carries `client`'s
   compile classpath and runs the Compose compiler plugin, so it also holds
-  the pure-JVM client-code specs under
-  `src/test/kotlin/com/breadmoirai/garnet/client/` (mirroring the client
-  package tree) — Compose snapshot-state and `@Composable` code included,
-  as long as no live `Minecraft`/GL/GLFW is required.
+  the pure-JVM client-code specs, packaged directly under each spec's own
+  feature package (e.g. `src/test/kotlin/com/breadmoirai/garnet/dock/shell/`,
+  `.../editor/explorer/ui/`) rather than under a separate `client/` mirror —
+  Compose snapshot-state and `@Composable` code included, as long as no live
+  `Minecraft`/GL/GLFW is required.
 - `src/gametest/` — Kotest specs driven by a single `@GameTest` sentinel
   that runs inside a dedicated MC server instance (`runGameTest`). Use the
   `awaitTicks`/`spawnStructure` primitives from the bridge.
@@ -60,9 +61,11 @@ The fix was two lines of `build.gradle.kts`: the client source set on the test c
   `src/clientTest/` on 2026-08-03 because none of them need a live client —
   `ExplorerTreeStateTest`, `ExplorerStateStoreTest`, `ModConfigTest`, `RootPickerControllerTest`,
   `StructureExplorerStatusTest`, `ExplorerLifecycleTest`, `DockInsetsTest`, `DockLifecycleTest`,
-  `GlfwKeyMapTest`, `ExplorerActionsTest`, `DockViewportSyncTest`, under
-  `src/test/kotlin/com/breadmoirai/garnet/client/` mirroring the client package tree. All
-  pure data / algorithm / Compose-state checks; no level, no runner, no live client.
+  `GlfwKeyMapTest`, `ExplorerActionsTest`, `DockViewportSyncTest`, packaged directly under
+  their own feature package under `src/test/kotlin/com/breadmoirai/garnet/` (e.g.
+  `dock/input/`, `dock/shell/`, `editor/explorer/ui/`), matching the production code they
+  test. All pure data / algorithm / Compose-state checks; no level, no runner, no live
+  client.
 - **Server gametest (`src/gametest/`):** the `*Spec` classes registered in
   `GametestSentinel` (`SmokeSpec`, `editor/*Spec`, `structure/*Spec`). These need a real level:
   only the live MC tick loop produces accurate scheduled-tick cadence, neighbor-update
@@ -102,8 +105,8 @@ the real-world circuit behaviour.
   in `GametestSentinel`.
 - New dock panel, widget, or payload-flow logic — including `@Composable`
   code and Compose snapshot state? Default to a plain Kotest spec under
-  `src/test/kotlin/com/breadmoirai/garnet/client/`, mirroring the client
-  package it tests; `test` carries `client`'s compile classpath and the
+  `src/test/kotlin/com/breadmoirai/garnet/`, in the same feature package as
+  the code it tests; `test` carries `client`'s compile classpath and the
   Compose compiler plugin, so no live client is needed. Only reach for
   `ClientSpec` under `src/clientTest/` (registered in `ClientTestSentinel`)
   when the assertion genuinely needs a live `Minecraft` instance, a GL

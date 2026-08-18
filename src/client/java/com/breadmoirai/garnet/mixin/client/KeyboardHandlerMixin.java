@@ -1,6 +1,6 @@
 package com.breadmoirai.garnet.mixin.client;
 
-import com.breadmoirai.garnet.ui.input.DockInputRouter;
+import com.breadmoirai.garnet.dock.input.DockInputRouter;
 import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;

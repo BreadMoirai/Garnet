@@ -1,16 +1,16 @@
 package com.breadmoirai.garnet
 
-import com.breadmoirai.garnet.config.ModConfig
+import com.breadmoirai.garnet.core.config.ModConfig
+import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
+import com.breadmoirai.garnet.editor.explorer.ui.registerExplorerLifecycle
 import com.breadmoirai.garnet.editor.network.EditorClientNetworking
-import com.breadmoirai.garnet.editor.ui.explorerPanel
-import com.breadmoirai.garnet.editor.ui.localHistoryPanel
-import com.breadmoirai.garnet.editor.ui.registerExplorerLifecycle
-import com.breadmoirai.garnet.editor.ui.structureInfoPanel
-import com.breadmoirai.garnet.ui.dock.DockState
-import com.breadmoirai.garnet.ui.viewport.registerCursorFocusToggle
-import com.breadmoirai.garnet.ui.viewport.registerDockKeybinds
-import com.breadmoirai.garnet.ui.viewport.registerDockWorldLifecycle
-import com.breadmoirai.garnet.ui.viewport.registerViewportToggle
+import com.breadmoirai.garnet.editor.history.ui.localHistoryPanel
+import com.breadmoirai.garnet.editor.structure.ui.structureInfoPanel
+import com.breadmoirai.garnet.dock.shell.DockState
+import com.breadmoirai.garnet.dock.viewport.registerCursorFocusToggle
+import com.breadmoirai.garnet.dock.viewport.registerDockKeybinds
+import com.breadmoirai.garnet.dock.viewport.registerDockWorldLifecycle
+import com.breadmoirai.garnet.dock.viewport.registerViewportToggle
 import net.fabricmc.api.ClientModInitializer
 import org.slf4j.LoggerFactory
 

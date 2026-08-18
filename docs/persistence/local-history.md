@@ -6,7 +6,7 @@ summary: How auto-saved .nbt structures record revisions under <instance>/.garne
 
 # Local history for standalone structures
 
-`com.breadmoirai.garnet.history.LocalHistoryStore` is a JetBrains-style local history for
+`com.breadmoirai.garnet.editor.history.data.LocalHistoryStore` is a JetBrains-style local history for
 standalone `.nbt` structures: every time `StructureCommit` is about to rewrite a structure's
 `.nbt` file, it first writes a **revision** — a snapshot of the NEWLY CAPTURED content that is
 about to become the live `.nbt`, not the content being replaced — so an edit can be rolled back
@@ -242,7 +242,7 @@ sizes (they come from the loaded template), while a *raw* one is zero on all fou
 
 Three, and only three:
 
-- `com.breadmoirai.garnet.editor.structure.StructureCommit` writes every `autosave`, `manual`,
+- `com.breadmoirai.garnet.editor.structure.ops.StructureCommit` writes every `autosave`, `manual`,
   `external`, and `restore` revision. There is no separate "manual snapshot" feature — a `manual`
   revision is a forced commit, not a distinct action. A `restore` revision is likewise not a fourth
   writer: `editor/history/StructureRestoreOps` re-places a chosen revision's tag into the world and
@@ -262,7 +262,7 @@ for how `StructureCommit` decides *when* to commit (debounce ticks, max-dirty ca
 
 ## Test coverage
 
-`LocalHistoryStoreSpec` (`src/gametest/kotlin/com/breadmoirai/garnet/test/history/`) exercises
+`LocalHistoryStoreSpec` (`src/gametest/kotlin/com/breadmoirai/garnet/editor/history/ops/`) exercises
 the store directly against a temp directory, filesystem-level and without a running world: writing
 and reading a revision byte-for-byte, same-millisecond sequence numbers, chronological ordering
 regardless of write order, age- and count-based pruning, and `localHistoryEnabled = false` writing

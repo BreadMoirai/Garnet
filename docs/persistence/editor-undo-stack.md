@@ -33,7 +33,7 @@ contact with two of the six mutating handlers:
 So each handler records what it *actually did*, as an `EditorUndoCommand`. That is also why the
 type is a sealed interface of six server-authored records rather than a wrapper around
 `CustomPacketPayload`, and why it is named `EditorUndoCommand` and not `EditorCommand` — the latter
-is the brigadier command object in `editor/command/`.
+is the brigadier command object in `editor/workspace/command/`.
 
 ## The six commands and their inverses
 

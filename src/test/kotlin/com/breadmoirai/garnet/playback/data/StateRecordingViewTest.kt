@@ -1,7 +1,7 @@
 package com.breadmoirai.garnet.playback.data
 
-import com.breadmoirai.garnet.spec.Phase
-import com.breadmoirai.garnet.spec.SimTime
+import com.breadmoirai.garnet.core.spec.Phase
+import com.breadmoirai.garnet.core.spec.SimTime
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.SharedConstants

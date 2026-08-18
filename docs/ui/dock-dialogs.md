@@ -13,7 +13,7 @@ Two rules govern any menu or dialog inside the Compose dock.
 **Retired 2026-07-28 (jewel-widget-layer spike):** this doc previously said the dock's
 `ImageComposeScene` couldn't host a Compose `Popup`/`DropdownMenu` because they open a
 separate desktop window, and told panels to hand-roll overlays instead
-(`ProjectExplorerPanel.RootMenu` was the reference for that pattern). That premise was wrong
+(`ExplorerPanel.RootMenu` was the reference for that pattern). That premise was wrong
 for Compose 1.11's `ImageComposeScene`: it is internally a `CanvasLayersComposeScene`, so
 popup layers draw into the *same* canvas as the rest of the scene rather than spawning an OS
 window. The spike confirmed a bare Compose `Popup` renders in-scene; the Explorer panel now
@@ -27,7 +27,7 @@ constraint survives from the old advice (this is the Compose-era analog of the l
 
 ## Native OS dialogs block — run them off the render thread (except on macOS)
 
-The Explorer's root picker (`NfdFolderPicker`, in `editor/ui/FolderPicker.kt`) is backed by
+The Explorer's root picker (`NfdFolderPicker`, in `editor/explorer/ui/FolderPicker.kt`) is backed by
 LWJGL's bindings for [NFD](https://github.com/btzy/nativefiledialog-extended)
 (`org.lwjgl.util.nfd.NativeFileDialog`) rather than tinyfd. Tinyfd's folder picker on Windows is
 its legacy Win32 `SHBrowseForFolder` browser — a small, dated tree view — where NFD drives the
