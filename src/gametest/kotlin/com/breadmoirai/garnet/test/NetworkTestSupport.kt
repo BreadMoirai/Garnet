@@ -12,6 +12,8 @@ import com.breadmoirai.garnet.editor.workspace.world.EditorWorld
 import com.breadmoirai.garnet.mixin.ConnectionAccessor
 import com.breadmoirai.garnet.mixin.ServerCommonPacketListenerImplAccessor
 import com.mojang.authlib.GameProfile
+import net.fabricmc.fabric.impl.networking.AbstractChanneledNetworkAddon
+import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl
 import io.netty.channel.embedded.EmbeddedChannel
 import net.minecraft.network.Connection
 import net.minecraft.network.protocol.PacketFlow
@@ -161,4 +163,30 @@ fun drainPayloads(player: ServerPlayer): List<CustomPacketPayload> {
         if (msg is ClientboundCustomPayloadPacket) out.add(msg.payload())
     }
     return out
+}
+
+/**
+ * Make [type] *sendable* to a mock player, i.e. make `ServerPlayNetworking.canSend` true for it.
+ *
+ * The unsolicited fan-out paths — `StructureSync.broadcast` and `HistoryWatchers.pushTo` — guard
+ * their sends with `canSend`, because on a dedicated server an unknown play-phase payload can
+ * disconnect a vanilla/unmodded client (F6). A real client makes `canSend` true by registering its
+ * channels during the CONFIGURATION phase; [makeMockServerPlayer] fabricates a play-phase
+ * connection directly and never goes through configuration, so its addon's sendable-channel set is
+ * EMPTY and every guarded send is silently dropped.
+ *
+ * **A spec asserting on a guarded send must call this first, or it will assert on packets the
+ * guard — correctly, by production rules — never emitted, and fail with an empty payload list
+ * that looks exactly like a broken feature.**
+ *
+ * Fabric exposes no public "pretend this client registered X" hook, so this reaches the
+ * package-private `AbstractChanneledNetworkAddon.register`, which is exactly what the real
+ * `minecraft:register` path calls. Test-only.
+ */
+fun grantChannel(player: ServerPlayer, type: CustomPacketPayload.Type<*>) {
+    val addon = ServerNetworkingImpl.getAddon(player.connection)
+    val register = AbstractChanneledNetworkAddon::class.java
+        .getDeclaredMethod("register", List::class.java)
+    register.isAccessible = true
+    register.invoke(addon, listOf(type.id()))
 }

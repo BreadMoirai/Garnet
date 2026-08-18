@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.history.ops
 
+import com.breadmoirai.garnet.editor.structure.network.StructureSync
 import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
 import com.breadmoirai.garnet.editor.explorer.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
@@ -22,6 +23,7 @@ import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import com.breadmoirai.garnet.editor.structure.data.structuresDiffer
 import com.breadmoirai.garnet.test.drainPayloads
+import com.breadmoirai.garnet.test.grantChannel
 import com.breadmoirai.garnet.test.withEditorServer
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -33,8 +35,6 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
-import net.fabricmc.fabric.impl.networking.AbstractChanneledNetworkAddon
-import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.NbtAccounter
@@ -59,30 +59,6 @@ class StructureRestoreSpec : GarnetTestSpec({
         // StructureAutoSave has no `markDirty(subpath, box)`; the watcher marks per-position via
         // `onEdit(subpath, pos, tick)`, which grows the dirty box itself.
         StructureAutoSave.of(server).onEdit(subpath, box.origin, server.overworld().gameTime)
-    }
-
-    /**
-     * Make [type] *sendable* to a mock player, i.e. make `ServerPlayNetworking.canSend` true for it.
-     *
-     * `HistoryWatchers.pushTo` guards its send with `canSend` because the commit fan-out is
-     * unsolicited (an unknown play-phase payload can disconnect a vanilla client on a dedicated
-     * server). A real client makes the server's `canSend` true by registering its channels during
-     * the CONFIGURATION phase; `makeMockServerPlayer` fabricates a play-phase connection directly
-     * and never goes through configuration, so its addon's sendable-channel set is EMPTY and every
-     * guarded send is silently dropped. Without this, the push tests below assert on packets that
-     * the guard — correctly, by production rules — never emitted.
-     *
-     * Fabric exposes no public "pretend this client registered X" hook, so this reaches the
-     * package-private `AbstractChanneledNetworkAddon.register`, which is exactly what the real
-     * `minecraft:register` path calls. Test-only, and deliberately here rather than in the shared
-     * harness: it is the one spec that exercises a `canSend`-guarded send.
-     */
-    fun grantChannel(player: ServerPlayer, type: CustomPacketPayload.Type<*>) {
-        val addon = ServerNetworkingImpl.getAddon(player.connection)
-        val register = AbstractChanneledNetworkAddon::class.java
-            .getDeclaredMethod("register", List::class.java)
-        register.isAccessible = true
-        register.invoke(addon, listOf(type.id()))
     }
 
     /**
@@ -350,7 +326,7 @@ class StructureRestoreSpec : GarnetTestSpec({
 
             editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
             StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL).let {
-                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).structure)
+                StructureSync.broadcast(server, (it as CommitOutcome.Committed).structure)
             }
 
             drainPayloads(player).filterIsInstance<StructureHistoryS2C>().shouldBeEmpty()
@@ -379,7 +355,7 @@ class StructureRestoreSpec : GarnetTestSpec({
             editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
             StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL).let {
                 // The push rides on `broadcast`, which is what every unsolicited commit path calls.
-                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).structure)
+                StructureSync.broadcast(server, (it as CommitOutcome.Committed).structure)
             }
 
             val after = drainPayloads(player).filterIsInstance<StructureHistoryS2C>().last()

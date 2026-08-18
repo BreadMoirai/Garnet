@@ -217,13 +217,19 @@ NBT/region geometry that used to be a top-level `structure/` package.
 - `ops/CommitBackoff.kt` — per-server failure-backoff and last-committed-disk-fingerprint
   bookkeeping used internally by `StructureCommit`.
 - `ops/StructureCommit.kt` — orchestration only: turns a structure's dirty state into a committed
-  `.nbt` plus a `LocalHistoryStore` revision. The sole `.nbt` writer. See
+  `.nbt` plus a `LocalHistoryStore` revision. The sole `.nbt` writer. Sends nothing — `tick` and
+  `commitAll` return what they committed and `network/StructureSync` announces it. See
   [redstone-project.md](redstone-project.md#standalone-structure-files).
 - `network/StructurePackets.kt` — `SaveNowC2S`, `EditorSaveReportS2C`, `PlaceStructureC2S`,
   `SaveStructureC2S`, `StructureAutoSavedS2C`, `StructureResultS2C`, plus
   `CommittedStructure.toAutoSavedPayload()`, the one place that knows a committed structure has a
   wire form.
 - `network/EditorStructureHandlers.kt` — their server handlers.
+- `network/StructureSync.kt` — the client-facing half of the commit pipeline: `broadcast` (the
+  unsolicited `canSend`-guarded fan-out) plus `tick`/`commitAll`, thin wrappers that run the
+  `ops` commit and announce what it produced. **Production calls these, not the `StructureCommit`
+  forms** — `Garnet.kt`'s `END_SERVER_TICK`, `BEFORE_SAVE` and `SERVER_STOPPING` all go through
+  here. Calling `StructureCommit.tick` directly commits correctly but tells nobody.
 - `ui/StructureInfoPanel.kt` + `ui/StructureInfoState.kt` (client) — the Structure Info dock panel
   and its state; `ui/OpenStructureState.kt` — which structure the panels are pointed at. See
   [ui/structure-info-panel.md](../ui/structure-info-panel.md).
@@ -429,27 +435,29 @@ path; drop same-node edges; apply the four bullets, with the `editor/network/` s
 entrypoints (`workspace/command/`, `Garnet`, `GarnetClient`) licensed as sources.
 
 ```
-editor-internal cross-node import edges : 224
-  permitted by the rule                 : 213
-  VIOLATIONS                            :  11
+editor-internal cross-node import edges : 226
+  permitted by the rule                 : 218
+  VIOLATIONS                            :   8
 ```
 
-**All 11 are `ops → network`** — the one direction the rule forbids — and every one is named here:
+**All 8 are `ops → network`** — the one direction the rule forbids — and every one is named here:
 
 | Source | Target | Imports | Why |
 |---|---|---:|---|
 | `undo/ops/EditorUndoOps.kt` | `editor/network` spine (`EditorHandlerSupport`) | 4 | The recorded exception below. |
 | `undo/ops/EditorUndoOps.kt` | `explorer/network` (`EditorFileOpsHandlers`, `DeleteOutcome`, `EditorFolderLoadedS2C`) | 3 | The recorded exception below. |
 | `history/ops/StructureRestoreOps.kt` | `editor/network` spine (`EditorHandlerSupport.commitDirtyUnder`) | 1 | Same reason as the undo case: restoring a revision must flush dirty structures through the shared helper that carries the commit ordering, not a copy of it. |
-| `structure/ops/StructureCommit.kt` | `structure/network` (`StructureAutoSavedS2C`, `toAutoSavedPayload`) | 2 | `StructureCommit.broadcast` lives in `ops` and sends the packet itself. |
-| `structure/ops/StructureCommit.kt` | `history/network` (`HistoryWatchers`) | 1 | `broadcast` also pushes the new revision to open Local History panels. |
 
-The `StructureCommit` rows (3 of the 11) are the ones plausibly fixable: they exist only because
-`broadcast` — a networking function — lives in `ops`. Moving it to `structure/network` does not by
-itself help, because `tick` and `commitAll` (both `ops`) call it; the fix is to have those two
-return their committed structures and let the caller at the network boundary do the sending. That
-is a real change to the auto-save call graph and is not attempted here. The other 8 are the
-recorded exception and its sibling, and are deliberate.
+This used to be 11. `StructureCommit` accounted for three of them, because `broadcast` — a
+networking function — lived in `ops`: it imported `StructureAutoSavedS2C`, `toAutoSavedPayload` and
+`history/network`'s `HistoryWatchers`, and `tick`/`commitAll` called it. That is now fixed rather
+than excused. `broadcast` moved to `network/StructureSync`, and `tick`/`commitAll` return their
+committed structures for the network layer to announce, so `StructureCommit` imports no network
+package at all.
+
+The remaining 8 are the recorded exception and its sibling, and are deliberate: both replay a file
+operation through the very handlers the client would have invoked, and duplicating those handlers'
+ordering rules would be the worse trade.
 
 #### History: what the previous audit reported
 

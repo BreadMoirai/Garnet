@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.explorer.network
 
+import com.breadmoirai.garnet.editor.structure.network.StructureSync
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.clearCellVolume
 import com.breadmoirai.garnet.editor.writeStub
@@ -347,7 +348,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     EditorDimRegistry.of(this).placedBoxOf("clock.nbt") shouldBe null
 
                     // A tick pass after the swap must not resurrect the cross-contamination either.
-                    StructureCommit.tick(this, now = overworld().gameTime + 1000)
+                    StructureSync.tick(this, now = overworld().gameTime + 1000)
                     fileB.readBytes() shouldBe bBefore
 
                     SharedSettings.projectRootPath = ""

@@ -13,6 +13,7 @@ import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.test.drainPayloads
+import com.breadmoirai.garnet.test.grantChannel
 import com.breadmoirai.garnet.test.makeMockServerPlayer
 import com.breadmoirai.garnet.test.withTempRoot
 import com.breadmoirai.garnet.harness.GarnetTestSpec
@@ -263,6 +264,65 @@ class EditorStructureNetworkSpec : GarnetTestSpec({
             } finally {
                 SharedSettings.structureRegionChunks = prevChunks
                 SharedSettings.localHistoryDir = prevHistDir
+                histDir.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    test("the debounced auto-save pass broadcasts what it committed") {
+        // REGRESSION GUARD for the ops/network split: StructureCommit.tick commits but deliberately
+        // sends nothing, and StructureSync.tick is the wrapper that announces the result. Every
+        // other StructureAutoSavedS2C assertion in this file goes through handleSaveStructure (an
+        // explicit player-triggered save), so nothing covered the UNSOLICITED fan-out that
+        // END_SERVER_TICK actually drives — if StructureSync.tick stopped broadcasting, or Garnet.kt
+        // were rewired back to the ops function, every existing test here would still pass.
+        withTempRoot("struct-autosave-broadcast") { tmp ->
+            val prevChunks = SharedSettings.structureRegionChunks
+            val prevHistDir = SharedSettings.localHistoryDir
+            val prevDebounce = SharedSettings.autoSaveDebounceTicks
+            SharedSettings.structureRegionChunks = 1
+            val histDir = kotlin.io.path.createTempDirectory("struct-autosave-broadcast-hist")
+            SharedSettings.localHistoryDir = histDir.toAbsolutePath().toString()
+            EditorNewStructure.create(tmp, "ticker")
+            try {
+                onServer {
+                    EditorServerContext.set(this, EditorServerContext(EditorRoot(tmp)))
+                    val player = makeMockServerPlayer(this)
+                    // The fan-out is canSend-guarded (F6). A mock player never runs the
+                    // CONFIGURATION handshake, so without this its sendable-channel set is empty
+                    // and the broadcast is correctly dropped — see grantChannel's KDoc.
+                    grantChannel(player, StructureAutoSavedS2C.TYPE)
+                    EditorStructureHandlers.handlePlaceStructure(this, player, PlaceStructureC2S("ticker.nbt"))
+                    drainPayloads(player)
+
+                    val region = EditorDimRegistry.of(this).structureRegionOriginOf("ticker.nbt")!!
+                    val lvl = overworld()
+                    // Empty the region first, so the committed capture is exactly the one block
+                    // stamped below rather than that plus the seeded platform — the same setup the
+                    // force-save test above uses.
+                    val width = SharedSettings.structureRegionChunks * 16
+                    StructurePersistence.clearBounds(
+                        lvl, BlockPos(region.x, lvl.minY, region.z),
+                        Vec3i(width, lvl.maxY - lvl.minY + 1, width),
+                    )
+                    val edited = region.offset(3, 0, 3)
+                    lvl.setBlock(edited, Blocks.IRON_BLOCK.defaultBlockState(), 2)
+                    StructureEditWatcher.onBlockChanged(lvl, edited)
+
+                    // Due immediately, so this tick pass commits rather than debouncing.
+                    SharedSettings.autoSaveDebounceTicks = 0
+                    StructureSync.tick(this)
+
+                    val saved = drainPayloads(player).filterIsInstance<StructureAutoSavedS2C>().single()
+                    saved.subpath shouldBe "ticker.nbt"
+                    saved.blockCount shouldBe 1
+
+                    EditorSession.clear(player.uuid)
+                }
+            } finally {
+                SharedSettings.structureRegionChunks = prevChunks
+                SharedSettings.localHistoryDir = prevHistDir
+                SharedSettings.autoSaveDebounceTicks = prevDebounce
                 histDir.toFile().deleteRecursively()
             }
         }

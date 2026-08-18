@@ -113,13 +113,13 @@ object EditorStructureHandlers {
                 // This is a REPLY to the SaveStructureC2S `player` just sent — they provably have
                 // the mod (they just used one of its channels), so send to them directly and
                 // unconditionally, the same way every other S2C in this file replies. The `canSend`
-                // guard on StructureCommit.broadcast exists for the genuinely UNSOLICITED fan-out
-                // (StructureCommit.tick's debounce, commitAll's backstop) where the recipient never
+                // guard on StructureSync.broadcast exists for the genuinely UNSOLICITED fan-out
+                // (StructureSync.tick's debounce, commitAll's backstop) where the recipient never
                 // asked for anything and isn't provably running the mod at all (F6) — it does not
                 // apply to a reply. Still broadcast to every OTHER player (guarded) so their
                 // Explorer status lines pick up the change too.
                 ServerPlayNetworking.send(player, outcome.structure.toAutoSavedPayload())
-                StructureCommit.broadcast(server, outcome.structure, exclude = player)
+                StructureSync.broadcast(server, outcome.structure, exclude = player)
             }
             is CommitOutcome.NoChange -> {
                 // Nothing to write: the region already matches the committed file.

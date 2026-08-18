@@ -83,7 +83,7 @@ data class StructureAutoSavedS2C(
 /**
  * The `data`-to-wire mapping for a committed structure. This is the ONLY place that knows a
  * [CommittedStructure] has a wire form — `structure/data` is a leaf layer and must not name the
- * payload, and `structure/ops` broadcasts through `StructureCommit.broadcast`, which converts here.
+ * payload, and `structure/ops` sends nothing at all — [StructureSync.broadcast] converts here.
  */
 fun CommittedStructure.toAutoSavedPayload() = StructureAutoSavedS2C(
     subpath, sizeX, sizeY, sizeZ, blockCount, savedAtMillis,

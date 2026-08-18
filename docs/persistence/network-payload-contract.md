@@ -39,8 +39,9 @@ a force-commit through `StructureCommit`, the same engine that drives auto-save 
 back to (recovery goes through `LocalHistoryStore` instead, see `docs/persistence/local-history.md`).
 
 `StructureAutoSavedS2C(subpath, sizeX, sizeY, sizeZ, blockCount, savedAtMillis)` is the one
-clientbound payload here that is **not** a reply to a specific request: `StructureCommit` broadcasts
-it to every player on every successful commit (debounced auto-save or a forced `SaveStructureC2S`),
+clientbound payload here that is **not** a reply to a specific request: `StructureSync.broadcast`
+sends it to every player on every successful commit (debounced auto-save or a forced
+`SaveStructureC2S`),
 since a structure region is server-global and any player looking at it wants the update. The client
 handler (`StructureInfoState.onAutoSaved`) renders every field —
 `subpath`/`sizeX`/`sizeY`/`sizeZ`/`blockCount`/`savedAtMillis` — into the

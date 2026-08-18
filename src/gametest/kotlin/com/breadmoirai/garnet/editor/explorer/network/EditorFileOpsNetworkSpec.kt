@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.explorer.network
 
+import com.breadmoirai.garnet.editor.structure.network.StructureSync
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
@@ -615,7 +616,7 @@ class EditorFileOpsNetworkSpec : GarnetTestSpec({
             StructureAutoSave.of(server).dirtySubpaths().contains("clock.nbt").shouldBeFalse()
 
             // commitAll is what BEFORE_SAVE / SERVER_STOPPING run; it must not resurrect the file.
-            StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+            StructureSync.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
             root.resolve("clock.nbt").exists().shouldBeFalse()
         }
     }

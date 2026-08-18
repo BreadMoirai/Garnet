@@ -9,6 +9,7 @@ import com.breadmoirai.garnet.editor.workspace.world.EditorDimLifecycle
 import com.breadmoirai.garnet.editor.explorer.data.EditorRoot
 import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.network.StructureSync
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.core.async.AsyncEventHandler
@@ -55,7 +56,7 @@ class Garnet : ModInitializer {
             // stopServer HEAD: levels are still fully live here. SERVER_STOPPED fires at TAIL, after
             // saveAllChunks and after every level is closed — retrying a failed commit there would
             // call getBlockState on a closed ServerLevel (B2).
-            StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+            StructureSync.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
         }
         ServerLifecycleEvents.SERVER_STOPPED.register { server ->
             StructureAutoSave.dispose(server)
@@ -63,10 +64,10 @@ class Garnet : ModInitializer {
             EditorDimLifecycle.releaseServerState(server)
         }
         ServerTickEvents.END_SERVER_TICK.register { server ->
-            StructureCommit.tick(server)
+            StructureSync.tick(server)
         }
         ServerLifecycleEvents.BEFORE_SAVE.register { server, _, _ ->
-            StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+            StructureSync.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
         }
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             EditorCommand.register(dispatcher)

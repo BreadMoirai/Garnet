@@ -8,6 +8,7 @@ import com.breadmoirai.garnet.editor.network.EditorHandlerSupport.sendUndoState
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewSpec
 import com.breadmoirai.garnet.editor.structure.network.EditorSaveReportS2C
 import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
+import com.breadmoirai.garnet.editor.structure.network.StructureSync
 import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
 import com.breadmoirai.garnet.editor.undo.data.CreatedFileKind
 import com.breadmoirai.garnet.editor.undo.data.EditorUndoCommand
@@ -126,7 +127,7 @@ object EditorTreeHandlers {
         // and "Open Folder" is the very action that fixes an unresolvable root — refusing here
         // would leave a player with a stale placed-and-dirty structure no way out at all. Log it
         // and proceed.
-        val uncommitted = StructureCommit.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
+        val uncommitted = StructureSync.commitAll(server, LocalHistoryStore.REASON_AUTOSAVE)
         val writeFailures = uncommitted.filter { it.writeFailed }
         if (writeFailures.isNotEmpty()) {
             fail(player,

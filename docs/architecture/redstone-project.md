@@ -188,7 +188,7 @@ inside the `deleteSubtree` primitive, not the handler, so the undo/redo replays 
   Local History panel keys off (see [ui/local-history-panel.md](../ui/local-history-panel.md)).
   `StructureAutoSavedS2C` → `StructureInfoState.onAutoSaved` fills `subpath`/sizes/`blockCount`/
   `lastSavedMillis` from the payload directly. The packet is
-  broadcast by `StructureCommit` (see the "Standalone structure files" section below), from both
+  broadcast by `StructureSync` (see the "Standalone structure files" section below), from both
   the end-of-tick debounce pass and the `commitAll` backstop.
 - `editor/workspace/ui/EditorIntegratedBoot` — `bootWorkspace()` (the only boot entry, reachable from
   the UI via `TitleScreenMixin`) opens/creates the single shared `garnet-workspace` save
@@ -222,10 +222,10 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
   `DiscardStructureC2S` any more — see below.
 - **Debounced auto-save + local history (the only auto-persist path):** `StructureCommit` writes
   the `.nbt` directly; there is no dirty-buffer sidecar. `ServerTickEvents.END_SERVER_TICK` calls
-  `StructureCommit.tick`, which commits any placed structure whose `StructureAutoSave` dirty state
+  `StructureSync.tick`, which commits any placed structure whose `StructureAutoSave` dirty state
   has gone quiet for `SharedSettings.autoSaveDebounceTicks` (or has been continuously dirty for
   `autoSaveMaxDirtyTicks`); `ServerLifecycleEvents.BEFORE_SAVE` and `SERVER_STOPPING` both call
-  `StructureCommit.commitAll` as a backstop flush regardless of timing — both fire while every
+  `StructureSync.commitAll` as a backstop flush regardless of timing — both fire while every
   level is still live (`SERVER_STOPPED`, by contrast, fires at `stopServer` TAIL after every level
   has closed, so retrying a failed commit there against a closed `ServerLevel` is unsafe; it's used
   only for the disposal calls below, not for `commitAll`). `SaveStructureC2S` →
@@ -236,7 +236,10 @@ by `NewStructureC2S.parentSubpath` (`""` = the project root).
   content BEFORE overwriting the `.nbt` with it (so that content is durably banked before it
   becomes the live file; the pre-edit content itself lives in the *previous* revision, banked by an
   earlier commit — see `docs/persistence/local-history.md` for the rollback implication), and
-  broadcasts `StructureAutoSavedS2C`. `SERVER_STOPPED` calls `StructureAutoSave.dispose`
+  broadcasts `StructureAutoSavedS2C`. The commit itself lives in `StructureCommit`
+  (`editor/structure/ops`) and sends nothing; the `StructureSync` wrappers in
+  `editor/structure/network` are what announce it, which is why production calls those and not the
+  `ops` forms directly. `SERVER_STOPPED` calls `StructureAutoSave.dispose`
   so per-server dirty state cannot leak across server lifecycles. Since there is no dirty buffer to
   revert to, there is no "Discard" action — an edit's only rollback path is `LocalHistoryStore`.
   See `docs/persistence/local-history.md` for the on-disk layout and pruning policy, and
