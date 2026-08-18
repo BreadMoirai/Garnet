@@ -2,6 +2,8 @@
 
 Project documentation lives in `docs/`. This file is the entry point: it indexes the **folder structure**, not individual articles. Each category has its own `INDEX.md` listing the articles inside.
 
+One rule here is not about docs at all: **[Fix what you find](#fix-what-you-find)** — anything broken you notice while working gets fixed in the same piece of work.
+
 ## How to search for information
 
 `docs/` is indexed for semantic search by [qmd](https://github.com/tobi/qmd) as the collection `garnet-docs`. **Query it first** — don't hand-walk the folder table.
@@ -43,6 +45,24 @@ Project documentation lives in `docs/`. This file is the entry point: it indexes
 Newly written articles are indexed automatically on save — there is no manual reindex step, and running `qmd embed` by hand only contends for the reindex lock.
 
 Skip steps 1–5 only when the source change is purely internal (an unobservable refactor) AND no doc currently references the changed code. If unsure, default to checking.
+
+## Fix what you find
+
+**Any issue you discover while working is an immediate must-fix in the same piece of work** — however you found it, whoever caused it, whatever it touches. If you find it, you fix it.
+
+These are **not** valid reasons to defer, and none of them may be used to close out a task with the issue still present:
+
+- "It was already broken."
+- "My change didn't cause it."
+- "It's pre-existing."
+- "That's out of scope."
+- "It's only a comment / doc / cosmetic."
+
+A stale KDoc link, a lying filename, a dead import, a doc that describes an architecture the code abandoned — these count. Cheap to fix is a reason to fix it now, not a reason to rank it below the "real" work.
+
+**If a fix genuinely cannot be done in the current change** — it needs a design decision only the user can make, or the fix is larger than the task that surfaced it — then say so **explicitly in your response to the user**: name what you are leaving broken, where it is, and why it cannot be done here. Silently deferring, quietly parking it, or burying it in a TODO comment is not permitted; an unreported issue is indistinguishable from an undiscovered one, and the next person pays for it twice.
+
+The failure mode this prevents: known defects accumulate across changes because every individual change had a locally reasonable excuse to skip them, and the tree ends up with a documented architecture nobody follows and comments nobody trusts.
 
 ## How to save learnings
 
