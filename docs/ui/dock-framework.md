@@ -144,7 +144,7 @@ assume it is already on the client thread; `garnet$updateScaledFramebuffer` reac
 `eventHandler.resizeGui()`, which is unsafe to call concurrently with rendering.
 
 The Project Explorer's per-world state is reset from its **own** `DISCONNECT` registration in
-`editor/ui/ExplorerLifecycle.kt`, not from this one: `ExplorerTreeSnapshot`, `StructureInfoState`,
+`editor/explorer/ui/ExplorerLifecycle.kt`, not from this one: `ExplorerTreeSnapshot`, `StructureInfoState`,
 `ExplorerTreeState`, `UndoState`, `OpenStructureState` and `LocalHistoryState` are all reset there
 (after the session
 save — see
@@ -197,8 +197,8 @@ whole dock (rendering and input) silently no-ops back to vanilla, never crashing
 
 ## First real panel: the Project Explorer (live-data pattern, now on Jewel)
 
-`editor/explorer/ui/ExplorerPanel.kt` + `editor/ui/ExplorerToolbar.kt` +
-`editor/ui/ExplorerTreeSnapshot.kt` + `editor/ui/ExplorerTreeState.kt` are the first non-demo panel
+`editor/explorer/ui/ExplorerPanel.kt` + `editor/explorer/ui/ExplorerToolbar.kt` +
+`editor/explorer/ui/ExplorerTreeSnapshot.kt` + `editor/explorer/ui/ExplorerTreeState.kt` are the first non-demo panel
 and the template future panels (debugger, timeline) should copy. As of the jewel-widget-layer
 migration, the panel is built entirely from JetBrains Jewel components (`LazyTree`, `PopupMenu`,
 `IconButton`) under one `IntUiTheme(isDark = true)`, not hand-rolled `BasicText`/`Box.clickable`
@@ -265,7 +265,7 @@ rows. The pattern:
   The exception is a `.nbt` `FileNode` (`node.extension == "nbt"`), which additionally sends
   `PlaceStructureC2S(path)` to place the standalone structure centered in its auto-assigned region.
   The Refresh `IconButton` sends `ListEditorTreeC2S.INSTANCE` (send the `INSTANCE`, never a fresh
-  unit payload — see `EditorPackets`). `TreeRow` prefixes a row's label with `●` when the row's
+  unit payload — see `editor/explorer/network/ExplorerPackets.kt`). `TreeRow` prefixes a row's label with `●` when the row's
   path equals `snapshot.currentSubpath`, and shows
   a Jewel `AllIconsKeys` icon per node kind (`Nodes.Folder`, `FileTypes.Archive` for `.nbt`,
   `FileTypes.Text` otherwise). There is no per-node dirty flag any more — a `.nbt`'s auto-save
@@ -278,7 +278,8 @@ rows. The pattern:
   (`UndoC2S.INSTANCE`) and Redo (`RedoC2S.INSTANCE`), each enabled only while the server's last
   `UndoStateS2C` carried a label for it, then Refresh
   (`ListEditorTreeC2S.INSTANCE` — send the `INSTANCE`, never a fresh unit payload, see
-  `EditorPackets`; the same rule applies to the two undo singletons) and Collapse All
+  `editor/explorer/network/ExplorerPackets.kt`; the same rule applies to the two undo singletons,
+  which live in `editor/undo/network/UndoPackets.kt`) and Collapse All
   (`ExplorerTreeState.collapseAll()`, which clears
   `treeState.openNodes` and leaves selection untouched). `PopupMenu`'s `onDismissRequest` takes an
   `(InputMode) -> Boolean` in this Jewel version, not a no-arg lambda.

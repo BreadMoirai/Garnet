@@ -6,7 +6,7 @@ summary: The revision list reached via the LEFT stripe's second icon — why it 
 
 # The Local History panel
 
-`LocalHistoryPanel.kt` (`src/client/kotlin/.../editor/ui/`) is the second LEFT-region dock panel,
+`LocalHistoryPanel.kt` (`src/client/kotlin/.../editor/history/ui/`) is the second LEFT-region dock panel,
 reached via the [dock stripe](dock-stripe.md)'s second icon — sharing the LEFT region with the Project
 Explorer and the [Structure Info panel](structure-info-panel.md), not tabbed beside them. It lists a
 structure's banked revisions and offers **Restore**, which moves both the world copy and the `.nbt`

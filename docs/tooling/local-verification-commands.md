@@ -159,7 +159,7 @@ cmd.exe /c "cd /d H:\\Repo\\Garnet && gradlew.bat :26.2:test"
 
 Then check the specific class's result under
 `versions/26.2/build/test-results/test/TEST-<fully.qualified.ClassName>.xml` (e.g.
-`TEST-com.breadmoirai.garnet.client.ui.dock.DockLifecycleTest.xml`).
+`TEST-com.breadmoirai.garnet.dock.shell.DockLifecycleTest.xml`).
 
 ## See also
 

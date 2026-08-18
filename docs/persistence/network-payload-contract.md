@@ -1,7 +1,7 @@
 ---
 title: Editor C2S/S2C payload contract
 tags: [networking, payloads, sync, authority, editor]
-summary: The authority model behind editor/network/EditorPackets.kt — every client subpath is resolved through EditorRoot.resolveSubpath's path-traversal guard, per-player intent is tracked by EditorSession, and the server is still the only writer.
+summary: The authority model behind the editor payloads under editor/*/network/ — every client subpath is resolved through EditorRoot.resolveSubpath's path-traversal guard, per-player intent is tracked by EditorSession, and the server is still the only writer.
 ---
 
 # Editor C2S/S2C payload contract
@@ -12,10 +12,18 @@ summary: The authority model behind editor/network/EditorPackets.kt — every cl
 all deleted — there is no in-game recorder/runner surface anymore (see
 [architecture/module-map.md](../architecture/module-map.md)).
 
-The Explorer/redstone-project wire protocol (`editor/network/EditorPackets.kt`,
-`editor/network/EditorNetworkRegistry.kt`, `EditorTreeHandlers.kt`, `EditorStructureHandlers.kt`,
-`EditorFileOpsHandlers.kt`) is a genuine replacement worth documenting on its own terms
-— it is a **different** authority model, not a renamed version of the old one. There is no
+The Explorer/redstone-project wire protocol is a genuine replacement worth documenting on its own terms
+— it is a **different** authority model, not a renamed version of the old one.
+
+It lives in four per-sub-feature payload files —
+`editor/explorer/network/ExplorerPackets.kt` (tree + file ops),
+`editor/structure/network/StructurePackets.kt`, `editor/history/network/HistoryPackets.kt`,
+`editor/undo/network/UndoPackets.kt` — over a shared spine of
+`editor/network/EditorNetworkRegistry.kt` (registration), `editor/network/EditorHandlerSupport.kt`
+(shared handler helpers) and `editor/network/PacketCodecs.kt` (the `id()` identifier helper), with
+the server handlers in `editor/explorer/network/EditorTreeHandlers.kt`,
+`editor/explorer/network/EditorFileOpsHandlers.kt` and
+`editor/structure/network/EditorStructureHandlers.kt`. There is no
 block-entity handle at all: the client addresses everything by **path** and by **player identity**.
 
 ## Invariant 1: server is the only writer
@@ -114,7 +122,7 @@ delegation — whichever resolves first is used for the entire request.
   `UnloadEditorFolderC2S`, `SaveNowC2S`, `UndoC2S`, `RedoC2S` use `StreamCodec.unit(INSTANCE)`, which captures one
   specific object by identity and throws `IllegalStateException("Can't encode A, expected B")` if
   a caller sends a newly-constructed instance instead of the registered `INSTANCE`/singleton.
-- Recursive tree codec: `FILE_TREE_STREAM_CODEC` (in `EditorPackets.kt`) hand-encodes a
+- Recursive tree codec: `FILE_TREE_STREAM_CODEC` (in `editor/explorer/network/ExplorerPackets.kt`) hand-encodes a
   `FileTreeNode` tree with a per-node tag byte (`TAG_FOLDER` / `TAG_FILE`), recursing for folder
   children.
 - Optional string: a leading `Boolean` flag before the string, used by

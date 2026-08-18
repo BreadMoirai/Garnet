@@ -27,7 +27,7 @@ constraint survives from the old advice (this is the Compose-era analog of the l
 
 ## Native OS dialogs block — run them off the render thread (except on macOS)
 
-The Explorer's root picker (`NfdFolderPicker`, in `editor/ui/FolderPicker.kt`) is backed by
+The Explorer's root picker (`NfdFolderPicker`, in `editor/explorer/ui/FolderPicker.kt`) is backed by
 LWJGL's bindings for [NFD](https://github.com/btzy/nativefiledialog-extended)
 (`org.lwjgl.util.nfd.NativeFileDialog`) rather than tinyfd. Tinyfd's folder picker on Windows is
 its legacy Win32 `SHBrowseForFolder` browser — a small, dated tree view — where NFD drives the

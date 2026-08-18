@@ -30,11 +30,12 @@ class RedoC2S private constructor() : CustomPacketPayload {
 /**
  * The acting player's undo/redo availability. A null label means that button is disabled.
  *
- * Per-player state, so unlike [StructureAutoSavedS2C] this is never broadcast — another player's
- * stack is none of this client's business.
+ * Per-player state, so unlike
+ * [com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C] this is never
+ * broadcast — another player's stack is none of this client's business.
  *
  * Optional strings use the leading-boolean-flag idiom, matching
- * [EditorTreeSnapshotS2C.currentSubpath].
+ * [com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C.currentSubpath].
  */
 data class UndoStateS2C(val undoLabel: String?, val redoLabel: String?) : CustomPacketPayload {
     companion object {

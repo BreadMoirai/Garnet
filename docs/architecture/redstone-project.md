@@ -90,13 +90,16 @@ Server state and lifecycle:
 - `EditorCommand` — `/garnet editor`.
 
 Network:
-- `editor/network/EditorPackets` + `EditorNetworkRegistry` + `EditorTreeHandlers` /
-  `EditorStructureHandlers` / `EditorFileOpsHandlers` — path-containment + per-player-session
+- `editor/explorer/network/ExplorerPackets` + `editor/structure/network/StructurePackets` +
+  `editor/history/network/HistoryPackets` + `editor/undo/network/UndoPackets` (the payloads, with
+  the shared `id()` helper in `editor/network/PacketCodecs`) + `editor/network/EditorNetworkRegistry`
+  + `editor/explorer/network/EditorTreeHandlers` / `editor/structure/network/EditorStructureHandlers`
+  / `editor/explorer/network/EditorFileOpsHandlers` — path-containment + per-player-session
   authority; see [persistence/network-payload-contract.md](../persistence/network-payload-contract.md).
 
 Client:
-- `editor/explorer/ui/ExplorerPanel` + `editor/ui/ExplorerToolbar` + `editor/ui/ExplorerTreeSnapshot` +
-  `editor/ui/ExplorerTreeState` — the Compose dock panel, built on Jewel widgets (`LazyTree`,
+- `editor/explorer/ui/ExplorerPanel` + `editor/explorer/ui/ExplorerToolbar` +
+  `editor/explorer/ui/ExplorerTreeSnapshot` + `editor/explorer/ui/ExplorerTreeState` — the Compose dock panel, built on Jewel widgets (`LazyTree`,
   `PopupMenu`, `IconButton`), that renders `snapshot.root` (`FolderNode`/`FileNode`) via
   `ExplorerTreeState.buildTreeFrom`, with per-folder expand/collapse (LEFT region, auto-opened on
   joining a Garnet-capable world subject to the remembered `garnet-dock.json` preference, with

@@ -29,7 +29,7 @@ exactly as it is drawn over where the LEFT/RIGHT columns stop), then LEFT, then 
 which is the whole point of the `null` case. Hidden/closed regions and splitters need no special
 case: a closed region reserves nothing, and splitters are drawn inside the reserved strips. It takes
 no `Minecraft`/GLFW dependency, so it is unit-tested in `DockHitTestTest`
-(`src/test/.../ui/dock/`) the same way `syncDockViewport` was split out for testability.
+(`src/test/.../dock/shell/`) the same way `syncDockViewport` was split out for testability.
 
 Both gestures skip themselves when `ViewportState.realWidth/realHeight` are still `0` — before
 `WindowMixin` has cached a real framebuffer size the layout is unknowable, and guessing it from a

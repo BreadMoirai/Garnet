@@ -6,7 +6,7 @@ summary: The LEFT panel showing the open structure's subpath, size, block count 
 
 # The Structure Info panel
 
-`StructureInfoPanel.kt` (`src/client/kotlin/.../editor/ui/`) is the third LEFT-region dock panel,
+`StructureInfoPanel.kt` (`src/client/kotlin/.../editor/structure/ui/`) is the third LEFT-region dock panel,
 `structureInfoPanel()` registering `Panel("garnet.structureInfo", "Structure Info", DockRegion.LEFT,
 AllIconsKeys.General.Information)`. It shows facts about whichever structure is currently placed in
 the world: subpath, size, block count, and last-saved time. See [dock-stripe.md](dock-stripe.md) for
