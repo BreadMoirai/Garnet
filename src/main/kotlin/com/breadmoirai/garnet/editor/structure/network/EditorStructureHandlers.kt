@@ -118,8 +118,8 @@ object EditorStructureHandlers {
                 // asked for anything and isn't provably running the mod at all (F6) — it does not
                 // apply to a reply. Still broadcast to every OTHER player (guarded) so their
                 // Explorer status lines pick up the change too.
-                ServerPlayNetworking.send(player, outcome.payload)
-                StructureCommit.broadcast(server, outcome.payload, exclude = player)
+                ServerPlayNetworking.send(player, outcome.structure.toAutoSavedPayload())
+                StructureCommit.broadcast(server, outcome.structure, exclude = player)
             }
             is CommitOutcome.NoChange -> {
                 // Nothing to write: the region already matches the committed file.

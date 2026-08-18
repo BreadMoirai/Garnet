@@ -199,6 +199,12 @@ NBT/region geometry that used to be a top-level `structure/` package.
   decide whether a commit's captured content actually changed vs. the committed `.nbt`.
 - `data/CommitOutcome.kt` — the sealed interface (`Committed`/`NoChange`/`NotApplicable`/`Failed`)
   returned by `StructureCommit.commit`.
+- `data/CommittedStructure.kt` — the domain record `Committed` carries (subpath, size, block count,
+  timestamp). Deliberately *not* the `StructureAutoSavedS2C` wire payload: `data` is a leaf layer,
+  so the wire mapping lives at the network boundary as
+  `StructurePackets.CommittedStructure.toAutoSavedPayload()`. The two types carry identical fields
+  today; the payload's field order is its stream codec and is frozen by the protocol, this one is
+  free to change.
 - `ops/StructurePersistence.kt` — compressed-NBT template save/load (`save`/`load`, origin-fixed
   1:1), the standalone-file path (`captureAutoFitIn`/`placeStructureCentered`), and the crash-safe
   `writeStructureAtomic`. `placeStructureCentered(file, …)` is a thin read-then-delegate wrapper
@@ -214,7 +220,9 @@ NBT/region geometry that used to be a top-level `structure/` package.
   `.nbt` plus a `LocalHistoryStore` revision. The sole `.nbt` writer. See
   [redstone-project.md](redstone-project.md#standalone-structure-files).
 - `network/StructurePackets.kt` — `SaveNowC2S`, `EditorSaveReportS2C`, `PlaceStructureC2S`,
-  `SaveStructureC2S`, `StructureAutoSavedS2C`, `StructureResultS2C`.
+  `SaveStructureC2S`, `StructureAutoSavedS2C`, `StructureResultS2C`, plus
+  `CommittedStructure.toAutoSavedPayload()`, the one place that knows a committed structure has a
+  wire form.
 - `network/EditorStructureHandlers.kt` — their server handlers.
 - `ui/StructureInfoPanel.kt` + `ui/StructureInfoState.kt` (client) — the Structure Info dock panel
   and its state; `ui/OpenStructureState.kt` — which structure the panels are pointed at. See

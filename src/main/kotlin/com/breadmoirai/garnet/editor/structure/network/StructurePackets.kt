@@ -1,6 +1,7 @@
 package com.breadmoirai.garnet.editor.structure.network
 
 import com.breadmoirai.garnet.editor.network.payloadId
+import com.breadmoirai.garnet.editor.structure.data.CommittedStructure
 import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
@@ -78,6 +79,15 @@ data class StructureAutoSavedS2C(
     }
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 }
+
+/**
+ * The `data`-to-wire mapping for a committed structure. This is the ONLY place that knows a
+ * [CommittedStructure] has a wire form — `structure/data` is a leaf layer and must not name the
+ * payload, and `structure/ops` broadcasts through `StructureCommit.broadcast`, which converts here.
+ */
+fun CommittedStructure.toAutoSavedPayload() = StructureAutoSavedS2C(
+    subpath, sizeX, sizeY, sizeZ, blockCount, savedAtMillis,
+)
 
 data class StructureResultS2C(
     val subpath: String,

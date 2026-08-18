@@ -2,7 +2,9 @@ package com.breadmoirai.garnet.editor.structure.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
+import com.breadmoirai.garnet.editor.structure.data.CommittedStructure
 import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.structure.network.toAutoSavedPayload
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.workspace.world.EditorRootResolver
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
@@ -241,7 +243,7 @@ object StructureCommit {
         autoSave.clear(subpath)
         clearBackoff(server, subpath)
 
-        return CommitOutcome.Committed(StructureAutoSavedS2C(
+        return CommitOutcome.Committed(CommittedStructure(
             subpath, size.x, size.y, size.z, captured.blockCount, System.currentTimeMillis(),
         ))
     }
@@ -261,7 +263,7 @@ object StructureCommit {
             val retryAt = backoff[subpath]
             if (retryAt != null && now < retryAt) continue
             val outcome = commit(server, subpath, LocalHistoryStore.REASON_AUTOSAVE, now, writeNbt)
-            if (outcome is CommitOutcome.Committed) broadcast(server, outcome.payload)
+            if (outcome is CommitOutcome.Committed) broadcast(server, outcome.structure)
         }
     }
 
@@ -307,7 +309,7 @@ object StructureCommit {
         val uncommitted = mutableListOf<UncommittedStructure>()
         for (subpath in autoSave.dirtySubpaths()) {
             when (val outcome = commit(server, subpath, reason)) {
-                is CommitOutcome.Committed -> broadcast(server, outcome.payload)
+                is CommitOutcome.Committed -> broadcast(server, outcome.structure)
                 is CommitOutcome.Failed ->
                     uncommitted += UncommittedStructure(subpath, outcome.reason, writeFailed = true)
                 is CommitOutcome.NotApplicable ->
@@ -333,7 +335,8 @@ object StructureCommit {
      * (a debounced auto-save and the periodic/shutdown backstop, neither triggered by a specific
      * player's packet) and both go through this function unfiltered (`exclude = null`).
      */
-    fun broadcast(server: MinecraftServer, payload: StructureAutoSavedS2C, exclude: ServerPlayer? = null) {
+    fun broadcast(server: MinecraftServer, committed: CommittedStructure, exclude: ServerPlayer? = null) {
+        val payload = committed.toAutoSavedPayload()
         for (player in server.playerList.players) {
             if (player === exclude) continue
             // Unlike every other S2C here, this one is unsolicited — it isn't a reply to a C2S, so

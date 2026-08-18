@@ -350,7 +350,7 @@ class StructureRestoreSpec : GarnetTestSpec({
 
             editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
             StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL).let {
-                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).payload)
+                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).structure)
             }
 
             drainPayloads(player).filterIsInstance<StructureHistoryS2C>().shouldBeEmpty()
@@ -379,7 +379,7 @@ class StructureRestoreSpec : GarnetTestSpec({
             editPlacedStructure(server, subpath, Blocks.GOLD_BLOCK)
             StructureCommit.commit(server, subpath, LocalHistoryStore.REASON_MANUAL).let {
                 // The push rides on `broadcast`, which is what every unsolicited commit path calls.
-                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).payload)
+                StructureCommit.broadcast(server, (it as CommitOutcome.Committed).structure)
             }
 
             val after = drainPayloads(player).filterIsInstance<StructureHistoryS2C>().last()
