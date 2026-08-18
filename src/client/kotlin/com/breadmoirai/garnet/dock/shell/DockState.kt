@@ -15,9 +15,10 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
  * focus.
  *
  * Fields are Compose **snapshot state** so [GarnetDock] recomposes when they change, yet plain
- * reads (`.value` via the getters below) are cheap and thread-safe for [ViewportState]/`WindowMixin`
- * to consult when computing the framebuffer shrink. The geometry is authoritative *plain arithmetic*
- * updated eagerly by input handlers — never a side effect of rendering — so the shrink never waits
+ * reads (`.value` via the getters below) are cheap and thread-safe for
+ * [com.breadmoirai.garnet.dock.viewport.ViewportState]/`WindowMixin` to consult when computing the
+ * framebuffer shrink. The geometry is authoritative *plain arithmetic* updated eagerly by input
+ * handlers — never a side effect of rendering — so the shrink never waits
  * on a compose pass. See docs/superpowers/specs/2026-07-24-compose-panel-framework-design.md §2.
  */
 object DockState {

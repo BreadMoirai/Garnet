@@ -50,7 +50,8 @@ fun evaluateConditionOnState(condition: StateCondition, state: BlockState): Bool
 
 /**
  * Returns a human-readable description of what a [StateCondition] expects.
- * Used in [TickCheck] "expected" field.
+ * Supplies the "expected" half of the [SpecFailure] message [OutputScope] reports on a
+ * failed assertion.
  */
 fun describeCondition(condition: StateCondition): String = when (condition) {
     is StateCondition.BoolProperty -> "${condition.name}=${condition.value}"
@@ -66,7 +67,8 @@ fun describeCondition(condition: StateCondition): String = when (condition) {
 
 /**
  * Returns a human-readable description of the relevant portion of [state] for the given [condition].
- * Used in [TickCheck] "actual" field.
+ * Supplies the "actual" half of the [SpecFailure] message [OutputScope] reports on a
+ * failed assertion.
  */
 fun describeStateForCondition(condition: StateCondition, state: BlockState): String = when (condition) {
     is StateCondition.BoolProperty -> blockStatePropertyStr(state, condition.name) ?: "missing"
