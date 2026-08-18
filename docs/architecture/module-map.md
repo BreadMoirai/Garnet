@@ -363,17 +363,46 @@ consumes `core/` and nothing else of the mod's own. `editor/` is the top of the 
 everything; nothing outside `editor/` depends on `editor/`.
 
 Inside `editor/`, the rule is stated at **(sub-feature, layer)** granularity, and the graph is
-meant to be a DAG:
+meant to be a DAG. It is stated in **three tiers**, `data` at the bottom and `network`/`ui` at the
+top:
 
-- `<sub>/data` is a leaf within its sub-feature, and any other sub-feature may import it.
-- `<sub>/ops` may import any `data`, and the `ops` of a sub-feature earlier in the order
-  **explorer → structure → history → undo → workspace**.
-- `<sub>/network` and `<sub>/ui` are tops. Nothing imports them except `editor/network/`'s spine
-  and the two entrypoints.
+- **`<sub>/data` — the leaf tier.** May import other `data` nodes and nothing else in `editor/`.
+  Every node may import any `data`.
+- **`<sub>/ops` — the middle tier.** May import any `data`, `workspace/world` (the shared world
+  substrate, see below), and the `ops` of its own sub-feature or of one earlier in the order
+  **explorer → structure → history → undo → workspace**. **`ops` may not import `network` or
+  `ui`** — this is the one direction the rule genuinely forbids.
+- **`<sub>/network` and `<sub>/ui` — the top tier.** May import anything below them, the
+  `editor/network/` spine, and *each other*: `ui → network` (a panel sending its own sub-feature's
+  payloads, or another's), `ui → ui` (cross-panel state sharing), and `network → network`
+  (handler-to-handler reuse) are all permitted. Nothing below this tier may import into it.
+- **The `editor/network/` spine and the two entrypoints** (`workspace/command/`, `Garnet` /
+  `GarnetClient`) are licensed to import anything.
 
-> **The tree does not currently satisfy this rule** — 60 of its 228 editor-internal edges violate
-> it, concentrated in `ui → network`. Treat the three bullets as design intent and read
-> [the full count](#the-rule-is-broadly-not-honoured--the-full-count) below before relying on them.
+`workspace/world` is deliberately *not* one of the three tiers. It is a shared substrate —
+`EditorDimRegistry`, `EditorRootResolver` — that every sub-feature's `ops` reads, and treating it
+as `workspace`'s `ops` (and therefore last in the sub-feature order) was a vocabulary gap in the
+rule rather than a real constraint.
+
+> **The tree satisfies this rule with 11 known exceptions**, all of them `ops → network`, all of
+> them recorded by name below. See [the full count](#the-count-what-the-rule-costs-today).
+
+### Why the top tier is permissive
+
+An earlier statement of this rule made `network` and `ui` *tops that nothing may import*, including
+each other. That was never how the client worked. A panel sends its own sub-feature's C2S payloads
+and mirrors its S2C ones directly, with no indirection layer between them and none ever intended —
+that shape alone accounted for 27 of the 60 "violations" the previous audit reported. `ui → ui`
+(9 edges) is `ExplorerLifecycle` resetting every panel's state on mount and `LocalHistoryPanel` /
+`StructureInfoPanel` sharing `explorer/ui`'s `formatClock` so their timestamps agree — the reason
+`TimeFormat.kt` exists at all. `network → network` (6) is handler-to-handler reuse, e.g. a file-op
+that relocates a `.nbt` calling `EditorStructureHandlers.placeStructureFrom` rather than
+duplicating its ordering rules.
+
+None of those is debt. A rule that reports the intended design as a violation is a broken rule, not
+a broken codebase, so the rule was restated to describe the tree that exists. What it still forbids
+— `data` or `ops` reaching upward into the wire and the screen — is the constraint that was
+actually worth having, and it is the one the remaining exceptions are measured against.
 
 That is what makes the structure/history relationship legal rather than cyclic: `structure/ops`
 (`StructureCommit`) imports `history/data` (`LocalHistoryStore`), while `history/ops`
@@ -390,74 +419,57 @@ the ordering rules that make the operation reversible, so duplicating them would
 choice. This is a genuine `ops → network` edge against the grain, written down here rather than
 hidden.
 
-### The rule is broadly not honoured — the full count
-
-The design intended `EditorUndoOps` to be the only exception. It is not, and not by a small margin.
-**Read this section before treating the rule above as a description of the code**: it is a
-statement of intent, not an invariant the tree satisfies.
+### The count: what the rule costs today
 
 Every import in `src/main/kotlin` and `src/client/kotlin` whose source and target are both
-`editor/<sub-feature>/<layer>` nodes was extracted and classified against the rule. Method: for
-each file, take its `(sub-feature, layer)` from its path; for each `import
-com.breadmoirai.garnet.editor.…` line, take the target's `(sub-feature, layer)` from the import;
-keep the edge if the rule forbids it. The rule constrains *who may import* a `network`/`ui` node,
-and *what `ops` and `data` may import*; `network`/`ui` are tops and may import downward freely, and
-the `editor/network/` spine plus the two entrypoints are explicitly licensed to import anything.
+`editor/<sub-feature>/<layer>` nodes, classified against the rule above. Method, to re-run it: for
+each file take its `(sub-feature, layer)` from its path; for each `import
+com.breadmoirai.garnet.editor.…` line take the target's `(sub-feature, layer)` from the import
+path; drop same-node edges; apply the four bullets, with the `editor/network/` spine and the
+entrypoints (`workspace/command/`, `Garnet`, `GarnetClient`) licensed as sources.
 
 ```
-editor-internal cross-node import edges : 228
-  permitted by the rule                 : 168
-  VIOLATIONS                            :  60
+editor-internal cross-node import edges : 224
+  permitted by the rule                 : 213
+  VIOLATIONS                            :  11
 ```
 
-Grouped by shape, largest first:
+**All 11 are `ops → network`** — the one direction the rule forbids — and every one is named here:
 
-| Shape | Imports | Files | Representative |
-|---|---:|---:|---|
-| `ui → network`, same sub-feature | 21 | 11 | `explorer/ui/ExplorerActions.kt` → six `explorer/network` C2S payloads |
-| `ui → ui`, cross-sub-feature | 9 | 5 | `explorer/ui/ExplorerLifecycle.kt` → `history/ui`, `structure/ui`, `undo/ui` |
-| `ops → workspace/world` | 7 | 4 | `structure/ops/StructureCommit.kt` → `EditorDimRegistry`, `EditorRootResolver` |
-| `network → network`, cross-sub-feature | 6 | 3 | `structure/network/EditorStructureHandlers.kt` → `explorer/network`, `history/network` |
-| `ui → network`, cross-sub-feature | 6 | 4 | `explorer/ui/ExplorerToolbar.kt` → `undo/network` (`UndoC2S`/`RedoC2S`) |
-| `ops → editor/network` spine | 5 | 2 | `undo/ops/EditorUndoOps.kt`, `history/ops/StructureRestoreOps.kt` |
-| `ops → network`, cross-sub-feature | 4 | 2 | `undo/ops/EditorUndoOps.kt` → `explorer/network` (the recorded exception) |
-| `data → network`, same sub-feature | 1 | 1 | `structure/data/CommitOutcome.kt` → `StructureAutoSavedS2C` |
-| `ops → network`, same sub-feature | 1 | 1 | `structure/ops/StructureCommit.kt` → `StructureAutoSavedS2C` |
+| Source | Target | Imports | Why |
+|---|---|---:|---|
+| `undo/ops/EditorUndoOps.kt` | `editor/network` spine (`EditorHandlerSupport`) | 4 | The recorded exception below. |
+| `undo/ops/EditorUndoOps.kt` | `explorer/network` (`EditorFileOpsHandlers`, `DeleteOutcome`, `EditorFolderLoadedS2C`) | 3 | The recorded exception below. |
+| `history/ops/StructureRestoreOps.kt` | `editor/network` spine (`EditorHandlerSupport.commitDirtyUnder`) | 1 | Same reason as the undo case: restoring a revision must flush dirty structures through the shared helper that carries the commit ordering, not a copy of it. |
+| `structure/ops/StructureCommit.kt` | `structure/network` (`StructureAutoSavedS2C`, `toAutoSavedPayload`) | 2 | `StructureCommit.broadcast` lives in `ops` and sends the packet itself. |
+| `structure/ops/StructureCommit.kt` | `history/network` (`HistoryWatchers`) | 1 | `broadcast` also pushes the new revision to open Local History panels. |
 
-Reading the shapes:
+The `StructureCommit` rows (3 of the 11) are the ones plausibly fixable: they exist only because
+`broadcast` — a networking function — lives in `ops`. Moving it to `structure/network` does not by
+itself help, because `tick` and `commitAll` (both `ops`) call it; the fix is to have those two
+return their committed structures and let the caller at the network boundary do the sending. That
+is a real change to the auto-save call graph and is not attempted here. The other 8 are the
+recorded exception and its sibling, and are deliberate.
 
-- **`ui → network` (27 across both rows) is the dominant pattern, and it is how the client is
-  designed to work.** A panel sends its own sub-feature's C2S payloads and mirrors its S2C ones;
-  there is no indirection layer between them and there was never meant to be. The rule's "nothing
-  imports `network`" simply does not describe the client half of `editor/`.
-- **`ui → ui` (9) is cross-panel state sharing.** `ExplorerLifecycle` resets every panel's state on
-  mount, and `LocalHistoryPanel`/`StructureInfoPanel` both reach for `explorer/ui`'s `formatClock`
-  so their timestamps agree — the reason `TimeFormat.kt` exists at all.
-- **`network → network` (6) is handler-to-handler reuse**, e.g. a file-op that relocates a `.nbt`
-  calling `EditorStructureHandlers.placeStructureFrom` rather than duplicating it.
-- **`data → network` (1) is the sharpest single edge**, because it inverts the leaf rule outright:
-  `CommitOutcome.Committed` carries the `StructureAutoSavedS2C` payload it will be broadcast as.
-- **`ops → workspace/world` (7)** is arguably a vocabulary gap rather than a violation: `world/` is
-  not one of the four layer names the rule uses, and in practice it is a shared substrate every
-  sub-feature reads, not `workspace`'s `ops`.
-- `workspace/command/EditorCommand.kt` → `explorer/network` is *not* counted above: `command/` is
-  an entrypoint layer, so it falls under the same licence as the spine.
+#### History: what the previous audit reported
 
-**None of these is new.** All 60 were checked against the branch point `2f823a3` by indexing where
-every symbol was declared in the old flat tree and comparing the old package of each edge's source
-file against the old package of its target symbol. Result: **46 were already cross-package imports
-at `2f823a3`** (e.g. `ExplorerToolbar.kt` in `editor/ui` already carried `import
-com.breadmoirai.garnet.editor.network.UndoC2S`), and **14 were intra-package references** that the
-old flat layout made invisible — every `ui → ui` edge, and 5 of the 6 `network → network` ones,
-because back then all panels lived in a single flat `editor.ui` package and all handlers in a
-single flat `editor.network` one.
-**Zero are new couplings introduced by the repackage.** The restructure did not add coupling; it
-made pre-existing coupling legible for the first time, which is the honest way to read this table.
+An earlier version of this section reported **60 violations of 228 edges**. That number was
+measured against the stricter rule ("nothing imports `network`/`ui`"), and 49 of the 60 were shapes
+that rule got wrong rather than code that was wrong: 27 `ui → network`, 9 `ui → ui`, 6
+`network → network`, 7 `ops → workspace/world`. Restating the rule removed all of those from the
+count without moving a line of code. One more — `data → network`, `CommitOutcome.Committed`
+carrying the `StructureAutoSavedS2C` payload it would be broadcast as — was a genuine layering
+inversion and was **fixed**: `Committed` now carries `CommittedStructure`, with the wire mapping at
+the network boundary.
 
-So the rule is a target, not a description. If it is to become real, `ui → network` is the shape to
-decide about first — it is nearly half the total and it is deliberate design, so the likelier
-correct move is to restate the rule (for instance: `ui` may import its own sub-feature's `network`)
-rather than to attack 27 imports.
+Worth keeping from that audit, because it stays true: **none of those 60 was introduced by the
+sub-package restructure.** Checked against the branch point `2f823a3` by indexing where every
+symbol was declared in the old flat tree, **46 were already cross-package imports** before the move
+and **14 were intra-package references** the old flat layout made invisible — every `ui → ui` edge,
+and 5 of the 6 `network → network` ones, because all panels then lived in one flat `editor.ui`
+package and all handlers in one flat `editor.network` one. **Zero were new couplings.** The
+restructure did not add coupling; it made pre-existing coupling legible for the first time, and
+this section is what that legibility bought.
 
 ## Where to start reading
 
