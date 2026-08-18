@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.dock.viewport
 
-import com.breadmoirai.garnet.dock.viewport.cursorFocusActive
 import com.breadmoirai.garnet.harness.ClientSpec
 import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
 import com.breadmoirai.garnet.test.closeClientScreen

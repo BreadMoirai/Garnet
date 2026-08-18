@@ -5,8 +5,6 @@ import com.breadmoirai.garnet.harness.ClientSpec
 import com.breadmoirai.garnet.dock.shell.DockRegion
 import com.breadmoirai.garnet.dock.shell.DockState
 import com.breadmoirai.garnet.dock.shell.Panel
-import com.breadmoirai.garnet.dock.viewport.ViewportState
-import com.breadmoirai.garnet.dock.viewport.WindowViewportExt
 import com.breadmoirai.garnet.test.closeClientScreen
 import com.breadmoirai.garnet.test.onClient
 import com.breadmoirai.garnet.test.runOnClient

@@ -8,14 +8,10 @@ package com.breadmoirai.garnet.editor.explorer.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerSession
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
-import com.breadmoirai.garnet.editor.explorer.ui.explorerPanel
 import com.breadmoirai.garnet.dock.compose.ComposeSceneHost
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainAll

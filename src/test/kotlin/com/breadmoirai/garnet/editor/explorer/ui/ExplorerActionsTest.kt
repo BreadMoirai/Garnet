@@ -1,8 +1,6 @@
 package com.breadmoirai.garnet.editor.explorer.ui
 
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
 import com.breadmoirai.garnet.editor.structure.ui.OpenStructureState
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
 import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C

@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.testing.data
 
-import com.breadmoirai.garnet.testing.data.KtsSpecLoader
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.core.Vec3i

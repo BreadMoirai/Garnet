@@ -8,13 +8,9 @@ import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
-import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
-import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.core.async.onServer
-import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import com.breadmoirai.garnet.editor.structure.data.structuresDiffer
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer

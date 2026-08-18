@@ -1,10 +1,5 @@
 package com.breadmoirai.garnet.dock.shell
 
-import com.breadmoirai.garnet.dock.shell.DockRegion
-import com.breadmoirai.garnet.dock.shell.DockState
-import com.breadmoirai.garnet.dock.shell.Panel
-import com.breadmoirai.garnet.dock.shell.STRIPE_WIDTH
-import com.breadmoirai.garnet.dock.shell.regionAt
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import org.jetbrains.jewel.ui.icons.AllIconsKeys

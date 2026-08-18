@@ -3,7 +3,6 @@
 package com.breadmoirai.garnet.harness
 
 import com.breadmoirai.garnet.core.async.AsyncDispatchers
-import com.breadmoirai.garnet.harness.RecordingHolder
 import io.kotest.core.concurrency.CoroutineDispatcherFactory
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.core.test.TestCase

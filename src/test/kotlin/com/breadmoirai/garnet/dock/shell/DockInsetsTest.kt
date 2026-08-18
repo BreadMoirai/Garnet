@@ -1,11 +1,5 @@
 package com.breadmoirai.garnet.dock.shell
 
-import com.breadmoirai.garnet.dock.shell.DockInsets
-import com.breadmoirai.garnet.dock.shell.DockRegion
-import com.breadmoirai.garnet.dock.shell.DockState
-import com.breadmoirai.garnet.dock.shell.Panel
-import com.breadmoirai.garnet.dock.shell.STRIPE_WIDTH
-import com.breadmoirai.garnet.dock.shell.insets
 import com.breadmoirai.garnet.dock.viewport.ViewportState
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe

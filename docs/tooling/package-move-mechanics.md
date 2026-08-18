@@ -1,6 +1,6 @@
 ---
 title: Package Move Mechanics
-tags: [gradle, kotlin, refactor, package-move, sed, verification]
+tags: [gradle, kotlin, refactor, package-move, sed, verification, imports]
 summary: Gotchas for moving files between packages across all six source sets without silently breaking discovery or content.
 ---
 
@@ -33,13 +33,21 @@ the Kotest/JUnit run that `:26.2:test` executes. Only a live `:26.2:runGameTest`
 (`runGameTest`, not `rungametest`) — Gradle task-name matching is case-sensitive enough
 that a wrong-case invocation fails to find the task rather than silently no-op-ing.
 
-## 3. `grep` needs `-a` in this repo
+## 3. A raw control byte in a source file makes it invisible to `grep` and `git diff`
 
-`src/test/kotlin/com/breadmoirai/garnet/editor/explorer/data/EditorRootTest.kt` embeds a
-NUL byte. Plain `grep` treats the file as binary on sight and reports zero matches — which
-looks identical to "the rewrite already ran and there's nothing left to find." Always pass
-`-a` (or use `grep -a` / `ugrep` equivalents) when auditing a package move with grep, or a
-real leftover reference in that file will pass a review silently.
+`EditorRootTest.kt` used to embed a literal NUL byte in a test string
+(`"bad\u0000name"`, asserting `resolveSubpath` rejects it). Plain `grep` treats a file
+containing a NUL as binary on sight and reports zero matches — which looks identical to
+"the rewrite already ran and there's nothing left to find" — and `git diff` renders it as
+`Bin 3036 -> 2974 bytes` instead of line changes, so a review of the move sees nothing at
+all. The byte is now written as the `\u0000` escape, which is behaviourally identical and
+leaves the file plain text.
+
+The general rule stands: **write control characters as escapes, never as raw bytes**, and
+when auditing a package move pass `grep -a` anyway — it costs nothing, and it is the only
+thing that distinguishes "no matches" from "unreadable file" if another one ever appears.
+Cross-check with `git diff --numstat`: a `-	-` row means git considered that file binary
+and showed you none of its changes.
 
 ## 4. Slash-path string literals are invisible to FQN sweeps
 
@@ -86,3 +94,22 @@ audit against the pre-move blob (confirm every changed line's payload change is 
 expected old-package-to-new-package substitution and nothing else) or, more reliably, the
 compiler — an unresolved or wrongly-resolved reference. Don't treat "survivor sweep is
 clean" as proof the move to the new package was itself performed correctly.
+
+## 8. Co-locating files turns legitimate imports into silent dead text
+
+Kotlin accepts an `import` of a symbol from the file's *own* package and ignores it. So the
+moment a move puts a file into the same package as something it imports — which is exactly
+what co-locating tests with their subjects does — every such import becomes dead text. No
+warning, no compile error, no behavioural difference. The
+2026-07 sub-package restructure created **156 of these across 57 files** in one commit
+without a single diagnostic.
+
+Sweep for them after any move, mechanically rather than by eye:
+
+1. Parse each `.kt` file's `^package ([\w.]+)$` declaration.
+2. Drop every `import <that same package>.<Symbol>` line.
+3. **Single-symbol imports only** — never a wildcard (`import pkg.*`, which is also
+   redundant but reads as deliberate) and never an aliased `import pkg.X as Y`, which is
+   *not* redundant: the alias is the only thing binding the new name.
+4. Recompile all five `*Classes` targets. A break means step 1 mis-parsed the package —
+   investigate it, don't re-add the import blindly.

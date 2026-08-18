@@ -1,8 +1,6 @@
 package com.breadmoirai.garnet.editor.history.ops
 
 import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
-import com.breadmoirai.garnet.editor.history.ops.RestoreOutcome
-import com.breadmoirai.garnet.editor.history.ops.StructureRestoreOps
 import com.breadmoirai.garnet.editor.explorer.network.EditorErrorS2C
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S

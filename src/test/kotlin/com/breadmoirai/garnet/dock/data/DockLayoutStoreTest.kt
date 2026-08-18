@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.dock.data
 
-import com.breadmoirai.garnet.dock.data.DockLayoutStore
 import com.breadmoirai.garnet.dock.shell.DockRegion
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe

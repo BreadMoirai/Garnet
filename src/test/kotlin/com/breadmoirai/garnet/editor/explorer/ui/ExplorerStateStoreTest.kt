@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.editor.explorer.ui
 
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerStateStore
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull

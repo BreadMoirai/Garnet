@@ -5,9 +5,6 @@ import com.breadmoirai.garnet.dock.shell.DockRegion
 import com.breadmoirai.garnet.dock.shell.DockState
 import com.breadmoirai.garnet.dock.shell.Panel
 import com.breadmoirai.garnet.dock.shell.stripeIconClicked
-import com.breadmoirai.garnet.dock.viewport.DockVisibilityCommit
-import com.breadmoirai.garnet.dock.viewport.ViewportState
-import com.breadmoirai.garnet.dock.viewport.commitDockVisibilityChange
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue

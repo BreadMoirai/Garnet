@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.core.async
 
-import com.breadmoirai.garnet.core.async.ServerThreadDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import net.minecraft.server.MinecraftServer
 

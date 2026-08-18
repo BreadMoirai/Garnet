@@ -1,16 +1,8 @@
 package com.breadmoirai.garnet.editor.explorer.network
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.explorer.network.CreateFolderC2S
-import com.breadmoirai.garnet.editor.explorer.network.DeletePathC2S
-import com.breadmoirai.garnet.editor.explorer.network.DuplicatePathC2S
-import com.breadmoirai.garnet.editor.explorer.network.MovePathC2S
-import com.breadmoirai.garnet.editor.explorer.network.NewStructureC2S
 import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
-import com.breadmoirai.garnet.editor.explorer.network.EditorErrorS2C
-import com.breadmoirai.garnet.editor.explorer.network.EditorFileOpsHandlers
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
-import com.breadmoirai.garnet.editor.explorer.network.RenamePathC2S
 import com.breadmoirai.garnet.editor.structure.network.StructureResultS2C
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure

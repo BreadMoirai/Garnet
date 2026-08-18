@@ -5,8 +5,6 @@ import com.breadmoirai.garnet.dock.shell.DockRegion
 import com.breadmoirai.garnet.dock.shell.DockState
 import com.breadmoirai.garnet.dock.shell.Panel
 import com.breadmoirai.garnet.dock.input.glfwMouseButtonToPointerButton
-import com.breadmoirai.garnet.dock.viewport.ViewportState
-import com.breadmoirai.garnet.dock.viewport.syncDockViewport
 import androidx.compose.ui.input.pointer.PointerButton
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeFalse

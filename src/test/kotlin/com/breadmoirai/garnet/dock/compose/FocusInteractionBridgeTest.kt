@@ -9,8 +9,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import com.breadmoirai.garnet.dock.compose.ComposeSceneHost
-import com.breadmoirai.garnet.dock.compose.GarnetTextField
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
