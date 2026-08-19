@@ -26,7 +26,8 @@ import java.awt.event.KeyEvent as AwtKeyEvent
  * jump). Window coords == scene coords (the scene is full-window).
  *
  * Focus is taken by the `G` keybind ([registerDockFocusKeybind]), by Alt+1, and by clicking a dock
- * region; it is dropped by any of those plus ESC.
+ * region; it is dropped by any of those plus ESC, and dropping it always ends any in-progress world
+ * drag and any active [OrbitCameraController] session — see [clearFocus].
  */
 object DockInputRouter {
 
@@ -43,9 +44,23 @@ object DockInputRouter {
         if (mc.gui.screen() == null) mc.mouseHandler.releaseMouse()
     }
 
+    /**
+     * Drops dock focus, re-grabs the cursor (unless a vanilla `Screen` is open), and ends whatever
+     * world gesture or camera mode was in progress. This is the single choke point for **every**
+     * way focus can be lost — `G`, ESC, and any future exit path — precisely so none of them can
+     * forget the camera: leaving `OrbitCameraController` active while control returns to the game
+     * would leave the player's own entity spectating with `applyTick` overwriting its position every
+     * tick, unable to move or look. See [onGlfwPress]/[onGlfwRelease] for why the drag-tracking
+     * fields below must also be cleared here rather than left to the release that never arrives
+     * (focus can be dropped mid-drag, with the button still held).
+     */
     fun clearFocus() {
         if (DockState.focusedRegion == null) return
         DockState.focusedRegion = null
+        swallowedButtons = 0
+        dragButton = null
+        dragKind = null
+        OrbitCameraController.exit()
         val mc = Minecraft.getInstance()
         if (mc.gui.screen() == null) {
             mc.mouseHandler.setIgnoreFirstMove()
@@ -55,14 +70,40 @@ object DockInputRouter {
 
     /** Which world gesture a held button is currently driving, or null when none is. */
     private enum class WorldDrag { ORBIT, PAN }
-    @Volatile private var worldDrag: WorldDrag? = null
+
+    /**
+     * Bitmask of GLFW mouse-button indices (0..30) whose **press** the world branch swallowed —
+     * i.e. arrived over the bare world while captured — so the matching release can be identified
+     * as belonging to that swallowed press and kept from reaching Compose as a release it never saw
+     * a press for. An earlier, now-deleted design used a single nullable field for this, back when
+     * the world press dropped dock focus outright (so the release always arrived uncaptured, and
+     * there was only ever one button to remember). That is no longer true — the world press keeps
+     * capture now, and more than one button can be swallowed at once: a second button pressed while
+     * a drag is already in progress (see [dragButton]) is still swallowed, just not made the drag
+     * owner — so a single nullable slot cannot represent it; each button needs its own bit.
+     * Read/written only from GLFW callback threads (not the client tick thread), same as every
+     * other `@Volatile` field on this object.
+     */
+    @Volatile private var swallowedButtons = 0
+    private fun isSwallowed(button: Int) = button in 0..30 && (swallowedButtons and (1 shl button)) != 0
+    private fun setSwallowed(button: Int) { if (button in 0..30) swallowedButtons = swallowedButtons or (1 shl button) }
+    private fun clearSwallowed(button: Int) { if (button in 0..30) swallowedButtons = swallowedButtons and (1 shl button).inv() }
+
+    /**
+     * The button currently driving a world gesture, and which gesture it is — `null`/`null` when no
+     * drag is in progress. Only one drag can be active at a time: a second mapped button pressed
+     * over the world while a drag is already owned does not steal or restart the gesture (it is
+     * still recorded in [swallowedButtons] so its own release doesn't leak to Compose either).
+     */
+    @Volatile private var dragButton: Int? = null
+    @Volatile private var dragKind: WorldDrag? = null
 
     fun onGlfwMove(x: Double, y: Double) {
         val dx = x - lastX
         val dy = y - lastY
         lastX = x; lastY = y
         if (!captured) return
-        when (worldDrag) {
+        when (dragKind) {
             WorldDrag.ORBIT -> OrbitCameraController.orbitBy(dx, dy)
             WorldDrag.PAN -> OrbitCameraController.panBy(dx, dy)
             null -> ComposeInput.sendPointerMove(Offset(x.toFloat(), y.toFloat()))
@@ -86,9 +127,13 @@ object DockInputRouter {
     /**
      * Press while a panel is focused.
      *
-     * A press over the **bare world viewport** begins a camera gesture — left orbits, middle pans —
-     * and never reaches Compose. It does *not* drop dock focus: with the cursor freed, the world is
-     * a viewport to fly around, and `G` is the way back to playing.
+     * A press over the **bare world viewport** is swallowed — recorded in [swallowedButtons] and
+     * never reaches Compose. If it maps to a gesture (left orbits, middle pans, via [WorldDrag]) it
+     * also becomes the drag owner, but *only* when no drag is already in progress: a second button
+     * pressed mid-drag is still swallowed (so its own release doesn't leak to Compose) but cannot
+     * steal or restart the gesture. Swallowing does *not* drop dock focus: with the cursor freed,
+     * the world is a viewport to fly around, and `G`/ESC (via [clearFocus]) are the way back to
+     * playing.
      *
      * This replaces click-to-return-to-game. That gesture had to go: it and orbit want the same
      * press, and a drag that sometimes ends in "you are now back in the game holding a pickaxe" is
@@ -99,10 +144,17 @@ object DockInputRouter {
     fun onGlfwPress(button: Int) {
         if (!captured) return
         if (geometryKnown && regionUnderCursor() == null) {
-            worldDrag = when (button) {
-                GLFW.GLFW_MOUSE_BUTTON_LEFT -> WorldDrag.ORBIT
-                GLFW.GLFW_MOUSE_BUTTON_MIDDLE -> WorldDrag.PAN
-                else -> null
+            setSwallowed(button)
+            if (dragButton == null) {
+                val kind = when (button) {
+                    GLFW.GLFW_MOUSE_BUTTON_LEFT -> WorldDrag.ORBIT
+                    GLFW.GLFW_MOUSE_BUTTON_MIDDLE -> WorldDrag.PAN
+                    else -> null
+                }
+                if (kind != null) {
+                    dragButton = button
+                    dragKind = kind
+                }
             }
             return
         }
@@ -110,12 +162,23 @@ object DockInputRouter {
         ComposeInput.sendPointerPress(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
     }
 
+    /**
+     * Release while a panel is focused. A release is swallowed — never forwarded to Compose — if
+     * and only if [isSwallowed] reports its button's press was swallowed by [onGlfwPress]; that
+     * record is cleared either way. If the released button was the drag owner, the drag ends, but
+     * camera mode does **not** — the camera keeps its pivot and angle between drags, which is the
+     * whole point of orbiting a fixed subject. (A drag that outlives its button because focus was
+     * dropped mid-press, rather than the button released, is handled by [clearFocus] instead —
+     * this release never arrives while uncaptured.)
+     */
     fun onGlfwRelease(button: Int) {
         if (!captured) return
-        if (worldDrag != null) {
-            // Ends the gesture but does NOT leave camera mode: the camera keeps its pivot and
-            // angle between drags, which is the whole point of orbiting a fixed subject.
-            worldDrag = null
+        if (isSwallowed(button)) {
+            clearSwallowed(button)
+            if (dragButton == button) {
+                dragButton = null
+                dragKind = null
+            }
             return
         }
         val composeButton = glfwMouseButtonToPointerButton(button) ?: return

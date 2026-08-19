@@ -61,11 +61,31 @@ it drives `com.breadmoirai.garnet.camera.input.OrbitCameraController` (Task 3) i
 | MMB drag | `panBy(dx, dy)` — slide the pivot |
 | Scroll | `dollyBy(dy)` — move toward/away from the pivot |
 
-`DockInputRouter` tracks which gesture a held button is driving in `worldDrag` (`WorldDrag.ORBIT` /
-`WorldDrag.PAN`, set in `onGlfwPress`, read in `onGlfwMove`, cleared in `onGlfwRelease`). Releasing the
-button ends the drag but does **not** exit camera mode or return dock focus to the game — the camera
-keeps its pivot and angle between drags, which is the point of orbiting a fixed subject. `G` is the
-only way back to playing; see the `G` section below.
+`DockInputRouter` tracks this with two pieces of state, not one, because more than one button can be
+swallowed by the world at a time:
+
+- `swallowedButtons` — a bitmask of every GLFW button index whose **press** landed over the bare
+  world while captured. `onGlfwPress` sets a button's bit; `onGlfwRelease` checks it and clears it.
+  A release is swallowed (never forwarded to Compose) if and only if its button's bit is set. This
+  is what closes the gap the old single-button design had: LMB-drag the world, then press RMB (an
+  unmapped button) — RMB is swallowed too, so *its* release doesn't leak to Compose as an unmatched
+  `Secondary` release either.
+- `dragButton`/`dragKind` — which single button, if any, currently owns the orbit/pan gesture
+  (`WorldDrag.ORBIT`/`WorldDrag.PAN`). Set in `onGlfwPress` only when no drag is already owned (a
+  second mapped button pressed mid-drag is swallowed but cannot steal or restart the gesture);
+  read in `onGlfwMove`; cleared in `onGlfwRelease` when the *drag owner's* button is released.
+  Releasing the drag owner ends the drag but does **not** exit camera mode — the camera keeps its
+  pivot and angle between drags, which is the point of orbiting a fixed subject.
+
+Both fields — along with `swallowedButtons` — are cleared unconditionally in `clearFocus()`, and
+`clearFocus()` also calls `OrbitCameraController.exit()`. This matters because a drag can outlive its
+own release: if focus is dropped (`G` or ESC) while a world button is still held, `onGlfwRelease`
+never fires for that button at all (`captured` is already `false` by the time the OS delivers it), so
+nothing but `clearFocus()` would ever clear `dragButton`/`swallowedButtons` or leave camera mode.
+Routing every exit — `G`'s branch in `onGlfwKey`, ESC, and any future one — through this single choke
+point is what guarantees the player is never left "back in the game" while `OrbitCameraController`
+keeps overwriting their position and look every tick from a stale, now-unreachable camera. `G` is the
+only key that returns to playing; see the `G` section below.
 
 This replaces the old click-to-return-to-game gesture, deleted because it and orbit wanted the same
 press: a drag that sometimes ended with focus silently dropped back to the game (and the player
@@ -115,7 +135,7 @@ is still byte-for-byte vanilla.
 - Pointer move/press/release/scroll are forwarded into `ComposeInput.sendPointer*/sendScroll`
   (guarded — a `disabled` Compose surface no-ops) — except a press or drag over the bare world
   viewport, which drives the orbit camera instead (see "World gestures while the dock is focused"
-  below) and reaches neither Compose nor the game. This is the load-bearing dispatch the Explorer
+  above) and reaches neither Compose nor the game. This is the load-bearing dispatch the Explorer
   relies on (pointer-driven interactions). **The GLFW button index is threaded all the way
   through as of the context-menu work**: `onGlfwPress(button: Int)`/`onGlfwRelease(button: Int)`
   map the raw index via `glfwMouseButtonToPointerButton` (file-scope function in
