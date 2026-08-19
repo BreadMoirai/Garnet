@@ -22,7 +22,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.server.network.CommonListenerCookie
-import net.minecraft.world.level.GameType
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
@@ -41,9 +40,13 @@ fun makeMockServerPlayer(server: MinecraftServer): ServerPlayer {
     require(server.isSameThread) { "makeMockServerPlayer must be called on the server thread" }
     val profile = GameProfile(UUID.randomUUID(), "test-${UUID.randomUUID().toString().take(6)}")
     val cookie = CommonListenerCookie.createInitial(profile, false)
-    val player = object : ServerPlayer(server, server.overworld(), cookie.gameProfile(), cookie.clientInformation()) {
-        override fun gameMode(): GameType = GameType.CREATIVE
-    }
+    // No `gameMode()` override here (fix, previously hardcoded to CREATIVE): that hid the real
+    // per-player gamemode field behind a constant, which nothing depended on -- abilities like
+    // flight/instabuild are already derived from the real field by ServerPlayerGameMode, not from
+    // this accessor -- but which would have silently defeated any test asserting on gamemode
+    // transitions (CameraModeSpec, camera/network). Falls through to ServerPlayer's own
+    // `gameMode()`, which reads the real field.
+    val player = ServerPlayer(server, server.overworld(), cookie.gameProfile(), cookie.clientInformation())
     val connection = Connection(PacketFlow.SERVERBOUND)
     EmbeddedChannel(connection)
     server.playerList.placeNewPlayer(connection, player, cookie)
