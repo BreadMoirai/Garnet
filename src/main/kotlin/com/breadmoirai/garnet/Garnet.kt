@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet
 
+import com.breadmoirai.garnet.camera.network.CameraModeHandlers
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.core.events.SubTickPhaseEvents
 import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
@@ -72,12 +73,16 @@ class Garnet : ModInitializer {
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             EditorCommand.register(dispatcher)
         }
-        ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
+        ServerPlayConnectionEvents.DISCONNECT.register { handler, server ->
             EditorSession.clear(handler.player.uuid)
             EditorUndoStack.clear(handler.player.uuid)
             // Otherwise a player rejoining on the same UUID inherits a watch on whatever structure
             // the last session had open, and starts receiving pushes for a panel that is not open.
             HistoryWatchers.clear(handler.player.uuid)
+            // A client that crashed or was killed mid-orbit never sent its leave payload, and
+            // vanilla persists spectator across a relog -- so the server has to undo its own grant
+            // here or the player is stranded spectating. No-ops for anyone the mod never granted.
+            CameraModeHandlers.handleDisconnect(server, handler.player)
         }
         LOGGER.debug("[Garnet#onInitialize] initialization complete")
     }
