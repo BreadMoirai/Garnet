@@ -28,11 +28,24 @@ import java.awt.event.KeyEvent as AwtKeyEvent
  * Focus is taken by the `G` keybind ([registerDockFocusKeybind]), by Alt+1, and by clicking a dock
  * region; it is dropped by any of those plus ESC, and dropping it always ends any in-progress world
  * drag and any active [OrbitCameraController] session — see [clearFocus].
+ *
+ * ### Threading
+ *
+ * Every mutable field on this object, and every entry point below, is touched **only from the
+ * client's main (render) thread**. That is not an assumption: `MouseHandler` and `KeyboardHandler`
+ * register their GLFW callbacks wrapped in `minecraft.execute(...)` (verified in decompiled 26.2),
+ * so the `onMove`/`onButton`/`onScroll`/`keyPress`/`charTyped` bodies the dock's mixins inject into
+ * are already dispatched onto the main thread — the same thread that runs `Minecraft.tick` and
+ * therefore `ClientTickEvents.END_CLIENT_TICK`. There is no GLFW-callback thread distinct from the
+ * client tick thread to hand state across, so none of these fields need `@Volatile`, and neither do
+ * [OrbitCameraController]'s, which this object drives and which are read back from that tick event.
+ * An earlier comment here claimed the opposite ("GLFW callback threads, not the client tick
+ * thread"); it was wrong, and the annotations it justified have gone with it.
  */
 object DockInputRouter {
 
-    @Volatile private var lastX = 0.0
-    @Volatile private var lastY = 0.0
+    private var lastX = 0.0
+    private var lastY = 0.0
 
     /** True while the dock is eating input; the mixins consult this to cancel vanilla handling. */
     val captured: Boolean get() = DockState.focusedRegion != null
@@ -81,10 +94,8 @@ object DockInputRouter {
      * capture now, and more than one button can be swallowed at once: a second button pressed while
      * a drag is already in progress (see [dragButton]) is still swallowed, just not made the drag
      * owner — so a single nullable slot cannot represent it; each button needs its own bit.
-     * Read/written only from GLFW callback threads (not the client tick thread), same as every
-     * other `@Volatile` field on this object.
      */
-    @Volatile private var swallowedButtons = 0
+    private var swallowedButtons = 0
     private fun isSwallowed(button: Int) = button in 0..30 && (swallowedButtons and (1 shl button)) != 0
     private fun setSwallowed(button: Int) { if (button in 0..30) swallowedButtons = swallowedButtons or (1 shl button) }
     private fun clearSwallowed(button: Int) { if (button in 0..30) swallowedButtons = swallowedButtons and (1 shl button).inv() }
@@ -95,8 +106,8 @@ object DockInputRouter {
      * over the world while a drag is already owned does not steal or restart the gesture (it is
      * still recorded in [swallowedButtons] so its own release doesn't leak to Compose either).
      */
-    @Volatile private var dragButton: Int? = null
-    @Volatile private var dragKind: WorldDrag? = null
+    private var dragButton: Int? = null
+    private var dragKind: WorldDrag? = null
 
     fun onGlfwMove(x: Double, y: Double) {
         val dx = x - lastX

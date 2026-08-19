@@ -26,6 +26,13 @@ import net.minecraft.world.phys.Vec3
  * cursor for the dock — because round-tripping the player's gamemode through the server every time
  * they want to click an Explorer button is not acceptable. The first orbit/pan/dolly over the bare
  * world enters camera mode instead.
+ *
+ * **Threading:** every field below is written from the gesture path (`DockInputRouter`) and read or
+ * written again from [applyTick] on `ClientTickEvents.END_CLIENT_TICK`, with no synchronization and
+ * no `@Volatile` — because both are the client's main (render) thread. `MouseHandler`/`KeyboardHandler`
+ * wrap their GLFW callbacks in `minecraft.execute(...)`, so the mixin entry points that reach the
+ * gesture path already run on the same thread as the tick event. See `DockInputRouter`'s own
+ * threading note, which this deliberately matches.
  */
 object OrbitCameraController {
 
