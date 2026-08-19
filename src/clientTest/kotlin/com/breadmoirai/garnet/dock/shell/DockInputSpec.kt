@@ -240,42 +240,17 @@ class DockInputSpec : ClientSpec({
         }
         onClient { DockState.focusedRegion } shouldBe null
 
-        // Both click-to-focus steps below hit-test against ViewportState's cached framebuffer size, so
-        // a client that never populated it would make them vacuously pass (DockInputRouter skips the
+        // The click-to-focus step below hit-tests against ViewportState's cached framebuffer size, so
+        // a client that never populated it would make it vacuously pass (DockInputRouter skips the
         // gesture when the geometry is unknown rather than guessing). Assert it is real first.
-        withClue("steps 7-8 need a cached framebuffer size to hit-test against") {
+        withClue("step 7 needs a cached framebuffer size to hit-test against") {
             onClient { ViewportState.realWidth > 0 && ViewportState.realHeight > 0 }.shouldBeTrue()
         }
 
-        // 7. a press on the bare world viewport drops dock focus and delivers nothing to the panel.
-        // LEFT is 300px wide with no other region visible, so x=600 is unambiguously world. The click
-        // count must not move: leaving a panel is click-to-focus, never click-through (a stray world
-        // click must not mine a block), and the mixin cancels the press either way.
-        runOnClient { DockInputRouter.focus(DockRegion.LEFT) }
-        waitClientTicks(3)
-        onClient { DockState.focusedRegion } shouldBe DockRegion.LEFT
-        val beforeWorldClick = clicks.get()
-        runOnClient {
-            DockInputRouter.onGlfwMove(600.0, 100.0)
-            DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_LEFT)
-        }
-        waitClientTicks(4)
-        withClue("step 7: a world click should return focus to the game") {
-            onClient { DockState.focusedRegion } shouldBe null
-        }
-        withClue("step 7: a world click must not reach the panel") {
-            clicks.get() shouldBe beforeWorldClick
-        }
-        // ...and its release is swallowed too, so vanilla never sees an unmatched button-up.
-        withClue("step 7: the matching release should be swallowed exactly once") {
-            onClient { DockInputRouter.consumeSwallowedRelease(GLFW.GLFW_MOUSE_BUTTON_LEFT) }.shouldBeTrue()
-            onClient { DockInputRouter.consumeSwallowedRelease(GLFW.GLFW_MOUSE_BUTTON_LEFT) }.shouldBeFalse()
-        }
-
-        // 8. uncaptured, with a vanilla Screen open, a press on the dock focuses it AND lands on the
+        // 7. uncaptured, with a vanilla Screen open, a press on the dock focuses it AND lands on the
         // widget. Without an open Screen the cursor is grabbed for play and there is no meaningful
         // pointer position, so onGlfwPressUncaptured declines — asserted first.
-        withClue("step 8: with no Screen open a dock click is not a gesture") {
+        withClue("step 7: with no Screen open a dock click is not a gesture") {
             onClient {
                 DockInputRouter.onGlfwMove(80.0, 80.0)
                 DockInputRouter.onGlfwPressUncaptured(GLFW.GLFW_MOUSE_BUTTON_LEFT)
@@ -286,7 +261,7 @@ class DockInputSpec : ClientSpec({
         runOnClient { mc -> mc.gui.setScreen(object : Screen(Component.literal("garnet probe")) {}) }
         waitClientTicks(3)
         val beforeDockClick = clicks.get()
-        withClue("step 8: a dock click with a Screen open should be handled by the router") {
+        withClue("step 7: a dock click with a Screen open should be handled by the router") {
             onClient {
                 DockInputRouter.onGlfwMove(80.0, 80.0)
                 DockInputRouter.onGlfwPressUncaptured(GLFW.GLFW_MOUSE_BUTTON_LEFT)
@@ -295,11 +270,11 @@ class DockInputSpec : ClientSpec({
         waitClientTicks(3)
         runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_LEFT) }
         waitClientTicks(3)
-        withClue("step 8: the dock click should have taken focus") {
+        withClue("step 7: the dock click should have taken focus") {
             onClient { DockState.focusedRegion } shouldBe DockRegion.LEFT
         }
         if (!ComposeSurface.disabled) {
-            withClue("step 8: the dock click should also land on the clickable box") {
+            withClue("step 7: the dock click should also land on the clickable box") {
                 (clicks.get() > beforeDockClick).shouldBeTrue()
             }
         }

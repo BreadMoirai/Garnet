@@ -318,6 +318,26 @@ Formerly the top-level `ui/` package; renamed because it is one capability, not 
 
 See [ui/INDEX.md](../ui/INDEX.md) for the detailed dock articles.
 
+## `camera/` — the orbit camera (main + client)
+
+The client owns this camera outright and just moves the player's own entity through spectator; the
+server's only involvement is the one payload below. See
+[ui/orbit-camera.md](../ui/orbit-camera.md) for the authority split and why.
+
+- `data/OrbitCamera.kt` (main) — the pure, immutable pivot/yaw/pitch/distance state and its
+  `orbit`/`pan`/`dolly` transforms plus the derived `eyePosition`. No Minecraft client dependency;
+  unit-tested directly under `src/test`.
+- `network/CameraPackets.kt` + `network/CameraModeHandlers.kt` (main) — `CameraModeC2S`, the one
+  payload this feature has, and its server handler. Registered through
+  `editor/network/EditorNetworkRegistry.kt` alongside the editor payloads even though it lives
+  outside `editor/*/network/` — see
+  [persistence/network-payload-contract.md](../persistence/network-payload-contract.md).
+- `input/OrbitCameraController.kt` (client) — applies the camera to the `LocalPlayer` every client
+  tick; owns lazy entry, the spectator-arm timeout, and exit.
+
+See [ui/dock-input-routing.md](../ui/dock-input-routing.md) for how `dock/input/DockInputRouter.kt`
+feeds world-viewport gestures into the controller.
+
 ## `mixin/` (main, Java) and `mixin/client/` (client, Java)
 
 These packages did **not** move — the mixin JSONs pin them by name.
@@ -344,8 +364,9 @@ of test it is. The old `test.` / `client.` infix segments are gone.
   single `@GameTest` sentinel (`test/GametestSentinel.kt`, task `runGameTest`). Support that serves
   more than one feature stays at `com.breadmoirai.garnet.test` (`NetworkTestSupport`, `SmokeSpec`);
   `editor/EditorTestSupport.kt` serves all of `editor/`.
-- `src/clientTest/kotlin/…` — client-side Kotest specs under `dock/shell/`, `dock/viewport/` and
-  `editor/explorer/ui/`, driven by `test/ClientTestSentinel.kt` (task `runClientTest`), with
+- `src/clientTest/kotlin/…` — client-side Kotest specs under `dock/shell/`, `dock/viewport/`,
+  `dock/input/`, `editor/explorer/ui/` and `camera/`, driven by `test/ClientTestSentinel.kt`
+  (task `runClientTest`), with
   `test/ClientTestSupport.kt`, `test/SpecTestContext.kt` and `dock/shell/PanelPixelProbe.kt`.
 - `src/testSupport/kotlin/…/harness/` — the Kotest bridge itself, not tests, so it keeps its
   `harness/` name: `GarnetTestSpec`, `GarnetTestSpecContext`, `ClientSpec`, `RecordingHolder`,

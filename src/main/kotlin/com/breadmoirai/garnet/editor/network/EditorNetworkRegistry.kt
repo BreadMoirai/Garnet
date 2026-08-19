@@ -1,5 +1,7 @@
 package com.breadmoirai.garnet.editor.network
 
+import com.breadmoirai.garnet.camera.network.CameraModeC2S
+import com.breadmoirai.garnet.camera.network.CameraModeHandlers
 import com.breadmoirai.garnet.editor.explorer.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.explorer.network.DeletePathC2S
 import com.breadmoirai.garnet.editor.explorer.network.DuplicatePathC2S
@@ -55,6 +57,7 @@ object EditorNetworkRegistry {
         PayloadTypeRegistry.serverboundPlay().register(RedoC2S.TYPE, RedoC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(WatchStructureHistoryC2S.TYPE, WatchStructureHistoryC2S.STREAM_CODEC)
         PayloadTypeRegistry.serverboundPlay().register(RestoreRevisionC2S.TYPE, RestoreRevisionC2S.STREAM_CODEC)
+        PayloadTypeRegistry.serverboundPlay().register(CameraModeC2S.TYPE, CameraModeC2S.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(StructureHistoryS2C.TYPE, StructureHistoryS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(UndoStateS2C.TYPE, UndoStateS2C.STREAM_CODEC)
         PayloadTypeRegistry.clientboundPlay().register(EditorTreeSnapshotS2C.TYPE, EditorTreeSnapshotS2C.STREAM_CODEC)
@@ -117,6 +120,9 @@ object EditorNetworkRegistry {
         }
         ServerPlayNetworking.registerGlobalReceiver(RestoreRevisionC2S.TYPE) { payload, ctx ->
             ctx.server().execute { EditorStructureHandlers.handleRestoreRevision(ctx.server(), ctx.player(), payload) }
+        }
+        ServerPlayNetworking.registerGlobalReceiver(CameraModeC2S.TYPE) { payload, ctx ->
+            ctx.server().execute { CameraModeHandlers.handleCameraMode(ctx.server(), ctx.player(), payload) }
         }
     }
 }

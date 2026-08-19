@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.test
 
+import com.breadmoirai.garnet.camera.CameraModeSpec
 import com.breadmoirai.garnet.editor.workspace.world.EditorCellSaverSpec
 import com.breadmoirai.garnet.editor.workspace.command.EditorCommandSpec
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimSpec
@@ -88,6 +89,7 @@ class GametestSentinel {
                             LocalHistoryStoreSpec::class,
                             StructureAutoSaveSpec::class,
                             StructureRestoreSpec::class,
+                            CameraModeSpec::class,
                         ),
                     )
                 }

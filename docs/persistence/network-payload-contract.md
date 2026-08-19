@@ -1,7 +1,7 @@
 ---
 title: Editor C2S/S2C payload contract
 tags: [networking, payloads, sync, authority, editor]
-summary: The authority model behind the editor payloads under editor/*/network/ — every client subpath is resolved through EditorRoot.resolveSubpath's path-traversal guard, per-player intent is tracked by EditorSession, and the server is still the only writer.
+summary: The authority model behind the editor payloads under editor/*/network/ — every client subpath is resolved through EditorRoot.resolveSubpath's path-traversal guard, per-player intent is tracked by EditorSession, CameraModeC2S's elevated /gamemode is gated on a server-written grant flag, and the server is still the only writer.
 ---
 
 # Editor C2S/S2C payload contract
@@ -18,13 +18,17 @@ The Explorer/redstone-project wire protocol is a genuine replacement worth docum
 It lives in four per-sub-feature payload files —
 `editor/explorer/network/ExplorerPackets.kt` (tree + file ops),
 `editor/structure/network/StructurePackets.kt`, `editor/history/network/HistoryPackets.kt`,
-`editor/undo/network/UndoPackets.kt` — over a shared spine of
+`editor/undo/network/UndoPackets.kt` — plus one payload outside `editor/*/network/` entirely,
+`camera/network/CameraPackets.kt` (`CameraModeC2S`, enter/leave the orbit camera's spectator
+gamemode — see [ui/orbit-camera.md](../ui/orbit-camera.md)), all riding the same shared spine:
 `editor/network/EditorNetworkRegistry.kt` (registration), `editor/network/EditorHandlerSupport.kt`
 (shared handler helpers) and `editor/network/PayloadIds.kt` (the `payloadId()` identifier helper), with
 the server handlers in `editor/explorer/network/EditorTreeHandlers.kt`,
-`editor/explorer/network/EditorFileOpsHandlers.kt` and
-`editor/structure/network/EditorStructureHandlers.kt`. There is no
-block-entity handle at all: the client addresses everything by **path** and by **player identity**.
+`editor/explorer/network/EditorFileOpsHandlers.kt`,
+`editor/structure/network/EditorStructureHandlers.kt`, and
+`camera/network/CameraModeHandlers.kt`. There is no
+block-entity handle at all: the client addresses everything by **path** and by **player identity**
+(camera mode is the one exception — it addresses only the requesting player, no path).
 
 ## Invariant 1: server is the only writer
 
@@ -108,6 +112,28 @@ Consequences:
   [use-cases/command.md](../use-cases/command.md) UC-CMD-04).
 - **Cleared on disconnect.** `Garnet.onInitialize` registers `ServerPlayConnectionEvents.DISCONNECT`
   → `EditorSession.clear(player.uuid)`.
+
+## Invariant 4: `CameraModeC2S` may only undo a spectator state the mod itself caused
+
+`CameraModeC2S` is the one payload here that changes *player* state rather than files, and it does so
+on a command source elevated to `PermissionSet.ALL_PERMISSIONS` (vanilla `/gamemode` gates on
+`Permissions.COMMANDS_GAMEMASTER`, which an ordinary player does not have). Elevation on a
+client-triggered path only stays safe if the server can tell its own doing from everyone else's, so
+`CameraModeHandlers` keeps a per-player grant flag — a `ConcurrentHashMap`-backed set of UUIDs it has
+itself put into spectator, written only when an enter actually performed the transition.
+
+- **`enter = false` no-ops without a grant.** Without the flag, a player an operator had put into
+  spectator could send `enter` (a server-side no-op, since they are already spectating) then
+  `leave`, and the handler would elevate itself and restore their `previousGameModeForPlayer` —
+  escaping an operator-imposed spectator, possibly into creative. Pinned by `CameraModeSpec`.
+- **The flag is not a stored gamemode.** Restore still reads vanilla's own
+  `previousGameModeForPlayer`; the flag records only *that* camera mode was granted. See
+  [ui/orbit-camera.md](../ui/orbit-camera.md) for why those are different things.
+- **Cleared on disconnect** — `Garnet.onInitialize`'s `ServerPlayConnectionEvents.DISCONNECT` block
+  calls `CameraModeHandlers.handleDisconnect`, which also *restores* the gamemode of anyone still
+  holding a grant. The client's leave payload cannot cover a client that crashed, and vanilla
+  persists spectator across a relog, so the server-side restore is the only thing that keeps such a
+  player from being stranded.
 
 ## Root resolution has a priority chain, not a single lookup
 
