@@ -32,12 +32,12 @@ fun isDockFocusKey(glfwKey: Int): Boolean =
  *
  * The one keybind a player needs to go from playing to using the UI: it frees the OS cursor (via
  * [DockInputRouter.focus], which calls `MouseHandler.releaseMouse`) and starts routing GLFW input
- * into the dock's Compose scene. Pressing it again — like ESC, or clicking the bare world — hands
- * both back and re-grabs the cursor without the camera snapping.
+ * into the dock's Compose scene. Pressing it again — like ESC — hands both back and re-grabs the
+ * cursor without the camera snapping.
  *
  * Leaving again is symmetric — the same key — but that half is handled in [DockInputRouter.onGlfwKey]
  * for the reason [isDockFocusKey] documents, and is suppressed while a text field has focus so the
- * letter `g` stays a letter. ESC and a click on the bare world remain the other two ways out.
+ * letter `g` stays a letter. ESC remains the other way out.
  *
  * It never opens or closes a panel. With nothing open, [focusTarget] picks LEFT, which owns the
  * stripe's column: focus alone makes `DockState.anyActive()` true, the stripe appears, and the freed

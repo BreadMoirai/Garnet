@@ -6,6 +6,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
+import com.breadmoirai.garnet.camera.input.OrbitCameraController
 import com.breadmoirai.garnet.dock.compose.ComposeInput
 import com.breadmoirai.garnet.dock.compose.DockTextInputFocus
 import com.breadmoirai.garnet.dock.shell.DockRegion
@@ -25,7 +26,7 @@ import java.awt.event.KeyEvent as AwtKeyEvent
  * jump). Window coords == scene coords (the scene is full-window).
  *
  * Focus is taken by the `G` keybind ([registerDockFocusKeybind]), by Alt+1, and by clicking a dock
- * region; it is dropped by any of those plus ESC and a click on the bare world.
+ * region; it is dropped by any of those plus ESC.
  */
 object DockInputRouter {
 
@@ -52,9 +53,20 @@ object DockInputRouter {
         }
     }
 
+    /** Which world gesture a held button is currently driving, or null when none is. */
+    private enum class WorldDrag { ORBIT, PAN }
+    @Volatile private var worldDrag: WorldDrag? = null
+
     fun onGlfwMove(x: Double, y: Double) {
+        val dx = x - lastX
+        val dy = y - lastY
         lastX = x; lastY = y
-        if (captured) ComposeInput.sendPointerMove(Offset(x.toFloat(), y.toFloat()))
+        if (!captured) return
+        when (worldDrag) {
+            WorldDrag.ORBIT -> OrbitCameraController.orbitBy(dx, dy)
+            WorldDrag.PAN -> OrbitCameraController.panBy(dx, dy)
+            null -> ComposeInput.sendPointerMove(Offset(x.toFloat(), y.toFloat()))
+        }
     }
 
     /**
@@ -72,28 +84,26 @@ object DockInputRouter {
         get() = ViewportState.realWidth > 0 && ViewportState.realHeight > 0
 
     /**
-     * A GLFW button whose **press** was handled as a focus gesture rather than delivered anywhere,
-     * recorded so the matching release can be swallowed too (see [consumeSwallowedRelease]).
-     */
-    @Volatile private var swallowRelease: Int? = null
-
-    /**
      * Press while a panel is focused.
      *
-     * A press over the **bare world viewport** is click-to-return-to-game: it drops dock focus (which
-     * re-grabs the cursor when no [net.minecraft.client.gui.screens.Screen] is open) and delivers
-     * nothing to Compose. The press is still *consumed* — `MouseHandlerMixin` cancels it regardless —
-     * so leaving a panel never mines a block or swings at a mob. Contrast [onGlfwPressUncaptured],
-     * which deliberately *does* deliver the click that enters a panel: acting on the widget you aimed
-     * at is what you wanted, acting on the world you clicked past is not.
+     * A press over the **bare world viewport** begins a camera gesture — left orbits, middle pans —
+     * and never reaches Compose. It does *not* drop dock focus: with the cursor freed, the world is
+     * a viewport to fly around, and `G` is the way back to playing.
+     *
+     * This replaces click-to-return-to-game. That gesture had to go: it and orbit want the same
+     * press, and a drag that sometimes ends in "you are now back in the game holding a pickaxe" is
+     * worse than a single unambiguous exit key.
      *
      * Everything else routes into the scene as before.
      */
     fun onGlfwPress(button: Int) {
         if (!captured) return
         if (geometryKnown && regionUnderCursor() == null) {
-            swallowRelease = button
-            clearFocus()
+            worldDrag = when (button) {
+                GLFW.GLFW_MOUSE_BUTTON_LEFT -> WorldDrag.ORBIT
+                GLFW.GLFW_MOUSE_BUTTON_MIDDLE -> WorldDrag.PAN
+                else -> null
+            }
             return
         }
         val composeButton = glfwMouseButtonToPointerButton(button) ?: return
@@ -102,6 +112,12 @@ object DockInputRouter {
 
     fun onGlfwRelease(button: Int) {
         if (!captured) return
+        if (worldDrag != null) {
+            // Ends the gesture but does NOT leave camera mode: the camera keeps its pivot and
+            // angle between drags, which is the whole point of orbiting a fixed subject.
+            worldDrag = null
+            return
+        }
         val composeButton = glfwMouseButtonToPointerButton(button) ?: return
         ComposeInput.sendPointerRelease(Offset(lastX.toFloat(), lastY.toFloat()), composeButton)
     }
@@ -142,23 +158,14 @@ object DockInputRouter {
         return true
     }
 
-    /**
-     * One-shot: reports whether this release completes a press that [onGlfwPress] consumed as a
-     * focus gesture, so `MouseHandlerMixin` can cancel it too.
-     *
-     * Needed because that press *drops* capture: the release then arrives with `captured == false`
-     * and would fall through to vanilla, which would see a button-up with no matching button-down.
-     * Clearing on any release (not just a matching one) keeps a stale button from outliving the
-     * gesture that armed it.
-     */
-    fun consumeSwallowedRelease(button: Int): Boolean {
-        val pending = swallowRelease ?: return false
-        swallowRelease = null
-        return pending == button
-    }
-
+    /** Scroll dollies over the bare world and scrolls the panel over a dock region. */
     fun onGlfwScroll(dx: Double, dy: Double) {
-        if (captured) ComposeInput.sendScroll(Offset(lastX.toFloat(), lastY.toFloat()), Offset(dx.toFloat(), dy.toFloat()))
+        if (!captured) return
+        if (geometryKnown && regionUnderCursor() == null) {
+            OrbitCameraController.dollyBy(dy)
+            return
+        }
+        ComposeInput.sendScroll(Offset(lastX.toFloat(), lastY.toFloat()), Offset(dx.toFloat(), dy.toFloat()))
     }
 
     /**

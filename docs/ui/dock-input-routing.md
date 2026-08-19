@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
 tags: [compose, dock, input, mixin, glfw, keybind, hit-test]
-summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the G dock-focus toggle (which region it picks, why its exit half lives in the router, and the DockTextInputFocus gate that keeps G a letter while typing), the Alt+1/Shift+1 keybinds (Shift+1 toggles the Explorer panel itself) and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, and the DockState.regionAt hit test — stripe first, then BOTTOM/LEFT/RIGHT/CENTER — behind click-to-focus in both directions.
+summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the G dock-focus toggle (which region it picks, why its exit half lives in the router, and the DockTextInputFocus gate that keeps G a letter while typing), the Alt+1/Shift+1 keybinds (Shift+1 toggles the Explorer panel itself) and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, the DockState.regionAt hit test — stripe first, then BOTTOM/LEFT/RIGHT/CENTER — behind click-to-focus into the dock, and how a press/scroll over the bare world routes into the orbit camera instead of the game while the dock is focused.
 ---
 
 # Dock input routing
@@ -16,7 +16,7 @@ opened while the viewport is shrunk are a separate concern: their cursor coordin
 through the content-rect offset by `MouseHandlerViewportMixin` — see
 [architecture/shrink-viewport-compose-model.md#cursor-input-maps-through-the-shrink-offset](../architecture/shrink-viewport-compose-model.md#cursor-input-maps-through-the-shrink-offset).
 
-## Click-to-focus, both directions
+## Click-to-focus into the dock
 
 Focus is not keyboard-only. `DockState.regionAt(x, y, realW, realH)` (`dock/shell/DockHitTest.kt`)
 answers "who owns this window pixel", returning `null` for the **bare world viewport**. It is the
@@ -31,18 +31,11 @@ case: a closed region reserves nothing, and splitters are drawn inside the reser
 no `Minecraft`/GLFW dependency, so it is unit-tested in `DockHitTestTest`
 (`src/test/.../dock/shell/`) the same way `syncDockViewport` was split out for testability.
 
-Both gestures skip themselves when `ViewportState.realWidth/realHeight` are still `0` — before
-`WindowMixin` has cached a real framebuffer size the layout is unknowable, and guessing it from a
-zero-sized window would drop focus on the first click after a startup/resize race.
+This gesture, like the world-gesture routing described in "World gestures while the dock is focused"
+below, skips itself when `ViewportState.realWidth/realHeight` are still `0` — before `WindowMixin`
+has cached a real framebuffer size the layout is unknowable, and guessing it from a zero-sized
+window would misroute the first click after a startup/resize race.
 
-- **World → game.** In `onGlfwPress`, a press while captured whose cursor is over the bare world
-  calls `clearFocus()` and delivers *nothing* to Compose. The press is still **consumed** (the mixin
-  cancels it regardless): leaving a panel is click-to-focus, never click-through, so a stray world
-  click cannot mine a block or swing at a mob. With a vanilla `Screen` open the same gesture drops
-  dock focus and `clearFocus()` already skips `grabMouse()`, so the cursor stays free for the screen.
-  Because that press drops capture, the matching **release** would arrive uncaptured and reach
-  vanilla as an unmatched button-up — so the press records the button in a one-shot `swallowRelease`,
-  which the mixin's release branch consumes.
 - **Game → dock.** `onGlfwPressUncaptured(button)` is called from the mixin's *uncaptured* branch and
   returns `true` (mixin cancels) only when `DockState.anyActive()`, a vanilla `Screen` is open, and
   the cursor is over a region. It then calls `focus(region)` **and** forwards the press into Compose,
@@ -53,11 +46,30 @@ zero-sized window would drop focus on the first click after a startup/resize rac
   cursor grabbed for play GLFW reports an accumulating raw delta, not a pointer position, so that
   state stays keybind-only.
 
-The asymmetry (leaving consumes, entering delivers) is intentional: acting on the world you clicked
-*past* is destructive, acting on the widget you clicked *at* is what you wanted.
-
 `anyActive()` is the guard that keeps the OFF-by-default invariant intact — with the dock closed the
 uncaptured branch is a plain field read that allocates nothing and touches no GLFW/AWT.
+
+## World gestures while the dock is focused
+
+A press, drag, or scroll whose cursor is over the bare world viewport (`regionUnderCursor() == null`,
+gated on `geometryKnown` the same way as click-to-focus above) no longer touches dock focus at all —
+it drives `com.breadmoirai.garnet.camera.input.OrbitCameraController` (Task 3) instead:
+
+| Gesture | Effect |
+| --- | --- |
+| LMB drag | `orbitBy(dx, dy)` — rotate around the pivot |
+| MMB drag | `panBy(dx, dy)` — slide the pivot |
+| Scroll | `dollyBy(dy)` — move toward/away from the pivot |
+
+`DockInputRouter` tracks which gesture a held button is driving in `worldDrag` (`WorldDrag.ORBIT` /
+`WorldDrag.PAN`, set in `onGlfwPress`, read in `onGlfwMove`, cleared in `onGlfwRelease`). Releasing the
+button ends the drag but does **not** exit camera mode or return dock focus to the game — the camera
+keeps its pivot and angle between drags, which is the point of orbiting a fixed subject. `G` is the
+only way back to playing; see the `G` section below.
+
+This replaces the old click-to-return-to-game gesture, deleted because it and orbit wanted the same
+press: a drag that sometimes ended with focus silently dropped back to the game (and the player
+holding a pickaxe) was worse than one unambiguous exit key.
 
 ## The capture gate
 
@@ -94,15 +106,16 @@ The historical GLFW-callback signatures changed in 26.1.2; the injections target
 A wrong `@Inject` target here fails silently (mixin doesn't apply) or crashes at class-load, so these
 descriptors are load-bearing. All are HEAD and `cancellable = true`. `onMove`/`onScroll` cancel
 vanilla **only when `captured`**, otherwise returning without touching `ci`. `onButton` is the one
-exception: its uncaptured branch consults `onGlfwPressUncaptured` / `consumeSwallowedRelease` (see
-"Click-to-focus, both directions" above), which decline unless the dock is on screen with a `Screen`
-open — so with the dock closed it is still byte-for-byte vanilla.
+exception: its uncaptured branch consults `onGlfwPressUncaptured` (see "Click-to-focus into the dock"
+above), which declines unless the dock is on screen with a `Screen` open — so with the dock closed it
+is still byte-for-byte vanilla.
 
 ## What is and isn't forwarded
 
 - Pointer move/press/release/scroll are forwarded into `ComposeInput.sendPointer*/sendScroll`
-  (guarded — a `disabled` Compose surface no-ops) — except a press over the bare world viewport,
-  which is the click-to-focus gesture described above and reaches neither Compose nor the game. This is the load-bearing dispatch the Explorer
+  (guarded — a `disabled` Compose surface no-ops) — except a press or drag over the bare world
+  viewport, which drives the orbit camera instead (see "World gestures while the dock is focused"
+  below) and reaches neither Compose nor the game. This is the load-bearing dispatch the Explorer
   relies on (pointer-driven interactions). **The GLFW button index is threaded all the way
   through as of the context-menu work**: `onGlfwPress(button: Int)`/`onGlfwRelease(button: Int)`
   map the raw index via `glfwMouseButtonToPointerButton` (file-scope function in
@@ -294,7 +307,7 @@ unaffected by `syncDockViewport()`.
 `DockState.panels` already holds the production Explorer/Local History/Structure Info panels, and a
 panel registered without a reset would land in the registry unopened, since `RegionColumn` only
 invokes `openPanelOf(region).content(...)` — a registered-but-unopened panel is never composed) —
-exercised through eight numbered steps, all through the **real** router→`ComposeInput`→scene path:
+exercised through seven numbered steps, all through the **real** router→`ComposeInput`→scene path:
 
 1. A raw secondary press (`onGlfwMove` + `onGlfwPress(GLFW_MOUSE_BUTTON_RIGHT)`) is collected by a
    `pointerInput { awaitPointerEventScope { ... } }` probe and asserted to arrive as exactly
@@ -309,17 +322,16 @@ exercised through eight numbered steps, all through the **real** router→`Compo
    `DockState.focusedRegion` to `null`, while a non-ESC key while captured is delivered but reported
    `false` (not consumed) — the ESC-only-consumed contract.
 6. An uncaptured ESC (focus already `null`) reports `false` and drops nothing.
-7. Click-to-return-to-game: with LEFT focused, a press at `x=600` (well past the 300 px LEFT strip,
-   no other region visible) drops `focusedRegion` to `null` **and** leaves the probe's click counter
-   untouched — the consumed-not-passed-through contract — after which
-   `consumeSwallowedRelease(LEFT_BUTTON)` reports `true` exactly once.
-8. Click-to-focus-the-dock: uncaptured with no `Screen` open, `onGlfwPressUncaptured` declines and
+7. Click-to-focus-the-dock: uncaptured with no `Screen` open, `onGlfwPressUncaptured` declines and
    focus stays `null`; open a bare probe `Screen` and the same press at the panel's coordinates
    reports `true`, focuses LEFT, and increments the probe's click counter.
 
-Steps 7–8 first assert `ViewportState.realWidth/realHeight` are non-zero. Both gestures hit-test
-against that cached size and *skip themselves* when it is unknown, so without that assertion a client
-that never populated it would make both steps vacuously pass.
+Step 7 first asserts `ViewportState.realWidth/realHeight` are non-zero. The gesture hit-tests
+against that cached size and *skips itself* when it is unknown, so without that assertion a client
+that never populated it would make the step vacuously pass.
+
+The world-gesture routing added in the orbit-camera work (LMB orbit / MMB pan / scroll dolly) is not
+yet covered by this spec — that coverage belongs with the orbit-camera clientTest work, not here.
 
 `DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
 

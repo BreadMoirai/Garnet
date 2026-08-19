@@ -107,4 +107,4 @@ it and would be remapped to a coordinate off the screen's left/bottom edge — a
 silently landing somewhere in the vanilla `Screen`. That case is now intercepted before it gets here:
 `DockInputRouter.onGlfwPressUncaptured` claims presses over a dock region while a `Screen` is open,
 focusing the panel and delivering the click to Compose instead. See
-[ui/dock-input-routing.md#click-to-focus-both-directions](../ui/dock-input-routing.md#click-to-focus-both-directions).
+[ui/dock-input-routing.md#click-to-focus-into-the-dock](../ui/dock-input-routing.md#click-to-focus-into-the-dock).
