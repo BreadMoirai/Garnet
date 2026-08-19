@@ -1,7 +1,7 @@
 ---
 title: The orbit camera — moving the player to fly the viewport
 tags: [camera, input, viewport, spectator, networking]
-summary: Why the client owns the orbit camera outright and just moves the player's own entity through spectator — the handleMovePlayer exemption and LocalPlayer's own position sync that make that legal, why entry is lazy and gesture-driven, why the tick loop waits for isSpectator() and uses setPos/setYRot instead of the obviously-correct absSnapTo, and why exit leaves the player wherever the camera ended.
+summary: Why the client owns the orbit camera outright and just moves the player's own entity through spectator — the handleMovePlayer exemption and LocalPlayer's own position sync that make that legal, why entry is lazy and gesture-driven, why the tick loop waits for isSpectator() and uses setPos/setYRot instead of the obviously-correct absSnapTo, why the server keeps a grant flag so leave cannot demote a spectator it never created, and why exit leaves the player wherever the camera ended.
 ---
 
 # The orbit camera — moving the player to fly the viewport
@@ -68,10 +68,21 @@ generic error message with no structured "no" the client can act on. There is no
 one payload as a design pillar, so a second, dedicated S2C refusal type was ruled out rather than
 added. The fallback is `ARM_TIMEOUT_TICKS` (100 ticks, five seconds at 20 TPS): while armed but not
 yet spectator, the controller counts ticks, and past the timeout it calls `exit()` on its own rather
-than leaving the client waiting forever for an answer that is never coming. The counter is only
-touched in the not-yet-spectator branch, so a refusal that arrives late can never fire once an orbit
-has already established spectator — the `isSpectator` check above returns before the counter is
-even read.
+than leaving the client waiting forever for an answer that is never coming.
+
+**A refusal latches.** Giving up is not enough on its own: `exit()` clears the camera, but the user
+is typically still mid-drag, with the button held and `DockInputRouter` still holding a live
+`dragKind` — so the very next mouse move would call `enter()` again, and the user would collect one
+enter packet and one "could not enter camera mode" chat error every five seconds for as long as they
+kept dragging. So the timeout also sets a latch that blocks further entries. The latch is
+deliberately *not* cleared by `exit()`, which also runs at the ordinary end of a drag: it is cleared
+only by `OrbitCameraController.resetEntryRefusal()`, called from `DockInputRouter.clearFocus()` (the
+end of the whole dock session) and on client disconnect. Ending a drag still keeps camera mode
+exactly as before.
+
+The counter itself is only touched in the not-yet-spectator branch, so a refusal that arrives late
+can never fire once an orbit has already established spectator — the `isSpectator` check above
+returns before the counter is even read.
 
 ## Why `setPos`/`setYRot`, not `absSnapTo`
 
@@ -121,6 +132,39 @@ own field sidesteps all of that: it survives a relog because vanilla already per
 go stale relative to an operator's mid-session gamemode change because there is nothing of ours to
 go stale, and there is no map to leak.
 
+### The one piece of state the server *does* keep: the grant flag
+
+Not storing a previous gamemode does **not** mean the server stores nothing. `CameraModeHandlers`
+keeps one thing per player: a set of UUIDs it has itself put into spectator for camera mode. That is
+authority state — the boolean fact *"the mod granted camera mode to this player"* — and it is a
+different kind of thing from duplicating a field vanilla already maintains. Nothing in it is a
+`GameType`; restore still reads `previousGameModeForPlayer`.
+
+It exists because without it the leave path is a privilege escalation. Enter no-ops when the player
+is already spectating, so it writes nothing, and vanilla leaves no mark distinguishing "spectating
+because an operator put them there" from "spectating for camera mode". An unprivileged client could
+therefore send `enter` (a server-side no-op) then `leave`, and the leave path would elevate itself to
+`ALL_PERMISSIONS` and hand them back `previousGameModeForPlayer` — walking straight out of an
+operator-imposed spectator, possibly into creative, without camera mode ever having been granted.
+Gating leave on a grant written only by a transition the handler actually performed closes that: a
+spectator state the mod did not cause cannot be undone through `CameraModeC2S` at all.
+
+The grant is in memory only and cleared on disconnect, so it cannot leak across sessions or be
+resurrected by a relog. `CameraModeSpec` pins the escalation case directly.
+
+### Why the server also restores on disconnect
+
+`Garnet.onInitialize`'s `ServerPlayConnectionEvents.DISCONNECT` block calls
+`CameraModeHandlers.handleDisconnect`, which restores any player still holding a grant and drops the
+grant either way. The client has its own `ClientPlayConnectionEvents.DISCONNECT` hook, but that hook
+can only help a client that is still running: a client that crashes, is killed, or loses its
+connection mid-orbit never sends the leave payload, and vanilla persists spectator across a relog —
+so without the server-side half that player is stranded in spectator until an operator notices. The
+grant flag is exactly what makes this safe to run on every disconnect: a player spectating for any
+reason the mod did not cause holds no grant and is left alone. Fabric fires the event from
+`Connection.handleDisconnection`, before `PlayerList.remove` saves the player, so the restored
+gamemode is the one written to disk.
+
 Restore also goes through the vanilla `/gamemode` command rather than calling `setGameMode`
 directly, for the same "don't maintain a second copy of behavior vanilla already has" reason — see
 the KDoc on `CameraModeHandlers.handleCameraMode` for that half of the design. The command runs with
@@ -139,7 +183,10 @@ flying around a structure useful — ending the session looking at the angle you
 consequences of that choice are named as open risks in the design rather than silently accepted:
 exit-stays-put is effectively a free teleport when restore lands the player back in survival, and
 the editor world's lifecycle has not been checked against having a genuinely *spectating* player in
-it mid-session. Both are scoped out of this feature's own work, not solved here.
+it mid-session. The free teleport also has a sharper edge worth naming: exiting hands the player
+back a gamemode with physics and collision at whatever pose the camera happened to end on, so a
+survival player can be dropped from altitude to their death, or left suffocating inside solid
+geometry the camera flew through. Both are scoped out of this feature's own work, not solved here.
 
 ## `clearFocus()` is the single exit choke point
 
@@ -158,8 +205,11 @@ rather than merely tested against.
 - `camera/data/OrbitCamera.kt` — the pure, immutable pivot/yaw/pitch/distance state and its
   `orbit`/`pan`/`dolly` transforms plus the derived `eyePosition`. No Minecraft client dependency;
   unit-tested directly.
-- `camera/network/CameraPackets.kt` + `CameraModeHandlers.kt` — the one C2S payload and its server
-  handler.
+- `camera/network/CameraPackets.kt` + `CameraModeHandlers.kt` — the one C2S payload, its server
+  handler, the per-player grant flag, and the disconnect restore. Registration lives in
+  `editor/network/EditorNetworkRegistry.kt` (the payload and its receiver) and in `Garnet.kt`'s
+  `ServerPlayConnectionEvents.DISCONNECT` block (the restore), beside the other per-player server
+  state cleared there.
 - `camera/input/OrbitCameraController.kt` — applies the camera to the `LocalPlayer` every client
   tick; owns entry, the arm timeout, and exit.
 - `dock/input/DockInputRouter.kt` — routes world-viewport gestures (LMB drag / MMB drag / scroll)
