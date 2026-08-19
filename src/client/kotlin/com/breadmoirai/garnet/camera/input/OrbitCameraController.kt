@@ -29,10 +29,31 @@ import net.minecraft.world.phys.Vec3
  */
 object OrbitCameraController {
 
+    /**
+     * How long to wait, in client ticks, for spectator to land before giving up on an entry.
+     *
+     * The server can refuse the gamemode flip — it answers only with `EditorErrorS2C` and nothing
+     * else — so the client has no positive signal that distinguishes "refused" from "still in
+     * flight"; it can only time out. A dedicated S2C refusal payload would remove the ambiguity,
+     * but this feature deliberately has exactly one payload (`CameraModeC2S`) as a design pillar,
+     * so the fix is a bounded wait rather than a second message. 100 ticks is 5 seconds at 20
+     * TPS: generous enough that no real round trip is mistaken for a refusal, short enough that a
+     * genuine refusal does not leave the feature dead until the process restarts.
+     */
+    private const val ARM_TIMEOUT_TICKS = 100
+
     private var camera: OrbitCamera? = null
 
     /** The `LocalPlayer` camera mode was entered with, to notice death and dimension change. */
     private var enteredPlayer: Player? = null
+
+    /**
+     * Ticks spent armed but not yet spectator, since the most recent [enter]. Only incremented
+     * while waiting; once spectator lands it is never consulted again until the next [enter]
+     * resets it, so the timeout can never interrupt an orbit that has already established
+     * spectator.
+     */
+    private var ticksWaitingForSpectator = 0
 
     /** True from the first world gesture until [exit]; the router consults this, not the gamemode. */
     val active: Boolean get() = camera != null
@@ -51,12 +72,15 @@ object OrbitCameraController {
      *
      * Seeding from the current pose is what makes entry visually a no-op: the view does not move
      * until the gesture that triggered entry is applied on the very next line. Returns null (and
-     * enters nothing) when there is no player to orbit.
+     * enters nothing) when there is no player to orbit, or when there is no connection to ask —
+     * arming with nobody to answer would leave the client stuck waiting out the full timeout for
+     * an entry that was never sent.
      */
     private fun enter(): OrbitCamera? {
         val mc = Minecraft.getInstance()
         val player = mc.player ?: return null
         if (mc.level == null) return null
+        if (!ClientPlayNetworking.canSend(CameraModeC2S.TYPE)) return null
 
         val hit = player.pick(PIVOT_RAYCAST_RANGE, 1.0f, false)
         // On a miss `pick` still returns a location — the far end of the ray — but that is
@@ -77,6 +101,7 @@ object OrbitCameraController {
         )
         camera = seeded
         enteredPlayer = player
+        ticksWaitingForSpectator = 0
         ClientPlayNetworking.send(CameraModeC2S(enter = true))
         return seeded
     }
@@ -86,6 +111,7 @@ object OrbitCameraController {
         if (camera == null) return
         camera = null
         enteredPlayer = null
+        ticksWaitingForSpectator = 0
         // canSend guards the disconnect path: the connection may already be gone, and the server
         // restores the gamemode on its own when the player reconnects.
         if (ClientPlayNetworking.canSend(CameraModeC2S.TYPE)) {
@@ -96,14 +122,20 @@ object OrbitCameraController {
     /**
      * Apply the camera to the player, once per client tick.
      *
-     * Two things are load-bearing here:
+     * Three things are load-bearing here:
      *
      * 1. **We wait for spectator to actually land before moving anything.** The gamemode change is
      *    a round trip; a non-spectator making this large a position jump is exactly the case
      *    `handleMovePlayer` rubber-bands. The gesture is not dropped in the meantime — the camera
      *    state has been accumulating all along — so the drag resumes seamlessly the moment the
      *    server answers.
-     * 2. **`setPos`/`setYRot`, deliberately NOT `absSnapTo`.** `absSnapTo` also writes the
+     * 2. **A refused entry must not leave the client half-armed forever.** While waiting for
+     *    spectator we count ticks in [ticksWaitingForSpectator]; past [ARM_TIMEOUT_TICKS] we give
+     *    up and [exit] rather than sit dead until the process restarts. See [ARM_TIMEOUT_TICKS]
+     *    for why a timeout, not a second payload, is the mechanism. The counter is only touched in
+     *    the not-yet-spectator branch, so it can never fire once an orbit has established
+     *    spectator — the check below short-circuits and returns before the counter is even read.
+     * 3. **`setPos`/`setYRot`, deliberately NOT `absSnapTo`.** `absSnapTo` also writes the
      *    previous-tick fields (`xo/yo/zo`, `yRotO`, `xRotO`), which kills the render interpolator.
      *    That is right for a teleport and wrong for a drag: interpolating from last tick's pose is
      *    exactly what makes a 20 Hz camera update look smooth at 144 fps instead of stepping.
@@ -123,7 +155,11 @@ object OrbitCameraController {
             exit()
             return
         }
-        if (!player.isSpectator) return
+        if (!player.isSpectator) {
+            ticksWaitingForSpectator++
+            if (ticksWaitingForSpectator > ARM_TIMEOUT_TICKS) exit()
+            return
+        }
         val eye = c.eyePosition
         player.setPos(eye.x, eye.y - player.eyeHeight, eye.z)
         player.setDeltaMovement(Vec3.ZERO)
