@@ -66,6 +66,12 @@ object DockInputRouter {
      * tick, unable to move or look. See [onGlfwPress]/[onGlfwRelease] for why the drag-tracking
      * fields below must also be cleared here rather than left to the release that never arrives
      * (focus can be dropped mid-drag, with the button still held).
+     *
+     * It is also where a latched entry refusal is cleared. `OrbitCameraController.resetEntryRefusal`
+     * is deliberately a *separate* call from `exit()`, not folded into it: `exit()` also runs on the
+     * ordinary end of a drag, where re-arming is exactly what should happen, whereas the end of the
+     * whole dock session is the only point at which "the user is still dragging and being refused"
+     * is definitely over.
      */
     fun clearFocus() {
         if (DockState.focusedRegion == null) return
@@ -74,6 +80,9 @@ object DockInputRouter {
         dragButton = null
         dragKind = null
         OrbitCameraController.exit()
+        // A dock session has ended, so a refusal latched during it must not outlive it: the next
+        // session gets to ask the server for camera mode again.
+        OrbitCameraController.resetEntryRefusal()
         val mc = Minecraft.getInstance()
         if (mc.gui.screen() == null) {
             mc.mouseHandler.setIgnoreFirstMove()

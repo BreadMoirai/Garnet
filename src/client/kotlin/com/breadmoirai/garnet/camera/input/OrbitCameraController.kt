@@ -62,6 +62,19 @@ object OrbitCameraController {
      */
     private var ticksWaitingForSpectator = 0
 
+    /**
+     * Latched by an arm timeout: the server refused (or never answered) an entry, so stop asking.
+     *
+     * Without this a refusal retries forever *while the gesture is still going*. The timeout's
+     * [exit] clears [camera], the button is still held and `DockInputRouter` still has a live
+     * `dragKind`, so the very next mouse move calls [enter] again — one enter packet and one
+     * "could not enter camera mode" chat error every five seconds for as long as the user keeps
+     * dragging. The latch is deliberately *not* cleared by [exit]: ending a drag, or dropping the
+     * camera for any ordinary reason, must leave camera mode re-enterable exactly as before. Only
+     * [resetEntryRefusal] clears it, from the one place a dock session actually ends.
+     */
+    private var entryRefused = false
+
     /** True from the first world gesture until [exit]; the router consults this, not the gamemode. */
     val active: Boolean get() = camera != null
 
@@ -79,11 +92,12 @@ object OrbitCameraController {
      *
      * Seeding from the current pose is what makes entry visually a no-op: the view does not move
      * until the gesture that triggered entry is applied on the very next line. Returns null (and
-     * enters nothing) when there is no player to orbit, or when there is no connection to ask —
+     * enters nothing) when there is no player to orbit, when there is no connection to ask —
      * arming with nobody to answer would leave the client stuck waiting out the full timeout for
-     * an entry that was never sent.
+     * an entry that was never sent — or when [entryRefused] has latched a previous refusal.
      */
     private fun enter(): OrbitCamera? {
+        if (entryRefused) return null
         val mc = Minecraft.getInstance()
         val player = mc.player ?: return null
         if (mc.level == null) return null
@@ -119,8 +133,11 @@ object OrbitCameraController {
         camera = null
         enteredPlayer = null
         ticksWaitingForSpectator = 0
-        // canSend guards the disconnect path: the connection may already be gone, and the server
-        // restores the gamemode on its own when the player reconnects.
+        // canSend guards the disconnect path: the connection may already be gone, in which case
+        // there is nobody left to tell. The gamemode is not lost with it — the server's own
+        // ServerPlayConnectionEvents.DISCONNECT handler (CameraModeHandlers.handleDisconnect)
+        // restores any player still holding a camera-mode grant, which is the only thing that can
+        // help a client that crashed rather than exited.
         if (ClientPlayNetworking.canSend(CameraModeC2S.TYPE)) {
             ClientPlayNetworking.send(CameraModeC2S(enter = false))
         }
@@ -138,8 +155,10 @@ object OrbitCameraController {
      *    server answers.
      * 2. **A refused entry must not leave the client half-armed forever.** While waiting for
      *    spectator we count ticks in [ticksWaitingForSpectator]; past [ARM_TIMEOUT_TICKS] we give
-     *    up and [exit] rather than sit dead until the process restarts. See [ARM_TIMEOUT_TICKS]
-     *    for why a timeout, not a second payload, is the mechanism. The counter is only touched in
+     *    up, latch [entryRefused] and [exit] rather than sit dead until the process restarts. The
+     *    latch is what keeps the still-held drag from re-arming on its very next mouse move and
+     *    asking again. See [ARM_TIMEOUT_TICKS] for why a timeout, not a second payload, is the
+     *    mechanism. The counter is only touched in
      *    the not-yet-spectator branch, so it can never fire once an orbit has established
      *    spectator — the check below short-circuits and returns before the counter is even read.
      * 3. **`setPos`/`setYRot`, deliberately NOT `absSnapTo`.** `absSnapTo` also writes the
@@ -164,7 +183,10 @@ object OrbitCameraController {
         }
         if (!player.isSpectator) {
             ticksWaitingForSpectator++
-            if (ticksWaitingForSpectator > ARM_TIMEOUT_TICKS) exit()
+            if (ticksWaitingForSpectator > ARM_TIMEOUT_TICKS) {
+                entryRefused = true
+                exit()
+            }
             return
         }
         val eye = c.eyePosition
@@ -175,16 +197,35 @@ object OrbitCameraController {
     }
 
     /**
+     * Clear a latched entry refusal so the next dock session may arm camera mode again.
+     *
+     * Called from `DockInputRouter.clearFocus()`, the single choke point every way of dropping dock
+     * focus already passes through — and therefore the one boundary at which "the user is still
+     * mid-gesture, being told no over and over" has definitely ended. Kept separate from [exit] on
+     * purpose: [exit] runs whenever the camera is dropped, including the ordinary end of a drag,
+     * and clearing the latch there would restore the retry loop it exists to break. An explicit
+     * function rather than a settable field so the router never reaches into this object's state.
+     */
+    fun resetEntryRefusal() {
+        entryRefused = false
+    }
+
+    /**
      * Registered from `GarnetClient.onInitializeClient()`.
      *
      * The DISCONNECT hook is not tidiness. A client that drops mid-orbit and never sends the
-     * leaving payload leaves that player permanently in spectator on the server; clearing local
-     * state here means the next session starts clean rather than half-armed. Death and dimension
+     * leaving payload leaves that player in spectator on the server until the server's own
+     * disconnect handler undoes it (`CameraModeHandlers.handleDisconnect`); clearing local state
+     * here means the next session starts clean rather than half-armed, and clearing the refusal
+     * latch means a new connection is not judged by the last one's answer. Death and dimension
      * change need no hook of their own — [applyTick]'s player-identity check covers both.
      */
     fun registerOrbitCamera() {
         ClientTickEvents.END_CLIENT_TICK.register { mc -> applyTick(mc) }
-        ClientPlayConnectionEvents.DISCONNECT.register { _, _ -> exit() }
+        ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
+            exit()
+            resetEntryRefusal()
+        }
     }
 }
 
