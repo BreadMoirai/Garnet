@@ -72,9 +72,10 @@ The fix was two lines of `build.gradle.kts`: the client source set on the test c
   ordering, and comparator/piston timing. Author new tests using
   `runGarnetSpec` with the DSL lambda; see
   [runner/engine-driven-verification.md](../runner/engine-driven-verification.md).
-- **Client gametest (`src/clientTest/`):** the seven specs registered in
+- **Client gametest (`src/clientTest/`):** the eight specs registered in
   `ClientTestSentinel` — `RunGarnetSpecSmokeTest`, `ViewportSpec`, `DockRenderSpec`,
-  `DockInputSpec`, `DockFocusKeybindSpec`, `JewelExplorerSpec`, `ExplorerUiSpec` — one user
+  `DockInputSpec`, `DockFocusKeybindSpec`, `JewelExplorerSpec`, `ExplorerUiSpec`,
+  `OrbitCameraSpec` — one user
   story each. Runs via `runClientTest`; exercises the Compose dock (viewport, input routing,
   Explorer) with a real `Minecraft` instance and GL context — there is no recorder-screen/
   runner-block flow to exercise anymore, since that UI and its blocks were deleted.

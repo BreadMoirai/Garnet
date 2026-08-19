@@ -350,8 +350,12 @@ Step 7 first asserts `ViewportState.realWidth/realHeight` are non-zero. The gest
 against that cached size and *skips itself* when it is unknown, so without that assertion a client
 that never populated it would make the step vacuously pass.
 
-The world-gesture routing added in the orbit-camera work (LMB orbit / MMB pan / scroll dolly) is not
-yet covered by this spec — that coverage belongs with the orbit-camera clientTest work, not here.
+The world-gesture routing added in the orbit-camera work (LMB orbit / MMB pan / scroll dolly) is
+deliberately *not* covered by this spec: it is pinned end to end by `OrbitCameraSpec`
+(`src/clientTest/kotlin/com/breadmoirai/garnet/camera/OrbitCameraSpec.kt`), which drives the same
+router entry points over both a bare-world and a dock-region coordinate — a world drag orbits
+without dropping focus, a region drag still reaches Compose, scroll splits the same way, camera
+mode survives a release and is ended by `G`.
 
 `DockInputSpec` is registered in `ClientTestSentinel` (autoscan is off).
 

@@ -344,8 +344,9 @@ of test it is. The old `test.` / `client.` infix segments are gone.
   single `@GameTest` sentinel (`test/GametestSentinel.kt`, task `runGameTest`). Support that serves
   more than one feature stays at `com.breadmoirai.garnet.test` (`NetworkTestSupport`, `SmokeSpec`);
   `editor/EditorTestSupport.kt` serves all of `editor/`.
-- `src/clientTest/kotlin/…` — client-side Kotest specs under `dock/shell/`, `dock/viewport/` and
-  `editor/explorer/ui/`, driven by `test/ClientTestSentinel.kt` (task `runClientTest`), with
+- `src/clientTest/kotlin/…` — client-side Kotest specs under `dock/shell/`, `dock/viewport/`,
+  `dock/input/`, `editor/explorer/ui/` and `camera/`, driven by `test/ClientTestSentinel.kt`
+  (task `runClientTest`), with
   `test/ClientTestSupport.kt`, `test/SpecTestContext.kt` and `dock/shell/PanelPixelProbe.kt`.
 - `src/testSupport/kotlin/…/harness/` — the Kotest bridge itself, not tests, so it keeps its
   `harness/` name: `GarnetTestSpec`, `GarnetTestSpecContext`, `ClientSpec`, `RecordingHolder`,

@@ -2,6 +2,7 @@ package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.harness.client.ClientContextHolder
 import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
+import com.breadmoirai.garnet.camera.OrbitCameraSpec
 import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import com.breadmoirai.garnet.harness.client.WorldHolder
 import com.breadmoirai.garnet.harness.launcher.LauncherResult
@@ -97,6 +98,10 @@ class ClientTestSentinel : FabricClientGameTest {
                         DockFocusKeybindSpec::class,
                         JewelExplorerSpec::class,
                         ExplorerUiSpec::class,
+                        // Last on purpose: it is the only spec that puts the player into
+                        // spectator (camera mode is a real server round trip here), so any
+                        // residue it could leave lands after every other spec has run.
+                        OrbitCameraSpec::class,
                     ),
                 )
             } catch (t: Throwable) {
