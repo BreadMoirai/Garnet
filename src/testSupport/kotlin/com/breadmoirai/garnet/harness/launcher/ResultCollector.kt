@@ -37,14 +37,24 @@ internal class ResultCollector : TestListener {
             is TestResult.Success -> passed++
             is TestResult.Failure -> {
                 failed++
-                errors.add(TestFailureRecord(testCase.name.testName, result.errorOrNull?.message ?: "(no message)", result.errorOrNull))
+                errors.add(TestFailureRecord(qualifiedName(testCase), result.errorOrNull?.message ?: "(no message)", result.errorOrNull))
             }
             is TestResult.Error -> {
                 failed++
-                errors.add(TestFailureRecord(testCase.name.testName, result.errorOrNull?.message ?: "(error)", result.errorOrNull))
+                errors.add(TestFailureRecord(qualifiedName(testCase), result.errorOrNull?.message ?: "(error)", result.errorOrNull))
             }
             else -> {} // Ignored, Pending, etc.
         }
         this.result = LauncherResult(passed, failed, errors.toList())
     }
+
+    /**
+     * Prefix a failure's test name with its spec's simple class name. `testCase.name.testName`
+     * alone is just the `test("...")` string, which several specs across this codebase reuse
+     * almost verbatim (e.g. every `ClientSpec` has a step called "camera" or "focus"); without the
+     * spec name a failure in the client-test/gametest sentinel log cannot be traced back to the
+     * file it came from.
+     */
+    private fun qualifiedName(testCase: TestCase): String =
+        "${testCase.spec::class.simpleName}: ${testCase.name.testName}"
 }
