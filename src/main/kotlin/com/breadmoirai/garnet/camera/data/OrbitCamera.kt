@@ -83,9 +83,13 @@ fun OrbitCamera.pan(dx: Double, dy: Double): OrbitCamera {
     val forward = viewVector(yaw, pitch)
     // Right is derived from yaw alone, so panning stays horizontal-plane-stable when looking
     // steeply up or down instead of shearing with the pitch.
+    //
+    // Note the negation: MC's yaw 0 looks along +Z (south), and facing south your right hand points
+    // *west*, which is -X. So the right basis vector is -(cos, 0, sin), not (cos, 0, sin) — the
+    // unnegated form is the LEFT vector, and using it inverts horizontal panning.
     val y = Math.toRadians(yaw.toDouble())
-    val right = Vec3(cos(y), 0.0, sin(y))
-    val up = forward.cross(right)
+    val right = Vec3(-cos(y), 0.0, -sin(y))
+    val up = right.cross(forward)
     val scale = distance * PAN_SENSITIVITY
     // Screen Y grows downward, so a downward drag (positive dy) must raise the pivot for the
     // scene to follow the cursor — hence +dy here, unlike the -dx above.

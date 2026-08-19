@@ -76,11 +76,12 @@ class OrbitCameraTest : FunSpec({
     }
 
     test("pan moves the pivot along the camera's own right/up basis, not the world axes") {
-        // At yaw 0 the camera's right is +X and its up is +Y, so this is the case where the two
-        // bases coincide and the signs are readable.
+        // At yaw 0 the camera looks along +Z (south), so its right is -X (west) and its up is +Y.
+        // Dragging the cursor right must carry the scene right with it, which means the pivot --
+        // and the camera rigidly following it -- moves the OTHER way, to +X.
         val panned = origin.pan(dx = 10.0, dy = 0.0)
 
-        panned.pivot.x shouldBe (-10.0 * PAN_SENSITIVITY * 5.0 plusOrMinus 1e-9)
+        panned.pivot.x shouldBe (10.0 * PAN_SENSITIVITY * 5.0 plusOrMinus 1e-9)
         panned.pivot.y shouldBe (0.0 plusOrMinus 1e-9)
         panned.pivot.z shouldBe (0.0 plusOrMinus 1e-9)
     }
@@ -96,10 +97,12 @@ class OrbitCameraTest : FunSpec({
     }
 
     test("pan at yaw 90 moves the pivot along Z — the basis rotated with the camera") {
+        // Yaw 90 looks west, so right is now +Z. Asserted signed, not by magnitude: an
+        // absolute-value assertion here is what let a fully inverted horizontal pan ship.
         val panned = origin.copy(yaw = 90f).pan(dx = 10.0, dy = 0.0)
 
         panned.pivot.x shouldBe (0.0 plusOrMinus 1e-6)
-        kotlin.math.abs(panned.pivot.z) shouldBe (10.0 * PAN_SENSITIVITY * 5.0 plusOrMinus 1e-6)
+        panned.pivot.z shouldBe (10.0 * PAN_SENSITIVITY * 5.0 plusOrMinus 1e-6)
     }
 
     test("pan scales with distance so it covers the same screen fraction at every zoom") {
