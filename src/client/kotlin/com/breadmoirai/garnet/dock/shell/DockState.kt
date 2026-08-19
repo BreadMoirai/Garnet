@@ -61,8 +61,27 @@ object DockState {
      */
     private val openPanel = mutableStateMapOf<DockRegion, String>()
 
+    private var focusedRegionState by mutableStateOf<DockRegion?>(null)
+
     /** Which region currently owns keyboard/pointer focus, or null when the game does. */
-    var focusedRegion by mutableStateOf<DockRegion?>(null)
+    var focusedRegion: DockRegion?
+        get() = focusedRegionState
+        set(value) {
+            if (value != null) lastFocusedRegion = value
+            focusedRegionState = value
+        }
+
+    /**
+     * The region [focusedRegion] last pointed at, kept after focus is dropped so the dock-focus
+     * keybind can put the player back where they were instead of always landing on LEFT (see
+     * `focusTarget` in `dock/input/DockFocusTarget.kt`).
+     *
+     * Recorded in [focusedRegion]'s setter rather than at each call site so *every* way of taking
+     * focus — the keybinds, click-to-focus, the stripe — feeds it from one place. A plain `var`, not
+     * snapshot state: nothing composes on it.
+     */
+    var lastFocusedRegion: DockRegion? = null
+        private set
 
     /**
      * Per-region "mount epoch": bumped whenever a region's open panel changes, or on [reset], and
@@ -170,6 +189,7 @@ object DockState {
         leftWidth = DEFAULT_LEFT; rightWidth = DEFAULT_RIGHT; bottomHeight = DEFAULT_BOTTOM
         panels.clear()
         focusedRegion = null
+        lastFocusedRegion = null
         // Every region's panels are gone: force a fresh composition for whatever mounts next, so no
         // popup/widget state from the previous mount can bleed through (see [mountEpochs]).
         DockRegion.entries.forEach { bumpMountEpoch(it) }

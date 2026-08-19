@@ -7,10 +7,10 @@ import com.breadmoirai.garnet.harness.client.WorldHolder
 import com.breadmoirai.garnet.harness.launcher.LauncherResult
 import com.breadmoirai.garnet.harness.launcher.launchKotest
 import com.breadmoirai.garnet.dock.compose.ComposeOverlay
+import com.breadmoirai.garnet.dock.input.DockFocusKeybindSpec
 import com.breadmoirai.garnet.dock.shell.DockInputSpec
 import com.breadmoirai.garnet.dock.shell.DockRenderSpec
 import com.breadmoirai.garnet.dock.shell.DockState
-import com.breadmoirai.garnet.dock.viewport.CursorFocusToggleSpec
 import com.breadmoirai.garnet.dock.viewport.ViewportSpec
 import com.breadmoirai.garnet.dock.viewport.ViewportState
 import com.breadmoirai.garnet.dock.viewport.WindowViewportExt
@@ -92,9 +92,9 @@ class ClientTestSentinel : FabricClientGameTest {
                     specs = listOf(
                         RunGarnetSpecSmokeTest::class,
                         ViewportSpec::class,
-                        CursorFocusToggleSpec::class,
                         DockRenderSpec::class,
                         DockInputSpec::class,
+                        DockFocusKeybindSpec::class,
                         JewelExplorerSpec::class,
                         ExplorerUiSpec::class,
                     ),

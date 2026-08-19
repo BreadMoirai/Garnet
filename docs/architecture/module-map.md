@@ -305,11 +305,14 @@ Formerly the top-level `ui/` package; renamed because it is one capability, not 
 - `compose/` — `ComposeOverlay.kt` (render/enable gate), `ComposeSceneHost.kt` (generic
   `ImageComposeScene` wrapper), `ComposeSurface.kt` (lifecycle + blit rendering), `ComposeInput.kt`
   (pointer/scroll/key entry points), `GlStateStash.kt` (GL state save/restore around Skia draws),
-  `FocusInteractionBridge.kt`, `GarnetTextField.kt`.
-- `input/` — `DockInputRouter.kt`, `GlfwKeyMap.kt`.
+  `FocusInteractionBridge.kt`, `GarnetTextField.kt` (which also reports its focus into
+  `DockTextInputFocus.kt`, the "someone is typing" gate the `G` keybind consults).
+- `input/` — `DockInputRouter.kt`, `GlfwKeyMap.kt`, `DockFocusKeybind.kt` (the `G` dock-focus
+  keybind and its `isDockFocusKey` half for the captured path), `DockFocusTarget.kt` (`focusTarget()`,
+  which region `G` focuses — pure, unit-tested).
 - `viewport/` — `ViewportState.kt`, `ViewportToggle.kt`, `DockKeybinds.kt`, `DockViewportSync.kt`
   (`syncDockViewport`, split out so it has no live-client class-init dependency and can run under a
-  plain-JVM test), `DockVisibilityCommit.kt`, `CursorFocusToggle.kt`, `CompositeTarget.kt`,
+  plain-JVM test), `DockVisibilityCommit.kt`, `CompositeTarget.kt`,
   `BlitUvPipeline.kt` (blend pipeline), and `WindowViewportExt.java`.
 - `data/DockLayoutStore.kt` — the `garnet-dock.json` round-trip for remembered region visibility.
 

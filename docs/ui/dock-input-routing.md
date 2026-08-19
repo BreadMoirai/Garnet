@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
 tags: [compose, dock, input, mixin, glfw, keybind, hit-test]
-summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the Alt+1/Shift+1 keybinds (Shift+1 toggles the Explorer panel itself) and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, and the DockState.regionAt hit test — stripe first, then BOTTOM/LEFT/RIGHT/CENTER — behind click-to-focus in both directions.
+summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the G dock-focus toggle (which region it picks, why its exit half lives in the router, and the DockTextInputFocus gate that keeps G a letter while typing), the Alt+1/Shift+1 keybinds (Shift+1 toggles the Explorer panel itself) and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, and the DockState.regionAt hit test — stripe first, then BOTTOM/LEFT/RIGHT/CENTER — behind click-to-focus in both directions.
 ---
 
 # Dock input routing
@@ -65,7 +65,7 @@ uncaptured branch is a plain field read that allocates nothing and touches no GL
 focused region and, when no vanilla `Screen` is open, calls `mouseHandler.releaseMouse()` so the OS
 cursor is free over the panel. `clearFocus()` clears it and re-grabs with
 `setIgnoreFirstMove()` **before** `grabMouse()` to swallow the accumulated raw-mouse delta (otherwise
-the camera snaps on re-grab — same idiom as `CursorFocusToggle`). Window coords == scene coords: the
+the camera snaps on re-grab). Window coords == scene coords: the
 scene is full-window at `Density(1f)`, so a GLFW `(x, y)` maps straight to `Offset(x, y)`.
 
 ## Mixin targets — verified against **decompiled MC 26.1.2**, not assumed
@@ -164,6 +164,49 @@ open — so with the dock closed it is still byte-for-byte vanilla.
   closes the previous total-input-lockout bug where ESC opened the pause menu while `captured` stayed
   true, and the mouse mixin then swallowed clicks on that menu too.
 
+## `G` — the dock-focus toggle (`DockFocusKeybind.kt`)
+
+The one key that takes a player from playing to using the UI and back. `G` (`key.garnet.dock_focus`,
+unbound in vanilla) frees the OS cursor and gives the dock keyboard/pointer focus; pressing it again
+hands both back. It never opens or closes a panel.
+
+- **Which region it focuses** is `DockState.focusTarget()` (`dock/input/DockFocusTarget.kt`): the
+  region focus was last in when that region still has a panel open, else the first visible region in
+  `DockRegion` order, else **LEFT with nothing open at all**. `DockState.lastFocusedRegion` feeds the
+  first case and is recorded in `focusedRegion`'s own setter, so every way of taking focus (keybinds,
+  click-to-focus, the stripe) updates it from one place. Pure and `Minecraft`-free, so it is
+  unit-tested in `DockFocusTargetTest` (`src/test`) rather than only in a client gametest.
+- **Focusing an empty LEFT is the point, not a degenerate case.** Focus alone makes
+  `DockState.anyActive()` true, which is what draws the stripe, and `regionAt` attributes the
+  stripe's column to LEFT — so `G` on a closed dock frees the cursor over a clickable stripe and the
+  player chooses the panel. Nothing is opened on their behalf.
+- **That is why the focusing branch passes `commitDockVisibilityChange(persist = false,
+  dropStaleFocus = false)`.** The commit's step 2 reads "the focused region has no open panel" as
+  "the region was closed underneath it" — true for every *visibility* change, and exactly wrong one
+  line after a focus-only keypress, where it would undo the press. Nothing about which panels are
+  open changed either way, so neither branch persists.
+- **The exit half cannot come through the `KeyMapping`.** `KeyboardHandlerMixin` cancels every key
+  while `captured`, so vanilla never ticks the mapping and `consumeClick()` never fires — the same
+  reason ESC is handled inside the router. `DockInputRouter.onGlfwKey` therefore handles it directly:
+  a modifier-free press whose key matches the *currently bound* mapping (`isDockFocusKey`, via
+  `KeyMapping.matches(InputConstants.Type.KEYSYM.getOrCreate(key))`, so a rebind in the Controls
+  screen moves both halves) drops focus and returns `true`.
+- **`G` stays a letter while a text field has focus.** Unlike ESC, the scene cannot be given first
+  refusal: typed characters reach a field through the separate `charTyped`/`nativeEvent` path (see
+  "What is and isn't forwarded"), so a focused field leaves the *key* event for `g` unconsumed and it
+  is indistinguishable from a keybind press. `DockTextInputFocus`
+  (`dock/compose/DockTextInputFocus.kt`) closes that gap: `GarnetTextField` mirrors its focus into a
+  counter — a count, not a boolean, because focus moving between two fields fires gained/lost in an
+  unpromised order, and `release()` floors at zero so an unbalanced release (a panel unmounted while
+  a field held focus, which fires no focus-lost event — hence the `DisposableEffect`) cannot hide the
+  next focus. The wrapper uses `hasFocus`, not `isFocused`: Jewel's `TextField` owns the real focus
+  target as a child node, so the outer modifier never sees `isFocused`. Because
+  `GarnetTextFieldUsageTest` makes that wrapper the only text input in the client, "every field
+  reports" is a property of one file rather than a convention.
+
+Covered end to end by `DockFocusKeybindSpec` (`src/clientTest`), which drives the entering half
+through the real `KeyMapping` and the leaving half through `onGlfwKey`, exactly as production does.
+
 ## Keybinds (`DockKeybinds.kt`)
 
 One `KeyMapping` on `1`; the Alt/Shift distinction is read from live GLFW modifier state on
@@ -198,7 +241,9 @@ order:
    join-time auto-open, and Alt+1's focus-only half, which changes no panel.
 2. **Drop focus if the focused region just closed** (`DockInputRouter.clearFocus()`). A closed region
    has no scene to route into, so leaving `focusedRegion` pointing at it keeps the cursor released and
-   keeps feeding clicks and keys to nothing.
+   keeps feeding clicks and keys to nothing. Skipped (`dropStaleFocus = false`) by the one caller for
+   which "focused region has no panel" is the *intended* state rather than a stale pointer: `G`
+   focusing an empty LEFT so only the stripe shows (see the `G` section above).
 3. `syncDockViewport()` — see "Render enablement is derived from DockState" below. Must run *after*
    step 2, because `focusedRegion` is one of the two inputs to `anyActive()`.
 4. `garnet$updateScaledFramebuffer(true)` — re-caches `WindowMixin`'s framebuffer override.
@@ -211,7 +256,7 @@ texture gets blitted into a `realW - 32`-wide rect, leaving the world visibly st
 something else resizes the framebuffer. That was a real shipped bug — `DockStripe` mutated `DockState`
 and stopped there.
 
-The call sites are the Shift+1 and Alt+1 keybind branches, `registerDockWorldLifecycle`'s JOIN and
+The call sites are the `G` keybind's two branches (and its exit half inside `onGlfwKey`), the Shift+1 and Alt+1 keybind branches, `registerDockWorldLifecycle`'s JOIN and
 DISCONNECT hooks, `ExplorerActions.openLocalHistory`, and the stripe's tap. The stripe reaches it
 through a callback: `ComposeSurface` passes `commitDockVisibilityChange` into `GarnetDock`, which
 threads it into `DockStripe`, whose `detectTapGestures` calls `stripeIconClicked(panelId, callback)`.

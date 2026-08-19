@@ -281,6 +281,18 @@ item that triggered it was.
   synchronously elsewhere in this file: the placeholder row only renders if the folder is already
   open by the time `LazyTree`'s prune runs.
 
+## Every panel body must wrap itself in `IntUiTheme` — including test probes
+
+Each panel (`ExplorerPanel`, `LocalHistoryPanel`, `StructureInfoPanel`, `DockStripe`) opens with
+`IntUiTheme(isDark = true)`; there is no theme at the scene root. A Jewel widget composed without one
+throws `IllegalStateException: No TextStyle provided. Have you forgotten the theme?` — and it throws
+**at scene creation**, inside `ComposeSurface.ensureHost`, which trips the surface's
+render/coexistence guard and disables Compose for the remainder of the client process. In a
+`clientTest` run that is not a local failure: every later spec that needs the scene fails too, with
+symptoms (pointer events never reaching a collector, Explorer payloads never sent) that point
+nowhere near the unthemed widget. A probe panel registered by a spec is a panel like any other, so it
+needs the wrapper as much as a real one does.
+
 ## Keyboard delivery into Jewel widgets
 
 Jewel's `LazyTree`/`TextField` consume real Compose key events (arrow-key navigation, typed text),

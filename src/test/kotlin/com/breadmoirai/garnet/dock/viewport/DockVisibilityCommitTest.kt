@@ -106,6 +106,21 @@ class DockVisibilityCommitTest : FunSpec({
         framebufferApplies shouldBe 1
     }
 
+    test("dropStaleFocus = false keeps focus on a region with no open panel") {
+        // The dock-focus keybind's state: G focused LEFT while nothing is open, so only the stripe
+        // shows. Nothing *closed* here, so step 2's "the focused region just went away" guard does
+        // not apply — and if it ran it would undo the focus the keypress just established.
+        DockState.focusedRegion = DockRegion.LEFT
+
+        commitDockVisibilityChange(persist = false, dropStaleFocus = false)
+
+        focusDrops shouldBe 0
+        DockState.focusedRegion shouldBe DockRegion.LEFT
+        // Focus alone makes the dock active, so the shrink/overlay must still come on.
+        ViewportState.active.shouldBeTrue()
+        framebufferApplies shouldBe 1
+    }
+
     test("focus is left alone when the focused region is still open") {
         DockState.showPanel("garnet.explorer")
         DockState.focusedRegion = DockRegion.LEFT

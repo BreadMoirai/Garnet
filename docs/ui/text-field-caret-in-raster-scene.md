@@ -1,7 +1,7 @@
 ---
 title: The missing caret — focus interactions in the dock's raster scene
 tags: [compose, jewel, focus, text-field, caret, interaction-source, gotcha]
-summary: Why a focused text field in the dock's ImageComposeScene shows no caret and no focused border, the exact gate that fails (FocusableNode never emits FocusInteraction.Focus, so TextFieldCoreModifierNode.showCursor stays false), and the GarnetTextField wrapper (over a focusInteractionBridge modifier) that restores both.
+summary: Why a focused text field in the dock's ImageComposeScene shows no caret and no focused border, the exact gate that fails (FocusableNode never emits FocusInteraction.Focus, so TextFieldCoreModifierNode.showCursor stays false), the GarnetTextField wrapper (over a focusInteractionBridge modifier) that restores both, and the DockTextInputFocus reporting that same wrapper carries for the G keybind.
 ---
 
 # The missing caret — focus interactions in the dock's raster scene
@@ -57,6 +57,14 @@ is exactly what a call site forgets, and the failure mode is a field that types 
 imports Jewel's `TextField`; a wrapper cannot make the wrapped API unreachable, so the import is the
 only thing there is to check. Reach for the bridge directly only for some *other* focusable widget
 whose focus visuals come from an interaction source.
+
+The wrapper carries a **second** piece of focus plumbing for the same reason (one file, so it cannot
+be forgotten): it mirrors its focus into `DockTextInputFocus`, the counter the `G` dock-focus keybind
+consults so a typed `g` is a letter rather than an exit to the game. It reads `hasFocus`, not
+`isFocused` — Jewel's `TextField` owns the real focus target as a *child* node, so the outer modifier
+never sees `isFocused` — and releases from a `DisposableEffect`, because a field unmounted while
+focused never gets a focus-lost event. See
+[dock-input-routing.md](dock-input-routing.md#g--the-dock-focus-toggle-dockfocuskeybindkt).
 
 With the interaction delivered, `BasicTextField` recomposes as focused, `updateNode` sets
 `isFocused = true`, `showCursor` flips, the blink animation starts — and Jewel's focused border
