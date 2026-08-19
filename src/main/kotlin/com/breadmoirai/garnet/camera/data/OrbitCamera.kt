@@ -85,9 +85,11 @@ fun OrbitCamera.pan(dx: Double, dy: Double): OrbitCamera {
     // steeply up or down instead of shearing with the pitch.
     val y = Math.toRadians(yaw.toDouble())
     val right = Vec3(cos(y), 0.0, sin(y))
-    val up = right.cross(forward)
+    val up = forward.cross(right)
     val scale = distance * PAN_SENSITIVITY
-    return copy(pivot = pivot.add(right.scale(-dx * scale)).add(up.scale(-dy * scale)))
+    // Screen Y grows downward, so a downward drag (positive dy) must raise the pivot for the
+    // scene to follow the cursor — hence +dy here, unlike the -dx above.
+    return copy(pivot = pivot.add(right.scale(-dx * scale)).add(up.scale(dy * scale)))
 }
 
 /** Zoom. Multiplicative for constant feel; clamped so the camera can neither reach nor invert. */

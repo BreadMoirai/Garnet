@@ -85,6 +85,16 @@ class OrbitCameraTest : FunSpec({
         panned.pivot.z shouldBe (0.0 plusOrMinus 1e-9)
     }
 
+    test("pan drags the scene with the cursor vertically: a downward drag raises the pivot") {
+        // Screen Y grows downward, so dy > 0 is a downward drag. For the scene to follow the
+        // cursor down, the pivot — what sits under the crosshair — must move up (+Y at yaw 0).
+        val panned = origin.pan(dx = 0.0, dy = 10.0)
+
+        panned.pivot.x shouldBe (0.0 plusOrMinus 1e-9)
+        panned.pivot.y shouldBe (10.0 * PAN_SENSITIVITY * 5.0 plusOrMinus 1e-9)
+        panned.pivot.z shouldBe (0.0 plusOrMinus 1e-9)
+    }
+
     test("pan at yaw 90 moves the pivot along Z — the basis rotated with the camera") {
         val panned = origin.copy(yaw = 90f).pan(dx = 10.0, dy = 0.0)
 
