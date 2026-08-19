@@ -2,10 +2,7 @@ package com.breadmoirai.garnet.editor.structure.network
 
 import com.breadmoirai.garnet.editor.explorer.network.CreateFolderC2S
 import com.breadmoirai.garnet.editor.explorer.network.NewStructureC2S
-import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.explorer.network.RenamePathC2S
-import com.breadmoirai.garnet.editor.structure.network.SaveStructureC2S
-import com.breadmoirai.garnet.editor.structure.network.StructureResultS2C
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.netty.buffer.Unpooled

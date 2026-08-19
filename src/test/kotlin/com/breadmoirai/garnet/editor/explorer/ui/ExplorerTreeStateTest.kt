@@ -1,9 +1,6 @@
 package com.breadmoirai.garnet.editor.explorer.ui
 
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerSession
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerEdit
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
 import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FileTreeNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode

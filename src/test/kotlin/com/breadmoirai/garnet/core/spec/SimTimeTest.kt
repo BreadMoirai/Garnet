@@ -1,7 +1,5 @@
 package com.breadmoirai.garnet.core.spec
 
-import com.breadmoirai.garnet.core.spec.Phase
-import com.breadmoirai.garnet.core.spec.SimTime
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import net.minecraft.SharedConstants

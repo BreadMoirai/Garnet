@@ -6,8 +6,8 @@ import com.breadmoirai.garnet.editor.explorer.ui.registerExplorerLifecycle
 import com.breadmoirai.garnet.editor.network.EditorClientNetworking
 import com.breadmoirai.garnet.editor.history.ui.localHistoryPanel
 import com.breadmoirai.garnet.editor.structure.ui.structureInfoPanel
+import com.breadmoirai.garnet.dock.input.registerDockFocusKeybind
 import com.breadmoirai.garnet.dock.shell.DockState
-import com.breadmoirai.garnet.dock.viewport.registerCursorFocusToggle
 import com.breadmoirai.garnet.dock.viewport.registerDockKeybinds
 import com.breadmoirai.garnet.dock.viewport.registerDockWorldLifecycle
 import com.breadmoirai.garnet.dock.viewport.registerViewportToggle
@@ -23,7 +23,7 @@ class GarnetClient : ClientModInitializer {
         ModConfig.load()
         EditorClientNetworking.register()
         registerViewportToggle()
-        registerCursorFocusToggle()
+        registerDockFocusKeybind()
         registerDockKeybinds()
         registerDockWorldLifecycle()
         registerExplorerLifecycle()

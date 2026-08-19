@@ -1,6 +1,5 @@
 package com.breadmoirai.garnet.editor.structure.ops
 
-import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.core.async.onServer

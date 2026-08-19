@@ -7,10 +7,12 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
 import com.breadmoirai.garnet.dock.compose.ComposeInput
+import com.breadmoirai.garnet.dock.compose.DockTextInputFocus
 import com.breadmoirai.garnet.dock.shell.DockRegion
 import com.breadmoirai.garnet.dock.shell.DockState
 import com.breadmoirai.garnet.dock.shell.regionAt
 import com.breadmoirai.garnet.dock.viewport.ViewportState
+import com.breadmoirai.garnet.dock.viewport.commitDockVisibilityChange
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import java.awt.Canvas
@@ -20,7 +22,10 @@ import java.awt.event.KeyEvent as AwtKeyEvent
  * Bridges raw GLFW input (forwarded by MouseHandlerMixin/KeyboardHandlerMixin) into the full-window
  * ComposeScene, but only while a panel is [captured]. On focus we release the cursor so the OS
  * pointer is free over the panel; on unfocus we re-grab (with setIgnoreFirstMove to avoid a camera
- * jump, mirroring CursorFocusToggle). Window coords == scene coords (the scene is full-window).
+ * jump). Window coords == scene coords (the scene is full-window).
+ *
+ * Focus is taken by the `G` keybind ([registerDockFocusKeybind]), by Alt+1, and by clicking a dock
+ * region; it is dropped by any of those plus ESC and a click on the bare world.
  */
 object DockInputRouter {
 
@@ -200,6 +205,17 @@ object DockInputRouter {
                 ),
             )
             if (!consumedByScene) clearFocus()
+            return true
+        }
+        // The dock-focus keybind's exit half. It cannot come through its KeyMapping: the mixin
+        // cancels every key while captured, so vanilla never ticks the mapping. Modifier-free
+        // presses only — Ctrl+G/Alt+G belong to whatever widget wants them — and never while a text
+        // field has focus, where `g` is a letter: a focused field does *not* consume the key event
+        // (typed text arrives via onGlfwChar), so it cannot decline this for us the way an open
+        // dropdown declines ESC above.
+        if (action == GLFW.GLFW_PRESS && mods == 0 && !DockTextInputFocus.anyFocused && isDockFocusKey(key)) {
+            clearFocus()
+            commitDockVisibilityChange(persist = false)
             return true
         }
         val composeKey = glfwKeyToComposeKey(key) ?: return false

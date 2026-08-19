@@ -4,9 +4,6 @@ import com.breadmoirai.garnet.editor.explorer.data.FileNode
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.explorer.network.LoadEditorFolderC2S
 import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerActions
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.explorer.ui.onElementClick
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain

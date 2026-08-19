@@ -8,13 +8,9 @@ import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
-import com.breadmoirai.garnet.editor.structure.ops.StructureAutoSave
-import com.breadmoirai.garnet.editor.structure.ops.StructureCommit
-import com.breadmoirai.garnet.editor.structure.ops.StructureEditWatcher
 import com.breadmoirai.garnet.harness.GarnetTestSpec
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.core.async.onServer
-import com.breadmoirai.garnet.editor.structure.ops.StructurePersistence
 import com.breadmoirai.garnet.editor.structure.data.structuresDiffer
 import com.breadmoirai.garnet.test.drainPayloads
 import com.breadmoirai.garnet.test.makeMockServerPlayer
@@ -249,9 +245,9 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     val outcome = StructureCommit.commit(this, "widget.nbt", LocalHistoryStore.REASON_AUTOSAVE)
                         .shouldBeInstanceOf<CommitOutcome.Committed>()
-                    outcome.payload.subpath shouldBe "widget.nbt"
-                    outcome.payload.sizeX shouldBe 1
-                    outcome.payload.blockCount shouldBe 1
+                    outcome.structure.subpath shouldBe "widget.nbt"
+                    outcome.structure.sizeX shouldBe 1
+                    outcome.structure.blockCount shouldBe 1
 
                     StructureAutoSave.of(this).isDirty("widget.nbt") shouldBe false
                     LocalHistoryStore.revisions(file) shouldHaveSize 2
@@ -605,10 +601,10 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     val outcome = StructureCommit.commit(this, "bounded.nbt", LocalHistoryStore.REASON_AUTOSAVE)
                         .shouldBeInstanceOf<CommitOutcome.Committed>()
-                    outcome.payload.blockCount shouldBe 1
-                    outcome.payload.sizeX shouldBe 1
-                    outcome.payload.sizeY shouldBe 1
-                    outcome.payload.sizeZ shouldBe 1
+                    outcome.structure.blockCount shouldBe 1
+                    outcome.structure.sizeX shouldBe 1
+                    outcome.structure.sizeY shouldBe 1
+                    outcome.structure.sizeZ shouldBe 1
                 }
             } finally {
                 SharedSettings.localHistoryDir = prevHistDir
@@ -676,7 +672,7 @@ class StructureAutoSaveSpec : GarnetTestSpec({
 
                     val outcome = StructureCommit.commit(this, "recoverable.nbt", LocalHistoryStore.REASON_AUTOSAVE)
                         .shouldBeInstanceOf<CommitOutcome.Committed>()
-                    outcome.payload.blockCount shouldBe 1
+                    outcome.structure.blockCount shouldBe 1
                     StructureAutoSave.of(this).isDirty("recoverable.nbt") shouldBe false
                 }
             } finally {

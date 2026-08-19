@@ -75,11 +75,17 @@ object DockVisibilityCommit {
  *
  * Pass `persist = false` when the change was not the user choosing a layout: see step 1 of
  * [DockVisibilityCommit]'s doc.
+ *
+ * Pass `dropStaleFocus = false` when nothing closed and the caller *just* set focus deliberately —
+ * the dock-focus keybind (`G`), which can focus an empty LEFT so only the stripe shows. Step 2 reads
+ * "the focused region has no panel" as "the region it pointed at was closed underneath it", which is
+ * true for every visibility change but exactly wrong for that one focus-only case: it would undo the
+ * focus the keypress just established, one line after it was set.
  */
-fun commitDockVisibilityChange(persist: Boolean = true) {
+fun commitDockVisibilityChange(persist: Boolean = true, dropStaleFocus: Boolean = true) {
     if (persist) DockVisibilityCommit.persistLayout(DockState.openMap())
     val focused = DockState.focusedRegion
-    if (focused != null && !DockState.isVisible(focused)) DockVisibilityCommit.dropFocus()
+    if (dropStaleFocus && focused != null && !DockState.isVisible(focused)) DockVisibilityCommit.dropFocus()
     syncDockViewport()
     DockVisibilityCommit.applyFramebuffer()
 }

@@ -163,7 +163,8 @@ object StructurePersistence {
      *   block, or in an otherwise empty structure) is still dropped. Growing the box to enclose
      *   entities would change what "the structure's extent" means for placement and re-centering,
      *   so it deliberately does not.
-     * - [structuresDiffer] compares blocks only, so an entity that merely moved does not by itself
+     * - [com.breadmoirai.garnet.editor.structure.data.structuresDiffer] compares blocks only,
+     *   so an entity that merely moved does not by itself
      *   count as a change — nor could it trigger a commit anyway, since the dirty-tracking watcher
      *   only ever sees `setBlock`. What this does guarantee is the reverse, and it is the important
      *   direction: capturing entities cannot make an otherwise-unchanged structure look different,

@@ -1,7 +1,5 @@
 package com.breadmoirai.garnet.editor.structure.data
 
-import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
-
 /**
  * The result of a single [com.breadmoirai.garnet.editor.structure.ops.StructureCommit.commit]
  * attempt. Deliberately distinguishes "there was nothing to do" from "an attempt was made and it
@@ -11,8 +9,15 @@ import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
  * honestly.
  */
 sealed interface CommitOutcome {
-    /** A real write landed; [payload] is what changed, for broadcasting. */
-    data class Committed(val payload: StructureAutoSavedS2C) : CommitOutcome
+    /**
+     * A real write landed; [structure] records what changed.
+     *
+     * This deliberately holds the domain record and **not** the `StructureAutoSavedS2C` wire
+     * payload it is eventually broadcast as. `data` is a leaf layer; coupling a pure value type to
+     * the wire format inverted that. Whoever broadcasts converts at the network boundary — see
+     * [CommittedStructure].
+     */
+    data class Committed(val structure: CommittedStructure) : CommitOutcome
 
     /** The capture already matches the committed `.nbt` (or there was nothing to scan at all). */
     data object NoChange : CommitOutcome

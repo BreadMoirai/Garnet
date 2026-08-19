@@ -1,14 +1,8 @@
 package com.breadmoirai.garnet.editor.explorer.ui
 
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerStateStore
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.explorer.data.FolderNode
 import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerSessionGate
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeState
-import com.breadmoirai.garnet.editor.explorer.ui.ExplorerTreeSnapshot
-import com.breadmoirai.garnet.editor.explorer.ui.armRestoreIfSingleplayer
-import com.breadmoirai.garnet.editor.explorer.ui.saveExplorerSession
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly

@@ -49,7 +49,7 @@ object HistoryWatchers {
             RevisionEntry(it.timestampMillis, it.sizeX, it.sizeY, it.sizeZ, it.blockCount, it.reason)
         }
         // Unsolicited when called from the commit fan-out, so guard exactly as
-        // `StructureCommit.broadcast` does: on a dedicated server an unknown play-phase payload can
+        // `StructureSync.broadcast` does: on a dedicated server an unknown play-phase payload can
         // get a vanilla/unmodded client disconnected (F6). A reply to a C2S the player just sent
         // does not need the guard, but sharing one helper is simpler than two send paths, and the
         // guard is a no-op for a client that provably speaks this channel.

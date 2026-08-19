@@ -1,5 +1,6 @@
 package com.breadmoirai.garnet.editor.explorer.network
 
+import com.breadmoirai.garnet.editor.structure.network.StructureSync
 import com.breadmoirai.garnet.core.config.SharedSettings
 import com.breadmoirai.garnet.editor.clearCellVolume
 import com.breadmoirai.garnet.editor.writeStub
@@ -11,19 +12,12 @@ import com.breadmoirai.garnet.editor.workspace.world.EditorServerContext
 import com.breadmoirai.garnet.editor.explorer.data.EditorSession
 import com.breadmoirai.garnet.editor.workspace.world.EditorWorld
 import com.breadmoirai.garnet.editor.explorer.data.walk
-import com.breadmoirai.garnet.editor.explorer.network.LoadEditorFolderC2S
-import com.breadmoirai.garnet.editor.explorer.network.EditorErrorS2C
-import com.breadmoirai.garnet.editor.explorer.network.EditorFolderLoadedS2C
 import com.breadmoirai.garnet.editor.network.EditorNetworkRegistry
-import com.breadmoirai.garnet.editor.explorer.network.EditorTreeHandlers
 import com.breadmoirai.garnet.editor.structure.network.EditorStructureHandlers
 import com.breadmoirai.garnet.editor.structure.network.EditorSaveReportS2C
-import com.breadmoirai.garnet.editor.explorer.network.EditorTreeSnapshotS2C
-import com.breadmoirai.garnet.editor.explorer.network.NewEditorSpecC2S
 import com.breadmoirai.garnet.editor.structure.network.PlaceStructureC2S
 import com.breadmoirai.garnet.editor.history.network.RestoreRevisionC2S
 import com.breadmoirai.garnet.editor.history.network.RevisionEntry
-import com.breadmoirai.garnet.editor.explorer.network.SetEditorRootC2S
 import com.breadmoirai.garnet.editor.history.network.StructureHistoryS2C
 import com.breadmoirai.garnet.editor.history.network.WatchStructureHistoryC2S
 import com.breadmoirai.garnet.editor.explorer.ops.EditorNewStructure
@@ -354,7 +348,7 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     EditorDimRegistry.of(this).placedBoxOf("clock.nbt") shouldBe null
 
                     // A tick pass after the swap must not resurrect the cross-contamination either.
-                    StructureCommit.tick(this, now = overworld().gameTime + 1000)
+                    StructureSync.tick(this, now = overworld().gameTime + 1000)
                     fileB.readBytes() shouldBe bBefore
 
                     SharedSettings.projectRootPath = ""
@@ -411,9 +405,10 @@ class EditorNetworkRegistrySpec : GarnetTestSpec({
                     // Force the commit's history write to fail deterministically and portably by
                     // occupying index.json's path with a directory -- the same trick
                     // EditorFileOpsNetworkSpec's rename-abort test uses.
-                    historyDir = LocalHistoryStore.dirFor(fileA)
-                    historyDir!!.resolve("index.json").toFile().delete()
-                    historyDir!!.resolve("index.json").createDirectories()
+                    val dir = LocalHistoryStore.dirFor(fileA)
+                    historyDir = dir
+                    dir.resolve("index.json").toFile().delete()
+                    dir.resolve("index.json").createDirectories()
 
                     EditorTreeHandlers.handleSetRoot(this, player, SetEditorRootC2S(rootB.toString()))
 

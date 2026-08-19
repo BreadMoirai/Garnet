@@ -20,7 +20,7 @@ It lives in four per-sub-feature payload files —
 `editor/structure/network/StructurePackets.kt`, `editor/history/network/HistoryPackets.kt`,
 `editor/undo/network/UndoPackets.kt` — over a shared spine of
 `editor/network/EditorNetworkRegistry.kt` (registration), `editor/network/EditorHandlerSupport.kt`
-(shared handler helpers) and `editor/network/PacketCodecs.kt` (the `id()` identifier helper), with
+(shared handler helpers) and `editor/network/PayloadIds.kt` (the `payloadId()` identifier helper), with
 the server handlers in `editor/explorer/network/EditorTreeHandlers.kt`,
 `editor/explorer/network/EditorFileOpsHandlers.kt` and
 `editor/structure/network/EditorStructureHandlers.kt`. There is no
@@ -39,8 +39,9 @@ a force-commit through `StructureCommit`, the same engine that drives auto-save 
 back to (recovery goes through `LocalHistoryStore` instead, see `docs/persistence/local-history.md`).
 
 `StructureAutoSavedS2C(subpath, sizeX, sizeY, sizeZ, blockCount, savedAtMillis)` is the one
-clientbound payload here that is **not** a reply to a specific request: `StructureCommit` broadcasts
-it to every player on every successful commit (debounced auto-save or a forced `SaveStructureC2S`),
+clientbound payload here that is **not** a reply to a specific request: `StructureSync.broadcast`
+sends it to every player on every successful commit (debounced auto-save or a forced
+`SaveStructureC2S`),
 since a structure region is server-global and any player looking at it wants the update. The client
 handler (`StructureInfoState.onAutoSaved`) renders every field —
 `subpath`/`sizeX`/`sizeY`/`sizeZ`/`blockCount`/`savedAtMillis` — into the

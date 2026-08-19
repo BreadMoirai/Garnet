@@ -1,22 +1,19 @@
 package com.breadmoirai.garnet.editor.structure.ops
 
 import com.breadmoirai.garnet.core.config.SharedSettings
-import com.breadmoirai.garnet.editor.history.network.HistoryWatchers
-import com.breadmoirai.garnet.editor.structure.network.StructureAutoSavedS2C
+import com.breadmoirai.garnet.editor.structure.data.CommittedStructure
 import com.breadmoirai.garnet.editor.workspace.world.EditorDimRegistry
 import com.breadmoirai.garnet.editor.workspace.world.EditorRootResolver
 import com.breadmoirai.garnet.editor.history.data.LocalHistoryStore
 import com.breadmoirai.garnet.editor.structure.data.CommitOutcome
 import com.breadmoirai.garnet.editor.structure.data.PlacedBox
 import com.breadmoirai.garnet.editor.structure.data.structuresDiffer
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.NbtAccounter
 import net.minecraft.nbt.NbtIo
 import net.minecraft.server.MinecraftServer
-import net.minecraft.server.level.ServerPlayer
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -241,28 +238,38 @@ object StructureCommit {
         autoSave.clear(subpath)
         clearBackoff(server, subpath)
 
-        return CommitOutcome.Committed(StructureAutoSavedS2C(
+        return CommitOutcome.Committed(CommittedStructure(
             subpath, size.x, size.y, size.z, captured.blockCount, System.currentTimeMillis(),
         ))
     }
 
-    /** Commit every dirty structure that has come due and isn't in a failure backoff, and tell the clients. */
+    /**
+     * Commit every dirty structure that has come due and isn't in a failure backoff.
+     *
+     * Returns what was committed so the caller can tell the clients. This deliberately does **not**
+     * send anything itself: `ops` is below `network` in the editor layering, so the fan-out lives
+     * in `structure/network`'s `StructureSync.tick`, which is what the server tick event actually
+     * calls. Calling this directly commits silently — correct for an ops-level test, wrong for
+     * production.
+     */
     fun tick(
         server: MinecraftServer,
         now: Long = server.overworld().gameTime,
         writeNbt: (CompoundTag, Path) -> Unit = StructurePersistence::writeStructureAtomic,
-    ) {
-        if (!SharedSettings.autoSaveEnabled) return
+    ): List<CommittedStructure> {
+        if (!SharedSettings.autoSaveEnabled) return emptyList()
         val autoSave = StructureAutoSave.of(server)
-        if (autoSave.dirtySubpaths().isEmpty()) return
+        if (autoSave.dirtySubpaths().isEmpty()) return emptyList()
         val backoff = CommitBackoff.backoffMap(server)
+        val committed = mutableListOf<CommittedStructure>()
         for (subpath in autoSave.dirtySubpaths()) {
             if (!autoSave.dueForCommit(subpath, now)) continue
             val retryAt = backoff[subpath]
             if (retryAt != null && now < retryAt) continue
             val outcome = commit(server, subpath, LocalHistoryStore.REASON_AUTOSAVE, now, writeNbt)
-            if (outcome is CommitOutcome.Committed) broadcast(server, outcome.payload)
+            if (outcome is CommitOutcome.Committed) committed += outcome.structure
         }
+        return committed
     }
 
     /**
@@ -294,20 +301,24 @@ object StructureCommit {
      * the OLD root before unplacing every previously-placed subpath during a root swap — and both
      * commit dirty state before unplacing, already covered above.
      *
-     * Returns the structures whose edits did NOT reach disk — empty on the happy path. The
-     * world-save and server-stop backstops ignore this (there is nobody to tell and nothing to
-     * abort), but `handleSetRoot` must not: it unplaces every structure right after calling this,
-     * so a structure left uncommitted here has its only copy — world blocks — destroyed moments
-     * later. It refuses the root swap on any entry with [UncommittedStructure.writeFailed] set, and
-     * merely logs the rest — see that property's KDoc for why the two cases cannot be treated
-     * alike.
+     * Reports the structures whose edits did NOT reach disk ([CommitAllResult.uncommitted]) — empty
+     * on the happy path. The world-save and server-stop backstops ignore it (there is nobody to
+     * tell and nothing to abort), but `handleSetRoot` must not: it unplaces every structure right
+     * after calling this, so a structure left uncommitted here has its only copy — world blocks —
+     * destroyed moments later. It refuses the root swap on any entry with
+     * [UncommittedStructure.writeFailed] set, and merely logs the rest — see that property's KDoc
+     * for why the two cases cannot be treated alike.
+     *
+     * Like [tick], this sends nothing: [CommitAllResult.committed] is handed back for the caller to
+     * broadcast. `StructureSync.commitAll` in `structure/network` is the form production uses.
      */
-    fun commitAll(server: MinecraftServer, reason: String): List<UncommittedStructure> {
+    fun commitAll(server: MinecraftServer, reason: String): CommitAllResult {
         val autoSave = StructureAutoSave.of(server)
+        val committed = mutableListOf<CommittedStructure>()
         val uncommitted = mutableListOf<UncommittedStructure>()
         for (subpath in autoSave.dirtySubpaths()) {
             when (val outcome = commit(server, subpath, reason)) {
-                is CommitOutcome.Committed -> broadcast(server, outcome.payload)
+                is CommitOutcome.Committed -> committed += outcome.structure
                 is CommitOutcome.Failed ->
                     uncommitted += UncommittedStructure(subpath, outcome.reason, writeFailed = true)
                 is CommitOutcome.NotApplicable ->
@@ -319,36 +330,17 @@ object StructureCommit {
                 is CommitOutcome.NoChange -> Unit
             }
         }
-        return uncommitted
+        return CommitAllResult(committed, uncommitted)
     }
 
     /**
-     * Unsolicited fan-out: tells every OTHER connected player (`exclude`, if given, is typically
-     * the player who just triggered the commit and was already replied to directly — see
-     * `EditorStructureHandlers.handleSaveStructure`) that a structure changed, so their Explorer status
-     * lines can update. Nothing here is a reply to anything these players sent, so — unlike every
-     * other S2C in this mod — the receiver isn't provably running the mod at all: a vanilla/unmodded
-     * client on a dedicated server can be disconnected for an unknown play-phase payload (F6). Guard
-     * every send with `canSend`. [tick] and [commitAll] are the two genuinely unsolicited callers
-     * (a debounced auto-save and the periodic/shutdown backstop, neither triggered by a specific
-     * player's packet) and both go through this function unfiltered (`exclude = null`).
+     * What one [commitAll] pass did: [committed] is what landed on disk and still needs announcing
+     * to clients, [uncommitted] is what did not and may need refusing or logging.
      */
-    fun broadcast(server: MinecraftServer, payload: StructureAutoSavedS2C, exclude: ServerPlayer? = null) {
-        for (player in server.playerList.players) {
-            if (player === exclude) continue
-            // Unlike every other S2C here, this one is unsolicited — it isn't a reply to a C2S, so
-            // the receiver isn't provably running the mod. On a dedicated server, sending an unknown
-            // play-phase payload to a vanilla/unmodded client can get it disconnected (F6).
-            if (ServerPlayNetworking.canSend(player, StructureAutoSavedS2C.TYPE)) {
-                ServerPlayNetworking.send(player, payload)
-            }
-        }
-        // Anyone with this structure's Local History panel open just gained a revision. Deliberately
-        // outside the `exclude` loop: `exclude` means "already replied to about the SAVE", and that
-        // reply carries no revision list — the player who triggered the commit needs this push as
-        // much as everyone else. `pushAll` applies the same `canSend` guard.
-        HistoryWatchers.pushAll(server, payload.subpath)
-    }
+    data class CommitAllResult(
+        val committed: List<CommittedStructure>,
+        val uncommitted: List<UncommittedStructure>,
+    )
 
     /**
      * Drop this server's failure-backoff and last-committed-fingerprint bookkeeping. Pair with
