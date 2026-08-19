@@ -91,6 +91,10 @@ This replaces the old click-to-return-to-game gesture, deleted because it and or
 press: a drag that sometimes ended with focus silently dropped back to the game (and the player
 holding a pickaxe) was worse than one unambiguous exit key.
 
+See [orbit-camera.md](orbit-camera.md) for why `OrbitCameraController` moves the player at all
+(the `handleMovePlayer` spectator exemption), why it waits for spectator before touching the
+player's pose, and why it uses `setPos`/`setYRot` rather than `absSnapTo`.
+
 ## The capture gate
 
 `DockInputRouter.captured` is simply `DockState.focusedRegion != null`. `focus(region)` sets the

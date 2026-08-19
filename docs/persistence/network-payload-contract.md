@@ -18,13 +18,17 @@ The Explorer/redstone-project wire protocol is a genuine replacement worth docum
 It lives in four per-sub-feature payload files —
 `editor/explorer/network/ExplorerPackets.kt` (tree + file ops),
 `editor/structure/network/StructurePackets.kt`, `editor/history/network/HistoryPackets.kt`,
-`editor/undo/network/UndoPackets.kt` — over a shared spine of
+`editor/undo/network/UndoPackets.kt` — plus one payload outside `editor/*/network/` entirely,
+`camera/network/CameraPackets.kt` (`CameraModeC2S`, enter/leave the orbit camera's spectator
+gamemode — see [ui/orbit-camera.md](../ui/orbit-camera.md)), all riding the same shared spine:
 `editor/network/EditorNetworkRegistry.kt` (registration), `editor/network/EditorHandlerSupport.kt`
 (shared handler helpers) and `editor/network/PayloadIds.kt` (the `payloadId()` identifier helper), with
 the server handlers in `editor/explorer/network/EditorTreeHandlers.kt`,
-`editor/explorer/network/EditorFileOpsHandlers.kt` and
-`editor/structure/network/EditorStructureHandlers.kt`. There is no
-block-entity handle at all: the client addresses everything by **path** and by **player identity**.
+`editor/explorer/network/EditorFileOpsHandlers.kt`,
+`editor/structure/network/EditorStructureHandlers.kt`, and
+`camera/network/CameraModeHandlers.kt`. There is no
+block-entity handle at all: the client addresses everything by **path** and by **player identity**
+(camera mode is the one exception — it addresses only the requesting player, no path).
 
 ## Invariant 1: server is the only writer
 
