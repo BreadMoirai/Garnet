@@ -123,12 +123,26 @@ stuck in spectator is the failure mode this list exists to prevent.
 Lives in `camera/network/`, registered on the existing `editor/network/EditorNetworkRegistry` spine
 and using `payloadId()` from `editor/network/PayloadIds.kt`.
 
-`CameraModeC2S(enter: Boolean)`. The server handler:
+`CameraModeC2S(enter: Boolean)`. The server handler runs the **vanilla `/gamemode` command**
+rather than calling `ServerPlayer.setGameMode` directly:
 
-- `enter = true` → `ServerPlayer.setGameMode(GameType.SPECTATOR)`.
-- `enter = false` → restore `ServerPlayerGameMode.getPreviousGameModeForPlayer()`. Vanilla already
-  tracks this per player — it is the same field `/gamemode spectator` and back uses — so this spec
-  stores no previous-gamemode state of its own.
+- `enter = true` → `gamemode spectator`.
+- `enter = false` → `gamemode <previous>`, where previous is
+  `ServerPlayerGameMode.getPreviousGameModeForPlayer()`. Vanilla already tracks this per player —
+  it is the same field `/gamemode` and back uses — so this spec stores no previous-gamemode state
+  of its own.
+
+Going through the command is deliberate. It is the path every other gamemode change in the game
+takes, so camera mode inherits `GameModeCommand`'s handling and feedback and stays consistent with
+it as vanilla evolves, instead of drifting the moment a step is added there.
+
+The cost is that `/gamemode` gates on `Permissions.COMMANDS_GAMEMASTER`, which an ordinary player
+does not hold. The handler therefore runs the command on an **elevated** source
+(`createCommandSourceStack().withPermission(PermissionSet.ALL_PERMISSIONS).withSuppressedOutput()`).
+That is a real grant and worth stating plainly: camera mode is a first-class feature of this mod
+rather than an operator tool, so the mod grants it. The elevation is scoped to one command string,
+built server-side from a `GameType` and never from anything the client sent — the payload carries a
+single boolean, so there is no path from client input into the command text.
 
 Follows the established contract (`docs/persistence/network-payload-contract.md`): the server is
 the only writer, and a refusal replies `EditorErrorS2C(reason)` rather than failing silently. A

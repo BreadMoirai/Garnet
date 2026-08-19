@@ -377,7 +377,15 @@ import net.minecraft.world.level.GameType
 //        CameraModeHandlers.handleCameraMode(server, player, CameraModeC2S(enter = true))
 //        assert player.gameMode() == GameType.SPECTATOR
 //
-//   2. "leaving restores the gamemode the player had before, not a hardcoded default"
+//   2. "a player with no operator permission can still enter camera mode"
+//        Deliberately explicit: the handler elevates the command source, and a regression that
+//        dropped the elevation would leave this feature working only for operators -- which is
+//        exactly the kind of break that never shows up in a single-player smoke test.
+//        val player = <make a non-op ServerPlayer via the harness>
+//        CameraModeHandlers.handleCameraMode(server, player, CameraModeC2S(enter = true))
+//        assert player.gameMode() == GameType.SPECTATOR
+//
+//   3. "leaving restores the gamemode the player had before, not a hardcoded default"
 //        val player = <make a ServerPlayer via the harness>
 //        player.setGameMode(GameType.ADVENTURE)      // deliberately NOT survival/creative
 //        CameraModeHandlers.handleCameraMode(server, player, CameraModeC2S(enter = true))
@@ -385,7 +393,7 @@ import net.minecraft.world.level.GameType
 //        assert player.gameMode() == GameType.ADVENTURE
 ```
 
-Fill the two method bodies using the surrounding files' harness idiom — do not invent a new one.
+Fill the three method bodies using the surrounding files' harness idiom — do not invent a new one.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -433,6 +441,7 @@ package com.breadmoirai.garnet.camera.network
 import com.breadmoirai.garnet.editor.network.EditorHandlerSupport
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.server.permissions.PermissionSet
 import net.minecraft.world.level.GameType
 
 object CameraModeHandlers {
@@ -440,30 +449,55 @@ object CameraModeHandlers {
     /**
      * Flip the requesting player into spectator, or back out of it.
      *
+     * **Goes through the vanilla `/gamemode` command rather than calling `setGameMode` directly.**
+     * The command is the path every other gamemode change in the game takes, so routing through it
+     * means camera mode inherits the whole of it for free and stays consistent with it forever:
+     * `GameModeCommand`'s own argument handling, the `sendGameModeFeedback` message, and anything a
+     * server owner has hooked onto command execution. A direct `setGameMode` bypasses all of that
+     * and would silently drift the moment vanilla adds a step.
+     *
      * **Restore deliberately reads vanilla's own previous-gamemode field** rather than remembering
-     * one here. That field is what `/gamemode spectator` and back uses, it survives a relog, and
+     * one here. That field is what `/gamemode` and back already uses, it survives a relog, and
      * leaning on it means there is no per-player map of ours to leak, to get out of sync with a
      * gamemode changed by an operator mid-orbit, or to strand a player in spectator if the client
      * never sends the matching leave.
      */
     fun handleCameraMode(server: MinecraftServer, player: ServerPlayer, payload: CameraModeC2S) {
-        if (payload.enter) {
+        val target = if (payload.enter) {
             if (player.gameMode() == GameType.SPECTATOR) return
-            if (!player.setGameMode(GameType.SPECTATOR)) {
-                EditorHandlerSupport.fail(player, "could not enter camera mode")
-            }
-            return
+            GameType.SPECTATOR
+        } else {
+            if (player.gameMode() != GameType.SPECTATOR) return
+            player.gameMode.previousGameModeForPlayer ?: server.defaultGameType
         }
-        if (player.gameMode() != GameType.SPECTATOR) return
-        val previous = player.gameMode.previousGameModeForPlayer ?: server.defaultGameType
-        if (!player.setGameMode(previous)) {
-            EditorHandlerSupport.fail(player, "could not leave camera mode")
+
+        // ELEVATED ON PURPOSE. `/gamemode` requires Permissions.COMMANDS_GAMEMASTER, which an
+        // ordinary player does not have, so running as the player's own source stack would refuse
+        // every request. Camera mode is a first-class feature of this mod rather than an operator
+        // tool, so the mod grants it — the elevation is scoped to this one command string, which is
+        // built here from a GameType and never from anything the client sent.
+        val source = player.createCommandSourceStack()
+            .withPermission(PermissionSet.ALL_PERMISSIONS)
+            .withSuppressedOutput()
+        server.commands.performPrefixedCommand(source, "gamemode ${target.getName()}")
+
+        // performPrefixedCommand returns void, so success is confirmed by reading the state back
+        // rather than by trusting the call.
+        if (player.gameMode() != target) {
+            val verb = if (payload.enter) "enter" else "leave"
+            EditorHandlerSupport.fail(player, "could not $verb camera mode")
         }
     }
 }
 ```
 
-`ServerPlayer.gameMode` is a `public final ServerPlayerGameMode` field and `getPreviousGameModeForPlayer()` is public, so `player.gameMode.previousGameModeForPlayer` resolves directly from Kotlin — this needs no accessor mixin. The getter is `@Nullable` (a player who has never changed gamemode has no previous one), which is what the `?: server.defaultGameType` fallback is for.
+Every API above is verified against decompiled 26.2, so none of it needs guessing:
+
+- `ServerPlayer.gameMode` is a `public final ServerPlayerGameMode` field and `getPreviousGameModeForPlayer()` is public, so `player.gameMode.previousGameModeForPlayer` resolves directly from Kotlin — no accessor mixin. It is `@Nullable` (a player who never changed gamemode has no previous one), which is what the `?: server.defaultGameType` fallback covers.
+- `Commands.performPrefixedCommand(CommandSourceStack, String)` returns `void`.
+- `CommandSourceStack.withPermission` takes a **`PermissionSet`**, not an int level — 26.2 replaced integer permission levels. `PermissionSet.ALL_PERMISSIONS` lives in `net.minecraft.server.permissions`.
+- `GameModeCommand` gates on `Permissions.COMMANDS_GAMEMASTER`, which is why the elevation is needed at all.
+- `GameType.getName()` returns the lowercase name (`"spectator"`) the command argument parses.
 
 Then register both in `EditorNetworkRegistry.register()` — add the payload registration next to the other `serverboundPlay().register(...)` lines:
 
@@ -485,7 +519,7 @@ with the matching imports for `CameraModeC2S` and `CameraModeHandlers`.
 
 Run: `cmd.exe /c "cd /d H:\\Repo\\Garnet && gradlew.bat :26.2:runGameTest"`
 
-Expected: PASS, both cases.
+Expected: PASS, all three cases.
 
 - [ ] **Step 5: Commit**
 
@@ -495,10 +529,17 @@ git add src/main/kotlin/com/breadmoirai/garnet/camera/network/ \
         src/gametest/kotlin/com/breadmoirai/garnet/camera/CameraModeGameTest.kt
 git commit -m "feat: add the CameraModeC2S gamemode payload
 
-The one thing camera mode asks the server for. Restore reads vanilla's own
-previous-gamemode field rather than remembering one: that field already survives
-a relog and already tracks an operator changing the mode mid-orbit, so there is
-no per-player map of ours to leak or desync."
+The one thing camera mode asks the server for. Goes through the vanilla
+/gamemode command rather than calling setGameMode directly, so it inherits that
+command's handling and stays consistent with it as vanilla changes.
+
+That needs an elevated command source -- /gamemode requires COMMANDS_GAMEMASTER
+and camera mode is a feature, not an operator tool -- scoped to a command string
+built from a GameType and never from client input.
+
+Restore reads vanilla'"'"'s own previous-gamemode field rather than remembering one:
+it already survives a relog and already tracks an operator changing the mode
+mid-orbit, so there is no per-player map of ours to leak or desync."
 ```
 
 ---
