@@ -2,7 +2,9 @@ package com.breadmoirai.garnet.test
 
 import com.breadmoirai.garnet.harness.client.ClientContextHolder
 import com.breadmoirai.garnet.harness.client.FabricTestThreadPump
+import com.breadmoirai.garnet.camera.BlockOutlineGateSpec
 import com.breadmoirai.garnet.camera.OrbitCameraSpec
+import com.breadmoirai.garnet.camera.WorldHoverSpec
 import com.breadmoirai.garnet.core.async.AsyncEventHandler
 import com.breadmoirai.garnet.harness.client.WorldHolder
 import com.breadmoirai.garnet.harness.launcher.LauncherResult
@@ -98,8 +100,17 @@ class ClientTestSentinel : FabricClientGameTest {
                         DockFocusKeybindSpec::class,
                         JewelExplorerSpec::class,
                         ExplorerUiSpec::class,
+                        // Hovering is not a gesture, so this one never arms camera mode and can
+                        // run before the spec that does.
+                        WorldHoverSpec::class,
+                        // Late on purpose: it drives the client's *local* gamemode to spectator to
+                        // reach vanilla's outline gate. That is client-side only — no packet, no
+                        // server grant — and it restores the mode in teardown, so it is far cheaper
+                        // to undo than OrbitCameraSpec's real round trip. Ordered next to it anyway
+                        // so both "player believes it is spectating" specs sit at the end.
+                        BlockOutlineGateSpec::class,
                         // Last on purpose: it is the only spec that puts the player into
-                        // spectator (camera mode is a real server round trip here), so any
+                        // spectator *on the server* (camera mode is a real round trip here), so any
                         // residue it could leave lands after every other spec has run.
                         OrbitCameraSpec::class,
                     ),

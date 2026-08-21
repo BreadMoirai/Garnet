@@ -7,6 +7,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
 import com.breadmoirai.garnet.camera.input.OrbitCameraController
+import com.breadmoirai.garnet.camera.input.WorldHover
 import com.breadmoirai.garnet.dock.compose.ComposeInput
 import com.breadmoirai.garnet.dock.compose.DockTextInputFocus
 import com.breadmoirai.garnet.dock.shell.DockRegion
@@ -122,6 +123,9 @@ object DockInputRouter {
         val dx = x - lastX
         val dy = y - lastY
         lastX = x; lastY = y
+        // Unconditionally, and before the capture check: [WorldHover] must know where the cursor is
+        // the *first* frame the dock takes focus, and the move that freed it arrived uncaptured.
+        WorldHover.moveTo(x, y)
         if (!captured) return
         when (dragKind) {
             WorldDrag.ORBIT -> OrbitCameraController.orbitBy(dx, dy)
@@ -143,6 +147,26 @@ object DockInputRouter {
     /** True once `WindowMixin` has cached a real framebuffer size, so [regionUnderCursor] means something. */
     private val geometryKnown: Boolean
         get() = ViewportState.realWidth > 0 && ViewportState.realHeight > 0
+
+    /**
+     * True when the free cursor is over the bare world viewport — the condition the hovered-block
+     * highlight is drawn under, and the one **both** of its mixins consult: `MinecraftPickMixin`
+     * aims `Minecraft.hitResult` at the cursor, and `GameRendererOutlineMixin` forces
+     * `GameRenderer#shouldRenderBlockOutline` true so a spectating camera-mode player still gets an
+     * outline. Sharing one condition is what keeps them in step — a frame that picks under the
+     * cursor is exactly a frame that draws under it.
+     *
+     * All three clauses are load-bearing. Without [captured] the cursor is grabbed and the crosshair
+     * genuinely *is* the pointer, so vanilla's own `hitResult` is already right. Without the region
+     * test the highlight would track a cursor resting on a panel, outlining whatever block happens to
+     * lie behind it. Without [geometryKnown] a startup or resize race would answer `null` — "the
+     * world" — from a zero-sized window and pick with a ray built from a rect that does not exist.
+     *
+     * Deliberately true **during** a world drag as well: the highlight simply follows the cursor, and
+     * suppressing it mid-orbit would blink it off for the whole gesture.
+     */
+    val hoveringWorld: Boolean
+        get() = captured && geometryKnown && regionUnderCursor() == null
 
     /**
      * Press while a panel is focused.
@@ -174,6 +198,13 @@ object DockInputRouter {
                 if (kind != null) {
                     dragButton = button
                     dragKind = kind
+                    // The press, not the first move, is what the user aimed with — and the pivot is
+                    // picked under the cursor, so it has to be *this* position. By the time the
+                    // lazy entry actually fires (on the first move of the drag) the cursor has
+                    // already travelled. focusAt also re-picks the pivot when camera mode is
+                    // *already* armed, which is what makes pressing on a block focus it on every
+                    // drag rather than only on the first of a dock session.
+                    OrbitCameraController.focusAt(lastX, lastY)
                 }
             }
             return
@@ -186,8 +217,9 @@ object DockInputRouter {
      * Release while a panel is focused. A release is swallowed — never forwarded to Compose — if
      * and only if [isSwallowed] reports its button's press was swallowed by [onGlfwPress]; that
      * record is cleared either way. If the released button was the drag owner, the drag ends, but
-     * camera mode does **not** — the camera keeps its pivot and angle between drags, which is the
-     * whole point of orbiting a fixed subject. (A drag that outlives its button because focus was
+     * camera mode does **not** — it survives until focus is dropped, so a release costs no gamemode
+     * round trip. The camera also keeps its pivot and angle across the gap; the next press re-picks
+     * both through [OrbitCameraController.focusAt], so what survives is the *session*, not the aim. (A drag that outlives its button because focus was
      * dropped mid-press, rather than the button released, is handled by [clearFocus] instead —
      * this release never arrives while uncaptured.)
      */
@@ -245,6 +277,8 @@ object DockInputRouter {
     fun onGlfwScroll(dx: Double, dy: Double) {
         if (!captured) return
         if (geometryKnown && regionUnderCursor() == null) {
+            // A scroll can arm camera mode with no press to have aimed with, so it aims itself.
+            OrbitCameraController.aimAt(lastX, lastY)
             OrbitCameraController.dollyBy(dy)
             return
         }

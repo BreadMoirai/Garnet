@@ -155,10 +155,16 @@ class OrbitCameraSpec : ClientSpec({
         val realH = onClient { ViewportState.realHeight }
         val worldX = realW * 0.6
         val worldY = realH * 0.5
+        // A second, clearly different world coordinate, for the re-aim step: re-picking the pivot
+        // from the *same* cursor position is a no-op by construction (it is already centred).
+        val worldX2 = realW * 0.95
         val regionX = 80.0
         val regionY = 80.0
         withClue("($worldX, $worldY) must be bare world for the world steps to mean anything") {
             onClient { DockState.regionAt(worldX.toInt(), worldY.toInt(), realW, realH) } shouldBe null
+        }
+        withClue("($worldX2, $worldY) must also be bare world for the re-aim step") {
+            onClient { DockState.regionAt(worldX2.toInt(), worldY.toInt(), realW, realH) } shouldBe null
         }
         withClue("($regionX, $regionY) must be the visible LEFT region") {
             onClient { DockState.regionAt(regionX.toInt(), regionY.toInt(), realW, realH) } shouldBe
@@ -241,8 +247,8 @@ class OrbitCameraSpec : ClientSpec({
         }
 
         // 5. press + release over the world, then a move: the drag is over (moves route to Compose
-        // again) but camera mode survives — the camera keeps its pivot and angle between drags,
-        // which is the whole point of orbiting a fixed subject.
+        // again) but camera mode survives — releasing must not cost a gamemode round trip. The aim
+        // itself is re-picked by the *next* press (step 9), so what survives here is the session.
         runOnClient {
             DockInputRouter.onGlfwMove(worldX, worldY)
             DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_LEFT)
@@ -280,7 +286,8 @@ class OrbitCameraSpec : ClientSpec({
         // lands a round trip later; asserting "position unchanged" after a fixed tick wait would be
         // a race against that answer in one direction and against the 100-tick arm timeout in the
         // other. Instead the gesture is driven inside a single render-thread task (no client tick
-        // can interleave, so `applyTick` cannot have run) and the invariant is then sampled in a
+        // can interleave, and neither can a render frame, so neither `applyTick` nor `applyFrame`
+        // can have run) and the invariant is then sampled in a
         // bounded loop that reads `isSpectator` and the position *together*, asserting only while
         // the precondition actually holds. Both loops end far inside the arm timeout's budget.
         runOnClient { OrbitCameraController.exit() }
@@ -348,6 +355,69 @@ class OrbitCameraSpec : ClientSpec({
         val yawAfter = onClient { mc -> mc.player?.yRot ?: 0f }
         withClue("step 8: orbiting while spectating must turn the player ($yawBefore -> $yawAfter)") {
             (abs(yawAfter - yawBefore) > 0.5f).shouldBeTrue()
+        }
+
+        // 9. every world press re-picks the pivot and turns to face it — not just the first of a
+        // dock session. `enter()` only runs while the camera is null and the camera deliberately
+        // survives the end of a drag, so without an explicit re-pick on press the pivot was chosen
+        // exactly once and pressing on a block did nothing at all.
+        //
+        // The press alone is the whole gesture here: no move follows it, so any rotation observed is
+        // the re-aim and cannot be the drag. Asserted against a *different* cursor position than the
+        // one already in use, because re-picking from the same spot is a no-op by construction — the
+        // pivot is already centred.
+        runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_LEFT) }
+        waitClientTicks(2)
+        val yawBeforeReaim = onClient { mc -> mc.player?.yRot ?: 0f }
+        runOnClient {
+            DockInputRouter.onGlfwMove(worldX2, worldY)
+            DockInputRouter.onGlfwPress(GLFW.GLFW_MOUSE_BUTTON_LEFT)
+        }
+        waitClientTicks(3)
+        val yawAfterReaim = onClient { mc -> mc.player?.yRot ?: 0f }
+        withClue(
+            "step 9: a press at a new world position must re-aim the camera " +
+                "($yawBeforeReaim -> $yawAfterReaim)",
+        ) {
+            (abs(yawAfterReaim - yawBeforeReaim) > 0.5f).shouldBeTrue()
+        }
+
+        // 10. the pose commit leaves the renderer nothing to interpolate — the anti-jitter invariant.
+        //
+        // `Camera.setup` lerps `xo`->`getX()` and `Entity.getViewYRot` rot-lerps `yRotO`->`getYRot()`
+        // by the frame's partial tick. A pose written with `setPos`/`setYRot` alone therefore renders
+        // smeared back toward wherever the camera was a tick ago — for a gesture that can swing the
+        // eye tens of blocks between ticks, most of a tick of lag, and a *varying* amount of it
+        // depending on how the frames fell, which is what read as jitter. `applyFrame` uses
+        // `absSnapTo`, which writes both halves.
+        //
+        // Driven by calling `applyFrame` directly, with the previous-pose fields deliberately
+        // scrambled first, rather than by sampling after a gesture: a client tick's own
+        // `setOldPosAndRot()` also equalizes these fields, so a sample taken at rest passes whether
+        // or not the commit writes them. Scrambling makes the assertion about this call and nothing
+        // else. That the call is *reached* every frame is covered by `MinecraftFrameMixin`, whose
+        // injection is `required` and so fails client startup — and therefore this whole spec — if
+        // its target ever moves.
+        val smear = AtomicReference<List<Double>?>(null)
+        runOnClient { mc ->
+            val p = mc.player
+            if (p != null) {
+                p.xo = p.x + 5.0
+                p.yo = p.y + 5.0
+                p.zo = p.z + 5.0
+                p.yRotO = p.yRot + 45f
+                p.xRotO = p.xRot + 45f
+                OrbitCameraController.applyFrame(mc)
+                smear.set(
+                    listOf(
+                        abs(p.x - p.xo), abs(p.y - p.yo), abs(p.z - p.zo),
+                        abs(p.yRot - p.yRotO).toDouble(), abs(p.xRot - p.xRotO).toDouble(),
+                    ),
+                )
+            }
+        }
+        withClue("step 10: the pose commit must leave no gap for the renderer to interpolate: ${smear.get()}") {
+            (smear.get()?.all { it < 1e-6 } ?: false).shouldBeTrue()
         }
 
         runOnClient { DockInputRouter.onGlfwRelease(GLFW.GLFW_MOUSE_BUTTON_LEFT) }

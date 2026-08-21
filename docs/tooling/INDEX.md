@@ -10,6 +10,7 @@ fabric/loom configuration, dependency choices, and the local docs-search index.
 
 ## Articles
 
+- [Recovering lost Kotlin source from build output](recovering-source-from-build-output.md) — When uncommitted source is lost, `versions/<mcver>/build/classes/kotlin/**` still holds the last compile; decompile it with the Vineflower jar already in the Windows Gradle cache, verify with the tests written against the lost version, and expect KDoc not to survive. Tags: gradle, tooling, recovery, decompiler.
 - [Invoking Gradle from WSL2 on Windows](wsl2-gradle-invocation.md) — Use `cmd.exe /c "gradlew.bat ..."`; why `./gradlew` from WSL is fragile against a Windows-resident project, and how the choice decides which Skiko native resolves. Tags: gradle, wsl, windows, wrapper.
 - [Stonecutter Task Paths and the Active Version](stonecutter-task-paths.md) — Tasks are `:26.2:<task>` (not `:versions:26.2:...`); how the active version is declared and switched. Tags: stonecutter, gradle, multi-version.
 - [Local Compile Verification Across All Source Sets](local-verification-commands.md) — Why `compileKotlin` is insufficient; run `clientClasses classes gametestClasses clientTestClasses testClasses` to cover main/client/gametest/clientTest/test; and why `:26.2:test --tests` doesn't select Kotest specs, so run `:26.2:test` unfiltered and read the per-class JUnit XML report instead. Tags: gradle, source-sets, verification, loom, kotest.

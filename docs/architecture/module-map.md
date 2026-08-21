@@ -325,15 +325,25 @@ server's only involvement is the one payload below. See
 [ui/orbit-camera.md](../ui/orbit-camera.md) for the authority split and why.
 
 - `data/OrbitCamera.kt` (main) — the pure, immutable pivot/yaw/pitch/distance state and its
-  `orbit`/`pan`/`dolly` transforms plus the derived `eyePosition`. No Minecraft client dependency;
-  unit-tested directly under `src/test`.
+  `orbit`/`pan`/`dolly` transforms, the shared `rightVector`/`upVector` basis, the `cursorRay`
+  projection inverse used to pick a pivot under the free cursor, `pivotFor`'s snap from that raycast
+  hit to the centre of the block cell, the `orbitAround` focus seed, and the derived `eyePosition`. `pan`/`dolly` translate the camera at flat world rates; `distance` is
+  the orbit radius only. No Minecraft client dependency; unit-tested directly under `src/test`.
 - `network/CameraPackets.kt` + `network/CameraModeHandlers.kt` (main) — `CameraModeC2S`, the one
   payload this feature has, and its server handler. Registered through
   `editor/network/EditorNetworkRegistry.kt` alongside the editor payloads even though it lives
   outside `editor/*/network/` — see
   [persistence/network-payload-contract.md](../persistence/network-payload-contract.md).
-- `input/OrbitCameraController.kt` (client) — applies the camera to the `LocalPlayer` every client
-  tick; owns lazy entry, the spectator-arm timeout, and exit.
+- `input/OrbitCameraController.kt` (client) — `applyFrame` writes the pose onto the `LocalPlayer`
+  every rendered frame (hooked by `mixin/client/MinecraftFrameMixin.java`), `applyTick` keeps the
+  tick-scoped bookkeeping; owns lazy entry, the cursor aim, the spectator-arm timeout, and exit.
+- `input/CursorPick.kt` (client) — stateless: the free-cursor ray (content rect, rendered FOV,
+  crosshair fallback) and the `Block.OUTLINE` / `Fluid.NONE` clip. Shared by the pivot pick and the
+  hovered-block highlight so the two name the same block for the same pixel.
+- `input/WorldHover.kt` (client) — the live cursor position and the hit result the hovered-block
+  highlight installs, cast from the *render* camera. Read by `mixin/client/MinecraftPickMixin.java`,
+  whose aimed hit only draws because `mixin/client/GameRendererOutlineMixin.java` defeats vanilla's
+  spectator outline gate; see [ui/cursor-block-targeting.md](../ui/cursor-block-targeting.md).
 
 See [ui/dock-input-routing.md](../ui/dock-input-routing.md) for how `dock/input/DockInputRouter.kt`
 feeds world-viewport gestures into the controller.
@@ -344,9 +354,14 @@ These packages did **not** move — the mixin JSONs pin them by name.
 
 Server-side: `ConnectionAccessor`, `ServerCommonPacketListenerImplAccessor`,
 `ServerLevelPhaseMixin`, `ServerLevelSetBlockMixin`. Client-side:
-`ClientCommonPacketListenerImplAccessor`, `KeyboardHandlerMixin`, `MinecraftPresentMixin`,
-`MouseHandlerMixin`, `MouseHandlerViewportMixin`, `TitleScreenMixin`, `WindowMixin` — the
-GLFW-input and viewport-shrink/composite mixins backing `dock/`. See
+`ClientCommonPacketListenerImplAccessor`, `GameRendererOutlineMixin`, `KeyboardHandlerMixin`,
+`MinecraftFrameMixin`, `MinecraftPickMixin`, `MinecraftPresentMixin`, `MouseHandlerMixin`,
+`MouseHandlerViewportMixin`, `TitleScreenMixin`, `WindowMixin` — the GLFW-input and
+viewport-shrink/composite mixins backing `dock/`, plus `MinecraftFrameMixin`'s per-frame
+orbit-camera commit (see [ui/orbit-camera.md](../ui/orbit-camera.md)) and the two halves of the
+free-cursor block highlight — `MinecraftPickMixin` aims the pick, `GameRendererOutlineMixin` stops
+vanilla's spectator rule from suppressing the draw (see
+[ui/cursor-block-targeting.md](../ui/cursor-block-targeting.md)). See
 [architecture/shrink-viewport-compose-model.md](shrink-viewport-compose-model.md) and
 [ui/dock-input-routing.md](../ui/dock-input-routing.md).
 

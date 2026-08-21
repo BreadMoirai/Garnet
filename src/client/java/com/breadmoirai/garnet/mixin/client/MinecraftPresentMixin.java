@@ -26,8 +26,10 @@ import org.spongepowered.asm.mixin.injection.At;
  * <p>This mixin wraps the {@code GpuSurface#blitFromTexture} present call (MC 26.2 replaced the old
  * {@code RenderTarget#blitToScreen()} path). When {@link ViewportState#shouldModify()}
  * is on it builds a full-real-size off-screen composite, fills it with an opaque edge color, blits
- * the shrunk game texture into the centered content sub-rect ({@link ViewportState#contentRect}),
- * and presents the composite instead. When off it forwards the original call untouched, so vanilla
+ * the shrunk game texture into the content sub-rect ({@link ViewportState#contentRect}) — at that
+ * rect's own {@code frameX}/{@code frameY} origin, i.e. offset by the strips the dock reserves, not
+ * centered in the window — and presents the composite instead. Cursor-to-world math depends on that
+ * origin matching: see {@code camera/data/cursorRay}. When off it forwards the original call untouched, so vanilla
  * present is byte-for-byte unchanged.</p>
  */
 @Mixin(Minecraft.class)

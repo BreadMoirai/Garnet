@@ -1,7 +1,7 @@
 ---
 title: Dock input routing — GLFW mixins into Compose, active-only
 tags: [compose, dock, input, mixin, glfw, keybind, hit-test]
-summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the G dock-focus toggle (which region it picks, why its exit half lives in the router, and the DockTextInputFocus gate that keeps G a letter while typing), the Alt+1/Shift+1 keybinds (Shift+1 toggles the Explorer panel itself) and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, the DockState.regionAt hit test — stripe first, then BOTTOM/LEFT/RIGHT/CENTER — behind click-to-focus into the dock, and how a press/scroll over the bare world routes into the orbit camera instead of the game while the dock is focused.
+summary: How raw GLFW pointer/key/char callbacks are routed into the dock ComposeScene only while a region is focused (off by default), the MC 26.1.2/26.2 MouseHandler/KeyboardHandler mixin targets that diverged from older signatures, the G dock-focus toggle (which region it picks, why its exit half lives in the router, and the DockTextInputFocus gate that keeps G a letter while typing), the Alt+1/Shift+1 keybinds (Shift+1 toggles the Explorer panel itself) and their garnet-dock.json persistence, why join-time auto-open changes visibility only and never focus, ESC-drops-focus, the DockState.regionAt hit test — stripe first, then BOTTOM/LEFT/RIGHT/CENTER — behind click-to-focus into the dock, and how a press/scroll over the bare world routes into the orbit camera instead of the game while the dock is focused, plus the unconditional WorldHover.moveTo feed and the hoveringWorld gate behind the hovered-block highlight.
 ---
 
 # Dock input routing
@@ -61,6 +61,14 @@ it drives `com.breadmoirai.garnet.camera.input.OrbitCameraController` (Task 3) i
 | MMB drag | `panBy(dx, dy)` — slide the pivot |
 | Scroll | `dollyBy(dy)` — move toward/away from the pivot |
 
+A bare **move** over the same pixels is not a gesture and must never arm anything, but it is still
+reported: `onGlfwMove` calls `WorldHover.moveTo(x, y)` unconditionally — before the `captured` check,
+so the hovered-block highlight knows where the cursor is on the very first frame focus is taken, and
+the move that freed the cursor arrived uncaptured. The matching read side is `hoveringWorld`
+(`captured && geometryKnown && regionUnderCursor() == null`), which gates whether the free cursor —
+rather than the crosshair — decides `Minecraft.hitResult`. See
+[cursor-block-targeting.md](cursor-block-targeting.md).
+
 `DockInputRouter` tracks this with two pieces of state, not one, because more than one button can be
 swallowed by the world at a time:
 
@@ -84,16 +92,25 @@ never fires for that button at all (`captured` is already `false` by the time th
 nothing but `clearFocus()` would ever clear `dragButton`/`swallowedButtons` or leave camera mode.
 Routing every exit — `G`'s branch in `onGlfwKey`, ESC, and any future one — through this single choke
 point is what guarantees the player is never left "back in the game" while `OrbitCameraController`
-keeps overwriting their position and look every tick from a stale, now-unreachable camera. `G` is the
+keeps overwriting their position and look every frame from a stale, now-unreachable camera. `G` is the
 only key that returns to playing; see the `G` section below.
 
 This replaces the old click-to-return-to-game gesture, deleted because it and orbit wanted the same
 press: a drag that sometimes ended with focus silently dropped back to the game (and the player
 holding a pickaxe) was worse than one unambiguous exit key.
 
+The world-gesture branch also tells the camera where the cursor is when it recognizes a gesture, since
+that — not the first move of the drag — is the position the pivot is raycast from. A press that takes
+ownership of a drag calls `OrbitCameraController.focusAt(lastX, lastY)`, which records the aim *and*
+re-picks the pivot on the spot when camera mode is already armed; a scroll over the world calls
+`aimAt(lastX, lastY)`, which records only, because a dolly should move the camera rather than snap the
+view. Neither arms camera mode by itself, so a world click that never becomes a drag still costs no
+gamemode round trip.
+
 See [orbit-camera.md](orbit-camera.md) for why `OrbitCameraController` moves the player at all
 (the `handleMovePlayer` spectator exemption), why it waits for spectator before touching the
-player's pose, and why it uses `setPos`/`setYRot` rather than `absSnapTo`.
+player's pose, why the pose is committed per rendered frame with `absSnapTo` rather than per tick,
+and why the pivot ray goes through the cursor rather than the crosshair.
 
 ## The capture gate
 

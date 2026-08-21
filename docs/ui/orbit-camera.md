@@ -1,7 +1,7 @@
 ---
 title: The orbit camera — moving the player to fly the viewport
 tags: [camera, input, viewport, spectator, networking]
-summary: Why the client owns the orbit camera outright and just moves the player's own entity through spectator — the handleMovePlayer exemption and LocalPlayer's own position sync that make that legal, why entry is lazy and gesture-driven, why the tick loop waits for isSpectator() and uses setPos/setYRot instead of the obviously-correct absSnapTo, why the server keeps a grant flag so leave cannot demote a spectator it never created, and why exit leaves the player wherever the camera ended.
+summary: Why the client owns the orbit camera outright and just moves the player's own entity through spectator — the handleMovePlayer exemption and LocalPlayer's own position sync that make that legal, why entry is lazy and gesture-driven, why the tick loop waits for isSpectator() while the pose itself is committed per render frame with absSnapTo, why the pivot is raycast through the free cursor rather than the crosshair, snapped to the centre of the block that was hit, and re-picked on every press, why pan and dolly translate at a flat world rate instead of scaling with distance, why the server keeps a grant flag so leave cannot demote a spectator it never created, and why exit leaves the player wherever the camera ended.
 ---
 
 # The orbit camera — moving the player to fly the viewport
@@ -16,7 +16,7 @@ thinks it is spectating.
 
 Every other piece of editor state in this mod is server-authoritative — the client asks, the server
 decides and replies. The orbit camera breaks that pattern on purpose: `OrbitCameraController` calls
-`setPos`/`setYRot`/`setXRot` on the client's own `LocalPlayer` every tick, with no packet describing
+`absSnapTo` on the client's own `LocalPlayer` every rendered frame, with no packet describing
 the new pose going anywhere. `CameraModeC2S` — the *only* payload this subsystem has — asks the
 server for exactly one thing: flip this player into spectator, or back out of it. Everything after
 that is client-local arithmetic.
@@ -48,6 +48,98 @@ over the bare world (`DockInputRouter`'s world-gesture branch — see
 [dock-input-routing.md](dock-input-routing.md)), and `CameraModeC2S(enter = true)` goes out from
 inside that same gesture handler. A dock session that only ever clicks panels never touches
 spectator at all.
+
+## The pivot is raycast through the *cursor*, not the crosshair
+
+Camera mode only ever arms while the dock has **freed the cursor**, so the user is pointing at a
+block with a real pointer somewhere over the viewport — not with the crosshair. Entry originally
+picked the pivot with `Entity.pick`, which casts along the player's view vector, i.e. through the
+centre of the rendered image. That is the correct ray in ordinary play, where the crosshair *is* the
+pointer, and the wrong one here: it orbits around whatever happened to be dead centre while the user
+was clearly aiming somewhere else.
+
+The offset is worse than it first looks, because "dead centre" is not the centre of the window.
+While the dock is on screen `WindowMixin` shrinks the reported framebuffer and `MinecraftPresentMixin`
+composites the result into the sub-rect the dock's reserved strips leave free (see
+[shrink-viewport-compose-model.md](shrink-viewport-compose-model.md)). With a 300 px left strip open,
+the crosshair is 150 px to the right of the window's centre.
+
+`camera/data/cursorRay` inverts the projection MC actually builds. `Projection` calls
+`Matrix4f.setPerspective(fov * DEG_TO_RAD, width / height, …)`, and JOML's `setPerspective` takes a
+**vertical** FOV — which is why the aspect ratio multiplies the horizontal term only:
+
+```
+ndcX = 2 * (cursorX - rectX) / rectW - 1        ndcY = 1 - 2 * (cursorY - rectY) / rectH
+ray  = normalize(forward + right * (ndcX * aspect * tan(fov/2)) + up * (ndcY * tan(fov/2)))
+```
+
+`right` is derived from yaw alone, never from the pitched forward vector: MC's camera has no roll, so
+its screen-horizontal axis stays in the world's horizontal plane however steeply you look up or down.
+Deriving it from `forward` instead shears both this and `pan` near the poles.
+
+The client-side half of that — reading the content rect, the rendered FOV, and falling back to the
+plain view vector when either is unknowable — lives in `camera/input/CursorPick.kt`, because the
+hovered-block highlight casts through the same pixels and the two must agree on which block a pixel
+names. See [cursor-block-targeting.md](cursor-block-targeting.md).
+
+`DockInputRouter` calls into the controller at the moment it recognizes a world gesture, not when the
+lazy entry actually fires — entry happens on the first *move* of a drag, by which point the cursor
+has already travelled away from what the user aimed at. Two entry points, because a press and a
+scroll want different things:
+
+- **`focusAt(x, y)`** on the press that takes ownership of a drag. Records the aim *and*, when camera
+  mode is already armed, re-picks the pivot and turns to face it right there on the press.
+- **`aimAt(x, y)`** on a scroll over the world. Records the aim only: a dolly should move the camera,
+  not snap the view somewhere new.
+
+The re-pick is not optional polish. `enter()` only runs while the camera is null, and the camera
+deliberately survives the end of a drag — so without `focusAt` the pivot was chosen **once per dock
+session** and every drag after the first orbited a stale point. Pressing on a block did nothing at
+all, which is exactly how it was reported.
+
+### Focusing turns the camera, but never moves it
+
+An `OrbitCamera` looks at its pivot by construction, so a pivot chosen off the view axis cannot also
+preserve the player's existing yaw/pitch — carrying the old rotation over would place `eyePosition`
+somewhere other than where the player is standing, i.e. teleport them. `orbitAround(eye, pivot)`
+resolves this the other way: it derives yaw/pitch from the eye→pivot direction, so the eye stays
+exactly put and only the *angle* changes, bringing the block the user pointed at to the centre of the
+view. There is a rotational snap at the start of every drag, bounded by half the FOV; this was chosen
+over the alternatives (keep the view and use only the hit's *depth* for the pivot; or ease
+the rotation over several frames, which needs a transition state the immutable `OrbitCamera` does not
+have).
+
+On a miss the ray still gets a pivot — `PIVOT_MISS_DISTANCE` (8 blocks) along it — rather than the
+far end of a `PIVOT_RAYCAST_RANGE` (64 block) ray, which would orbit a point in empty sky far behind
+anything visible. The clip is `Block.OUTLINE` / `Fluid.NONE`: the block picked should be the one the
+user visibly aimed at, the same shape the block highlight draws, rather than one the ray reached by
+passing through a fence's empty half, or a water surface whose edges you cannot see. That is not a
+simile any more — the highlight really is drawn on this clip's block, because both go through
+`CursorPick`.
+
+### The pivot is the block's centre, not the point the ray hit
+
+`camera/data/pivotFor` turns the clip result into an orbit centre, and a hit gives
+`Vec3.atCenterOf(hit.blockPos)` — **not** `hit.location`. The raw hit location is where the ray
+entered the block's outline, i.e. a point on the *face* turned toward the camera. Orbiting that
+sweeps the camera around the block's skin: the picked block slides across the screen as you drag,
+and its far side can never be brought into view. Orbiting the cell's centre keeps the block fixed
+under the cursor through a full sweep, which is what "orbit this block" means.
+
+The **cell** centre, deliberately, and not the centroid of the shape actually hit. For a slab, a
+stair or a fence post the two differ, and a pivot that moves depending on which part of a block you
+clicked is harder to predict than one that is always `blockPos + (0.5, 0.5, 0.5)`. The cost — on a
+bottom slab the pivot floats a quarter-block above the surface — is a far smaller surprise than the
+pivot shifting between two clicks on the same block.
+
+`pivotFor` tests the result's own type rather than only checking for `MISS`, because `MISS` is not
+the only non-block outcome: a world-border hit reports type `BLOCK` from a `BlockHitResult` whose
+`blockPos` is the clamped border cell.
+
+One knock-on: the pivot now sits roughly half a block *deeper* than the surface, so `distance` at
+entry is that much larger. That slightly relieves the sub-block orbit radii described under
+[Why pan and dolly translate at a flat world rate](#why-pan-and-dolly-translate-at-a-flat-world-rate)
+— it does not remove them, since the pivot is still cursor-picked and often close.
 
 ## Why the tick loop waits for `isSpectator()` before moving the player
 
@@ -84,39 +176,88 @@ The counter itself is only touched in the not-yet-spectator branch, so a refusal
 can never fire once an orbit has already established spectator — the `isSpectator` check above
 returns before the counter is even read.
 
-## Why `setPos`/`setYRot`, not `absSnapTo`
+## Why the pose is committed per *frame*, with `absSnapTo`
 
-This is the one line in the subsystem a future reader is most likely to "fix" back, so it is worth
-stating plainly: **`applyTick` deliberately calls `setPos`/`setYRot`/`setXRot`, not
-`absSnapTo`.**
+This section used to argue the exact opposite — that `applyTick` should call `setPos`/`setYRot` and
+leave the previous-pose fields alone so MC's tick interpolator could smooth a 20 Hz camera update
+into 144 fps of motion. That reasoning shipped, and it is what made orbiting **jittery**. It is
+recorded here rather than deleted because it is a genuinely tempting mistake to make twice.
 
-`absSnapTo` looks like the obviously-correct call for "teleport the player to an exact pose" — and
-for an actual teleport it would be right. But `absSnapTo` also overwrites the *previous*-tick pose
-fields (`xo`/`yo`/`zo`, `yRotO`, `xRotO`), which is precisely what a real teleport needs: there is no
-old position worth interpolating from, so the renderer should not try. A 20 Hz camera update is the
-opposite case. The client renders at whatever the display's frame rate is, and between two ticks it
-interpolates the rendered pose from the previous tick's fields to the current ones so a 20 Hz update
-reads as smooth motion at 144 fps instead of a visible step every tick. Calling `absSnapTo` here
-would erase the "previous" side of that interpolation every single tick, turning every orbit drag
-into a strobe of discrete jumps instead of a smooth pan. `setPos`/`setYRot` update only the current
-pose and leave the previous-tick fields for the interpolator to read, which is exactly the behavior
-a moving camera needs. Entry itself needs no interpolation to worry about: it seeds the `OrbitCamera`
-from the player's *current* pose before sending `CameraModeC2S`, so there is never a jump between
-"not in camera mode" and "in camera mode, but the view already matches" for the renderer to smear.
+The flaw is that MC's tick interpolation is not a smoothing filter, it is a *delay*. `Camera.setup`
+renders the eye at `Mth.lerp(partialTick, entity.xo, entity.getX())` and the angle at
+`Entity.getViewYRot(partialTick)` (which rot-lerps `yRotO` → `yRot`). Committing the pose on
+`END_CLIENT_TICK` therefore meant the frame the user sees is always replaying the motion of the tick
+*before* — and, worse, replaying it at a rate set by how much mouse movement that particular tick
+happened to collect. Mouse deltas arrive per frame; ticks arrive every 50 ms; the two do not divide
+evenly, so consecutive ticks hand the interpolator different-sized steps to stretch over the same
+50 ms. Uneven step sizes stretched over a fixed interval is the definition of jitter, on top of a
+constant 50–100 ms of lag.
 
-## Why pan scales with distance, and dolly is multiplicative
+Vanilla never does this to the player's own view, and how it avoids it is the fix. `Minecraft.runTick`
+drains this frame's GLFW callbacks (`runAllTasks()`), runs zero or more `tick()`s, then calls
+`MouseHandler.handleAccumulatedMovement()` — **every frame, before `renderFrame`** — and that path
+ends in `Entity.turn`, which advances `xRotO`/`yRotO` by the same delta it adds to `xRot`/`yRot`.
+Vanilla mouse-look is applied per frame *and* leaves the interpolator nothing to interpolate.
 
-Panning slides the pivot across the camera's own right/up plane by an amount proportional to the
-current `distance`. Fixed-size panning would crawl to uselessness once zoomed out over a large
-structure — the same mouse movement that comfortably repositions a close-up pivot would barely nudge
-one twenty blocks further out. Scaling by distance keeps a given drag covering roughly the same
-*fraction of the screen* regardless of zoom level.
+So the orbit camera does the same thing:
 
-Dolly (scroll-to-zoom) multiplies `distance` by a constant factor per notch rather than adding or
-subtracting a fixed amount. Additive zoom feels wildly different at different scales: the same
-scroll notch that is imperceptible at `distance = 200` would rocket the camera straight through the
-pivot at `distance = 1`. A multiplicative step feels like the same *proportional* change in scale no
-matter how far out the camera already is, which is what "zoom" is expected to feel like.
+- **`MinecraftFrameMixin`** injects immediately after that `handleAccumulatedMovement()` call and
+  invokes `OrbitCameraController.applyFrame`, putting the camera commit on exactly vanilla's
+  schedule: after this frame's input, before this frame's render.
+- **`applyFrame` calls `absSnapTo`**, which writes `xo`/`yo`/`zo`/`yRotO`/`xRotO` alongside the
+  current pose. With a per-frame commit that is precisely right — the pose is already current for
+  the frame about to be drawn, so any interpolation away from it is error, not smoothing.
+
+`applyTick` still exists and still runs on `END_CLIENT_TICK`, but only for the state that genuinely
+belongs to the tick: noticing a replaced `LocalPlayer`, counting out `ARM_TIMEOUT_TICKS`, and zeroing
+delta movement. It deliberately does **not** write the pose, and `applyFrame` deliberately never
+calls `exit()` or sends a packet — round trips must not fire at frame rate.
+
+## Why pan and dolly translate at a flat world rate
+
+Both of these were originally scaled by `distance`, on the standard modelling-viewport reasoning:
+pan should cover the same *fraction of the screen* at any zoom, and a dolly notch should be the same
+*proportional* change in scale whether you are 1 block out or 200. That reasoning assumes you chose
+your subject from a comfortable distance. Cursor-picked pivots break the assumption — the pick
+routinely lands on a surface less than a block away, and a real client run captured exactly that:
+
+```
+hit=BLOCK  eye=(0.85,-64.50,11.88)  pivot=(0.83,-64.00,11.51)  dist=0.62
+```
+
+(That trace predates the block-centre pivot above, so its `pivot` is the raw hit location. Snapping
+to the cell centre would have pushed `dist` out by up to half a block — still well inside the range
+that broke the distance-scaled rates.)
+
+At `distance = 0.62` the old rates gave `0.002 * 0.62` = 0.0012 blocks per pixel of pan — a
+500-pixel drag moved the camera **0.6 blocks** — and a multiplicative dolly that asymptoted into the
+pivot and stopped dead at `MIN_DISTANCE = 0.5` after about one notch. The controls did not read as
+sluggish; they read as a zoom control with no travel left, which is precisely how they were reported.
+
+So both are now world-space:
+
+- **`PAN_SENSITIVITY` is blocks per pixel**, flat. Pan already translated eye and pivot rigidly
+  together (the angle and radius are untouched, so `eyePosition` moves by the same vector the pivot
+  does); only the rate changed.
+- **`DOLLY_STEP` is blocks per scroll notch** along the view axis. The eye moves by exactly
+  `scrollDy * DOLLY_STEP` **whatever the clamps do**. Normally that is spent shortening `distance`,
+  which is what "move closer" should mean; once `distance` would leave `MIN_DISTANCE..MAX_DISTANCE`
+  the remainder is spent pushing the *pivot* along the same axis instead, so you fly straight through
+  where the pivot was rather than stalling against it. The identity that makes this exact:
+
+  ```
+  eye' = (pivot + view * shortfall) - view * clamped
+       = pivot - view * (clamped - shortfall)
+       = pivot - view * desired            = eye + view * step
+  ```
+
+`distance` is therefore no longer a zoom level — it is only the orbit radius, i.e. how far the
+rotation centre sits in front of the camera. `MIN_DISTANCE`/`MAX_DISTANCE` bound that radius and
+nothing else.
+
+Both constants are single tunable numbers in `camera/data/OrbitCamera.kt` with no config surface;
+`DOLLY_STEP` in particular is deliberately conservative and is the first thing to raise if travel
+feels slow.
 
 ## Why restore reads vanilla's previous-gamemode field instead of storing one
 
@@ -176,7 +317,7 @@ the mod grants exactly the permission needed for its own gamemode string and not
 
 `OrbitCameraController.exit()` does not move the player back to wherever camera mode was entered.
 It clears the camera state, tells the server to restore the previous gamemode, and stops — the
-player's entity stays exactly where the last `applyTick` left it, now standing (or floating) there
+player's entity stays exactly where the last `applyFrame` left it, now standing (or floating) there
 in whatever gamemode restore lands them in. This is a deliberate choice, not an oversight: an orbit
 camera that snapped back to the entry point on exit would throw away the very thing that makes
 flying around a structure useful — ending the session looking at the angle you flew to. The two
@@ -195,23 +336,33 @@ branch of the input handler directly. `clearFocus()` is where **every** way of d
 converges — `G`, ESC, and any future path that drops focus — so routing the camera's exit through it
 means none of those paths can forget to call it. Wiring `exit()` only into `G`'s own branch was
 tried first and left the identical bug reachable through ESC: a player who dropped focus with ESC
-while still orbiting would stay in spectator, with `applyTick` overwriting their entity's position
-every tick, control back in the game and no way to move or look around. Because `exit()` lives in
+while still orbiting would stay in spectator, with `applyFrame` overwriting their entity's position
+every frame, control back in the game and no way to move or look around. Because `exit()` lives in
 the one place every exit path already passes through, that failure mode is structurally impossible
 rather than merely tested against.
 
 ## Where the pieces live
 
 - `camera/data/OrbitCamera.kt` — the pure, immutable pivot/yaw/pitch/distance state and its
-  `orbit`/`pan`/`dolly` transforms plus the derived `eyePosition`. No Minecraft client dependency;
-  unit-tested directly.
+  `orbit`/`pan`/`dolly` transforms, the `rightVector`/`upVector` basis they share with `cursorRay`,
+  the `cursorRay` projection inverse, `pivotFor`'s hit → block-centre choice, the `orbitAround` entry
+  seed, and the derived `eyePosition`. No Minecraft client dependency; unit-tested directly by
+  `OrbitCameraTest`, `CursorRayTest` and `PivotTest`.
 - `camera/network/CameraPackets.kt` + `CameraModeHandlers.kt` — the one C2S payload, its server
   handler, the per-player grant flag, and the disconnect restore. Registration lives in
   `editor/network/EditorNetworkRegistry.kt` (the payload and its receiver) and in `Garnet.kt`'s
   `ServerPlayConnectionEvents.DISCONNECT` block (the restore), beside the other per-player server
   state cleared there.
-- `camera/input/OrbitCameraController.kt` — applies the camera to the `LocalPlayer` every client
-  tick; owns entry, the arm timeout, and exit.
+- `camera/input/OrbitCameraController.kt` — `applyFrame` writes the pose onto the `LocalPlayer` every
+  rendered frame, `applyTick` owns the tick-scoped bookkeeping (lost player, arm timeout, delta
+  zeroing); also owns entry, the cursor aim, and exit.
+- `camera/input/CursorPick.kt` — the free-cursor ray (the projection inverse above) and the
+  `Block.OUTLINE` / `Fluid.NONE` clip, held in one stateless place because the hovered-block
+  highlight raycasts through the same pixels and must name the same block; see
+  [cursor-block-targeting.md](cursor-block-targeting.md).
+- `mixin/client/MinecraftFrameMixin.java` — the per-frame hook, injected after
+  `MouseHandler.handleAccumulatedMovement()` in `Minecraft.runTick` so the camera commit lands on
+  exactly the schedule vanilla mouse-look uses.
 - `dock/input/DockInputRouter.kt` — routes world-viewport gestures (LMB drag / MMB drag / scroll)
   into the controller; see [dock-input-routing.md](dock-input-routing.md) for the routing mechanics
   and the swallowed-press bookkeeping that keeps those gestures from leaking into the Compose scene.
